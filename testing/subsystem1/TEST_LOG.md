@@ -13,9 +13,13 @@ Define a test here before running it. Test IDs never change.
 | S1-U01 | cyclic handler is running | | auto | `subsystem1_test.c` | `[TEST] S1-U01 PASS` |
 | S1-U02 | LED task sleeps between ticks (not busy) | | auto | `subsystem1_test.c` | `[TEST] S1-U02 PASS` |
 | S1-U03 | LED on GP19 toggles every 250 ms | | manual | 1. Flash normal image. 2. Watch LED / measure with scope. | 2 Hz blink, 50 % duty |
+| S1-U04 | mqtt_link.c public API: publish validation, status seqlock, init ordering (good config, repeat call, queue-creation failure), the single-writer gate between mqtt_link_poll() and start_link(), and last_poll_msec / b_stale staleness including a 32-bit clock wraparound | | host | `testing/subsystem1/mqtt_link_host_test.c` -- build and run commands are in the file's own header comment | `RESULT: all passed`, exit 0 |
 
 *Method:* **auto** = `TEST_CHECK` in code, result printed on the console;
-**manual** = a person observes the result (LED, scope, meter, phone app…).
+**manual** = a person observes the result (LED, scope, meter, phone app…);
+**host** = a standalone program built and run on the development machine
+(not on the Pico, no kernel needed) -- see the test file's own header for
+exact build/run commands.
 
 ## Results
 
@@ -24,3 +28,4 @@ Add a new row for every run. Never edit or delete old rows.
 | Date | Test ID | Commit | Tester | Result | Log / evidence | Notes |
 |---|---|---|---|---|---|---|
 | YYYY-MM-DD | S1-U01 | `abc1234` | | PASS / FAIL | `logs/YYYY-MM-DD_….txt` | |
+| 2026-10-14 | S1-U04 | `01d8fee` | 2502893 | PASS | `logs/2026-10-14_host_test_mqtt_link.txt` | driver differs from b307336 by comments only (ae4758c), builds byte-identical; 4/4 mutations caught |

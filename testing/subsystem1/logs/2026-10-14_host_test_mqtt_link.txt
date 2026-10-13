@@ -1,0 +1,15 @@
+=== build exit 0 ===
+$ eval gcc -std=gnu11 -O0 -w -DTM_MQTT=1 $I -o mqtt_link_host_test testing/subsystem1/mqtt_link_host_test.c
+$ ./mqtt_link_host_test
+-- publish rejections
+-- publish accepted cases
+-- get_status
+-- receive_command
+-- init order, good configuration
+-- a second init after success does nothing
+-- init when the queue cannot be created
+-- last_poll_msec / b_stale
+-- poll before init: no crash, no publish, stamp still happens
+-- poll after a successful init publishes
+RESULT: all passed
+exit code: 0
