@@ -1,0 +1,4 @@
+# Local broker credentials for the MQTT link -- never commit. Copy
+# mqtt_config.example.h to mqtt_config.h (same folder) and fill in your
+# own broker's host, port, client ID and login. See CLAUDE.md "Secrets".
+mqtt_config.h
