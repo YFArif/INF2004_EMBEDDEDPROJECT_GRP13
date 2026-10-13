@@ -119,6 +119,10 @@
 
 /* The topic level under the prefix that carries commands to the car. */
 #define COMMAND_LEVEL           "cmd/"
+/* Same cast reasoning as HOST_LEN and the other string-length macros
+ * above: sizeof is a compile-time constant, so the cast to uint32_t
+ * cannot lose any bits.
+ */
 #define COMMAND_LEVEL_LEN       ((uint32_t)(sizeof(COMMAND_LEVEL) - 1U))
 
 /* lwIP's value for the last part of an incoming message, as an unsigned
@@ -451,6 +455,10 @@ mqtt_link_publish (const char * p_topic, const uint8_t * p_payload,
         }
 
         msg.payload_len = payload_len;
+        /* qos was already validated to be MQTT_LINK_QOS_0 or
+         * MQTT_LINK_QOS_1 by the parameter checks earlier in this
+         * function, so the cast to uint8_t cannot lose any bits.
+         */
         msg.qos = (uint8_t)qos;
         msg.b_retain = b_retain;
         result = mqtt_queue_put_publish(&msg);
@@ -565,6 +573,10 @@ start_link (void)
          * status.
          */
         build_topics();
+        /* MQTT_LINK_CFG_BROKER_PORT is already range-checked (1 to
+         * 65535) by the #if near the top of this file, so it fits in
+         * uint16_t.
+         */
         g_status.broker_port = (uint16_t)MQTT_LINK_CFG_BROKER_PORT;
         g_status.b_initialised = true;
         publish_status();
@@ -863,6 +875,9 @@ start_connect (uint32_t now_msec)
 static void
 send_birth (uint32_t now_msec)
 {
+    /* ONLINE_LEN is sizeof(MQTT_LINK_STATUS_ONLINE) - 1: the length of
+     * the string literal "online", 6 bytes, fixed at build time.
+     */
     const err_t result = mqtt_publish(gp_client, g_status_topic,
                                       MQTT_LINK_STATUS_ONLINE,
                                       (u16_t)ONLINE_LEN, 1U, 1U,
@@ -1164,6 +1179,9 @@ append_payload (const u8_t * p_data, u16_t length)
     else if (length > 0U)
     {
         memcpy(&g_command.payload[g_command.payload_len], p_data, length);
+        /* total was already checked against MQTT_LINK_COMMAND_MAX by
+         * the guard just above, so it fits in uint16_t here.
+         */
         g_command.payload_len = (uint16_t)total;
     }
     else
