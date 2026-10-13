@@ -1,0 +1,1347 @@
+﻿Week 6: Design Review
+
+
+GROUP ID: LAB-P1 SE13
+
+
+Purpose
+
+
+Document the system requirements, hardware connections, RTOS task structure, behavioural models, assumptions, and AI-supported design reasoning before major implementation. Treat this Week 6 submission as an architecture freeze before full integration and Tribunal 1. The design may change later, but major changes must be justified with engineering evidence.
+Team Role and Subsystem Ownership
+Identify each buddy’s primary subsystem responsibility. The role does not need to match the examples exactly, but every major hardware and software responsibility should have a clear owner.
+
+
+Buddy
+	Student ID
+	Primary subsystem / responsibility
+	Buddy 1 - Caleb
+	2502893
+	S1 - WiFi communication, MQTT command and telemetry (telemetry_task, plus MQTT publish/subscribe code inside the kernel's cyw43_utk_task, as required by Section 3 of TEAM.md)
+	Buddy 2 - Arif
+	2501261
+	S2 - Motion control: motor driver, two wheel encoders, PID speed control, encoder-based MOVE/TURN API (motion_task)
+	Buddy 3 - Sean
+	2500316
+	S3 - IR line following, junction/line-loss detection, Code 39 barcode decoding and navigation command interface (line_task, barcode_task, barcode part of gpio_isr)
+	Buddy 4 - Kessler
+	2502114
+	S4 - IMU-based motion and terrain monitoring: IMU calibration, tilt (pitch) detection, hump detection and peak hump height, impact (collision) detection, turn-rate monitoring, motion classification and motion-event reporting (imu_task)
+	Buddy 5 - Anna
+	2502447
+	S5 - Ultrasonic + servo obstacle scanning, profiling, avoidance and line recovery, plus the Vehicle Controller / mission state machine (obstacle_task, vehicle_ctrl_task) - see decision D1
+	
+
+1. Requirements
+1.1 Functional Requirements
+ID
+	Requirement
+	Source · owner · verification
+	FR1
+	The robot shall follow the 18 mm black line autonomously using the Left IR and Centre IR sensors, with no remote driving input.
+	Write-up Mission 1 · S3 line_task · Test S3-U02, SYS-01
+	FR2
+	The robot shall calibrate black/white thresholds for each IR sensor at start-up (CALIBRATING state) so that line detection tolerates changes in ambient lighting.
+	Write-up 'robust against minor lighting changes' · S3 line_task · S3-U01
+	FR3
+	The robot shall detect line junctions and line loss and report them as EV_JUNCTION and EV_LINE_LOST events.
+	Briefing Buddy 3 'junction detection' · S3 line_task · S3-U05
+	FR4
+	The robot shall detect and decode the Code 39 barcodes placed 20 mm beside the line (format *X*, verified from the sample sheets 'A' and 'Z'), in either printed orientation.
+	Write-up Mission 2 · S3 gpio_isr + barcode_task · S3-U03, S3-U04
+	FR5
+	The robot shall map each decoded character to a navigation command (TURN_LEFT, TURN_RIGHT, GO_STRAIGHT, U_TURN) through a configurable table, and shall ignore characters not in the table.
+	Write-up Mission 3 · S3 barcode_task → S5 vehicle_ctrl_task · INT-01
+	FR6
+	The robot shall execute navigation commands with encoder-based motion (MOVE distance, TURN ±90°, TURN 180°) and then reacquire the line.
+	Write-up 'encoder-based motion control' · S2 motion_task, S5 · S2-U03, INT-01
+	FR7
+	The motion subsystem shall regulate each wheel's speed with closed-loop PID control using encoder feedback and expose MOVE, TURN, FOLLOW and STOP commands through mbx_motion.
+	Write-up Buddy 2 required APIs · S2 motion_task · S2-U02
+	FR8
+	The robot shall detect each hump from IMU pitch (a climb followed by a descent), estimate its height by integrating h += sin θ · Δs using encoder distance Δs from odom, and report the highest hump peak of the run (peak_mm) in telemetry and in the run summary. 
+	Write-up Missions 4–5 ('detect hump using IMU data', 'estimate hump height using IMU data') · S4 imu_task · S4-U01, S4-U02, INT-03 
+	FR9
+	The robot shall detect an obstacle on or near the line ahead, slow to 50 % speed when it is closer than 35 cm, and stop before collision.
+	Write up Missions 6, 8
+S5 obstacle_task, vehicle_ctrl_task
+S5-U01, S5-U05, INT-02
+	FR10
+	The robot shall profile the obstacle with a coarse scan (30°, 60°, 90°, 120°, 150°) followed by two fine sweeps in 5° steps, correcting edge angles for the ultrasonic beam width, and shall estimate closest point, width, and left/right clearance.
+	Write-up Mission 7, Buddy 5 stages 1–3
+S5 obstacle_task
+S5-U03, S5-U04
+	FR11
+	The robot shall choose to continue (obstacle off its path), bypass left, bypass right, reverse and rescan (at most 2 times), or stop; it shall bypass on the side with greater clearance, then search for and reacquire the original line.
+	Write-up Missions 8–9, Buddy 5 stage 4
+S5 vehicle_ctrl_task
+S3 line_task 
+INT-06, SYS-01 
+	FR12
+	The robot shall publish telemetry over WiFi/MQTT: robot state, wheel speeds, encoder counts, line sensor status, last barcode, hump peak, obstacle profile, distance travelled.
+	Write-up Mission 10
+Buddy 1 telemetry list 
+S1 telemetry_task 
+S1-U01 
+	FR13
+	The robot shall publish a 1 Hz heartbeat, register a retained MQTT last-will of “offline” on its robot/status topic, and accept START, STOP and RESET commands over MQTT. It shall also start from the GP20 button. RESET only asks vehicle_ctrl_task to move from FAULT to READY with the motors still braked. It never restarts the motors.
+	Write-up Buddy 1 "heartbeat" and "command subscription" S1 telemetry_task
+S5 vehicle_ctrl_task handles RESET
+S1-U03 
+	FR14
+	The robot shall detect an impact (collision) when the horizontal (x, y) gravity-removed acceleration |a_xy − a_xy_lp| exceeds 1.0 g (preliminary, set by A18) in any accelerometer sample, then set MF_ESTOP so the motors brake and post EV_IMPACT. The accelerometer shall run at ±8 g full scale and 400 Hz, read through its FIFO, so short spikes between 20 ms task cycles are not missed. 
+	Write-up Buddy 4 'collision detection' · S4 imu_task → MF_ESTOP · S4-U03, INT-02 
+	FR15
+	On any fault (impact, wheel stall, sensor failure, line not reacquired after 3 retries, no bypass path) the robot shall brake both motors, enter FAULT and report the fault code.
+	Robustness criterion · all subsystems → S5 FAULT · INT-02, S2-U05
+	FR16
+	obstacle_task shall log every avoidance decision (state, distance, angle, chosen action) to mbf_event.
+	Write-up Buddy 5 Stage 4 'Avoidance Planning' · S5 obstacle_task → S1 telemetry_task · S5-U05 
+	FR17
+	The communication link shall recover automatically from WiFi loss and MQTT broker loss (rejoin, then reconnect with 1, 2, 4, 8 seconds back-off) without a reboot and without affecting the autonomous run.
+	Write-up Buddy 1 "implement connection recovery" 
+S1, MQTT code in cyw43_utk_task + telemetry_task
+S1-U02 
+	FR18
+	imu_task shall calibrate the accelerometer offsets during 2 s stationary on level ground at start-up, and report chassis pitch θ and roll every 20 ms. Pitch shall be corrected for the robot's own forward acceleration a_fwd taken from encoder odometry: sin θ = (a_x − a_fwd) / g. 
+	Write-up Buddy 4 'sensor calibration', 'tilt detection' · S4 imu_task · S4-U01 
+	FR19
+	imu_task shall classify motion every 20 ms as STATIONARY, MOVING, ACCELERATING (speeding up or braking), TURNING, CLIMBING_HUMP, DESCENDING_HUMP or IMPACT. It shall send every change of class, with time and value, to mbf_event for telemetry. 
+	Write-up Buddy 4 'motion classification', 'motion event reporting' and its example events · S4 imu_task → S1 telemetry_task · S4-U05 
+	FR20
+	imu_task shall compute the turn rate ω = (v_R − v_L) / b × 180/π in deg/s, where b is the track width, from the encoder counts in odom and publish it in terrain. 
+	Write-up Buddy 4 'turn-rate monitoring'; A7 · S4 imu_task · S4-U04 
+	1.2 Non-Functional Requirements
+ID
+	Requirement
+	Rationale · verification
+	NFR1
+	line_task shall sample both line IR sensors every 10 ms (one 10 ms system tick, CNF_TIMER_PERIOD = 10).
+	At 0.4 m/s the robot moves 4 mm per sample, giving ≥ 4 samples across the 18 mm line · S3-U02
+	NFR2
+	Barcode edges shall be timestamped in gpio_isr with 1 µs resolution; barcode_task shall not poll the sensor.
+	Narrow element ≈ 141 mm / 47 modules = 3.0 mm → 7.5 ms at 0.4 m/s, shorter than one 10 ms tick, so task polling would miss bars · S3-U03
+	NFR3
+	Barcode recognition shall succeed in ≥ 9 of 10 passes per character at each test speed of 0.15, 0.25 and 0.35 m/s, with 0 wrong commands published.
+	Wrong command is worse than no command; invalid frames are rejected · S3-U04
+	NFR4
+	motion_task shall run every 20 ms; wheel speed shall settle within ±10 % of set-point within 0.5 s of a step change.
+	S2-U02
+	NFR5
+	90° turns shall be within ±5° and 180° turns within ±8° over 10 trials each.
+	S2-U03
+	NFR6
+	motion_task shall brake both motors within one motion cycle (≤ 20 ms) of MF_ESTOP being set; the robot shall stop at least 50 mm before an obstacle when approaching at 0.3 m/s.
+	Worst case: 2 pings (120 ms) + 20 ms = 140 ms ≈ 42 mm travel at 0.3 m/s vs 150 mm threshold · S2-U05, INT-02
+	NFR7
+	The HC-SR04 shall be triggered no more often than every 60 ms; measured distance shall be within ±1 cm between 10 cm and 50 cm.
+	Datasheet recommends ≥ 60 ms measurement cycle · S5-U01
+	NFR8
+	imu_task shall run every 20 ms (50 Hz) and read all new accelerometer samples from the LSM303DLHC FIFO (ODR 400 Hz, about 8 samples per cycle). Peak hump height error shall be ≤ ±5 mm or ±20 % of the true height, whichever is larger, over 10 runs per test height. 
+	0.3 m/s × 20 ms = 6 mm of travel per cycle, giving ≥ 10 cycles on a 60 mm hump face. 8 samples per cycle uses 8 of the 32 FIFO slots · S4-U02 
+	NFR9
+	Telemetry shall be published at 2 Hz or faster and the heartbeat at 1 Hz while connected. Loss of WiFi shall not delay any core-1 control task (0 missed periods).
+	Autonomy must not depend on the network: a lost link must not stop line following or obstacle avoidance · S1-U02, INT-04 
+	NFR10
+	After an obstacle bypass the line shall be reacquired within 300 mm of travel in ≥ 19 of 20 trials (≥ 95 %, target 100 %).
+	A band = 100 %, B ≥ 95 % INT-06 
+	NFR11
+	Each periodic task's measured worst-case execution time shall be ≤ 20 % of its period, and stack high-water mark ≤ 75 % of TASK_STACK_SIZE (2048 B).
+	Resource-efficiency criterion · measured with tk_get_tim/µs timer and stack fill pattern · INT-04 · JSON is built with integer fields only (no %f), because float printf can use more than 1 KB of stack
+	NFR12
+	Firmware shall be written in C with the Pico C SDK on micro T-Kernel 3.0, follow the course template repo and the Barr-C 2018 standard; each peripheral shall be driven by exactly one owning task.
+	Write-up constraint; TEAM.md Section 3 · code review at each merge
+	NFR13
+	Over 20 obstacle approaches: detection 100 %, direction selection 100 %, width error ≤ 10 % of the measured width, and time from stop to EV_LINE_FOUND < 5 s (target < 3 s).
+	A band for detection, direction and width
+B band for time (budget in Appendix D)
+S5-U04, S5-U05, INT-06 
+	NFR14
+	After the access point or broker comes back, telemetry shall resume within 15 s. The broker shall show the robot as offline within 10 s of link loss (keep-alive 5 s plus last-will).
+	Write-up "connection recovery"; a 5 s keep-alive plus the last-will lets the broker mark the robot offline within 10 s · S1-U02 
+	NFR15
+	A STOP command shall reach vehicle_ctrl_task and be acknowledged on the robot/cmd/ack topic with a dashboard-measured round trip under 300 ms in at least 95% of 50 trials, with all tasks running.
+	Remote STOP must be prompt for a safe demo; the measured round trip includes WiFi, broker and dashboard · S1-U03 
+	NFR16
+	An impact shall set MF_ESTOP within 40 ms of the impact (one 20 ms imu_task cycle plus FIFO latency) while MQTT telemetry is running. A full lap over the test humps shall cause 0 false impact triggers. 
+	imu_task shares core 0 with the WiFi service task, so the latency must be measured under network load. A false E-stop on a hump would stop the run · S4-U03, INT-02 
+	2. Hardware Integration Pin Layout
+Device / Module
+	Type
+	Signal Name
+	Sensor label
+	Pico GPIO Pin
+	Interface
+	Left IR line sensor
+	Sensor
+	IR_L_AOUT
+	Grove 7 (pin 2)
+	GP28
+	ADC2
+	Centre IR line sensor
+	Sensor
+	IR_C_AOUT
+	Grove 6 (pin 2)
+	GP27
+	ADC1
+	Barcode IR sensor
+	Sensor
+	BC_DOUT
+	Grove 5 (pin 1)
+	GP6
+	GPIO in, edge IRQ
+	Barcode IR sensor
+	Sensor
+	BC_AOUT
+	Grove 5 (pin 2)
+	GP26
+	- (disconnected)
+	IMU LSM303DLHC
+	Sensor
+	IMU_SDA
+	Grove 3 (pin 1)
+	GP4
+	I2C0 SDA
+	IMU LSM303DLHC
+	Sensor
+	IMU_SCL
+	Grove 3 (pin 2)
+	GP5
+	I2C0 SCL
+	Ultrasonic HC-SR04
+	Sensor
+	US_TRIG
+	Grove 2 (pin 1)
+	GP2
+	GPIO output
+	Ultrasonic HC-SR04
+	Sensor
+	US_ECHO
+	Grove 2 (pin 2)
+	GP3
+	GPIO input, edge IRQ
+	SG90 servo (ultrasonic scanner)
+	Actuator
+	SERVO_PWM
+	Servo port 1
+	GP12
+	PWM6 A, 50 Hz
+	DC motor left (M1)
+	Actuator
+	M1A / M1B
+	Motor M1
+	GP8 / GP9
+	PWM4 A/B, 20 kHz
+	DC motor right (M2)
+	Actuator
+	M2A / M2B
+	Motor M2
+	GP10 / GP11
+	PWM5 A/B, 20 kHz
+	Wheel encoder left
+	Sensor
+	ENC_L
+	Grove 4 (pin 1)
+	GP16
+	GPIO in, edge IRQ
+	Wheel encoder right
+	Sensor
+	ENC_R
+	Grove 4 (pin 2)
+	GP17
+	GPIO in, edge IRQ
+	Start button (on-board)
+	Input
+	BTN_START
+	Button 1
+	GP20
+	GPIO in, pull-up, edge IRQ
+	Calibrate button (on-board)
+	Input
+	BTN_CAL
+	Button 2
+	GP21
+	GPIO in, pull-up, edge IRQ 
+	Piezo buzzer (on-board)
+	Actuator
+	BUZZER
+	Buzzer
+	GP22
+	PWM3 A
+	NeoPixel RGB (on-board)
+	Actuator
+	NEOPIXEL
+	RGB LED
+	GP18
+	PIO (not used)
+	WiFi CYW43 (Pico W)
+	Comms
+	WL_*
+	On-module
+	GP23/24/25/29
+	PIO gSPI and 2 DMA channels (internal)
+	Power
+	Power
+	VBAT / 3V3
+	LiPo / VIN
+	VUSB - 0.4V ≈ 4.6V
+	3.6–6 V in
+	3. RTOS Task Table
+Task
+	Purpose
+	Inputs
+	Outputs
+	Trigger
+	Priority · core (1 = highest)
+	vehicle_ctrl_task (S5)
+	Mission state machine and coordination; executes obstacle PLAN / BYPASS / REVERSE_RETRY / SEARCH_LINE
+	flg_mission, mbx_nav, obst_profile
+	mbx_motion, flg_line, flg_obst, flg_motion (STOP/CLEAR), mbf_event, buzzer, command ack (mbf_event)
+	Event-driven (tk_wai_flg OR on flg_mission)
+	7 · core 1
+	line_task (S3)
+	Sample Left/Centre IR, compute line-edge error, PD steering, detect junction / line loss
+	ADC1, ADC2 (sole ADC owner), flg_line, odom (dist_mm via getter under mtx_odom)
+	steer_sp (mtx_steer), EV_JUNCTION / EV_LINE_LOST / EV_LINE_FOUND
+	Periodic 10 ms (cyc_line → tk_wup_tsk)
+	8 · core 1
+	motion_task (S2)
+	Per-wheel PID speed control, MOVE/TURN execution, odometry, emergency brake
+	encoder counts (ISR), mbx_motion, steer_sp, flg_motion
+	PWM slices 4–5, odom (mtx_odom), EV_MOTION_DONE, EV_FAULT (stall)
+	Periodic 20 ms (cyc_motion → tk_wup_tsk)
+	9 · core 1
+	imu_task (S4)
+	Read the LSM303DLHC accelerometer FIFO; compute pitch corrected for drive acceleration; hump state and peak height; impact detection; turn rate from encoder counts; motion classification and motion-event reporting 
+	I2C0 (sole owner); odom (Δs, count_l/count_r, speed) via getter under mtx_odom; flg_motion (MF_ESTOP, read only) 
+	terrain (mtx_terrain); MF_ESTOP in flg_motion + EV_IMPACT in flg_mission; mbf_event (hump, motion-class and IMU warning events) 
+	Periodic 20 ms (cyc_imu → tk_wup_tsk)
+	10 · core 0
+	obstacle_task (S5)
+	Ping HC-SR04 (median of 3), drive servo, coarse scan plus two-sweep fine scan, build obstacle profile with beam-width correction, log decisions 
+	echo width (ISR), flg_obst
+	TRIG pulse, servo PWM slice 6, EV_OBSTACLE_NEAR, MF_ESTOP + EV_OBSTACLE, obst_profile, EV_PROFILE_READY, mbf_event (decision log) 
+	Periodic 60 ms (cyc_obst → tk_wup_tsk); scan on OB_SCAN_REQ 
+	11 · core 0
+	barcode_task (S3)
+	Turn edge timestamps into element widths, decode Code 39, map to command
+	sem_bc, bc_edges ring buffer, odom (cooldown), flg_line
+	NAV_MSG → mbx_nav, EV_BARCODE, mbf_event
+	Event-driven (sem_bc), then 20 ms polls until quiet gap
+	12 · core 1
+	telemetry_task (S1)
+	Build JSON status snapshot, forward MQTT commands
+	getters of odom/terrain/obst_profile/state, mbf_event, mbf_cmd, cyw43_utk_get_status(), line status getter (D6)
+	mbf_telemetry (TMO_POL), EV_START / EV_STOP / EV_RESET
+	Periodic 500 ms, or earlier when a command arrives in mbf_cmd
+	14 · core 0
+	gpio_isr (ISR, not a task)
+	Single IO_IRQ_BANK0 handler: timestamps barcode and echo edges, counts encoder edges, reads buttons
+	GP6, GP3, GP16, GP17, GP20, GP21 
+	bc_edges + tk_sig_sem(sem_bc), encoder counters, echo width + OB_ECHO (flg_obst), EV_START, EV_CAL (GP21) 
+	Hardware interrupt (core 1)
+	Above all tasks
+	cyw43_utk_task (kernel)
+	WiFi driver, lwIP and MQTT client (mqtt_utk.c); Buddy 1 adds publish/subscribe code here, plus broker reconnect with back-off, the last-will and the 1 s heartbeat
+	mbf_telemetry (TMO_POL)
+	MQTT publish, mbf_cmd
+	Kernel service task
+	4 · core 0 (fixed by kernel)
+	
+
+Priority and ownership justification:
+Priority 1 is highest in micro T-Kernel. Priorities 1–4 belong to the kernel (initial task 1, USB console 3, WiFi 4), so application tasks start at 7. Values 5–6, 13 and 15+ are left free for later tasks.
+
+
+Within each core, periodic tasks follow rate-monotonic order (shorter period → higher priority). Core 1: vehicle_ctrl_task (7, sporadic) > line_task 10 ms (8) > motion_task 20 ms (9) > barcode_task (12, event). Core 0: the kernel's WiFi task (4) > imu_task 20 ms (10) > obstacle_task 60 ms (11) > telemetry_task 500 ms (14). Tasks on different cores do not preempt each other, so motion_task and imu_task sharing a 20 ms period only interact through mtx_odom, where TA_INHERIT bounds the wait to one struct copy. 
+
+
+vehicle_ctrl_task (7) is sporadic and short (a state transition plus one mailbox send), so placing it above all periodic tasks costs little CPU but guarantees that a mode change (stop, obstacle, fault) is acted on within one dispatch. barcode_task (12) is low because the time-critical part, edge capture, is already done in gpio_isr; decoding has hundreds of milliseconds before the junction is reached.
+
+
+Core placement is based on the template repo: cyw43_utk_task and the USB console task are created with assprc = TP_PRC1 (core 0) in cyw43_utk_kernel.c and usb_console.c. The control loop (vehicle_ctrl, line, motion, barcode) is pinned to core 1 (TP_PRC2) so network bursts on core 0 cannot preempt it. Slower sensing (IMU, ultrasonic) and telemetry run on core 0.
+
+
+The emergency-stop path does not depend on priority order: obstacle_task and imu_task set MF_ESTOP in flg_motion directly, and motion_task polls it at the start of every 20 ms cycle. A busy vehicle_ctrl_task cannot delay braking.
+
+
+Ownership follows TEAM.md Section 3 (one owning task per peripheral): ADC → line_task, I2C0 → imu_task, PWM slices 4–5 → motion_task, PWM slice 6 → obstacle_task, IO_IRQ_BANK0 → one shared gpio_isr (agreed shared file, see Appendix B), radio → kernel. Shared data is protected by mutexes created with TA_INHERIT (priority inheritance) and held only to copy a struct. Deviation from TEAM.md: the template's default bands (S1 12–13 … S5 20–21) follow folder number, not criticality. The team proposes the values above and will record them in TEAM.md Section 4 by agreement. All values are preliminary until NFR11 timing logs confirm them.
+4. Task Interaction Diagram
+
+
+  
+
+(Task interaction diagram, Section 4)
+Brief explanation of the main communication paths:
+
+
+P1 Line-following loop (core 1): cyc_line wakes line_task every 10 ms → ADC read → PD steering Δv written to steer_sp under mtx_steer (owned by S2) → motion_task reads it each 20 ms cycle and adjusts the left/right PWM. steer_sp is latest-value data, so a mutex-protected struct is used instead of a queue. Stale corrections are worthless, so queueing them would only add lag.
+
+
+P2 Barcode path: barcode DOUT edges (GP6) → gpio_isr stores (t_us, level) in the bc_edges[64] ring buffer and signals sem_bc on the first edge → barcode_task waits for a quiet gap, decodes, and sends NAV_MSG to mbx_nav (owned by S5) plus EV_BARCODE in flg_mission. A mailbox is used because every decoded command must be delivered exactly once.
+
+
+P3 Command execution: vehicle_ctrl_task waits on flg_mission (OR of all EV_ bits), reads mbx_nav with TMO_POL, then sends MOVE/TURN/FOLLOW/STOP as MOTION_CMD to mbx_motion. motion_task sets EV_MOTION_DONE when a move completes. Line following is enabled or put into search mode with flg_line, and scans are requested with flg_obst.
+
+
+P4 Emergency stop (red): obstacle_task (distance < 15 cm in 2 consecutive pings) and imu_task (horizontal gravity-removed acceleration |a_xy − a_xy_lp| > 1.0 g in any FIFO sample)  set MF_ESTOP in flg_motion directly. motion_task polls it first in every cycle and brakes, without waiting for vehicle_ctrl_task. Only vehicle_ctrl_task may clear it. Before the stop, obstacle_task sets EV_OBSTACLE_NEAR in flg_mission when three pings read under 35 cm, and vehicle_ctrl_task halves the speed through mbx_motion, so the robot reaches the 15 cm stop slowly and the scan starts closer to the obstacle. 
+
+
+P5 Hump measurement and motion monitoring: motion_task publishes odom (count_l, count_r, dist_mm, speed_mms) under mtx_odom. Every 20 ms imu_task copies odom and derives Δs, the forward acceleration a_fwd (change in edge-timed speed over 100 ms)  and the turn rate from the wheel-count difference. It burst-reads the accelerometer FIFO over I2C0, computes pitch with a_fwd removed, and integrates h += sin θ · Δs to track the peak. It publishes terrain (pitch, hump state, peak, hump count, motion class, turn rate) under mtx_terrain, and sends hump reports and motion-class changes to mbf_event. 
+
+
+P6 Telemetry: telemetry_task copies each subsystem's status through getter functions (each takes that subsystem's mutex briefly), drains mbf_event, serialises JSON (up to 160 bytes), and sends it to mbf_telemetry with TMO_POL. The MQTT code inside cyw43_utk_task polls mbf_telemetry with TMO_POL and publishes each message on the topic named by its first byte (Appendix B). MQTT commands go the other way, from mbf_cmd to telemetry_task, which turns them into EV_START, EV_STOP or EV_RESET. Between periods, telemetry_task waits on mbf_cmd between periods, so a command is forwarded as soon as it arrives, not at the next 500 ms tick. No student task calls cyw43, lwIP or MQTT functions (Section 3 of TEAM.md).
+
+
+Hardware vs software vs ISR: grey boxes are hardware, hexagon/orange boxes are interrupt-level code (gpio_isr, cyclic handlers), and rounded boxes are tasks coloured by core. Each kernel object is labelled with the subsystem that creates it (the receiver/owner, per TEAM.md Section 5).
+5. System-Level Statechart
+  
+
+(System-level statechart, Section 5)
+
+
+Elaboration on main states and any important assumptions:
+IMU identity over I2C0 (the magnetometer's IRA/IRB/IRC_REG_M must read 'H','4','3'; the LSM303DLHC accelerometer has no WHO_AM_I register, so it is checked by writing CTRL_REG1_A and reading it back). If only the IMU checks fail, the run still starts, with Region B in IMU_DEGRADED and an IMU_WARN event; any other self-test failure goes to FAULT. .
+
+
+CALIBRATING runs in two steps, because the IMU needs the robot still and the IR sweep needs it moving. First the IMU offset: 2 s stationary on level ground, averaging the accelerometer to get the pitch and roll offsets. Then the IR sweep: line_task collects min/max while the robot sweeps over the line (≤ 3 s). If the black/white contrast is below 800 ADC counts the system faults, because thresholds would be unreliable (FR2, FR18).
+
+
+READY: motors braked, line following disabled. EV_START comes from the GP20 button or an MQTT START command. Remote input only starts or stops the run; it never steers (FR1 autonomy).
+
+
+RUNNING has three orthogonal regions. Region A (mission) is the only one that changes motion: LINE_FOLLOWING → APPROACH_JUNCTION (after a valid barcode) → EXECUTING_COMMAND → REACQUIRE_LINE → LINE_FOLLOWING. OBSTACLE_AVOIDANCE is entered on EV_OBSTACLE from any Region A substate (LINE_FOLLOWING, APPROACH_JUNCTION, EXECUTING_COMMAND, REACQUIRE_LINE, LINE_RECOVERY). A pending barcode command is discarded and logged, and after EV_LINE_FOUND the mission returns to LINE_FOLLOWING. LINE_RECOVERY handles line loss with ≤ 3 retries. Region B (terrain: FLAT/ON_HUMP) and Region C (link: OFFLINE/ONLINE) run in parallel and never block the mission, so the robot keeps driving with no WiFi or with a degraded IMU.
+
+
+FAULT is reachable from every RUNNING substate (EV_IMPACT, stall, sensor fault, line not found after 3 retries, no bypass path). Entry action: MF_ESTOP set, motors braked, buzzer pattern, fault code published. Recovery needs a deliberate action (GP20 held 2 s or MQTT RESET) and the fault cause cleared, so a transient glitch cannot restart the motors. A fault raised in INIT or CALIBRATING returns to INIT, so self-test and calibration run again; a fault raised while RUNNING returns to READY with the motors braked.
+
+
+FINISHED is entered on EV_STOP or the course end condition. How the course end is signalled is not given in the brief (assumption A12, decision D3). The run summary (peak hump height, barcodes decoded, run time) is published there.
+
+
+Key assumptions: a barcode always precedes the junction it refers to by a fixed, measurable distance d_junction (A11), and only one command is pending at a time (a new barcode overwrites an unexecuted one and is logged).
+6. Subsystem Statecharts
+6.1 Subsystem Statechart 1
+* Subsystem name: Line Following (S3 - Buddy 3)
+* Related RTOS task(s): line_task (pri 8, core 1, 10 ms); cyc_line
+* Purpose: Keep the Centre IR sensor on the line edge with PD steering; detect junctions and line loss; perform line search when commanded.
+* Reason a statechart is needed: Its behaviour depends on history, not only the current reading: the same 'both sensors white' reading means a brief wobble in TRACKING but line loss after 30 mm, and steering must be held during JUNCTION. A state machine makes these distance-based timeouts and the hand-over with vehicle_ctrl_task (LF_ENABLE / LF_SEARCH) explicit and testable.
+  
+
+(Line Following statechart, Section 6.1)
+
+
+Brief explanation of states, events, and fault handling:
+DISABLED is the safe default (steer_sp = 0), entered whenever vehicle_ctrl_task clears LF_ENABLE, e.g. during turns.
+
+
+CALIBRATING records each sensor’s white and black level, so readings become n = 0 (white) to 1 (black). Two levels are used: BLACK means n > 0.75 and WHITE means n < 0.25. One midpoint threshold would fail, because the Centre sensor sits on the line edge at about 0.5.
+
+
+TRACKING: the Centre sensor rides the line edge. A PD controller turns the error e = n_C − 0.5 into a steering correction for motion_task. If the robot overshoots (Left BLACK, Centre WHITE), it steers hard left.
+
+
+JUNCTION: Left BLACK while Centre is not WHITE, for ≥ 15 mm → EV_JUNCTION. LOST: both WHITE for ≥ 30 mm → EV_LINE_LOST. The last Centre reading shows which side the line is on. In SEARCHING, vehicle_ctrl_task turns the robot and counts retries; when Centre is no longer WHITE → EV_LINE_FOUND.
+
+
+Faults: calibration contrast below 800 counts, or a reading more than 20 % outside the calibrated range for 0.5 s → SENSOR_FAULT, latched until RESET.
+6.2 Subsystem Statechart 2
+* Subsystem name: Barcode Decoder (S3 - Buddy 3)
+* Related RTOS task(s): gpio_isr (GP6 edges) + barcode_task (pri 12, core 1)
+* Purpose: Capture bar/space widths at µs resolution, decode Code 39 '*X*' frames read in either direction, and publish exactly one NAV_MSG per barcode.
+* Reason a statechart is needed: Decoding is a sequence-dependent protocol (arm → capture → quiet-gap → decode → publish → cooldown). Without explicit states the same barcode would be read twice, partial frames would be decoded, or edges seen while the robot is turning across the line would produce false commands.
+
+
+  
+
+(Barcode Decoder statechart, Section 6.2)
+Brief explanation of states, events, and fault handling:
+The barcode is Code 39 *X*, verified from the sample PDF: 29 elements, of which 3 in every 9 are wide. A narrow element is about 3 mm.
+
+ARMED: gpio_isr timestamps every edge on GP6, ignores flips under 0.5 ms (sensor flicker), and wakes barcode_task on the first edge. CAPTURING ends when no edge arrives for max(60 ms, 4 × widest element).
+
+
+DECODING: the 3 longest elements in each group of 9 are wide, so robot speed cancels out. The shortest wide element must be ≥ 1.8 × the longest narrow one. If '*' isn't found, the list is reversed in case the barcode is printed the other way round.
+
+
+A valid frame → PUBLISH: the command goes to mbx_nav with EV_BARCODE. COOLDOWN then ignores edges for 200 mm so the same barcode isn’t read twice. Clearing LF_ENABLE disarms the decoder from any state, so turns can’t create commands.
+
+
+Faults: more than 64 edges or an invalid frame → REJECT, logged, with no motion change. The robot keeps following the line, so a failed read never causes a wrong turn.
+6.3 Subsystem Statechart 3
+* Subsystem name: Motion Control (S2 - Buddy 2)
+* Related RTOS task(s): motion_task (pri 9, core 1, 20 ms); encoder part of gpio_isr; cyc_motion
+* Purpose: Closed-loop wheel speed control and encoder-based MOVE / TURN execution for every other subsystem.
+* Reason a statechart is needed: The meaning of a cycle depends on the active command (follow vs fixed distance vs in-place turn), and the emergency-brake latch must override every motion state until it is explicitly cleared.
+
+
+
+
+  
+
+(Motion Control statechart, Section 6.3)
+
+
+Brief explanation of states, events, and fault handling:
+In IDLE_BRAKED, both motor inputs are set low for active electrical braking (Robo Pico truth table). It transitions to FOLLOWING on MOTION_CMD FOLLOW, to MOVING_DIST on MOTION_CMD MOVE, or to TURNING on MOTION_CMD TURN. In FOLLOWING, closed-loop steering applies base speed ± steer_sp from line_task. Receiving MOTION_CMD STOP returns to IDLE_BRAKED.
+
+
+MOVING_DIST executes PID control until reaching target encoder distance dist_mm, then posts EV_MOTION_DONE and returns to IDLE_BRAKED. TURNING executes in-place rotation until ticks match target arc length arc = (θ · π · track) / 360°, posts EV_MOTION_DONE, and returns to IDLE_BRAKED. Receiving MOTION_CMD STOP in either state forces an immediate return to IDLE_BRAKED.
+
+
+ESTOP_BRAKED latches on MF_ESTOP from any moving state (checked every 20 ms cycle), sets motor outputs low (GP8–GP11 low), and discards every mbx_motion message that arrived before CLEAR. CLEAR is accepted only after vehicle_ctrl_task has cleared MF_ESTOP. motion_task then returns to IDLE_BRAKED and executes the messages queued after CLEAR in order, so "CLEAR, TURN 45°" sent together works.
+STALL_FAULT triggers from any moving state if PWM duty ≥ 40% with 0 encoder counts for 300 ms. Entry action brakes the motors (GP8–GP11 low), sets MF_ESTOP and posts EV_FAULT (STALL); it then waits in ESTOP_BRAKED for CLEAR like any other stop. 
+Implementation &amp; Interface Protocols: Single-channel encoders on GP16/GP17 count tick edges without direction sensing, so motion_task explicitly applies the active command sign to odometry (Δs) for reverse moves (e.g. REVERSE_RETRY -100 mm). Stall monitoring guards all moving states, and receiving CLEAR unconditionally flushes mbx_motion to prevent stale command execution upon recovery.
+6.4 Subsystem Statechart 4
+* Subsystem name: Obstacle Scan, Avoidance and Line Recovery (S5 - Buddy 5)
+* Related RTOS task(s): obstacle_task (pri 11, core 0) + vehicle_ctrl_task (pri 7, core 1); echo part of gpio_isr
+* Purpose: Detect an obstacle on or near the line, slow down and stop, profile it with a coarse then fine servo scan, choose continue / left / right / reverse / stop, drive the bypass and hand control back to line following. 
+* Reason a statechart is needed: The write-up defines a staged process (coarse scan → fine scan → profile → plan → bypass → recover). Each stage has its own exit conditions and retry limits, and the same distance reading means different things in MONITORING (is something ahead?) and FINE_SCAN (where is its edge?). A statechart makes those stages and their failure exits explicit and testable. 
+
+
+  
+
+(Obstacle Scan, Avoidance and Line Recovery statechart, Section 6.4)
+Brief explanation of states, events, and fault handling:
+Ranging: obstacle_task drives TRIG high for 10 µs, then waits up to 30 ms on OB_ECHO in flg_obst (TWF_ORW + TWF_BITCLR). gpio_isr timestamps both ECHO edges and sets OB_ECHO on the falling edge. An ECHO pulse longer than 25 ms, or no falling edge within 30 ms, means nothing within 4 m: path clear, not a fault. The stop check uses raw pings (two in a row under 15 cm) to avoid median filter delay, and applies from both MONITORING and SLOW. 
+MONITORING → SLOW → STOPPING: with the servo at 90°, three pings under 35 cm set EV_OBSTACLE_NEAR, and vehicle_ctrl_task halves the speed (write-up: "stop or slow down"). 40 cm or more returns to MONITORING and sets EV_OBSTACLE_CLEAR, so vehicle_ctrl_task restores full speed; the 5 cm gap stops the state flickering. Two consecutive pings under 15 cm set MF_ESTOP and EV_OBSTACLE, so motion_task brakes within one 20 ms cycle without waiting for vehicle_ctrl_task (NFR6).
+COARSE_SCAN: on OB_SCAN_REQ the servo visits 30°, 60°, 90°, 120° and 150°. Each reading becomes a point in the robot frame, x = d·cos θ and y = d·sin θ (x = sideways offset, positive to the right; y = distance ahead). Servo 30° points to the robot's right and 150° to its left (checked in S5-U03). If every hit (a reading under 40 cm) has |x| greater than half the robot width + 50 mm on the same side,the obstacle is near the line but off the robot's path. obstacle_task sets EV_OBSTACLE_CLEAR, and vehicle_ctrl_task clears MF_ESTOP, sends CLEAR and resumes FOLLOW. 
+FINE_SCAN and PROFILING: the servo sweeps 5° steps across ±15° of the hit sector, out and back. Edges are where the range jumps by more than 10 cm. Each edge angle is moved inward by half the measured beam width, because the 15° HC-SR04 beam sees an edge early (A16). Width W = √(dL² + dR² − 2·dL·dR·cos(θR − θL)), by the law of cosines. If the two sweeps disagree by more than 10 %, FINE_SCAN repeats once. The result goes to obst_profile with EV_PROFILE_READY.
+PLAN, BYPASS and SEARCH_LINE are executed by vehicle_ctrl_task, because they command motion and mbx_motion has one sender. Before any motion leaves STOPPING (continue, bypass or reverse), vehicle_ctrl_task first clears MF_ESTOP in flg_motion (tk_clr_flg) and then sends CLEAR to mbx_motion, so motion_task leaves ESTOP_BRAKED. A side is chosen only if its clearance ≥ robot width + 50 mm. BYPASS sends TURN 45° away from the obstacle, MOVE out (enough for the chosen clearance), TURN −45° to drive parallel to the line, MOVE past the obstacle (its width + robot length + 50 mm), then TURN −45° back toward the line. After EV_MOTION_DONE, SEARCH_LINE sets LF_SEARCH until EV_LINE_FOUND, then hands control back to line_task.
+Faults: if no side is clear, REVERSE_RETRY moves back 100 mm and rescans, at most twice, then NO_PATH. No line within 300 mm after the bypass is LINE_NOT_FOUND. Echo stuck high or 5 invalid pings is SENSOR_FAULT. All three raise EV_FAULT and the system enters FAULT. EV_IMPACT from imu_task in any state centres the servo and aborts. Every transition logs {state, d, θ, decision} to mbf_event (FR16).
+6.5 Subsystem Statechart 5
+* Subsystem name: IMU Motion and Terrain Monitoring (S4 - Buddy 4)
+* Related RTOS task(s):imu_task (pri 10, core 0, 20 ms), woken by cyc_imu. Reads odom (S2); writes terrain, MF_ESTOP (flg_motion), EV_IMPACT (flg_mission) and mbf_event. 
+* Purpose: Calibrate the IMU, track pitch, detect humps and measure the peak hump height, detect impacts, derive turn rate and classify motion for telemetry.
+* Reason a statechart is needed: A hump is a sequence (climb → crest → descend), and peak height only means something over that whole sequence. Sample-count hysteresis stops motor vibration creating false humps. The impact latch and the degraded mode must override every terrain state, and a statechart makes those overrides explicit and testable.
+
+
+  
+
+(Hump Detection and Terrain Monitoring statechart, Section 6.5)
+Brief explanation of states, events, and fault handling:
+Sensor set-up. The LSM303DLHC powers up in power-down mode at ±2 g, so imu_task's init writes CTRL_REG1_A = 400 Hz with X/Y/Z enabled, sets CTRL_REG4_A = ±8 g with high resolution and block data update, and puts the FIFO in stream mode. Every 20 ms cycle it burst-reads all new samples (about 8) in one I2C transaction of about 1.2 ms. The sensor has no gyroscope, so pitch comes from the accelerometer alone.
+CALIBRATING. With the robot still and level, imu_task averages 2 s of samples for the pitch and roll offsets, then sets terrain.cal_done = 1. vehicle_ctrl_task starts the IR sweep only after it reads cal_done = 1 (or after 3 s with an IMU_WARN if the IMU is degraded). Roll φ = atan2(a_y, a_z) is reported in terrain for telemetry only.
+Pitch and height. The samples are low-pass filtered. The robot's own forward acceleration a_fwd is subtracted. It is the change in speed_mms over the last 100 ms (5 odom samples), where motion_task measures speed from the time between encoder edges (gpio_isr already timestamps them at 1 µs), not from counts per 20 ms. a_fwd passes through the same low-pass filter as a_x so the two stay aligned in time: sin θ = (a_x − a_fwd) / g, minus the offset. Height is integrated as h += sin θ · Δs with encoder distance Δs, so it does not depend on speed and stops changing when the robot stops. The last 3 samples of Δh are buffered, so the climb that happens before CLIMBING is confirmed is added back rather than lost. h is reset to 0 in FLAT, so a small pitch offset cannot build up between humps.
+Hump states. Enter CLIMBING when θ > +5° for 3 samples, go to DESCENDING when θ < −5°, and go to REPORT when |θ| < 3° for 5 samples. A climb whose peak is under 5 mm returns to FLAT as a false trigger. REPORT increments hump_count, updates the run peak peak_mm = max(peak_mm, h_max), publishes terrain and sends a HUMP event to mbf_event. Here a sample is one 20 ms filtered pitch value, not a raw 400 Hz FIFO sample. If CLIMBING or DESCENDING lasts more than 1 m of travel without completing, imu_task returns to FLAT and sends HUMP_ABORT to mbf_event, so a long slope cannot leave the state machine stuck. 
+Short humps. Chassis pitch follows the hump surface only when the hump is longer than the wheelbase L. On a shorter hump, the integrated h is the average height under the wheelbase and reads low. imu_task therefore also records θ_max and reports L · sin θ_max. S4-U02 decides which estimate is used (A17).
+Impact. Any FIFO sample with |a_xy − a_xy_lp| > 1.0 g (x and y only, gravity removed, preliminary) sets MF_ESTOP in flg_motion directly and EV_IMPACT in flg_mission, from any state. z is left out because hump edges jolt the robot vertically, while a collision decelerates it horizontally. IMPACT is left when imu_task sees that vehicle_ctrl_task has cleared MF_ESTOP (imu_task reads flg_motion with tk_ref_flg at the start of each cycle).
+Turn rate and motion class. ω = (v_R − v_L) / track width comes from the encoder counts in odom (A7). Motion class runs alongside the hump states: STATIONARY (|speed| < 10 mm/s), ACCELERATING (|a_fwd| > 0.2 m/s²), TURNING (|ω| > 30 °/s), MOVING otherwise. CLIMBING_HUMP, DESCENDING_HUMP and IMPACT override these. A class must hold for 5 samples (100 ms) before it is reported. Changes go to mbf_event, and the current class and ω go in terrain (all thresholds preliminary, S4-U05).
+Faults. An I2C error after 3 retries → IMU_DEGRADED. Hump, tilt and impact data are unavailable, terrain.imu_ok = 0, and an IMU_WARN event goes to mbf_event. It does not set EV_FAULT, because hump measurement is not safety-critical and the obstacle stop still protects against collisions. imu_task retries the init every 1 s and returns to FLAT when the chip responds, keeping the stored offsets.
+6.6 Subsystem Statechart 6
+* Subsystem name: Telemetry and Command Link (S1, Buddy 1)
+* Related RTOS task(s): telemetry_task (pri 14, core 0) and MQTT code in cyw43_utk_task (kernel, pri 4), which runs the broker-connection states
+* Purpose: Keep the robot connected to WiFi and the MQTT broker, publish telemetry and heartbeat, forward START/STOP/RESET, and recover from WiFi or broker loss without affecting control.
+* Reason a statechart is needed: Link availability changes at run time and each state has a different buffering policy. Making it explicit shows that no network state can block a control task, and that every network failure has a defined recovery path (write-up: “implement connection recovery”).
+
+
+  
+(Telemetry and Command Link statechart, Section 6.6)
+
+
+Brief explanation of states, events, and fault handling:
+OFFLINE and ONLINE are read from cyw43_utk_get_status(), which the template documents as safe from any task. The broker session (MQTT_CONNECTING, ONLINE, BACKOFF) is tracked by Buddy 1’s MQTT code inside cyw43_utk_task. It is read by telemetry_task through a getter, and telemetry_task never calls cyw43, lwIP or MQTT functions. 
+
+
+If the WiFi link drops, every state returns to OFFLINE and cyw43_utk_task rejoins. The public port only joins once at start-up, so this must be checked in the template (A14). If the broker refuses, times out after 5 s or misses keep-alive, BACKOFF waits 1, 2, 4, then 8 s before reconnecting, and goes back to 1 s after a successful connection. This stops a flaky network from causing a flood of reconnects. The connect message sets a retained last-will of "offline", so the dashboard knows the robot has dropped even when the robot cannot tell it.
+Every send uses TMO_POL. If mbf_telemetry is full, the sample is skipped and drop_count is incremented (BUFFER_FULL). The newest snapshot is regenerated next period, so dropping old snapshots loses nothing important. Discrete events wait in mbf_event (2048 B, about 30 events) until drained; when it is full the event is dropped and counted. 
+Commands are only START, STOP and RESET, so remote input can never steer the robot (autonomy requirement). RESET only sends EV_RESET. vehicle_ctrl_task owns the MF_ESTOP latch (IF-05). It checks that the fault has cleared, then moves from FAULT to READY with the motors braked. A new START is needed to move. 
+7. Assumptions
+
+
+ID
+	Assumption
+	Risk if wrong
+	Validation method
+	Owner
+	Status
+	A1
+	The barcode narrow element is ≈ 3.0 mm (141 mm / 47 modules, ratio 3.0 from the sample) and the barcode IR spot at mounting height resolves 3 mm bars.
+	Narrow bars merge with neighbours, so element counts are wrong and every barcode is rejected.
+	S3-U03: drive over the printed barcode 10× at 0.15 / 0.25 / 0.35 m/s, log edge widths; pass if the wide:narrow ratio is within 2.2–3.8 and the element count = 29 in ≥ 9/10 runs.
+	Buddy 3
+	Open
+	A2
+	GP26 is not driven by two outputs: the Centre IR DOUT (Grove 6 pin 1) and Barcode AOUT (Grove 5 pin 2) both land on GP26, and one wire will be disconnected.
+	Two sensor outputs fight on one net: wrong readings and possible damage to the comparator output.
+	S3-U06: continuity test with a multimeter, then toggle each sensor over black/white and confirm GP26 shows only one source.
+	Buddy 3
+	Open
+	A3
+	The Robo Pico VBAT-sense jumper (GP28) is open, so GP28 carries only the Left IR analogue signal.
+	Left IR reading is mixed with battery voltage, and line following drifts as the battery drains.
+	Visual check of the jumper on the board underside; read GP28 with the sensor unplugged (expect floating/0, not ≈ VBAT/2).
+	Buddy 3
+	Open
+	A4
+	Encoder edges can be captured by a gpio_isr registered with tk_def_int(IO_IRQ_BANK0) without breaking the kernel's vector table (the SDK gpio_set_irq_enabled_with_callback is not used).
+	Interrupts never fire or the kernel crashes, which loses encoder, barcode and echo timing together.
+	INT-05: build with CRASH_REPORT=1, generate edges on GP6/GP16/GP17/GP3 with a function generator or by hand, and check counts against a known pulse number.
+	Buddy 2
+	Open
+	A5
+	No other code (e.g. a micro T-Kernel physical timer, which uses PWM slices) uses PWM slices 4, 5 or 6.
+	Motor or servo PWM is reconfigured at run time, causing sudden speed changes.
+	Code review: grep for StartPhysicalTimer / ptimer use; measure 20 kHz on GP8–GP11 and 50 Hz on GP12 with a scope during a full test run (S2-U04).
+	Buddy 2
+	Open
+	A6
+	Accelerometer pitch, with the robot's own forward acceleration (from odom) subtracted, is accurate to ±1° while driving, enough for ±5 mm height error. 
+	Driving acceleration or vibration is read as pitch, giving false humps or a wrong peak height. 
+	S4-U01: static ramp 0/5/10/15°, then accelerate and brake on a flat floor and log pitch error with and without the a_fwd correction. S4-U02: blocks of known height (10, 20, 30 mm), 10 runs each. 
+	Buddy 4
+	Open
+	A7
+	The encoder wheel-speed difference gives turn rate within ±10 %, because the LSM303DLHC has no gyroscope and the magnetometer may be disturbed by motor current. 
+	Turn-rate and TURNING events are wrong or noisy; wheel slip during turns inflates ω. 
+	S4-U04: 10 × 90° and 10 × 180° turns. Compare encoder ω integrated over the turn with the angle measured on video or with a protractor. Also log magnetometer heading with motors off and on at a fixed pose; use the magnetometer as a cross-check only if the deviation is < 5°. 
+	Buddy 4
+	Open
+	A8
+	The HC-SR04 is powered within spec (5 V) and its 5 V echo is reduced to ≤ 3.3 V, or a 3.3 V-capable variant is used. Robo Pico Grove ports provide 3.3 V only.
+	Unreliable ranging at 3.3 V, or GPIO damage from a 5 V echo (Pico digital input max 3.6 V).
+	S5-U02: measure the echo-pin voltage with a multimeter/scope before connecting to the Pico; S5-U01 range accuracy at 10/30/50 cm.
+	Buddy 5
+	Open
+	A9
+	The servo settles within 150 ms per 30° step, so a coarse scan takes ≤ 1.1 s (5 × (150 + 60) ms).
+	Pings taken while the servo moves give wrong angles, so the profile is wrong.
+	S5-U03: log ping distance vs time after each servo command against a flat wall; find the settle time. 
+Repeat at full and low battery charge, because servo V+ is the raw battery voltage; if settle time exceeds 150 ms at low charge, lengthen the settle delay and update Appendix D. 
+	Buddy 5
+	Open
+	A10
+	MQTT publishing can be added inside cyw43_utk_task by polling mbf_telemetry with TMO_POL (NET=lwip MQTT=1 build), with instructor agreement as required by Section 3 of TEAM.md.
+	Buddy 1 has no legal way to publish, so the telemetry design must change.
+	Raise with the instructor in Week 7. In test INT-04, publish at 2 Hz for 10 min while logging core-1 task periods (0 overruns).
+	Buddy 1
+	Open
+	A11
+	Each barcode precedes its junction by a fixed, measurable distance d_junction on the track.
+	Turns execute too early or late, and the robot misses the branch.
+	Measure on the practice track; confirm with the instructor; INT-01 run ×10 per command.
+	Buddy 3 / Buddy 5
+	Open
+	A12
+	The end of the course is signalled by an MQTT STOP or a defined end marker (not yet specified in the brief).
+	The robot never enters FINISHED and the run time or summary is not reported.
+	Ask the instructor (decision D3); SYS-01 full run.
+	Buddy 5
+	Open
+	A13
+	The barcode character → command mapping (write-up example: A = Left, B = Right, C = Straight, D = U-turn) is configurable; the 'Z' sample suggests other characters may appear.
+	Correctly decoded barcodes trigger the wrong manoeuvre.
+	Confirm the official mapping with the instructor; the mapping lives in one const table in subsystem3.h (S3-U04 checks all 4 commands).
+	Buddy 3
+	Open
+	A14
+	The template's cyw43_utk_task rejoins the WiFi network by itself after the link drops.
+	The public mtk3smp-rp2040 port scans and joins once at start-up and has no rejoin code, so the robot would stay OFFLINE for the rest of the run.
+	Read cyw43_utk.c in the template. S1-U02 switches the access point off and on mid-run. If the link does not come back, Buddy 1 adds a rejoin to the MQTT code using the BACKOFF timing.
+	Buddy 1
+	Open
+	A15
+	The demo network is 2.4 GHz WPA2-Personal, allows device-to-device traffic, and gives RSSI better than -70 dBm across the whole track.
+	Campus WiFi (WPA2-Enterprise or client isolation) or a 5 GHz-only hotspot stops the robot reaching the broker. Weak signal at the far end of the track causes repeated reconnects during the demo.
+	Use a team-owned travel router or phone hotspot locked to 2.4 GHz. Report RSSI in the heartbeat and drive the full track, checking that the broker receives every heartbeat.
+	Buddy 1
+	Open
+	A16
+	The HC-SR04 gets a reliable echo from the course obstacles (the datasheet asks for a smooth target of at least 0.5 m²), and a fixed beam-width edge correction gives width error ≤ 10 %. 
+	Missed or unstable edges; width error above 10 % or the wrong bypass side (FR10, NFR13). 
+	S5-U04: scan 3 boxes of known width at 15, 20 and 30 cm, 10 runs each; fit the edge-correction angle and report mean and worst width error. 
+	Buddy 5
+	Open
+	A17
+	The course humps are longer than the robot's wheelbase, so chassis pitch follows the hump surface and the integrated h equals the hump height. 
+	On a short hump the robot bridges it and the integrated h (average height under the wheelbase) underestimates the peak. 
+	Measure the wheelbase L and the practice-hump length. S4-U02 with one block shorter and one longer than L: compare integrated h and L · sin θ_max against the true height, and choose the estimator by hump length. 
+	Buddy 4 
+	Open
+	A18
+	A 1.0 g gravity-removed horizontal threshold separates real impacts from hump edges and motor vibration, and ±8 g full scale does not clip real impacts. 
+	Missed collisions, or false emergency stops on every hump 
+	S4-U03: with the obstacle stop disabled in a test build, bump into a fixed block at 0.15 and 0.3 m/s, 10 trials each, and log peak |a_xy − a_xy_lp|. Drive a full lap over the test humps with logging and require 0 triggers. Set the threshold midway between the two distributions. 
+	Buddy 4
+	Open
+	A19
+	The Left and Centre IR sensors are more than 18 mm apart (wider than the line), so both can only read black together at a real junction.
+	A drift on a plain line reads as EV_JUNCTION, and the robot turns early.
+	Measure the sensor spacing on the chassis. In S3-U05, drive 10 laps on a plain curved line and require 0 junction events.
+	Buddy 3
+	Open
+	8. AI-Supported Design Evidence
+8.1 Pre-Submission AI Ideation
+
+
+Buddy
+	AI prompt or discussion used
+	Useful AI ideas
+	Weak or unrealistic AI ideas
+	Team decision
+	Buddy 1
+	Asked Claude whether Buddy 1 must start before the rest of the team, what hardware is needed beyond the Robo Pico and Pico W, and how to begin the WiFi/MQTT work on the micro T-Kernel RP2040 port. Later asked it to check the Buddy 1 parts of this report against the port source and the write-up.
+	(1) The other buddies are not blocked: they can code against the agreed interface (mbf_telemetry, mbf_cmd). (2) One context must own the radio and lwIP because lwIP runs single-threaded (NO_SYS), which matches the TEAM.md rule. (3) Every send uses TMO_POL so a network fault cannot stall a control loop. (4) Use a retained last-will status topic and limit commands so remote input never steers. (5) The vetting found that broker reconnection had no owner and that RESET bypassed vehicle_ctrl_task.
+	(1) It first said IP networking on the port was unproven, based on the hub README. The port's own README confirms DHCP, DNS, UDP and TCP work on hardware. (2) It suggested the Pico SDK's pico_cyw43_arch_lwip_poll, which the port does not use. The port has its own CYW43 service task. (3) It listed a USB-serial adapter as required, but the USB-CDC console removes the need.
+	MQTT publish/subscribe and broker reconnect live in cyw43_utk_task, pending instructor agreement (A10, D5). telemetry_task only formats and forwards. Added reconnect with back-off and a last-will (FR17, NFR14), routed RESET through vehicle_ctrl_task, and treated the port's own README and source as more reliable than AI summaries.
+	Buddy 2
+	Propose a micro T-Kernel task and ISR structure for PID wheel-speed control with encoders on the RP2040, and explain how an emergency stop should override it.
+	PID task every 20ms on core 1, encoder edges captured in gpio_isr, MF_ESTOP polled first every cycle.
+	AI suggested blocking delays in PID or software PWMing motors directly.
+	Adopted 20ms motion_task with PID, hardware PWM slices 4-5 at 20 kHz, gpio_isr encoder counting, and direct MF_ESTOP polling.
+	Buddy 3
+	Asked Claude to read the project folder (write-up, briefing, Robo Pico datasheet, sensor datasheets, barcode spec) and the instructor's template repo, then check the line/barcode design and pin map for gaps before Week 6.
+	(1) The 10 ms system tick (CNF_TIMER_PERIOD) is too slow to poll ~3 mm bars, so edges must be timestamped in an ISR. (2) Grove 5 and Grove 6 both include GP26. (3) GP28 doubles as VBAT sense. (4) The ADC is a single peripheral and needs one owning task. (5) WiFi/USB kernel tasks are pinned to core 0, so control belongs on core 1.
+	(1) The first estimate of bar width assumed a 3-character barcode without checking; it was later confirmed by decoding the sample PDF. (2) It first claimed the Centre IR was 'probably on the wrong pin' from a general Grove convention, and only later identified the real issue (two outputs on GP26). (3) It initially suggested generating the whole team's report and AI evidence, which would misrepresent the other buddies' work.
+	Adopted ISR edge capture with a speed-independent '3 widest of 9' Code 39 classifier; barcode read from digital DOUT on GP6 only; ADC owned by line_task; GP26/GP28 issues logged as A2/A3 with physical validation; other buddies write their own AI evidence.
+	Buddy 4
+	Asked Claude how hump height can be estimated using an accelerometer-only IMU (LSM303DLHC) and wheel odometry, how to verify hardware identity without a WHO_AM_I register, and what sampling rates and ranges are needed to detect collision impacts without analog filter distortion 
+	1) Pointed out that double-integrating vertical acceleration (a_z) drifts quadratically; recommended deriving pitch θ from gravity and integrating Δh = sin θ · Δs using encoder travel. (2) Suggested a multi-stage FSM (CLIMBING, DESCENDING, REPORT) with hysteresis (±3° to +5°) to eliminate false triggers. (3) Identified that LSM303DLHC chip verification must read Magnetometer Identification Registers IRA_REG_M–IRC_REG_M (0x48, 0x34, 0x33 at 0x1E) since no accelerometer WHO_AM_I exists. 
+	(1) AI initially assumed a gyroscope was present on the LSM303DLHC for pitch rate integration. (2) AI suggested using default ±2 g scale for a 2.5 g impact threshold, which would saturate the sensor. (3) AI suggested using a 50 Hz ODR, which has an internal bandwidth of only 5.6 Hz and would smooth out short impact shocks. (4) Its pitch formula sin θ ≈ −a_x/g had the wrong sign for x-forward, z-up mounting. 
+	Configure accelerometer to ±8 g range at 400 Hz ODR in FIFO stream mode; integrate pitch with wheel odometry for hump elevation; identify chip using registers 0x0A–0x0C at 0x1E; trigger MF_ESTOP in flg_motion upon gravity-removed acceleration |a_xy − a_xy_lp| > 1.0 g.
+	Buddy 5
+	Asked Claude how an HC-SR04 on a servo should detect and profile an obstacle and how the stop and bypass targets should be set.
+	(1) Slow down before stopping (write-up: "stop or slow down"): a 35 cm slow zone ahead of the 15 cm stop. 
+(2) Two fine sweeps plus a beam-width edge correction to reach ≤ 10 % width error. 
+(3) NFR10 at 4/5 trials is only a D on the Week 10 table, so it was raised to 19/20. (4) A "continue" outcome for obstacles near but not on the path. 
+(5) Grove 2 keeps the HC-SR04 on one cable and leaves GP0/GP1 free for CRASH_REPORT. 
+	(1) Its first pin map split the HC-SR04 across Grove 5 and Grove 7, sharing both ports with IR analogue pins. 
+(2) It first proposed a separate WiFi task and a priority-2 task, which clash with the template's kernel-owned priorities 1–4 and cyw43_utk_task.
+(3) It had obstacle_task send moves to motion_task directly, which breaks the single-sender rule for mbx_motion. 
+(4) It first claimed the A-band bypass time was met, but its own timing budget gives about 4.6 s, which is B band.
+	Adopted the slow zone, two-sweep profiling, beam-width correction (A16), decision logging (FR16) and Grove 2 (GP2/GP3). Bypass time stays a B-band target with an A-band stretch (Appendix D). 
+CLEAR before bypass (6.4)
+	8.2 Team-Reviewed Architecture Freeze
+AI or initial idea
+	Team decision
+	Engineering reason
+	Affected artefact
+	Use the template's default priority bands (S1 12–13 … S5 20–21, by folder number).
+	Modified
+	The bands give obstacle detection the lowest priority. Re-banded by rate-monotonic period plus a sporadic coordinator on top; to be recorded in TEAM.md Section 4 by agreement.
+	RTOS task table, Section 9
+	Poll the barcode sensor in a periodic task.
+	Rejected with reason
+	A 3.0 mm element passes in 7.5 ms at 0.4 m/s, which is less than one 10 ms tick. Edge timestamps in gpio_isr (1 µs) plus decoding in barcode_task are used instead.
+	NFR2, task table, TID P2, Section 6.2
+	Read the barcode with the ADC (analogue output) for more information.
+	Rejected with reason
+	The ADC is one peripheral already owned by line_task; GP26 is shared with Grove 6; and sequential ADC sampling cannot reach µs resolution alongside line sampling. The digital comparator output on GP6 gives edges the interrupt can timestamp directly; a 0.5 ms glitch filter in gpio_isr handles flicker.
+	Pin layout, A2
+	Create a dedicated WiFi/MQTT task that calls MQTT functions.
+	Rejected with reason
+	Section 3 of TEAM.md says no student task may call cyw43, lwIP or MQTT functions. Telemetry goes through mbf_telemetry, polled inside cyw43_utk_task.
+	TID P6, Section 6.6, A10
+	Pin all tasks to 'any core' and rely on priorities alone.
+	Modified
+	The repo pins WiFi/USB to core 0 (verified in source). Control tasks are pinned to core 1 to isolate them from network bursts. On SMP, priority does not give mutual exclusion, so mutexes with TA_INHERIT protect shared data.
+	Task table, TID
+	Route all stops through vehicle_ctrl_task.
+	Modified
+	Safety-critical detections set MF_ESTOP directly in flg_motion so braking never waits for the coordinator. vehicle_ctrl_task only clears the latch.
+	NFR6, TID P4, Section 6.3
+	Place the Vehicle Controller (mission state machine) shown in the briefing in its own sixth subsystem.
+	Modified
+	The template repo has exactly 5 subsystem folders. Placed in S5, following the Week 6 template example for Buddy 5 ('integration … or system coordination'). To be confirmed by the team (D1).
+	Roles, task table, Section 5
+	Use the IMU gyroscope with a complementary or Kalman filter for pitch and turn rate (AI suggestion). 
+	Rejected with reason 
+	The GY-511 carries an LSM303DLHC, which is an accelerometer + magnetometer with no gyroscope (datasheet). Pitch comes from the low-pass filtered accelerometer, and turn rate from the encoder wheel-speed difference. 
+	FR8, FR18, FR20, Section 6.5, A6, A7
+	Find hump height by double-integrating vertical acceleration a_z. 
+	Rejected with reason 
+	Bias and vibration make a double integral drift with t². Height is integrated geometrically as h += sin θ · Δs with Δs from the wheel encoders, so it does not depend on speed and stops changing when the robot stops. h is reset in FLAT, so an offset cannot build up between humps. 
+	FR8, NFR8, TID P5, Section 6.5 
+	Read pitch directly from the accelerometer while driving. 
+	Modified 
+	An accelerometer reads speeding up or braking as tilt: 0.5 m/s² ≈ 2.9° of false pitch, close to the 5° hump threshold. imu_task subtracts the forward acceleration from odom: sin θ = (a_x − a_fwd)/g. Offsets are calibrated with the robot still and level, before the IR sweep. 
+	FR18, Section 5 CALIBRATING, Section 6.5, A6, S4-U01 
+	Detect a collision when |a| > 2.5 g, sampled every 20 ms (initial design). 
+	Modified 
+	The LSM303DLHC defaults to ±2 g, so it saturates before 2.5 g and the trigger could never fire. The total magnitude also includes 1 g of gravity, and a short impact spike can fall between two 20 ms reads. The accelerometer is now set to ±8 g and 400 Hz in FIFO stream mode, and every sample is checked for |a_xy − a_xy_lp| > 1.0 g MF_ESTOP is still set directly in flg_motion. 
+	FR14, NFR16, TID P4, Section 6.5, A18, S4-U03 
+	Use the magnetometer heading for turn-rate monitoring (AI suggestion). 
+	Modified 
+	Motor currents and the battery near the board disturb the magnetometer. Turn rate is ω = (v_R − v_L)/track width from the encoder counts already in odom. The magnetometer is kept only as a cross-check if S4-U04 shows < 5° deviation with the motors on. 
+	FR20, A7, S4-U04 
+	Run motion classification and event reporting in a separate task. 
+	Rejected with reason 
+	Every input it needs (pitch, hump state, odom speed and acceleration, turn rate, impact) is already in imu_task each cycle. Classifying there costs no extra task, stack or kernel object. Class changes go to mbf_event and the current class goes into terrain. 
+	FR19, task table, IF-08, Appendix C 
+	Report the peak hump height as the maximum of the integrated h. 
+	Accepted, needs validation 
+	Chassis pitch follows the hump only when the hump is longer than the wheelbase L. On a shorter hump, the integrated h is the average height under the wheelbase and reads low. imu_task also logs θ_max and computes L · sin θ_max, and S4-U02 with short and long blocks decides which estimate is reported. 
+	FR8, NFR8, Section 6.5, A17, S4-U02 
+	Move imu_task to core 1 with the control loop so impact braking is faster. 
+	Rejected with reason 
+	Braking does not depend on imu_task's core: motion_task on core 1 polls MF_ESTOP at the start of every 20 ms cycle. Keeping the IMU on core 0 leaves core 1 for line, motion, barcode and the coordinator. The cost is possible delay from WiFi bursts, so NFR16 latency is measured with MQTT running. 
+	Task table, NFR16, Section 8.3, INT-02 
+	8.3 Final AI-Vetted Gap Check
+
+
+AI reviewer prompt used
+
+
+Act as a strict embedded systems reviewer for an autonomous line-following robot car on Raspberry Pi Pico W + Robo Pico, running micro T-Kernel 3.0 (dual-core SMP, 10 ms tick) with the Pico C SDK. Check the requirements, pin layout, RTOS task table, task interaction diagram, statecharts, assumptions and AI evidence against each other and against the project write-up and the team template repo rules (one owning task per peripheral, no student task calls WiFi/MQTT). Identify missing requirements, unclear interfaces, untested assumptions, weak safety mitigations, timing risks, task conflicts and shared-resource problems. Do not rewrite the design; list only gaps that the team must review and justify.
+
+
+AI-identified gap
+	Team response
+	Action taken
+	Evidence or reason
+	Three subsystems (S2 encoders, S3 barcode, S5 echo) plus buttons share the single IO_IRQ_BANK0 interrupt, but no one owns it.
+	Fixed
+	One gpio_isr in an agreed shared file (app_gpio_irq.c) dispatches by pin to short per-subsystem handlers. It is registered once, on core 1. Recorded as interface IF-11.
+	Appendix B IF-11; A4 / INT-05 validates it.
+	Mutexes shared by tasks of different priority (e.g. odom read by priority-14 telemetry_task and written by priority-9 motion_task) risk priority inversion.
+	Fixed
+	All mutexes are created with TA_INHERIT and held only to copy a struct (< 10 µs target).
+	Section 3 justification; NFR11 timing logs.
+	Only two line sensors (Left, Centre): a branch on the right-hand side cannot be detected directly.
+	Accepted as risk
+	Turns are executed by encoder distance after the barcode (d_junction, A11) rather than by detecting the branch. EV_JUNCTION is used as confirmation when the branch is on the left.
+	Write-up requires encoder-based navigation; A11 and INT-01 validate.
+	The end-of-course condition and the official barcode → command mapping are not defined.
+	Needs validation
+	FINISHED is triggered by MQTT STOP for now; the mapping is a single configurable table.
+	A12, A13; decisions D2/D3 to raise with the instructor.
+	The barcode could be misread while crossing the main line or at junctions (dense edges).
+	Partially fixed
+	Decoder disarmed when LF_ENABLE is clear; > 64 edges rejected; start/stop '*' and 29-element checks; 200 mm cooldown.
+	Section 6.2; S3-U04 includes a junction-crossing case.
+	Emergency-stop latency depends on obstacle_task on core 0, which shares the core with the WiFi service task (priority 4).
+	Needs validation
+	obstacle_task at priority 11 can be preempted by WiFi bursts. Latency will be measured under telemetry load. If it exceeds 140 ms, the echo processing moves to the core-1 ISR.
+	NFR6, INT-02 (with MQTT running).
+	HC-SR04 voltage: Grove ports are 3.3 V but the module is specified for 5 V.
+	Needs validation
+	Power from 5 V with an echo divider, or use a 3.3 V variant; measure before connecting.
+	A8, S5-U02.
+	Battery voltage sag changes motor torque, and VBAT sense on GP28 is unavailable because Left IR uses GP28.
+	Accepted as risk
+	Closed-loop PID compensates for speed. Battery is checked before each run with a multimeter. Telemetry reports PWM duty so sag is visible.
+	S2-U02 at low and full charge.
+	Connection recovery is a Buddy 1 task in the write-up, but the design said reconnection is handled by the kernel task, which has no knowledge of the MQTT session.
+	Fixed
+	Added MQTT_CONNECTING and BACKOFF states to Section 6.6, plus FR17 and NFR14. WiFi rejoin by the kernel is recorded as A14 and will be added by Buddy 1 if the template lacks it.
+	Section 6.6, FR17, NFR14, A14, S1-U02.
+	MQTT RESET cleared FAULT directly from telemetry_task, bypassing vehicle_ctrl_task, which is the only task allowed to clear MF_ESTOP.
+	Fixed
+	RESET now only sends EV_RESET. vehicle_ctrl_task checks the fault cause and moves from FAULT to READY with the motors braked. A new START is needed.
+	Section 6.6 HANDLE_CMD, FR13, IF-05, S1-U03.
+	A 256-byte JSON payload plus topic and MQTT header does not fit lwIP's default MQTT output buffer (MQTT_OUTPUT_RINGBUF_SIZE is 256), so every publish would fail with ERR_MEM.
+	Needs validation
+	Telemetry JSON now uses short keys and is capped at 160 bytes (worst case 138 bytes, Appendix B). With the topic and MQTT header a message is at most about 175 bytes, so it fits the default 256-byte buffer. If S1-U01 still sees ERR_MEM when messages queue up, raise MQTT_OUTPUT_RINGBUF_SIZE to 1024 in lwipopts.h.
+	IF-10. S1-U01 checks that no publish returns an error.
+	The accelerometer powers up in power-down mode at ±2 g full scale, so the 2.5 g impact threshold was unreachable and the IMU init sequence was undefined. 
+	Fixed 
+	imu_task init writes CTRL_REG1_A (400 Hz, X/Y/Z on), CTRL_REG4_A (±8 g, HR, BDU) and enables FIFO stream mode. The impact threshold now uses gravity-removed acceleration. 
+	LSM303DLHC datasheet register defaults; FR14, Section 6.5, S4-U03. 
+	The self-test reads "IMU WHO_AM_I", but the LSM303DLHC accelerometer has no WHO_AM_I register. 
+	Fixed 
+	The self-test reads the magnetometer identification registers IRA/IRB/IRC_REG_M ('H43') and reads CTRL_REG1_A back after writing it. 
+	Datasheet register map (accelerometer 0x00–0x1F reserved); Section 5 INIT. 
+	IMU_DEGRADED raised EV_FAULT, but the system statechart sends every EV_FAULT to FAULT, so one I2C glitch would end the run although the design says the mission continues. 
+	Fixed 
+	IMU_DEGRADED now sends IMU_WARN to mbf_event and sets terrain.imu_ok = 0, with no EV_FAULT. imu_task retries the init every 1 s. 
+	Section 6.5, Section 5 Region B. 
+	9. Design Consistency
+
+
+Which task owns each hardware device?
+
+
+line_task (S3): Left/Centre IR via the ADC (sole ADC owner). gpio_isr + barcode_task (S3): barcode DOUT GP6. motion_task (S2): motors GP8–GP11 (PWM slices 4–5) and encoders GP16/GP17 (via gpio_isr). imu_task (S4): LSM303DLHC on I2C0 GP4/GP5. obstacle_task (S5): HC-SR04 GP2/GP3 (Grove 2) and servo GP12 (PWM slice 6). vehicle_ctrl_task (S5): button GP21, buzzer GP22, and GP20 events via gpio_isr. cyw43_utk_task (kernel): WiFi radio GP23/24/25/29, with Buddy 1's MQTT code inside it. telemetry_task (S1) owns no hardware. Each device in Section 2 has exactly one owning task, listed above, matching TEAM.md Section 3. 
+
+
+Which task has the highest priority, and why?
+
+
+Among application tasks, vehicle_ctrl_task (7, core 1): it is sporadic and short, and every mode change (obstacle, fault, barcode command) must be acted on within one dispatch. Above it are only the kernel (USB 3, WiFi 4) and gpio_isr. Within each core the periodic tasks follow rate-monotonic order: core 1 line 8 (10 ms) > motion 9 (20 ms); core 0 imu 10 (20 ms) > obstacle 11 (60 ms) > telemetry 14 (500 ms); barcode_task is 12 because its timing-critical work is in the ISR. Braking does not rely on priority: MF_ESTOP is polled by motion_task every cycle.
+
+
+Which subsystem statechart corresponds to which RTOS task or subsystem?
+
+
+Section 5 System → vehicle_ctrl_task (S5). 
+Section 6.1 Line Following → line_task (S3). 
+Section 6.2 Barcode Decoder → gpio_isr + barcode_task (S3). 
+Section 6.3 Motion → motion_task (S2).
+Section 6.4 Obstacle → obstacle_task + vehicle_ctrl_task (S5). 
+Section 6.5 IMU Motion and Terrain → imu_task (S4), including motion classification; also Region B of Section 5. 
+Section 6.6 Telemetry → telemetry_task (S1) + cyw43_utk_task; also Region C of Section 5. Every event name used in a statechart (EV_*, MF_ESTOP, LF_*, OB_SCAN_REQ) is a bit of a kernel object shown in the Section 4 diagram.
+
+
+How are functional requirements reflected in the task and statechart design?
+
+
+Appendix A traces every FR/NFR to its task(s), statechart state and test ID. For example: FR1 → line_task / TRACKING / S3-U02; FR4–FR5 → gpio_isr + barcode_task / DECODING→PUBLISH / S3-U03–U04, INT-01; FR9 → obstacle_task / MONITORING→SLOW→STOPPING / S5-U01, S5-U05, INT-02; FR15 → MF_ESTOP latch in motion_task + FAULT in the system statechart / S2-U05.
+
+
+What changes are still expected after the Week 6 review?
+(1) Confirm the Vehicle Controller owner (D1), barcode mapping (D2) and end condition (D3) with the team and instructor. Confirm encoder pins (D4 is resolved: HC-SR04 on Grove 2) (2) Tune priorities and periods from NFR11 timing logs. (3) Replace preliminary thresholds (15 cm stop, 5° hump, 1.0 g impact, 800-count contrast) with measured values from the unit tests. (4) Agree the MQTT-in-service-task change with the instructor (A10). Any change will be traced through Appendix A and recorded as a new row in Section 8.2.
+
+
+Which numbers in this document are measured and which are targets?
+
+
+Measured or verified: Code 39 symbology and 3.0 wide:narrow ratio (from the sample PDF), 141 mm / 20 mm / 18 mm barcode and line dimensions (spec sheet), 10 ms tick, core pinning of WiFi/USB, kernel priorities 3/4 (template repo source), pins and electrical limits (Robo Pico datasheet), 60 ms ping period (HC-SR04 datasheet). Everything else (speeds, thresholds, latencies, settle times) is a target, validated by the test named next to it.
+Appendix A. Requirements Traceability Matrix
+Req.
+	Task(s)
+	Statechart state(s)
+	Verifying test(s)
+	FR1
+	line_task, motion_task
+	Section 6.1 TRACKING; Section 5 LINE_FOLLOWING
+	S3-U02, SYS-01
+	FR2
+	line_task, vehicle_ctrl_task
+	Section 6.1 CALIBRATING; Section 5 CALIBRATING
+	S3-U01
+	FR3
+	line_task
+	Section 6.1 JUNCTION / LOST
+	S3-U05
+	FR4
+	gpio_isr, barcode_task
+	Section 6.2 CAPTURING → DECODING
+	S3-U03, S3-U04
+	FR5
+	barcode_task, vehicle_ctrl_task
+	Section 6.2 PUBLISH / REJECT; Section 5 APPROACH_JUNCTION
+	S3-U04, INT-01
+	FR6
+	vehicle_ctrl_task, motion_task
+	Section 5 EXECUTING_COMMAND; Section 6.3 TURNING
+	S2-U03, INT-01
+	FR7
+	motion_task
+	Section 6.3 FOLLOWING / MOVING_DIST / TURNING
+	S2-U01, S2-U02
+	FR8
+	imu_task, motion_task (odom)
+	Section 6.5 CLIMBING → REPORT; Section 5 Region B
+	S4-U01, S4-U02, INT-03
+	FR9
+	obstacle_task, vehicle_ctrl_task, motion_task
+	Section 6.4 MONITORING → SLOW → STOPPING
+	S5-U01, S5-U05, INT-02
+	FR10
+	obstacle_task
+	Section 6.4 COARSE_SCAN → PROFILING
+	S5-U03, S5-U04
+	FR11
+	vehicle_ctrl_task, line_task
+	Section 6.4 PLAN → BYPASS → SEARCH_LINE; REVERSE_RETRY
+	INT-06, SYS-01
+	FR12
+	telemetry_task, cyw43_utk_task
+	Section 6.6 ONLINE
+	S1-U01
+	FR13
+	telemetry_task, vehicle_ctrl_task
+	Section 6.6 HANDLE_CMD, Section 5 READY
+	S1-U03
+	FR14
+	imu_task, motion_task
+	Section 6.5 IMPACT; Section 6.3 ESTOP_BRAKED
+	S4-U03, INT-02
+	FR15
+	all → vehicle_ctrl_task
+	Section 5 FAULT; Section 6.3 ESTOP_BRAKED / STALL_FAULT
+	S2-U05, INT-02
+	FR16
+	obstacle_task, telemetry_task
+	all Section 6.4 transitions
+	S5-U05
+	FR17
+	cyw43_utk_task (MQTT code), telemetry_task
+	Section 6.6 OFFLINE, MQTT_CONNECTING, BACKOFF
+	S1-U02
+	FR18
+	imu_task, vehicle_ctrl_task
+	Section 6.5 CALIBRATING; Section 5 CALIBRATING
+	S4-U01
+	FR19
+	imu_task, telemetry_task
+	Section 6.5 motion-class region
+	S4-U05
+	FR20
+	imu_task, motion_task (odom)
+	Section 6.5
+	S4-U04
+	NFR1–NFR3
+	line_task, gpio_isr, barcode_task
+	Section 6.1, Section 6.2
+	S3-U02–U04
+	NFR4–NFR6
+	motion_task
+	Section 6.3
+	S2-U02, S2-U03, S2-U05, INT-02
+	NFR7, NFR10
+	obstacle_task, vehicle_ctrl_task
+	Section 6.4
+	S5-U01, INT-06
+	NFR8
+	imu_task
+	Section 6.5
+	S4-U02
+	NFR9
+	telemetry_task
+	Section 6.6
+	S1-U02, INT-04
+	NFR11–NFR12
+	all
+	-
+	INT-04, code review
+	NFR13
+	obstacle_task, vehicle_ctrl_task
+	Section 6.4
+	S5-U04, S5-U05, INT-06
+	NFR14, NFR15
+	cyw43_utk_task (MQTT code), telemetry_task
+	Section 6.6 BACKOFF, HANDLE_CMD
+	S1-U02, S1-U03
+	NFR16
+	imu_task, motion_task
+	Section 6.5 IMPACT; Section 6.3 ESTOP_BRAKED
+	S4-U03, INT-02
+	Appendix B. Inter-Subsystem Interfaces 
+The receiving or owning subsystem creates each kernel object and publishes its ID in its own subsystemN.h; senders only use it.
+ID
+	From → To
+	Mechanism (owner)
+	Object ID name
+	Data / meaning
+	IF-01
+	S3 → S5
+	mailbox (owned by S5)
+	mbx_nav
+	NAV_MSG {T_MSG header; char, cmd, dir_reversed, t_ms}, taken from a static ring of 4 in barcode_task (mailboxes pass a pointer, not a copy). mbx_nav is TA_MFIFO.
+	IF-02
+	S3 → S2
+	shared data + mutex (owned by S2)
+	steer_sp, mtx_steer
+	INT16 Δv in mm/s; latest value wins
+	IF-03
+	S2/S3/S4/S5/S1 → S5
+	event flag (owned by S5)
+	flg_mission
+	EV_* bits (see Section 4); vehicle_ctrl_task waits TWF_ORW + TWF_BITCLR
+	IF-04
+	S5 → S2
+	mailbox (owned by S2)
+	mbx_motion
+	MOTION_CMD {T_MSG header; type FOLLOW/MOVE/TURN/STOP/CLEAR, value, speed}. Mailboxes pass a pointer, not a copy, so vehicle_ctrl_task takes each packet from its own static ring of 8 and never reuses one before motion_task has received it. mbx_motion is created TA_MFIFO, and motion_task drains it with TMO_POL until E_TMOUT every cycle. 
+	IF-05
+	S4/S5 → S2
+	event flag (owned by S2)
+	flg_motion
+	MF_ESTOP latch; only S5 vehicle_ctrl_task clears
+	IF-06
+	S2 → S3/S4/S1
+	shared data + mutex (owned by S2)
+	odom, mtx_odom
+	ODOM {count_l, count_r, dist_mm, speed_mms}
+	IF-07
+	S5 → S3
+	event flag (owned by S3)
+	flg_line
+	LF_ENABLE, LF_SEARCH
+	IF-08
+	S4 → S1/S5
+	shared data + mutex (owned by S4)
+	terrain, mtx_terrain
+	TERRAIN {pitch_cdeg, roll_cdeg, hump_state, peak_mm, hump_count, motion_class, turn_rate_cdps, imu_ok, cal_done}
+	IF-09
+	S5 internal / → S1
+	shared data + mutex (owned by S5)
+	obst_profile, mtx_obst
+	PROFILE {closest_mm, angle_deg, width_mm, clear_l_mm, clear_r_mm}
+	IF-10
+	All tasks send to S1; S1 and kernel send both ways
+	message buffers (owned by S1)
+	mbf_event, mbf_telemetry, mbf_cmd
+	Event text up to 64 bytes (mbf_event 2048 B), JSON up to 160 bytes, command up to 16 bytes, all sends use TMO_POL. Each mbf_telemetry message starts with a one-byte topic ID (T = telemetry, E = event, A = command ack) so the MQTT code knows where to publish it. Topics and JSON fields are listed below.
+	IF-11
+	hardware → S2/S3/S5
+	shared ISR (team-owned file)
+	gpio_isr in app_gpio_irq.c
+	pin-dispatched handlers; each ≤ 5 µs target
+	Appendix C. Kernel Object Budget 
+Object
+	Limit (config.h)
+	S1
+	S2
+	S3
+	S4
+	S5
+	Total
+	Task
+	32
+	1 (telemetry)
+	1 (motion)
+	2 (line, barcode)
+	1 (imu)
+	2 (vehicle_ctrl, obstacle)
+	7
+	Semaphore
+	16
+			1 (sem_bc)
+			1
+	Event flag
+	16
+		1 (flg_motion)
+	1 (flg_line)
+		2 (flg_mission, flg_obst)
+	4
+	Mailbox
+	12
+		1 (mbx_motion)
+			1 (mbx_nav)
+	2
+	Mutex
+	12
+		2 (mtx_steer, mtx_odom)
+		1 (mtx_terrain)
+	1 (mtx_obst)
+	4
+	Message buffer
+	12
+	3 (event, telemetry, cmd)
+					3
+	Cyclic handler
+	12
+		1 (cyc_motion)
+	1 (cyc_line)
+	1 (cyc_imu)
+	1 (cyc_obst 60 ms)
+	4
+	Appendix D. Timing Budget and Derivations
+Quantity
+	Derivation
+	Value
+	Consequence
+	Design speeds
+	Team choice
+	cruise 0.30 m/s, SLOW 0.15 m/s, worst case 0.40 m/s 
+	Sampling limits (NFR1, NFR2) use the 0.40 m/s worst case; stopping and IMU budgets (NFR6, NFR8) use the 0.30 m/s cruise speed. 
+	Barcode narrow element
+	141 mm ÷ 47 modules (3 × 15 + 2 gaps)
+	≈ 3.0 mm
+	Verified ratio from sample; length 'approx' per spec
+	Narrow element dwell
+	3.0 mm ÷ 0.40 / 0.25 / 0.15 m/s
+	7.5 / 12 / 20 ms
+	< 10 ms tick at top speed → ISR capture required
+	Edge timing resolution
+	RP2040 µs timer
+	1 µs = 0.013 % of 7.5 ms
+	Quantisation negligible
+	Whole barcode pass
+	141 mm ÷ 0.3 m/s
+	≈ 470 ms; 30 edges
+	Fits the 64-entry ring buffer
+	Line sample spacing
+	0.40 m/s × 10 ms
+	4 mm
+	≥ 4 samples across the 18 mm line
+	E-stop worst case
+	2 pings × 60 ms + 20 ms motion cycle
+	140 ms → 42 mm at 0.3 m/s
+	150 mm threshold leaves ≥ 100 mm margin before braking distance
+	Coarse scan
+	5 × (150 ms settle + 60 ms ping)
+	≈ 1.05 s
+	A9 to validate settle time
+	Fine scan
+	7 steps × 2 sweeps × (≈ 25 ms settle per 5° + 60 ms ping)
+	≈ 1.2 s
+	A9 / S5-U03 confirm settle time
+	Stop to line found
+	coarse 1.05 s + fine 1.2 s + bypass drive ≈ 0.7 m at 0.3 m/s (≈ 2.3 s)
+	≈ 4.5 s ( B band)
+	Includes three 45° in-place turns (≈ 1.5 s). Bypassing at 0.4 m/s hits B band (< 5 s). A band (< 3 s) is unreachable with two fine sweeps. 
+	Ultrasonic echo max
+	400 cm × 58 µs/cm
+	23.2 ms
+	Timeout at 30 ms = path clear
+	IMU travel per sample
+	0.30 m/s × 20 ms
+	6 mm
+	≥ 10 samples on a 60 mm hump face
+	Telemetry bandwidth
+	Up to 160 bytes at 2 Hz, plus heartbeat
+	Under 400 bytes per second
+	Negligible for WiFi
+	Stack RAM
+	7 tasks × 2048 B
+	14 KB of 264 KB SRAM (5.3 %)
+	TASK_STACK_SIZE from app.h
+	IMU FIFO fill
+	400 Hz × 20 ms
+	8 samples
+	8 of 32 FIFO slots; the task can be late by up to 3 cycles before overrun
+	IMU I2C read per cycle
+	8 × 6 B + address ≈ 50 B × 9 bits ÷ 400 kHz
+	≈ 1.2 ms
+	≈ 6 % of the 20 ms period, inside NFR11's 20 %
+	Pitch error from uncorrected acceleration
+	atan(0.5 m/s² ÷ 9.81 m/s²)
+	≈ 2.9°
+	Why a_fwd from odom is subtracted
+	Height error from a 1° offset
+	100 mm hump face × sin 1°
+	≈ 1.7 mm
+	Inside ±5 mm; the reset in FLAT stops it accumulating
+	Appendix E. Planned Test Cases (testing/ folder)
+Test ID
+	What is checked (pass criterion)
+	Verifies
+	S3-U01
+	IR calibration contrast ≥ 800 counts on track paper, 3 lighting conditions
+	FR2
+	S3-U02
+	Line tracking: 3 laps of the practice loop at 0.3 m/s without LINE_LOST
+	FR1, NFR1
+	S3-U03
+	Barcode edge-width log, 10 passes × 3 speeds; ratio 2.2–3.8, 29 elements
+	FR4, NFR2, A1
+	S3-U04
+	Decode A/B/C/D (+ Z) 10 passes × 3 speeds, both directions, incl. junction crossing; ≥ 9/10, 0 wrong
+	FR4, FR5, NFR3, A13
+	S3-U05
+	Junction and line-loss events at marked positions, 10 trials each
+	FR3
+	S3-U06
+	GP26 continuity / single-source check
+	A2
+	S2-U01
+	Encoder counts per wheel revolution, 10 revolutions
+	FR7
+	S2-U02
+	PID step response 0→0.25 m/s, settle ±10 % ≤ 0.5 s, full and low battery
+	FR7, NFR4
+	S2-U03
+	Turn accuracy 90°/180°, 10 trials each
+	FR6, NFR5
+	S2-U04
+	PWM frequency on GP8–GP12 with scope
+	A5
+	S2-U05
+	MF_ESTOP → brake latency (GPIO toggle + scope), 20 trials
+	NFR6, FR15
+	S4-U01
+	Static pitch on a 0/5/10/15° ramp; pitch error while accelerating and braking on a flat floor ≤ 1° with the a_fwd correction
+	FR8, FR18, A6
+	S4-U02
+	Peak hump height vs 10/20/30 mm blocks, one shorter and one longer than the wheelbase, 10 runs each
+	FR8, NFR8, A6, A17
+	S4-U03
+	Impact: bump a fixed block at 0.15 m/s, 10 trials, MF_ESTOP latency logged with MQTT running; 0 false triggers over a full lap including the humps
+	FR14, NFR16, A18
+	S4-U04
+	Turn rate from encoders vs 10 × 90° and 10 × 180° turns measured on video; magnetometer heading with motors off vs on
+	FR20, A7
+	S4-U05
+	Motion classification on a scripted run (stop, accelerate, cruise, turn, hump, bump): ≥ 95 % of samples in the right class, no class shorter than 100 ms reported
+	FR19
+	S5-U01
+	HC-SR04 accuracy at 10/30/50 cm, 20 pings each
+	FR9, NFR7
+	S5-U02
+	Echo pin voltage ≤ 3.3 V before connection
+	A8
+	S5-U03
+	Servo settle time per 30° and 5° step, at full and low battery; angle at 30/60/90/120/150° checked with a protractor
+	A9, FR10
+	S5-U04
+	Profile width vs 3 boxes of known width at 15/20/30 cm, 10 runs each; width error ≤ 10 %
+	FR10, NFR13, A16
+	S5-U05
+	20 approaches at 0.3 m/s: detected 100 %, slows below 35 cm, correct side chosen 100 %, every decision in the mbf_event log
+	FR9, FR16, NFR13
+	S1-U01
+	Telemetry rate at least 2 Hz, heartbeat 1 Hz over 10 min
+	FR12, NFR9
+	S1-U02
+	Switch access point off mid-run, then broker; robot keeps running, telemetry resumes ≤ 15 s, broker shows offline ≤ 10 s, drop_count reported
+	NFR9, NFR14, FR17, A14
+	S1-U03
+	START/STOP/RESET via MQTT and GP20; STOP round trip < 300 ms in ≥ 95% of 50 trials; RESET leaves motors braked
+	FR13, NFR15
+	INT-01
+	Barcode → mbx_nav → turn → reacquire, 10 runs per command
+	FR5, FR6, A11
+	INT-02
+	Obstacle at 0.3 m/s → stop ≥ 50 mm before it, with MQTT running
+	FR9, NFR6
+	INT-03
+	Hump height using live odometry
+	FR8
+	INT-04
+	All tasks + MQTT 10 min: 0 period overruns, WCET ≤ 20 %, stack ≤ 75 %
+	NFR9, NFR11, A10
+	INT-05
+	Shared gpio_isr: encoder + barcode + echo + button edges simultaneously
+	A4, IF-11
+	INT-06
+	Bypass and line reacquisition ≤ 300 mm, 20 trials, ≥ 19/20; stop-to-EV_LINE_FOUND time logged
+	FR11, NFR10, NFR13
+	SYS-01
+	Full course run end-to-end, 3 runs, telemetry recorded
+	All FR
+	Appendix F. Cross-Check Against Project Documents
+Source requirement
+	Covered by
+	Status / note
+	Write-up Mission 1–3 (line, barcode, commands incl. U-turn)
+	FR1–FR6
+	Covered. U-turn is in the Mission list but missing from the Buddy 3 task list; included here.
+	Write-up Mission 4–5 (hump detect, peak)
+	FR8
+	Covered (accelerometer + odometry).
+	Write-up Mission 6–9 (obstacle detect, profile, bypass, reacquire)
+	FR9–FR11
+	Covered; stages 1–5 of Buddy 5 map to Section 6.4 states.
+	Write-up Mission 10 (WiFi telemetry)
+	FR12, FR13, FR17, NFR14, NFR15
+	Covered within the TEAM.md WiFi rule.
+	Write-up 'robust to lighting, imperfections, speed'
+	FR2, NFR3, Section 6.2 classifier
+	Calibration + speed-independent decoding.
+	Write-up constraint: µT-Kernel, C, Pico SDK, template repo, Barr-C
+	NFR12
+	Covered.
+	Briefing: central Vehicle Controller
+	vehicle_ctrl_task (S5)
+	Ownership pending team decision D1.
+	Buddy 4 'turn-rate monitoring', 'motion classification'
+	FR18–FR20, A7
+	Covered: no gyroscope, so turn rate is encoder-derived; classification inside imu_task.
+	TEAM.md Section 2–Section 6 (pins, peripherals, priorities, interfaces, budget)
+	Section 2, Section 3, App. B, App. C
+	Priorities deviate from default bands by proposal (Section 3).
+	testing/README.md (S#-U##, INT-##, SYS-## IDs)
+	Section 7, App. A
+	Every assumption and requirement names a test ID.
+	Appendix G. Open Team Decisions Before Tribunal 1
+ID
+	Decision needed
+	Current proposal
+	D1
+	Who owns the Vehicle Controller (mission state machine)?
+	Proposed: Buddy 5 / S5, per template example. Alternative: shared app_main.c owned by the team.
+	D2
+	Official barcode character → command mapping.
+	Ask the instructor; table is configurable (A13).
+	D3
+	How is the end of the course signalled?
+	Ask the instructor (A12).
+	D4
+	Move HC-SR04 from Grove 1 (GP0/GP1) to Grove 2 (GP2/GP3) so CRASH_REPORT=1 stays usable?
+	Resolved: HC-SR04 on Grove 2 (GP2/GP3)
+	D5
+	Agree MQTT publish code inside cyw43_utk_task.
+	Buddy 1 to raise with the instructor (A10).
