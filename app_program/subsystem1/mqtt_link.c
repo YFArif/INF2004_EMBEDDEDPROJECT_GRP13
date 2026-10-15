@@ -61,10 +61,10 @@
 #error "mqtt_config.h: MQTT_LINK_CFG_BROKER_PORT must be 1 to 65535"
 #endif
 
-/* Limits on the configured strings. The 48-character prefix cap is derived
+/* Limits on the configured strings. The 32-character prefix cap is derived
  * from lwIP's 256-byte output ring in the checks further down.
  */
-#define PREFIX_MAX_LEN          48U
+#define PREFIX_MAX_LEN          32U
 #define CLIENT_ID_MAX_LEN       32U
 #define LOGIN_MAX_LEN           32U
 
@@ -82,24 +82,24 @@
 #define OFFLINE_LEN     ((uint32_t)(sizeof(MQTT_LINK_STATUS_OFFLINE) - 1U))
 
 /* Reconnect backoff. The first retry waits 1 s and every failed attempt
- * doubles the wait, up to a cap of 30 s: 1, 2, 4, 8, 16, 30, 30, and so on.
+ * doubles the wait, up to a cap of 8 s: 1, 2, 4, 8, 8, and so on.
  * The cap keeps a car that lost WiFi briefly from sitting idle for long
  * once it is back, and keeps a dead broker from being hammered. A session
  * that stayed up for at least STABLE_SESSION_MSEC resets the wait to 1 s.
  */
 #define BACKOFF_MIN_MSEC        1000U
-#define BACKOFF_MAX_MSEC        30000U
+#define BACKOFF_MAX_MSEC        8000U
 #define STABLE_SESSION_MSEC     10000U
 
 /* lwIP gives a connect attempt 100 s, which is far too long for a car, so
  * the poll step gives up after this much time.
  */
-#define CONNECT_TIMEOUT_MSEC    15000U
+#define CONNECT_TIMEOUT_MSEC    5000U
 
 /* MQTT keep-alive in seconds. lwIP drops a silent broker after 1.5 times
- * this, which is 45 s.
+ * this, which is 7.5 s.
  */
-#define KEEPALIVE_SECONDS       30U
+#define KEEPALIVE_SECONDS       5U
 
 /* Commands are subscribed at QoS 1 so that lwIP acknowledges each one: it
  * sends a PUBACK after the last fragment (mqtt_message_received() in lwIP's

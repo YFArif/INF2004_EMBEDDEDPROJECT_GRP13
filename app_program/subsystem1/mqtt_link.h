@@ -74,7 +74,7 @@
  * Broker host, port, client ID and topic prefix come from
  * app_program/subsystem1/mqtt_config.h (see
  * app_program/subsystem1/mqtt_config.example.h). The topic prefix is
- * limited to 48 characters, which mqtt_link.c checks at compile time, so
+ * limited to 32 characters, which mqtt_link.c checks at compile time, so
  * that every packet fits lwIP's 256-byte output ring.
  */
 
@@ -105,7 +105,7 @@
  * checks that at compile time, so raising either constant may force a lower
  * prefix cap.
  */
-#define MQTT_LINK_PAYLOAD_MAX       128U
+#define MQTT_LINK_PAYLOAD_MAX       160U
 
 /* Largest command payload delivered to an application, in bytes. A longer
  * incoming command is dropped and counted in command_dropped.

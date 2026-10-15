@@ -14,10 +14,15 @@
  * the order of work in mqtt_link_init(), the last_poll_msec / b_stale
  * staleness fields mqtt_link_poll() and mqtt_link_get_status() share, and
  * the single-writer gate between mqtt_link_poll() and start_link() (see
- * mqtt_link.c's own "Single writer" note). The rest of the state machine
- * and the lwIP callbacks are not exercised here -- every test drives
- * mqtt_link_poll() with a zeroed struct netif, so link_ready() is always
- * false and run_state() never leaves MQTT_LINK_STATE_IDLE.
+ * mqtt_link.c's own "Single writer" note). Two file-local statics are
+ * also called directly, to reach state the public API cannot drive
+ * without a real broker: enter_backoff()/next_backoff() (test_backoff(),
+ * the reconnect delay sequence and its cap) and start_connect()
+ * (test_connect_info(), the keep-alive placed in the CONNECT info). The
+ * rest of the state machine and the lwIP callbacks are not exercised here
+ * -- every other test drives mqtt_link_poll() with a zeroed struct netif,
+ * so link_ready() is always false and run_state() never leaves
+ * MQTT_LINK_STATE_IDLE.
  *
  * @par What the stubs replace
  * mqtt_queue.c is replaced by stubs that record what they are given and
@@ -93,6 +98,14 @@
 
 #include "../../app_program/subsystem1/mqtt_link.c"
 
+/* Pins CONNECT_TIMEOUT_MSEC at compile time. No test here reaches
+ * MQTT_LINK_STATE_CONNECTING (every test keeps the stub netif down, so
+ * link_ready() is always false), so a regression in this constant would
+ * not be caught at run time -- this typedef fails to compile instead.
+ */
+typedef uint8_t host_test_check_connect_timeout_t[
+    (CONNECT_TIMEOUT_MSEC == 5000U) ? 1 : -1];
+
 /* Stub state. The tests set the results and read what the stubs recorded. */
 static bool                 gb_stub_ready = false;
 static int32_t              g_stub_init_result = 0;
@@ -109,6 +122,9 @@ static bool                 gb_stub_init_status_ok = false;
 static bool                 gb_stub_init_topics_ok = false;
 static uint16_t             g_stub_init_port = 0U;
 
+/* What mqtt_client_connect() last received, read by test_connect_info(). */
+static uint16_t             g_stub_connect_keep_alive = 0U;
+
 /* A netif with every field zero. netif_is_up() reads only p_netif->flags
  * (0, so "not up"), and link_ready()'s "&&" chain short-circuits there
  * without touching the IP address field -- so this is safe to pass to
@@ -122,6 +138,14 @@ static struct netif g_stub_netif;
 static const uint8_t g_data[8] = { 1U, 2U, 3U, 4U, 5U, 6U, 7U, 8U };
 static char          g_topic_max[MQTT_LINK_TOPIC_MAX + 1U];
 static char          g_topic_over[MQTT_LINK_TOPIC_MAX + 2U];
+
+/* A source buffer as large as the longest payload mqtt_link_publish()
+ * accepts. g_data is only 8 bytes, so the "longest payload" case in
+ * test_publish_accepted() must not read it as the source -- that would
+ * read past its end.
+ */
+static uint8_t       g_data_max[MQTT_LINK_PAYLOAD_MAX];
+
 static int32_t       g_failures = 0;
 
 static void say(const char * p_text);
@@ -139,6 +163,8 @@ static void test_init_queue_failure(void);
 static void test_staleness(void);
 static void test_poll_before_init(void);
 static void test_poll_after_init(void);
+static void test_connect_info(void);
+static void test_backoff(void);
 static int run_config_mode(bool b_expect_refusal);
 
 /* The queue stubs. The casts to void only silence the unused-parameter
@@ -225,9 +251,11 @@ mqtt_queue_now_msec (void)
     return (g_stub_now_msec);
 }
 
-/* The lwIP stubs. The tests never reach them, and they ignore their
- * arguments, so the casts to void only silence the compiler. A cast to
- * void discards the value, so there is no range to check.
+/* The lwIP stubs. Every test but test_connect_info() leaves these
+ * unreached, and they ignore their arguments, so the casts to void only
+ * silence the compiler -- a cast to void discards the value, so there is
+ * no range to check. mqtt_client_connect() is the one exception: it
+ * records the keep-alive it was given, for that test to read.
  */
 
 u32_t
@@ -285,7 +313,9 @@ mqtt_client_connect (mqtt_client_t * p_client, const ip_addr_t * p_addr,
     (void)port;
     (void)connection_cb;
     (void)p_arg;
-    (void)p_info;
+
+    /* Recorded for test_connect_info(); every other field is unused. */
+    g_stub_connect_keep_alive = p_info->keep_alive;
 
     return (ERR_VAL);
 }
@@ -396,6 +426,12 @@ test_publish_rejections (void)
     check(MQTT_LINK_ERR_PARAM
           == mqtt_link_publish("t", g_data, MQTT_LINK_PAYLOAD_MAX + 1U,
                                MQTT_LINK_QOS_0, false), __LINE__);
+    /* Literal 161U, so raising MQTT_LINK_PAYLOAD_MAX without also raising
+     * the boundary here still gets caught.
+     */
+    check(MQTT_LINK_ERR_PARAM
+          == mqtt_link_publish("t", g_data_max, 161U,
+                               MQTT_LINK_QOS_0, false), __LINE__);
     check(MQTT_LINK_ERR_PARAM
           == mqtt_link_publish("t", NULL, 5U, MQTT_LINK_QOS_0, false),
           __LINE__);
@@ -431,7 +467,13 @@ test_publish_accepted (void)
           == mqtt_link_publish("t", NULL, 0U, MQTT_LINK_QOS_0, false),
           __LINE__);
     check(MQTT_LINK_OK
-          == mqtt_link_publish("t", g_data, MQTT_LINK_PAYLOAD_MAX,
+          == mqtt_link_publish("t", g_data_max, MQTT_LINK_PAYLOAD_MAX,
+                               MQTT_LINK_QOS_0, false), __LINE__);
+    /* Literal 160U, so lowering MQTT_LINK_PAYLOAD_MAX below the agreed
+     * limit without also lowering this call still gets caught.
+     */
+    check(MQTT_LINK_OK
+          == mqtt_link_publish("t", g_data_max, 160U,
                                MQTT_LINK_QOS_0, false), __LINE__);
 
     /* Only the exact status topic is reserved, and only a leading cmd/ is
@@ -692,6 +734,38 @@ test_poll_after_init (void)
     check(54321U == g_published.last_poll_msec, __LINE__);
 }
 
+static void
+test_connect_info (void)
+{
+    say("-- start_connect() carries the configured keep-alive\n");
+
+    g_stub_connect_keep_alive = 0U;
+    start_connect(0U);
+
+    /* Literal 5U, so reverting KEEPALIVE_SECONDS still gets caught. */
+    check(5U == g_stub_connect_keep_alive, __LINE__);
+}
+
+static void
+test_backoff (void)
+{
+    say("-- reconnect backoff doubles and then holds its cap\n");
+
+    g_status.b_connected = false;
+    g_backoff_msec = 0U;
+
+    enter_backoff(0U);
+    check(1000U == g_backoff_msec, __LINE__);
+    enter_backoff(0U);
+    check(2000U == g_backoff_msec, __LINE__);
+    enter_backoff(0U);
+    check(4000U == g_backoff_msec, __LINE__);
+    enter_backoff(0U);
+    check(8000U == g_backoff_msec, __LINE__);
+    enter_backoff(0U);
+    check(8000U == g_backoff_msec, __LINE__);
+}
+
 /* The configuration check, run once per build of this file. */
 static int
 run_config_mode (bool b_expect_refusal)
@@ -739,6 +813,7 @@ main (int argc, char * * pp_argv)
     g_topic_max[MQTT_LINK_TOPIC_MAX] = '\0';
     memset(g_topic_over, 'a', MQTT_LINK_TOPIC_MAX + 1U);
     g_topic_over[MQTT_LINK_TOPIC_MAX + 1U] = '\0';
+    memset(g_data_max, 'p', MQTT_LINK_PAYLOAD_MAX);
 
     if (argc > 1)
     {
@@ -756,6 +831,8 @@ main (int argc, char * * pp_argv)
         test_staleness();
         test_poll_before_init();
         test_poll_after_init();
+        test_connect_info();
+        test_backoff();
 
         if (0 == g_failures)
         {

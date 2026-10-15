@@ -63,12 +63,12 @@
  * of 4 bytes, so a buffer holds exactly MQTT_LINK_QUEUE_DEPTH records when
  * it is MQTT_LINK_QUEUE_DEPTH times the cost of one:
  *
- *   publish: 182-byte record -> 184 + 4 =  188 bytes;  8 x 188 = 1504 bytes
+ *   publish: 214-byte record -> 216 + 4 =  220 bytes;  8 x 220 = 1760 bytes
  *   command: 116-byte record -> 116 + 4 =  120 bytes;  8 x 120 =  960 bytes
- *   total static RAM for the two buffers                         2464 bytes
+ *   total static RAM for the two buffers                         2720 bytes
  *
  * NOTE: The figures above are for a depth of 8, MQTT_LINK_TOPIC_MAX 48,
- * MQTT_LINK_PAYLOAD_MAX 128 and MQTT_LINK_COMMAND_MAX 64. The macros
+ * MQTT_LINK_PAYLOAD_MAX 160 and MQTT_LINK_COMMAND_MAX 64. The macros
  * recompute them if those constants change.
  */
 #define PUBLISH_BUF_BYTES       (MQTT_LINK_QUEUE_DEPTH * PUBLISH_COST_BYTES)
