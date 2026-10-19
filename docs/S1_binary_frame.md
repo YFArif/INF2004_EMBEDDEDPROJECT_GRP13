@@ -337,9 +337,9 @@ changed only the test log). `arm-none-eabi-size`:
 | `mqtt_queue.o` | 560 B | 0 B | 2733 B | `g_publish_buf` 1760 (`mbf_telemetry` storage), `g_command_buf` 960 (`mbf_cmd` storage) |
 | **Total** | **3014 B** | **1 B** | **3381 B** | |
 
-These match the computed figures in `mqtt_queue.c`: publish record
-214 B, cost 220 B, 8 x 220 = 1760 B; command record 116 B, cost 120 B,
-8 x 120 = 960 B; 2720 B for the two buffers.
+These match the computed figures in `mqtt_queue.c` at `pre-minbit`:
+publish record 214 B, cost 220 B, 8 x 220 = 1760 B; command record
+116 B, cost 120 B, 8 x 120 = 960 B; 2720 B for the two buffers.
 
 **In the linked image these objects take 0 B today.** Nothing calls the
 driver until Stage 3, so `--gc-sections` drops every section of both
@@ -613,7 +613,10 @@ and version 2; a wrong type in the low nibble; a command with opcode 0
 
 Build checks (mutation, like S1-U04): change one layout constant at a
 time (a field position, `MSG_TEL_BYTES`, `MQTT_LINK_COMMAND_MAX`) and
-confirm the build stops at the compile-time check.
+confirm the build stops at the compile-time check. S1-U05 runs the layout
+mutations; S1-U07 (`testing/subsystem1/run_link_test.sh`) runs the
+`MQTT_LINK_COMMAND_MAX` and `MQTT_LINK_PAYLOAD_MAX` ones, because that
+check is compiled from `mqtt_link.c` and needs the lwIP headers.
 
 ### 10.2 Golden vectors
 

@@ -90,28 +90,30 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "msg_layout.h"
+
 /* Largest topic suffix, in characters, excluding the terminating NUL.
  * A suffix is the part of a topic after the configured prefix, for
  * example "telemetry/state".
- * NOTE: Provisional, for the same reason as MQTT_LINK_PAYLOAD_MAX.
+ * NOTE: Provisional; it could shrink to fit the real suffixes
+ * (docs/S1_binary_frame.md, section 9.2).
  */
 #define MQTT_LINK_TOPIC_MAX         48U
 
-/* Largest payload an application may publish, in bytes.
- * NOTE: Provisional. The value stands until the other buddies define their
- * telemetry messages, then it is sized to the largest of them. The topic
- * prefix cap, MQTT_LINK_TOPIC_MAX and this value together must keep the
- * largest publish packet inside lwIP's 256-byte output ring. mqtt_link.c
- * checks that at compile time, so raising either constant may force a lower
- * prefix cap.
+/* Largest payload an application may publish, in bytes: the largest
+ * packed message in msg_layout.h (docs/S1_binary_frame.md, section 9.2).
+ * The topic prefix cap, MQTT_LINK_TOPIC_MAX and this value together must
+ * keep the largest publish packet inside lwIP's 256-byte output ring;
+ * mqtt_link.c checks that, and that every message fits, at compile time.
  */
-#define MQTT_LINK_PAYLOAD_MAX       160U
+#define MQTT_LINK_PAYLOAD_MAX       MSG_MAX_BYTES
 
-/* Largest command payload delivered to an application, in bytes. A longer
- * incoming command is dropped and counted in command_dropped.
- * NOTE: Provisional, for the same reason as MQTT_LINK_PAYLOAD_MAX.
+/* Largest command payload delivered to an application, in bytes: one
+ * packed COMMAND message (msg_layout.h). A longer incoming command is
+ * dropped and counted in command_dropped; mqtt_link.c checks this value
+ * against MSG_CMD_BYTES at compile time.
  */
-#define MQTT_LINK_COMMAND_MAX       64U
+#define MQTT_LINK_COMMAND_MAX       MSG_CMD_BYTES
 
 /* Number of messages the publish queue holds. When the queue is full a new
  * message is not queued: mqtt_link_publish() returns
