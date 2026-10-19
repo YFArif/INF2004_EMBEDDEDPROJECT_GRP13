@@ -562,7 +562,7 @@ before they are run.
 |---|---|---|---|
 | S1-U05 | Host round trip of every message type; cases listed in 10.1 | Every case in 10.1 gives its expected value; lengths match sections 3 to 6; bad version, type or length rejected | Version B (R3, "encode-decode test") |
 | INT (B1 + all) | Encode on the robot, decode on the dashboard, every packet type | Every decoded value matches what was sent; message sizes as in 9.1 | Version B tables |
-| S1-U03 (redefined) | STOP over the binary command: 50 trials | Robot stops and the ack arrives in under 300 ms in at least 95 % of trials (NFR15) | Version B tables; Week 6 NFR15 |
+| S1-U06 (replaces S1-U03) | STOP over the binary command: 50 trials | Robot stops and the ack arrives in under 300 ms in at least 95 % of trials (NFR15) | Version B tables; Week 6 NFR15 |
 | INT (S4 + S1) | `imu_task` run time and lateness before and after packing, with WiFi telemetry running | Well inside 20 ms; never more than 60 ms late (no FIFO overflow) | Submitted document |
 | Week 13 | RAM and message size, before and after | Section 8 vs the same measurement after | Change requirement |
 
@@ -618,7 +618,7 @@ confirm the build stops at the compile-time check.
 ### 10.2 Golden vectors
 
 One or more fixed byte strings per message type. They were produced by a
-Python script (`golden.py`, not yet in the repository) that reads
+Python script (`testing/subsystem1/golden.py`) that reads
 the field widths and offsets from this document's own tables and packs
 each value as a string of 0/1 characters, MSB first. It shares no code
 with the C codec, so it is an independent check of both the codec and
