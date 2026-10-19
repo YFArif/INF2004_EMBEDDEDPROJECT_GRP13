@@ -31,3 +31,4 @@ Add a new row for every run. Never edit or delete old rows.
 | YYYY-MM-DD | S1-U01 | `abc1234` | | PASS / FAIL | `logs/YYYY-MM-DD_….txt` | |
 | 2026-10-14 | S1-U04 | `01d8fee` | 2502893 | PASS | `logs/2026-10-14_host_test_mqtt_link.txt` | driver differs from b307336 by comments only (ae4758c), builds byte-identical; 4/4 mutations caught |
 | 2026-10-16 | S1-U04 | `429c7e9` | 2502893 | PASS | `logs/2026-10-16_host_test_mqtt_link.txt` | constants aligned with Week 6 (back-off 8 s, keep-alive 5 s, connect timeout 5 s, payload 160 B, prefix 32); 5/5 mutations caught (connect timeout via compile-time pin); default and NET=lwip builds byte-identical to b307336 |
+| 2026-10-20 | S1-U05 | `1858c7d` | 2502893 | PASS | `logs/2026-10-20_host_test_msg_codec.txt` | 248 checks, 18/18 vectors agree, 10/10 mutations caught (4 compile-time, 6 run-time), target compile ok; Apple clang 17.0.0 with UBSan/ASan, arm-none-eabi-gcc 15.3.1 |
