@@ -1,0 +1,27 @@
+S1-U07 run_link_test.sh, 2026-10-20 00:55:07 +08
+commit: d604644
+cc: Apple clang version 17.0.0 (clang-1700.6.4.2)
+== stage 1: build the host test
+stage 1: ok
+== stage 2: run
+-- publish rejections
+-- publish accepted cases
+-- get_status
+-- receive_command
+-- incoming commands: 2-byte limit, whole and in fragments
+-- init order, good configuration
+-- a second init after success does nothing
+-- init when the queue cannot be created
+-- last_poll_msec / b_stale
+-- poll before init: no crash, no publish, stamp still happens
+-- poll after a successful init publishes
+-- start_connect() carries the configured keep-alive
+-- reconnect backoff doubles and then holds its cap
+RESULT: all passed
+stage 2: ok
+== stage 3: compile-time check of the caps
+unmutated copy: clean compile
+L1 MQTT_LINK_COMMAND_MAX MSG_CMD_BYTES -> 3U: caught by mqtt_link_check_caps_t
+L2 MQTT_LINK_PAYLOAD_MAX MSG_MAX_BYTES -> 24U: caught by mqtt_link_check_caps_t
+stage 3: 2/2 mutations caught
+S1-U07: PASS (host test all passed, clean compile of the copy, 2/2 cap mutations caught by mqtt_link_check_caps_t)
