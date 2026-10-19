@@ -360,13 +360,14 @@ S1 static RAM before, **object level plus computed `mbf_event`** (stack
 not counted): 3382 B + 2048 B = **5430 B**. This is not a linked-image
 figure; the linked-image figure is in 8.3.
 
-### 8.3 Linked-image before (measured 19 Oct 2026)
+### 8.3 Linked-image before and after (measured 19 and 20 Oct 2026)
 
 Goal: an image-level number that includes the driver, without changing
 driver code, the makefiles or any tracked file. Unlike 8.2, these are
 linked-image figures, not object sizes.
 
-**Result.** Measured with the method below (option A): the `NET=lwip
+**Before (measured 19 Oct 2026, `pre-minbit`).** Measured with the
+method below (option A): the `NET=lwip
 MQTT=1` profile, built from the exported `pre-minbit` tree with the
 placeholder `.example` configs. "Normal" is that profile's own
 `_lwip_mqtt.elf`; "rooted" is the same objects linked again with the 13
@@ -399,11 +400,38 @@ and `.bss.g_command_buf` (960 B) in RAM, and neither is under
   functions 324 B (`strcmp`, `memchr`, `strpbrk`, `strcpy`), other lwIP
   and libtm pieces 312 B, and 2 B of alignment.
 
-**The "after"** will be measured the same way, with the same 13 roots,
-once the driver change (caps from the layout header, 9.2) is in. The
-codec is not a root, so the difference isolates the change to the
-driver; the codec's own size is taken from its object file
-(`msg_codec.o`: 4124 B text, 0 data, 0 bss at the profile's `-O2`).
+**After (measured 20 Oct 2026, driver change `d604644`).** Same method
+and the same 13 roots: `rooted_link.sh` ran unchanged in the exported
+`d604644` tree, whose own link line differs from it only by
+`msg_codec.o` (nothing refers to it, so the linker drops it either way).
+
+| Section | Before (`pre-minbit`) | After (`d604644`) | Change |
+|---|---|---|---|
+| text | +5324 B | +5192 B | -132 B |
+| data | +4 B | +4 B | 0 B |
+| bss | +3388 B | +1624 B | -1764 B |
+| **Static RAM (data + bss)** | **+3392 B** | **+1628 B** | **-1764 B (-52 %)** |
+
+The normal image is unchanged (339368 / 96 / 82356). The rooted map
+places `.bss.g_publish_buf` at 672 B (0x2a0) and `.bss.g_command_buf` at
+480 B (0x1e0).
+
+- **bss +1624 B:** the new bss symbols total 1619 B: the driver's
+  1617 B (`mqtt_link.o` 452 + `mqtt_queue.o` 1165, see 9.2) plus the
+  same 2 B of lwIP DNS state as before. The other 5 B is alignment
+  padding.
+- **data +4 B:** unchanged (`gb_command_drop` plus 3 B of padding).
+- **text -132 B:** `mqtt_link.o`'s own text fell from 2454 to 2320 B
+  (-134 B) with the smaller records; the other 2 B is alignment.
+
+Not in these figures:
+
+- **The codec.** Nothing calls it yet, so it is neither in the image
+  nor a root. Its flash cost is a separate, computed line from its
+  object file: `msg_codec.o` 4124 B text, 0 data, 0 bss at the
+  profile's `-O2`.
+- **`mbf_event`.** Stage 3 builds it; until then its 2048 -> 240 B stays
+  computed (9.2).
 
 **Tag.** The local annotated tag `pre-minbit` on `a25b9f4` (the last
 commit before any minimum-bit change) lets the "before" be rebuilt at
@@ -467,10 +495,10 @@ give through constant propagation.
 
 **What Week 13 will report, labelled "static":**
 
-1. **Static, rooted link (driver only).** Before: the table above, at
-   `pre-minbit`. After: the same 13 roots on the commit with the driver
-   change. Same recipe, so the difference isolates the change to the
-   driver buffers.
+1. **Static, rooted link (driver only).** Before and after: the tables
+   above (`pre-minbit` and `d604644`), with the same 13 roots and the
+   same recipe, so the difference isolates the change to the driver
+   buffers.
 2. **Static, Stage 3/4 build.** `pre-minbit` cannot give this "before",
    because no Stage 3/4 code exists at that commit. Instead, once Stage 3
    and 4 exist, the same Stage 3/4 code is built twice: once with the old
@@ -491,7 +519,11 @@ option A, slightly more realistic code generation, but it is more code
 to write and keep in step with the compiler flags. Not needed, since
 option A worked.
 
-## 9. After, computed from this draft (not measured)
+## 9. After
+
+9.1 is computed from the layout. In 9.2 the driver objects and the two
+message buffers are measured (20 Oct 2026, `d604644`); `mbf_event` stays
+computed until Stage 3 builds it.
 
 ### 9.1 Message sizes
 
@@ -508,19 +540,18 @@ Example on the wire, topic `robot/telemetry` (15 characters, a guess),
 QoS 0: before 1 + 2 + 2 + 15 + 138 = 158 B, after 1 + 1 + 2 + 15 + 25 =
 44 B.
 
-### 9.2 RAM, if the driver caps are cut to the largest message
+### 9.2 RAM with the driver caps cut to the largest message
 
-**The caps come from the layout header, not typed numbers.** When the
-driver is changed (step 4 of the S1 plan, after this layout is agreed),
-`mqtt_link.h` includes the layout header and defines:
+**The caps come from the layout header, not typed numbers.** Since
+`d604644`, `mqtt_link.h` includes the layout header and defines:
 
 ```
 #define MQTT_LINK_PAYLOAD_MAX   MSG_MAX_BYTES   /* largest message */
 #define MQTT_LINK_COMMAND_MAX   MSG_CMD_BYTES
 ```
 
-and a compile-time check (a negative-size array typedef, the pattern
-`mqtt_link.c` and `mqtt_queue.c` already use) stops the build unless:
+and `mqtt_link_check_caps_t` in `mqtt_link.c` (a negative-size array
+typedef, the pattern the driver already uses) stops the build unless:
 
 - every message length (`MSG_TEL_BYTES`, `MSG_HB_BYTES`, `MSG_EVT_BYTES`,
   `MSG_ACK_BYTES`) is at most `MQTT_LINK_PAYLOAD_MAX`;
@@ -530,23 +561,33 @@ and a compile-time check (a negative-size array typedef, the pattern
 
 So dropping or widening a field changes the buffers automatically, and a
 cap that no longer fits a message cannot build. With today's layout the
-header gives 25 and 2; the numbers below are those values put through
-the record and cost formulas in `mqtt_queue.c` (depth 8, and
-`MQTT_LINK_TOPIC_MAX` 48 unchanged). If turn_rate is dropped (section 7),
+header gives 25 and 2 (depth 8, and `MQTT_LINK_TOPIC_MAX` 48
+unchanged). If turn_rate is dropped (section 7),
 `MSG_MAX_BYTES` becomes 24: the publish record shrinks to 78 B but still
 costs 84 B in the buffer (rounded up to 4), so the totals below do not
 change.
 
-| Item | Before | After | How |
-|---|---|---|---|
-| Publish record | 214 B | 80 B | 49 topic + 1 pad + 2 len + 1 qos + 1 retain + 25 payload = 79, struct aligned to 80 |
-| `mbf_telemetry` (8 records) | 1760 B | 672 B | 8 x (4 + 80) |
-| Command record | 116 B | 54 B | 49 topic + 1 pad + 2 len + 2 payload |
-| `mbf_cmd` (8 records) | 960 B | 480 B | 8 x (4 + 56) |
-| `mqtt_link.o` bss | 648 B | 452 B | `g_pending` 214 -> 80, `g_command` 116 -> 54 |
-| `mqtt_queue.o` bss | 2733 B | 1165 B | the two buffers + 13 B of IDs and counters |
-| `mbf_event` (30 events) | 2048 B | 240 B | 30 x (4 + 4), record 3 B rounded to 4 |
-| **S1 static RAM, object level plus computed `mbf_event`** | **5430 B** | **about 1858 B** | Not linked-image figures; see 8.3 for those |
+| Item | Before | After | How | Status of "after" |
+|---|---|---|---|---|
+| Publish record | 214 B | 80 B | 49 topic + 1 pad + 2 len + 1 qos + 1 retain + 25 payload = 79, struct aligned to 80 | measured (`sizeof`, host and target) |
+| `mbf_telemetry` (8 records) | 1760 B | 672 B | 8 x (4 + 80) | measured (rooted map, 0x2a0) |
+| Command record | 116 B | 54 B | 49 topic + 1 pad + 2 len + 2 payload | measured (`sizeof`, host and target) |
+| `mbf_cmd` (8 records) | 960 B | 480 B | 8 x (4 + 56) | measured (rooted map, 0x1e0) |
+| `mqtt_link.o` bss | 648 B | 452 B | `g_pending` 214 -> 80, `g_command` 116 -> 54 | measured (`arm-none-eabi-size`) |
+| `mqtt_queue.o` bss | 2733 B | 1165 B | the two buffers + 13 B of IDs and counters | measured (`arm-none-eabi-size`) |
+| `mbf_event` (30 events) | 2048 B | 240 B | 30 x (4 + 4), record 3 B rounded to 4 | computed (Stage 3 not built) |
+| **S1 static RAM, object level plus computed `mbf_event`** | **5430 B** | **about 1858 B** | Not linked-image figures; see 8.3 for those | mixed: see below |
+
+**Measured saving: 1764 B** of static RAM for the driver objects and the
+two buffers, the same at object level (3382 -> 1618 B: `mqtt_link.o`
+648 + 1 data -> 452 + 1, `mqtt_queue.o` 2733 -> 1165) and in the linked
+image (3392 -> 1628 B, 8.3). The 3572 B difference of the total row
+also contains the computed `mbf_event` saving of 1808 B (2048 -> 240 B),
+which is only confirmed once Stage 3 builds `mbf_event`.
+
+**Codec flash (computed, separate):** `msg_codec.o` adds 4124 B of text
+(0 data, 0 bss) at the profile's `-O2` once Stage 4 calls it; until then
+it is not in the image.
 
 The 49-byte topic now dominates the publish record (49 of 80 bytes).
 Cutting `MQTT_LINK_TOPIC_MAX` to fit the real suffixes would save more.
