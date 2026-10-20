@@ -261,9 +261,11 @@ can be acked:
 
 | Case | Where it stops | Acked? | Counted in |
 |---|---|---|---|
-| Payload longer than `MQTT_LINK_COMMAND_MAX` (2 B once the cap comes from the layout header, 9.2) | The driver, before the codec: `incoming_publish_cb` accepts a message only if `total_len <= MQTT_LINK_COMMAND_MAX` (`mqtt_link.c:1344`); otherwise the payload is never copied | **No.** The cmd_id is never read, so there is nothing to echo. The dashboard sees a timeout. | `command_dropped` in the driver status (`mqtt_link.c:1201`) |
-| Topic suffix longer than `MQTT_LINK_TOPIC_MAX`, or the command queue full | The driver, same path | No | `command_dropped` (`mqtt_link.c:1201` and `1209`) |
+| Payload longer than `MQTT_LINK_COMMAND_MAX` (2 B once the cap comes from the layout header, 9.2) | The driver, before the codec: `incoming_publish_cb` accepts a message only if `total_len <= MQTT_LINK_COMMAND_MAX` (`mqtt_link.c:1363`); otherwise the payload is never copied | **No.** The cmd_id is never read, so there is nothing to echo. The dashboard sees a timeout. | `command_dropped` in the driver status (`mqtt_link.c:1220`) |
+| Topic suffix longer than `MQTT_LINK_TOPIC_MAX`, or the command queue full | The driver, same path | No | `command_dropped` (`mqtt_link.c:1220` and `1228`) |
 | Shorter than 2 B, wrong version or type, or opcode 0 | The codec, in `telemetry_task` | Yes, result 1. opcode and cmd_id are echoed when the length, version and type are right; otherwise both are 0. | `cmd_reject` (kept by `telemetry_task`) |
+
+Line numbers in this table are as of `df58a14`.
 
 The driver does count the oversize case, but in its own
 `command_dropped`, which also counts over-long topics and a full queue.
@@ -424,6 +426,37 @@ places `.bss.g_publish_buf` at 672 B (0x2a0) and `.bss.g_command_buf` at
 - **text -132 B:** `mqtt_link.o`'s own text fell from 2454 to 2320 B
   (-134 B) with the smaller records; the other 2 B is alignment.
 
+**After the topic ID (measured 20 Oct 2026, `df58a14`).** Same method,
+the same 13 roots and the same `rooted_link.sh`, in the exported
+`df58a14` tree. `df58a14` replaces the topic string in the queue records
+with a one-byte topic ID in the publish record and no topic in the
+command record (9.2).
+
+| Section | Before (`pre-minbit`) | After (`d604644`) | After topic ID (`df58a14`) | Change from `d604644` | Change from `pre-minbit` |
+|---|---|---|---|---|---|
+| text | +5324 B | +5192 B | +4832 B | -360 B | -492 B |
+| data | +4 B | +4 B | +4 B | 0 B | 0 B |
+| bss | +3388 B | +1624 B | +724 B | -900 B | -2664 B |
+| **Static RAM (data + bss)** | **+3392 B** | **+1628 B** | **+728 B** | **-900 B** | **-2664 B (-79 %)** |
+
+The normal image is unchanged (339368 / 96 / 82356, byte-identical to
+the `d604644` one). The rooted map places `.bss.g_publish_buf` at 288 B
+(0x120), `.bss.g_command_buf` at 64 B (0x40), `g_pending` at 32 B and
+`g_command` at 4 B.
+
+- **bss +724 B:** the driver's bss is 719 B (`mqtt_link.o` 354 +
+  `mqtt_queue.o` 365, see 9.2), plus the same 2 B of lwIP DNS state. The
+  other 3 B is alignment padding.
+- **data +4 B:** unchanged.
+- **text -360 B:** in the rooted maps, `mqtt_link.o`'s placed text fell
+  from 2236 to 2112 B (-124 B: the topic string checks went, the 12 B
+  suffix table came in) and `mqtt_queue.o`'s from 560 to 556 B; the C
+  library's `strcmp` (136 B) and `memchr` (112 B) are no longer linked,
+  because only the removed checks used them. The other +16 B is in the
+  merged-string section the map lists under `libtm_printf.o`, where the
+  linker pools identical strings from all objects, so string bytes move
+  between objects there.
+
 Not in these figures:
 
 - **The codec.** Nothing calls it yet, so it is neither in the image
@@ -495,9 +528,9 @@ give through constant propagation.
 **What Week 13 will report, labelled "static":**
 
 1. **Static, rooted link (driver only).** Before and after: the tables
-   above (`pre-minbit` and `d604644`), with the same 13 roots and the
-   same recipe, so the difference isolates the change to the driver
-   buffers.
+   above (`pre-minbit`, then `d604644` and `df58a14`), with the same 13
+   roots and the same recipe, so the difference isolates the change to
+   the driver buffers.
 2. **Static, Stage 3/4 build.** `pre-minbit` cannot give this "before",
    because no Stage 3/4 code exists at that commit. Instead, once Stage 3
    and 4 exist, the same Stage 3/4 code is built twice: once with the old
@@ -521,9 +554,9 @@ option A worked.
 ## 9. After
 
 9.1 is computed from the layout. In 9.2 the driver objects and the two
-message buffers are measured (20 Oct 2026, `d604644`), and so is the
-codec's flash (S1-U08 build, `3814f93`); `mbf_event` stays computed
-until Stage 3 builds it.
+message buffers are measured (20 Oct 2026, `d604644` and, with the topic
+ID, `df58a14`), and so is the codec's flash (S1-U08 build, `3814f93`);
+`mbf_event` stays computed until Stage 3 builds it.
 
 ### 9.1 Message sizes
 
@@ -536,11 +569,12 @@ until Stage 3 builds it.
 | Heartbeat payload | not defined | 9 B | - |
 | Ack payload | not defined | 3 B | - |
 
-Example on the wire, topic `robot/telemetry` (15 characters, a guess),
+Example on the wire, topic `robot/telemetry` (15 characters; the suffix
+is fixed by the topic ID, the prefix `robot` is a guess),
 QoS 0: before 1 + 2 + 2 + 15 + 138 = 158 B, after 1 + 1 + 2 + 15 + 25 =
 44 B.
 
-### 9.2 RAM with the driver caps cut to the largest message
+### 9.2 RAM with the driver caps cut to the largest message, and the topic ID
 
 **The caps come from the layout header, not typed numbers.** Since
 `d604644`, `mqtt_link.h` includes the layout header and defines:
@@ -561,29 +595,33 @@ typedef, the pattern the driver already uses) stops the build unless:
 
 So dropping or widening a field changes the buffers automatically, and a
 cap that no longer fits a message cannot build. With today's layout the
-header gives 25 and 2 (depth 8, and `MQTT_LINK_TOPIC_MAX` 48
-unchanged). If turn_rate is dropped (section 7),
-`MSG_MAX_BYTES` becomes 24: the publish record shrinks to 78 B but still
-costs 84 B in the buffer (rounded up to 4), so the totals below do not
-change.
+header gives 25 and 2 (depth 8). Since `df58a14` the publish record
+carries a one-byte topic ID instead of a topic string, and the command
+record carries no topic (see the end of this section). If turn_rate is
+dropped (section 7), `MSG_MAX_BYTES` becomes 24: the publish record
+shrinks to 30 B but still costs 36 B in the buffer (rounded up to 4),
+so the totals below do not change.
 
-| Item | Before | After | How | Status of "after" |
-|---|---|---|---|---|
-| Publish record | 214 B | 80 B | 49 topic + 1 pad + 2 len + 1 qos + 1 retain + 25 payload = 79, struct aligned to 80 | measured (`sizeof`, host and target) |
-| `mbf_telemetry` (8 records) | 1760 B | 672 B | 8 x (4 + 80) | measured (rooted map, 0x2a0) |
-| Command record | 116 B | 54 B | 49 topic + 1 pad + 2 len + 2 payload | measured (`sizeof`, host and target) |
-| `mbf_cmd` (8 records) | 960 B | 480 B | 8 x (4 + 56) | measured (rooted map, 0x1e0) |
-| `mqtt_link.o` bss | 648 B | 452 B | `g_pending` 214 -> 80, `g_command` 116 -> 54 | measured (`arm-none-eabi-size`) |
-| `mqtt_queue.o` bss | 2733 B | 1165 B | the two buffers + 13 B of IDs and counters | measured (`arm-none-eabi-size`) |
-| `mbf_event` (30 events) | 2048 B | 240 B | 30 x (4 + 4), record 3 B rounded to 4 | computed (Stage 3 not built) |
-| **S1 static RAM, object level plus computed `mbf_event`** | **5430 B** | **about 1858 B** | Not linked-image figures; see 8.3 for those | mixed: see below |
+| Item | Before | After caps (`d604644`) | After topic ID (`df58a14`) | How (`df58a14`) | Status of `df58a14` |
+|---|---|---|---|---|---|
+| Publish record | 214 B | 80 B | 32 B | 1 topic ID + 1 pad + 2 len + 1 qos + 1 retain + 25 payload = 31, struct aligned to 32 | measured (`sizeof`, host and target) |
+| `mbf_telemetry` (8 records) | 1760 B | 672 B | 288 B | 8 x (4 + 32) | measured (rooted map, 0x120) |
+| Command record | 116 B | 54 B | 4 B | 2 len + 2 payload, no topic | measured (`sizeof`, host and target) |
+| `mbf_cmd` (8 records) | 960 B | 480 B | 64 B | 8 x (4 + 4) | measured (rooted map, 0x40) |
+| `mqtt_link.o` bss | 648 B | 452 B | 354 B | `g_pending` 214 -> 80 -> 32, `g_command` 116 -> 54 -> 4 | measured (`arm-none-eabi-size`) |
+| `mqtt_queue.o` bss | 2733 B | 1165 B | 365 B | the two buffers + 13 B of IDs and counters | measured (`arm-none-eabi-size`) |
+| `mbf_event` (30 events) | 2048 B | 240 B | 240 B | 30 x (4 + 4), record 3 B rounded to 4 | computed (Stage 3 not built) |
+| **S1 static RAM, object level plus computed `mbf_event`** | **5430 B** | **about 1858 B** | **about 960 B** | Not linked-image figures; see 8.3 for those | mixed: see below |
 
-**Measured saving: 1764 B** of static RAM for the driver objects and the
-two buffers, the same at object level (3382 -> 1618 B: `mqtt_link.o`
-648 + 1 data -> 452 + 1, `mqtt_queue.o` 2733 -> 1165) and in the linked
-image (3392 -> 1628 B, 8.3). The 3572 B difference of the total row
-also contains the computed `mbf_event` saving of 1808 B (2048 -> 240 B),
-which is only confirmed once Stage 3 builds `mbf_event`.
+**Measured saving: 2664 B** of static RAM in the linked image for the
+driver objects and the two buffers (3392 -> 1628 -> 728 B, 8.3): 1764 B
+from the caps (`d604644`) and 900 B more from the topic ID (`df58a14`).
+At object level it is 2662 B (3382 -> 1618 -> 720 B: `mqtt_link.o`
+648 + 1 data -> 452 + 1 -> 354 + 1, `mqtt_queue.o` 2733 -> 1165 -> 365);
+the 2 B difference is alignment padding in the linked image. The 4470 B
+difference of the total row also contains the computed `mbf_event`
+saving of 1808 B (2048 -> 240 B), which is only confirmed once Stage 3
+builds `mbf_event`.
 
 **Codec flash (measured, separate):** the `NET=lwip MQTT=1` image with
 the codec in it (the 11 public codec functions linked as roots) is
@@ -603,9 +641,15 @@ runs below the WiFi service and is reported only (worst call 8303 us).
 All figures are in the S1-U08 row of
 `testing/subsystem1/TEST_LOG.md` (2026-10-20, `3814f93`).
 
-The 49-byte topic now dominates the publish record (49 of 80 bytes).
-Cutting `MQTT_LINK_TOPIC_MAX` to fit the real suffixes would save more.
-That is a separate decision and is not counted above.
+**Topic ID (`df58a14`).** The publish record carries a one-byte topic ID
+instead of the 49-byte topic string, as the Week 6 IF-10 design
+specified for `mbf_telemetry` (section 11), and the command record
+carries no topic: every command arrives under `cmd/`, and its opcode is
+in the payload. `MQTT_LINK_TOPIC_MAX` (48) now sizes only the driver's
+topic buffers (`g_status_topic` and `g_cmd_filter`, 82 B each, and an
+82 B stack buffer in the poll service when it publishes) and the longest
+incoming command topic. Cutting it is a separate decision and is not
+counted above.
 
 ## 10. Tests this layout needs
 
@@ -672,9 +716,10 @@ and version 2; a wrong type in the low nibble; a command with opcode 0
 Build checks (mutation, like S1-U04): change one layout constant at a
 time (a field position, `MSG_TEL_BYTES`, `MQTT_LINK_COMMAND_MAX`) and
 confirm the build stops at the compile-time check. S1-U05 runs the layout
-mutations; S1-U07 (`testing/subsystem1/run_link_test.sh`) runs the
-`MQTT_LINK_COMMAND_MAX` and `MQTT_LINK_PAYLOAD_MAX` ones, because that
-check is compiled from `mqtt_link.c` and needs the lwIP headers.
+mutations; S1-U09 (`testing/subsystem1/run_link_test.sh`, which replaced
+S1-U07) runs the `MQTT_LINK_COMMAND_MAX` and `MQTT_LINK_PAYLOAD_MAX` ones
+and the topic table ones, because those checks are compiled from
+`mqtt_link.c` and need the lwIP headers.
 
 ### 10.2 Golden vectors
 
@@ -743,8 +788,18 @@ zeros = `00`.
   `mqtt_link.h`). It is a session marker rather than application data.
   Decide whether to keep it as text or make it one byte.
 - The Week 6 IF-10 design put a one-byte topic ID (T, E, A) at the start
-  of each `mbf_telemetry` message. The driver's record carries a topic
-  string instead, so that byte is not needed.
+  of each `mbf_telemetry` message. Since `df58a14` the publish record
+  carries that ID (`mqtt_link_topic_t`: TELEMETRY 0, EVENT 1, ACK 2), and
+  `mqtt_link.c` maps it to `<prefix>/telemetry`, `<prefix>/event` or
+  `<prefix>/ack`; the command record carries no topic. The heartbeat is
+  published on the telemetry topic: IF-10 has three IDs, and the header's
+  type nibble (2.1) tells HEARTBEAT from TELEMETRY. A separate heartbeat
+  topic, if the dashboard wants one, is a small change: one enum value in
+  `mqtt_link.h` with `MQTT_LINK_TOPIC_COUNT` raised to 4, one suffix with
+  its table entry in `mqtt_link.c` (and in `mqtt_link_check_suffix_t`),
+  and S1-U09's first unused value moved from 3 to 4.
+  `mqtt_link_check_table_t` stops the build if the count and the table
+  disagree.
 - Ack topic: the Week 6 report still says `robot/cmd/ack`; this draft
   uses `<prefix>/ack`.
 - `uptime_s` saturates at 65535 s (about 18 h) rather than wrapping.
