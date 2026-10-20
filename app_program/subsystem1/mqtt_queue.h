@@ -56,7 +56,7 @@
  */
 typedef struct
 {
-    char        topic[MQTT_LINK_TOPIC_MAX + 1U];    /* Suffix, NUL end.     */
+    uint8_t     topic_id;                           /* mqtt_link_topic_t.   */
     uint16_t    payload_len;
     uint8_t     qos;                                /* 0 or 1.              */
     bool        b_retain;

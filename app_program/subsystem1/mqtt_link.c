@@ -117,13 +117,12 @@
 
 #define STATUS_READ_ATTEMPTS    8U
 
-/* The topic level under the prefix that carries commands to the car. */
-#define COMMAND_LEVEL           "cmd/"
-/* Same cast reasoning as HOST_LEN and the other string-length macros
- * above: sizeof is a compile-time constant, so the cast to uint32_t
- * cannot lose any bits.
+/* Suffix of each topic ID (mqtt_link_topic_t). None is
+ * MQTT_LINK_TOPIC_STATUS or under "cmd/", so no task can publish there.
  */
-#define COMMAND_LEVEL_LEN       ((uint32_t)(sizeof(COMMAND_LEVEL) - 1U))
+#define TOPIC_TELEMETRY         "telemetry"
+#define TOPIC_EVENT             "event"
+#define TOPIC_ACK               "ack"
 
 /* lwIP's value for the last part of an incoming message, as an unsigned
  * mask. The check further down makes sure it still matches lwIP.
@@ -188,6 +187,13 @@ typedef uint8_t mqtt_link_check_incoming_t[(INCOMING_HEADER_MAX \
     <= MQTT_VAR_HEADER_BUFFER_LEN) ? 1 : -1];
 typedef uint8_t mqtt_link_check_flag_t[(MQTT_DATA_FLAG_LAST \
     == DATA_FLAG_LAST_MASK) ? 1 : -1];
+/* Every topic suffix fits MQTT_LINK_TOPIC_MAX, which sizes the topic buffer
+ * and the publish packet check above.
+ */
+typedef uint8_t mqtt_link_check_suffix_t[ \
+    (((sizeof(TOPIC_TELEMETRY) - 1U) <= MQTT_LINK_TOPIC_MAX) \
+     && ((sizeof(TOPIC_EVENT) - 1U) <= MQTT_LINK_TOPIC_MAX) \
+     && ((sizeof(TOPIC_ACK) - 1U) <= MQTT_LINK_TOPIC_MAX)) ? 1 : -1];
 /* The caps come from msg_layout.h: every message the robot publishes must
  * fit the publish cap, and the command cap must be exactly one COMMAND
  * message (docs/S1_binary_frame.md, section 9.2).
@@ -250,6 +256,20 @@ static uint32_t                 g_pending_attempts = 0U;
 static uint32_t                 g_step_start_msec = 0U;
 static uint32_t                 g_session_start_msec = 0U;
 static uint32_t                 g_backoff_msec = 0U;
+
+/* Suffix of each topic ID, indexed by the ID. */
+static const char * const       g_topic_suffix[] =
+{
+    [MQTT_LINK_TOPIC_TELEMETRY] = TOPIC_TELEMETRY,
+    [MQTT_LINK_TOPIC_EVENT]     = TOPIC_EVENT,
+    [MQTT_LINK_TOPIC_ACK]       = TOPIC_ACK
+};
+
+/* One suffix for each topic ID: an ID added without a suffix stops the
+ * build here.
+ */
+typedef uint8_t mqtt_link_check_table_t[((sizeof(g_topic_suffix) \
+    / sizeof(g_topic_suffix[0])) == MQTT_LINK_TOPIC_COUNT) ? 1 : -1];
 
 static void memory_barrier(void);
 static void publish_status(void);
@@ -400,7 +420,7 @@ mqtt_link_get_status (mqtt_link_status_t * p_status)
 /*!
  * @brief Queue one message for publication.
  *
- * @param[in] p_topic     Topic suffix, NUL terminated.
+ * @param[in] topic       Topic ID.
  * @param[in] p_payload   Payload bytes.
  * @param[in] payload_len Payload size.
  * @param[in] qos         Quality of service.
@@ -410,41 +430,21 @@ mqtt_link_get_status (mqtt_link_status_t * p_status)
  *         MQTT_LINK_ERR_FULL or MQTT_LINK_ERR_KERNEL.
  */
 int32_t
-mqtt_link_publish (const char * p_topic, const uint8_t * p_payload,
+mqtt_link_publish (mqtt_link_topic_t topic, const uint8_t * p_payload,
                    uint16_t payload_len, mqtt_link_qos_t qos, bool b_retain)
 {
     int32_t              result = MQTT_LINK_OK;
-    mqtt_queue_publish_t msg = { .topic = { '\0' }, .payload_len = 0U,
+    mqtt_queue_publish_t msg = { .topic_id = 0U, .payload_len = 0U,
                                  .qos = 0U, .b_retain = false,
                                  .payload = { 0U } };
-    size_t               topic_len = 0U;
 
-    if ((NULL == p_topic) || ('\0' == p_topic[0]))
+    /* Whether the enum is signed or unsigned is implementation-defined.
+     * The cast to uint32_t keeps a value of 0 or more as it is and turns a
+     * negative value into one of at least 2^31, far above
+     * MQTT_LINK_TOPIC_COUNT, so this one comparison refuses both.
+     */
+    if ((uint32_t)topic >= MQTT_LINK_TOPIC_COUNT)
     {
-        result = MQTT_LINK_ERR_PARAM;
-    }
-    else if ('/' == p_topic[0])
-    {
-        /* A leading slash would leave an empty level after the prefix. */
-        result = MQTT_LINK_ERR_PARAM;
-    }
-    else if (NULL == memchr(p_topic, '\0', MQTT_LINK_TOPIC_MAX + 1U))
-    {
-        result = MQTT_LINK_ERR_PARAM;
-    }
-    else if ((NULL != strpbrk(p_topic, "#+"))
-             || (0 == strcmp(p_topic, MQTT_LINK_TOPIC_STATUS)))
-    {
-        /* Wildcards are illegal in a publish topic, and the status topic
-         * belongs to the driver.
-         */
-        result = MQTT_LINK_ERR_PARAM;
-    }
-    else if (0 == strncmp(p_topic, COMMAND_LEVEL, COMMAND_LEVEL_LEN))
-    {
-        /* A message published under cmd/ would come back to this car as a
-         * command, because the car subscribes to that level.
-         */
         result = MQTT_LINK_ERR_PARAM;
     }
     else if ((payload_len > MQTT_LINK_PAYLOAD_MAX)
@@ -455,8 +455,11 @@ mqtt_link_publish (const char * p_topic, const uint8_t * p_payload,
     }
     else
     {
-        topic_len = strlen(p_topic);
-        memcpy(msg.topic, p_topic, topic_len);
+        /* The first check above refused every topic of
+         * MQTT_LINK_TOPIC_COUNT (3) or more, so here it is 0 to 2 and the
+         * cast to uint8_t cannot lose any bits.
+         */
+        msg.topic_id = (uint8_t)topic;
 
         if (payload_len > 0U)
         {
@@ -933,7 +936,8 @@ take_pending (void)
 {
     const int32_t result = mqtt_queue_get_publish(&g_pending);
 
-    if (MQTT_LINK_OK == result)
+    if ((MQTT_LINK_OK == result)
+        && (g_pending.topic_id < MQTT_LINK_TOPIC_COUNT))
     {
         gb_pending_valid = true;
         g_pending_attempts = 0U;
@@ -944,7 +948,10 @@ take_pending (void)
     }
     else
     {
-        /* The record is lost, and the read already removed it. */
+        /* The record is lost, and the read already removed it. A topic ID
+         * out of range, which mqtt_link_publish() never queues, is lost
+         * the same way rather than used as a table index.
+         */
         g_status.publish_failed++;
     }
 }
@@ -961,7 +968,10 @@ submit_pending (uint32_t now_msec)
     char  topic[FULL_TOPIC_BYTES];
     err_t result = ERR_OK;
 
-    build_topic(topic, g_pending.topic);
+    /* take_pending() lets only a topic ID below MQTT_LINK_TOPIC_COUNT into
+     * g_pending, so the index is inside g_topic_suffix.
+     */
+    build_topic(topic, g_topic_suffix[g_pending.topic_id]);
 
     /* The retain flag is 0 or 1, so it fits lwIP's 8-bit argument. */
     result = mqtt_publish(gp_client, topic, g_pending.payload,
@@ -1352,7 +1362,6 @@ incoming_publish_cb (void * p_arg, const char * p_topic, u32_t total_len)
         if ((strlen(p_suffix) <= MQTT_LINK_TOPIC_MAX)
             && (total_len <= MQTT_LINK_COMMAND_MAX))
         {
-            strcpy(g_command.topic, p_suffix);
             gb_command_drop = false;
         }
     }

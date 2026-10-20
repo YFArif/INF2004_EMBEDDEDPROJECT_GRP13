@@ -42,8 +42,8 @@
  * split between the two callers.
  *
  * @par Command topic length
- * A command arrives on "<prefix>/cmd/...". The topic delivered to the
- * application is the part after the prefix, including "cmd/", and it must
+ * A command arrives on "<prefix>/cmd/...". Only the payload is delivered;
+ * the part of the topic after the prefix, including "cmd/", must still
  * fit MQTT_LINK_TOPIC_MAX characters; a longer one is dropped and counted
  * in command_dropped. A command name after "cmd/" can therefore be at most
  * MQTT_LINK_TOPIC_MAX minus 4 characters. lwIP's incoming header buffer
@@ -67,8 +67,8 @@
  * ("<prefix>/status", payload "offline"). After each successful connect it
  * publishes a retained "online" on the same topic. A listener therefore
  * sees "online" while the car is connected and "offline" after the broker
- * notices it has gone. The driver owns this topic; mqtt_link_publish()
- * rejects it.
+ * notices it has gone. The driver owns this topic, and no topic ID
+ * (mqtt_link_topic_t) maps to it.
  *
  * @par Configuration
  * Broker host, port, client ID and topic prefix come from
@@ -94,7 +94,8 @@
 
 /* Largest topic suffix, in characters, excluding the terminating NUL.
  * A suffix is the part of a topic after the configured prefix, for
- * example "telemetry/state".
+ * example "cmd/stop". It sizes the topic buffers in mqtt_link.c and
+ * limits an incoming command topic; the queue records hold no topic.
  * NOTE: Provisional; it could shrink to fit the real suffixes
  * (docs/S1_binary_frame.md, section 9.2).
  */
@@ -174,10 +175,22 @@ typedef enum
     MQTT_LINK_QOS_1 = 1             /* At least once.                 */
 } mqtt_link_qos_t;
 
+/** Topic of a published message: the one-byte topic ID of IF-10 (Week 6
+ * design). mqtt_link.c maps each ID to "<prefix>/<suffix>".
+ */
+typedef enum
+{
+    MQTT_LINK_TOPIC_TELEMETRY = 0,  /* T: "telemetry", also the heartbeat. */
+    MQTT_LINK_TOPIC_EVENT     = 1,  /* E: "event".                         */
+    MQTT_LINK_TOPIC_ACK       = 2   /* A: "ack".                           */
+} mqtt_link_topic_t;
+
+/* Number of topic IDs: every value below this one is an ID. */
+#define MQTT_LINK_TOPIC_COUNT       3U
+
 /** One command received from the broker. */
 typedef struct
 {
-    char        topic[MQTT_LINK_TOPIC_MAX + 1U];    /* Suffix, NUL end. */
     uint16_t    payload_len;
     uint8_t     payload[MQTT_LINK_COMMAND_MAX];
 } mqtt_link_command_t;
@@ -289,7 +302,7 @@ bool mqtt_link_get_status(mqtt_link_status_t * p_status);
  *
  * WARNING: measured with -fstack-usage against this port's real build
  * flags: this function's own frame plus mqtt_queue_put_publish()'s is
- * about 224 bytes, before whatever the kernel's own tk_snd_mbf() adds on
+ * about 72 bytes, before whatever the kernel's own tk_snd_mbf() adds on
  * top. A caller on app.h's default TASK_STACK_SIZE (2048 bytes) must
  * budget for that on top of its own locals and call depth -- app.h's own
  * note that tm_printf alone costs about 1 KB leaves little headroom if
@@ -297,23 +310,20 @@ bool mqtt_link_get_status(mqtt_link_status_t * p_status);
  * function its own larger stack via tk_cre_tsk() rather than
  * app_start_task()'s shared default.
  *
- * NOTE: A topic under "cmd/" is refused because the car subscribes to that
+ * NOTE: No topic ID maps under "cmd/", because the car subscribes to that
  * level and would receive its own message back as a command.
  *
- * @param[in] p_topic     Topic suffix, NUL terminated, at most
- *                        MQTT_LINK_TOPIC_MAX characters. It must not be
- *                        MQTT_LINK_TOPIC_STATUS, start with a slash or
- *                        with "cmd/", or contain # or +.
+ * @param[in] topic       Topic ID, below MQTT_LINK_TOPIC_COUNT.
  * @param[in] p_payload   Payload bytes. May be NULL when payload_len is 0.
  * @param[in] payload_len Payload size, at most MQTT_LINK_PAYLOAD_MAX.
  * @param[in] qos         Quality of service.
  * @param[in] b_retain    True to ask the broker to retain the message.
  *
  * @return MQTT_LINK_OK, MQTT_LINK_ERR_PARAM, MQTT_LINK_ERR_NOT_READY or
- *         MQTT_LINK_ERR_FULL. MQTT_LINK_ERR_PARAM covers every refused
- *         topic listed above, and any other bad argument.
+ *         MQTT_LINK_ERR_FULL. MQTT_LINK_ERR_PARAM covers a value that is
+ *         not a topic ID, and any other bad argument.
  */
-int32_t mqtt_link_publish(const char * p_topic, const uint8_t * p_payload,
+int32_t mqtt_link_publish(mqtt_link_topic_t topic, const uint8_t * p_payload,
                           uint16_t payload_len, mqtt_link_qos_t qos,
                           bool b_retain);
 
@@ -321,8 +331,8 @@ int32_t mqtt_link_publish(const char * p_topic, const uint8_t * p_payload,
  * @brief Take the next command received from the broker.
  *
  * Called by the application dispatcher task only. Commands arrive on the
- * topics under "<prefix>/cmd/" and the delivered topic is the suffix after
- * the prefix.
+ * topics under "<prefix>/cmd/"; only the payload is delivered, not the
+ * topic.
  *
  * If mqtt_link_init() has not succeeded, this returns
  * MQTT_LINK_ERR_NOT_READY at once, even with MQTT_LINK_WAIT_FOREVER, because

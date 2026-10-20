@@ -7,16 +7,17 @@
  * @brief Host test for the public half of mqtt_link.c.
  *
  * @par Test IDs
- * Since the driver takes its caps from msg_layout.h
- * (MQTT_LINK_PAYLOAD_MAX 25, MQTT_LINK_COMMAND_MAX 2), this file is
- * S1-U07, run by testing/subsystem1/run_link_test.sh. Its earlier form,
- * S1-U04, pinned the Week 6 caps (160 and 64); it can still be re-run by
- * checking out 429c7e9.
+ * Since the queue records carry a topic ID (mqtt_link_topic_t) instead of
+ * a topic string, this file is S1-U09, run by
+ * testing/subsystem1/run_link_test.sh. Its earlier forms can still be
+ * re-run by checking out the commit named: S1-U07, string topics with the
+ * caps from msg_layout.h (92d58a6), and S1-U04, the Week 6 caps of 160 and
+ * 64 (429c7e9).
  *
  * @par What it tests
  * The real app_program/subsystem1/mqtt_link.c is compiled on the build
  * machine, not on the Pico, and its public functions are called directly:
- * topic validation in mqtt_link_publish(), the seqlock reader in
+ * topic ID validation in mqtt_link_publish(), the seqlock reader in
  * mqtt_link_get_status(), the pass-through in mqtt_link_receive_command(),
  * the order of work in mqtt_link_init(), the last_poll_msec / b_stale
  * staleness fields mqtt_link_poll() and mqtt_link_get_status() share, and
@@ -28,7 +29,10 @@
  * (test_connect_info(), the keep-alive placed in the CONNECT info). The
  * incoming-message callbacks incoming_publish_cb() and incoming_data_cb()
  * are also called directly (test_incoming_commands(), the 2-byte command
- * limit, whole and in fragments). The rest of the state machine is not
+ * limit, whole and in fragments, and the topic length limit), and so are
+ * take_pending() and submit_pending() (test_topic_mapping(), the full
+ * topic of each ID and a queued record with an ID out of range). The rest
+ * of the state machine is not
  * exercised here -- every other test drives mqtt_link_poll() with a
  * zeroed struct netif,
  * so link_ready() is always false and run_state() never leaves
@@ -43,8 +47,10 @@
  * lwIP functions mqtt_link.c calls (sys_now, dns_gethostbyname,
  * ip4addr_aton, mqtt_client_new, mqtt_set_inpub_callback,
  * mqtt_client_connect, mqtt_disconnect, mqtt_publish and mqtt_sub_unsub)
- * are replaced by stubs that are never reached by these tests. The lwIP
- * headers themselves are the real ones.
+ * are replaced by stubs. Only test_connect_info() reaches
+ * mqtt_client_connect(), and only test_topic_mapping() reaches
+ * mqtt_publish(), which records the topic it is given. The lwIP headers
+ * themselves are the real ones.
  *
  * @par Build gate
  * mqtt_link.c's whole body is gated on TM_MQTT (see its own "Build gate"
@@ -143,6 +149,14 @@ static uint16_t             g_stub_init_port = 0U;
 static int32_t              g_stub_cmd_calls = 0;
 static mqtt_link_command_t  g_stub_cmd_last;
 
+/* What mqtt_queue_get_publish() returns, and the record it hands out. */
+static int32_t              g_stub_get_result = MQTT_LINK_ERR_TIMEOUT;
+static mqtt_queue_publish_t g_stub_get_msg;
+
+/* What mqtt_publish() returns, and the topic it last received. */
+static err_t                g_stub_publish_result = ERR_VAL;
+static char                 g_stub_publish_topic[FULL_TOPIC_BYTES];
+
 /* What mqtt_client_connect() last received, read by test_connect_info(). */
 static uint16_t             g_stub_connect_keep_alive = 0U;
 
@@ -160,6 +174,11 @@ static const uint8_t g_data[8] = { 1U, 2U, 3U, 4U, 5U, 6U, 7U, 8U };
 static char          g_topic_max[MQTT_LINK_TOPIC_MAX + 1U];
 static char          g_topic_over[MQTT_LINK_TOPIC_MAX + 2U];
 
+/* An incoming topic, "<prefix>/<suffix>", with room for a suffix one
+ * character longer than MQTT_LINK_TOPIC_MAX.
+ */
+static char          g_in_topic[FULL_TOPIC_BYTES + 1U];
+
 /* A source buffer as large as the longest payload mqtt_link_publish()
  * accepts. g_data is only 8 bytes, so the "longest payload" case in
  * test_publish_accepted() must not read it as the source -- that would
@@ -172,8 +191,9 @@ static int32_t       g_failures = 0;
 static void say(const char * p_text);
 static void say_failure(int line);
 static void check(bool b_ok, int line);
-static void expect_param(const char * p_topic, int line);
-static void expect_ok(const char * p_topic, int line);
+static void expect_param(mqtt_link_topic_t topic, int line);
+static void expect_ok(mqtt_link_topic_t topic, int line);
+static void make_in_topic(const char * p_suffix);
 static void test_publish_rejections(void);
 static void test_publish_accepted(void);
 static void test_get_status(void);
@@ -187,6 +207,7 @@ static void test_poll_before_init(void);
 static void test_poll_after_init(void);
 static void test_connect_info(void);
 static void test_backoff(void);
+static void test_topic_mapping(void);
 static int run_config_mode(bool b_expect_refusal);
 
 /* The queue stubs. The casts to void only silence the unused-parameter
@@ -235,10 +256,13 @@ mqtt_queue_put_publish (const mqtt_queue_publish_t * p_msg)
 int32_t
 mqtt_queue_get_publish (mqtt_queue_publish_t * p_msg)
 {
-    /* The stub never has a message, and does not need the argument. */
-    (void)p_msg;
+    /* The stub hands out g_stub_get_msg when the test asks for success. */
+    if (MQTT_LINK_OK == g_stub_get_result)
+    {
+        *p_msg = g_stub_get_msg;
+    }
 
-    return (MQTT_LINK_ERR_TIMEOUT);
+    return (g_stub_get_result);
 }
 
 int32_t
@@ -274,11 +298,12 @@ mqtt_queue_now_msec (void)
     return (g_stub_now_msec);
 }
 
-/* The lwIP stubs. Every test but test_connect_info() leaves these
- * unreached, and they ignore their arguments, so the casts to void only
- * silence the compiler -- a cast to void discards the value, so there is
- * no range to check. mqtt_client_connect() is the one exception: it
- * records the keep-alive it was given, for that test to read.
+/* The lwIP stubs. Only test_connect_info() and test_topic_mapping() reach
+ * any of them. Two record what they are given, for those tests to read:
+ * mqtt_client_connect() the keep-alive and mqtt_publish() the topic. The
+ * other arguments are ignored, so the casts to void only silence the
+ * compiler -- a cast to void discards the value, so there is no range to
+ * check.
  */
 
 u32_t
@@ -355,7 +380,6 @@ mqtt_publish (mqtt_client_t * p_client, const char * p_topic,
               mqtt_request_cb_t done_cb, void * p_arg)
 {
     (void)p_client;
-    (void)p_topic;
     (void)p_payload;
     (void)length;
     (void)qos;
@@ -363,7 +387,12 @@ mqtt_publish (mqtt_client_t * p_client, const char * p_topic,
     (void)done_cb;
     (void)p_arg;
 
-    return (ERR_VAL);
+    /* Recorded for test_topic_mapping(). build_topic() wrote the topic into
+     * a buffer of this size, so it always fits.
+     */
+    strcpy(g_stub_publish_topic, p_topic);
+
+    return (g_stub_publish_result);
 }
 
 err_t
@@ -406,22 +435,31 @@ check (bool b_ok, int line)
 
 /* Publish one byte to a topic and expect it to be refused. */
 static void
-expect_param (const char * p_topic, int line)
+expect_param (mqtt_link_topic_t topic, int line)
 {
     const int32_t calls = g_stub_put_calls;
 
     check((MQTT_LINK_ERR_PARAM
-           == mqtt_link_publish(p_topic, g_data, 1U, MQTT_LINK_QOS_0, false))
+           == mqtt_link_publish(topic, g_data, 1U, MQTT_LINK_QOS_0, false))
           && (calls == g_stub_put_calls), line);
 }
 
 /* Publish one byte to a topic and expect it to reach the queue. */
 static void
-expect_ok (const char * p_topic, int line)
+expect_ok (mqtt_link_topic_t topic, int line)
 {
     check(MQTT_LINK_OK
-          == mqtt_link_publish(p_topic, g_data, 1U, MQTT_LINK_QOS_0, false),
+          == mqtt_link_publish(topic, g_data, 1U, MQTT_LINK_QOS_0, false),
           line);
+}
+
+/* Put "<prefix>/<suffix>" in g_in_topic. */
+static void
+make_in_topic (const char * p_suffix)
+{
+    memcpy(g_in_topic, MQTT_LINK_CFG_TOPIC_PREFIX, PREFIX_LEN);
+    g_in_topic[PREFIX_LEN] = '/';
+    strcpy(&g_in_topic[PREFIX_LEN + 1U], p_suffix);
 }
 
 /* The tests. */
@@ -429,37 +467,40 @@ expect_ok (const char * p_topic, int line)
 static void
 test_publish_rejections (void)
 {
-    const int32_t calls = g_stub_put_calls;
+    const int32_t           calls = g_stub_put_calls;
+    const mqtt_link_topic_t topic = MQTT_LINK_TOPIC_TELEMETRY;
 
     say("-- publish rejections\n");
     g_stub_put_result = MQTT_LINK_OK;
 
-    expect_param(NULL, __LINE__);
-    expect_param("", __LINE__);
-    expect_param("/leading", __LINE__);
-    expect_param("status", __LINE__);
-    expect_param("a#", __LINE__);
-    expect_param("#", __LINE__);
-    expect_param("a/+/b", __LINE__);
-    expect_param(g_topic_over, __LINE__);
-    expect_param("cmd/x", __LINE__);
-    expect_param("cmd/", __LINE__);
-    expect_param("cmd/mission/stop", __LINE__);
+    /* Values that are not topic IDs: the first unused one (literal 3, so
+     * an ID added without updating this test is caught), a larger one and
+     * a negative one. The casts are the only way to pass such values,
+     * which is the point of these checks. 3 and 255 fit the enum's
+     * underlying type, signed or unsigned; -1 stays negative or becomes a
+     * large unsigned value, and the driver must refuse either.
+     */
+    expect_param((mqtt_link_topic_t)3, __LINE__);
+    expect_param((mqtt_link_topic_t)255, __LINE__);
+    expect_param((mqtt_link_topic_t)-1, __LINE__);
 
     check(MQTT_LINK_ERR_PARAM
-          == mqtt_link_publish("t", g_data, MQTT_LINK_PAYLOAD_MAX + 1U,
+          == mqtt_link_publish(topic, g_data, MQTT_LINK_PAYLOAD_MAX + 1U,
                                MQTT_LINK_QOS_0, false), __LINE__);
     /* Literal 26U, so raising MQTT_LINK_PAYLOAD_MAX without also raising
      * the boundary here still gets caught.
      */
     check(MQTT_LINK_ERR_PARAM
-          == mqtt_link_publish("t", g_data_max, 26U,
+          == mqtt_link_publish(topic, g_data_max, 26U,
                                MQTT_LINK_QOS_0, false), __LINE__);
     check(MQTT_LINK_ERR_PARAM
-          == mqtt_link_publish("t", NULL, 5U, MQTT_LINK_QOS_0, false),
+          == mqtt_link_publish(topic, NULL, 5U, MQTT_LINK_QOS_0, false),
           __LINE__);
+    /* 2 is not a QoS the driver accepts. The cast is the only way to pass
+     * it, which is the point of this check.
+     */
     check(MQTT_LINK_ERR_PARAM
-          == mqtt_link_publish("t", g_data, 1U, (mqtt_link_qos_t)2, false),
+          == mqtt_link_publish(topic, g_data, 1U, (mqtt_link_qos_t)2, false),
           __LINE__);
 
     /* No rejected call may have reached the queue. */
@@ -469,52 +510,49 @@ test_publish_rejections (void)
 static void
 test_publish_accepted (void)
 {
+    const mqtt_link_topic_t topic = MQTT_LINK_TOPIC_TELEMETRY;
+
     say("-- publish accepted cases\n");
     g_stub_put_result = MQTT_LINK_OK;
 
     check(MQTT_LINK_OK
-          == mqtt_link_publish("telemetry/state", g_data, 8U,
+          == mqtt_link_publish(MQTT_LINK_TOPIC_ACK, g_data, 8U,
                                MQTT_LINK_QOS_1, true), __LINE__);
-    check(0 == strcmp(g_stub_last_msg.topic, "telemetry/state"), __LINE__);
+    /* Literal IDs here and below, so renumbering the IDs is caught. */
+    check(2U == g_stub_last_msg.topic_id, __LINE__);
     check((8U == g_stub_last_msg.payload_len)
           && (0 == memcmp(g_stub_last_msg.payload, g_data, 8U)), __LINE__);
     check((1U == g_stub_last_msg.qos) && (g_stub_last_msg.b_retain),
           __LINE__);
 
-    /* Exactly the longest topic. */
-    expect_ok(g_topic_max, __LINE__);
-    check(0 == strcmp(g_stub_last_msg.topic, g_topic_max), __LINE__);
+    /* Each topic ID is queued as its own value. */
+    expect_ok(MQTT_LINK_TOPIC_TELEMETRY, __LINE__);
+    check(0U == g_stub_last_msg.topic_id, __LINE__);
+    expect_ok(MQTT_LINK_TOPIC_EVENT, __LINE__);
+    check(1U == g_stub_last_msg.topic_id, __LINE__);
 
     /* An empty payload, and the longest payload. */
     check(MQTT_LINK_OK
-          == mqtt_link_publish("t", NULL, 0U, MQTT_LINK_QOS_0, false),
+          == mqtt_link_publish(topic, NULL, 0U, MQTT_LINK_QOS_0, false),
           __LINE__);
     check(MQTT_LINK_OK
-          == mqtt_link_publish("t", g_data_max, MQTT_LINK_PAYLOAD_MAX,
+          == mqtt_link_publish(topic, g_data_max, MQTT_LINK_PAYLOAD_MAX,
                                MQTT_LINK_QOS_0, false), __LINE__);
     /* Literal 25U, so lowering MQTT_LINK_PAYLOAD_MAX below the agreed
      * limit without also lowering this call still gets caught.
      */
     check(MQTT_LINK_OK
-          == mqtt_link_publish("t", g_data_max, 25U,
+          == mqtt_link_publish(topic, g_data_max, 25U,
                                MQTT_LINK_QOS_0, false), __LINE__);
-
-    /* Only the exact status topic is reserved, and only a leading cmd/ is
-     * refused.
-     */
-    expect_ok("status/extra", __LINE__);
-    expect_ok("cmd", __LINE__);
-    expect_ok("xcmd/y", __LINE__);
-    expect_ok("telemetry/cmd/x", __LINE__);
 
     /* Whatever the queue says is passed back. */
     g_stub_put_result = MQTT_LINK_ERR_FULL;
     check(MQTT_LINK_ERR_FULL
-          == mqtt_link_publish("t", g_data, 1U, MQTT_LINK_QOS_0, false),
+          == mqtt_link_publish(topic, g_data, 1U, MQTT_LINK_QOS_0, false),
           __LINE__);
     g_stub_put_result = MQTT_LINK_ERR_NOT_READY;
     check(MQTT_LINK_ERR_NOT_READY
-          == mqtt_link_publish("t", g_data, 1U, MQTT_LINK_QOS_0, false),
+          == mqtt_link_publish(topic, g_data, 1U, MQTT_LINK_QOS_0, false),
           __LINE__);
     g_stub_put_result = MQTT_LINK_OK;
 }
@@ -571,7 +609,8 @@ test_receive_command (void)
 }
 
 /* Incoming commands against the 2-byte limit (MQTT_LINK_COMMAND_MAX),
- * whole and in fragments, through the callbacks lwIP would call.
+ * whole and in fragments, and against the topic length limit
+ * (MQTT_LINK_TOPIC_MAX), through the callbacks lwIP would call.
  */
 static void
 test_incoming_commands (void)
@@ -582,7 +621,8 @@ test_incoming_commands (void)
     uint32_t           dropped;
     int32_t            calls;
 
-    say("-- incoming commands: 2-byte limit, whole and in fragments\n");
+    say("-- incoming commands: 2-byte limit, whole and in fragments,"
+        " topic length\n");
 
     /* 2 bytes in one piece: queued intact, nothing dropped. */
     calls = g_stub_cmd_calls;
@@ -592,7 +632,6 @@ test_incoming_commands (void)
     check((calls + 1) == g_stub_cmd_calls, __LINE__);
     check((2U == g_stub_cmd_last.payload_len)
           && (0 == memcmp(g_stub_cmd_last.payload, cmd2, 2U)), __LINE__);
-    check(0 == strcmp(g_stub_cmd_last.topic, "cmd/stop"), __LINE__);
     check(dropped == g_status.command_dropped, __LINE__);
 
     /* The same 2 bytes as two 1-byte fragments: queued intact. */
@@ -629,6 +668,23 @@ test_incoming_commands (void)
     check((calls + 1) == g_stub_cmd_calls, __LINE__);
     check(0U == g_stub_cmd_last.payload_len, __LINE__);
     check(dropped == g_status.command_dropped, __LINE__);
+
+    /* A topic whose suffix is exactly MQTT_LINK_TOPIC_MAX characters
+     * reaches the queue; one character longer is dropped, counted once.
+     */
+    calls = g_stub_cmd_calls;
+    make_in_topic(g_topic_max);
+    incoming_publish_cb(NULL, g_in_topic, 2U);
+    incoming_data_cb(NULL, cmd2, 2U, MQTT_DATA_FLAG_LAST);
+    check((calls + 1) == g_stub_cmd_calls, __LINE__);
+    check(dropped == g_status.command_dropped, __LINE__);
+
+    calls = g_stub_cmd_calls;
+    make_in_topic(g_topic_over);
+    incoming_publish_cb(NULL, g_in_topic, 2U);
+    incoming_data_cb(NULL, cmd2, 2U, MQTT_DATA_FLAG_LAST);
+    check(calls == g_stub_cmd_calls, __LINE__);
+    check((dropped + 1U) == g_status.command_dropped, __LINE__);
 }
 
 static void
@@ -850,6 +906,53 @@ test_backoff (void)
     check(8000U == g_backoff_msec, __LINE__);
 }
 
+/* Each topic ID reaches lwIP as "<prefix>/<suffix>", and a queued record
+ * whose ID is out of range is dropped before it can index the table.
+ */
+static void
+test_topic_mapping (void)
+{
+    uint32_t failed;
+
+    say("-- topic mapping: full topic of each ID, bad queued ID\n");
+
+    /* ERR_MEM means "try again later": submit_pending() changes no state,
+     * so the pending record can be reused. Literal suffixes, so a changed
+     * suffix is caught.
+     */
+    g_stub_publish_result = ERR_MEM;
+    g_pending.topic_id = 0U;
+    submit_pending(0U);
+    check(0 == strcmp(g_stub_publish_topic,
+                      MQTT_LINK_CFG_TOPIC_PREFIX "/telemetry"), __LINE__);
+    g_pending.topic_id = 1U;
+    submit_pending(0U);
+    check(0 == strcmp(g_stub_publish_topic,
+                      MQTT_LINK_CFG_TOPIC_PREFIX "/event"), __LINE__);
+    g_pending.topic_id = 2U;
+    submit_pending(0U);
+    check(0 == strcmp(g_stub_publish_topic,
+                      MQTT_LINK_CFG_TOPIC_PREFIX "/ack"), __LINE__);
+    g_stub_publish_result = ERR_VAL;
+
+    /* take_pending() keeps a record with the last ID, and drops one with
+     * the first unused value (3), counting it in publish_failed.
+     */
+    g_stub_get_result = MQTT_LINK_OK;
+    gb_pending_valid = false;
+    g_stub_get_msg.topic_id = 2U;
+    take_pending();
+    check(gb_pending_valid, __LINE__);
+
+    gb_pending_valid = false;
+    failed = g_status.publish_failed;
+    g_stub_get_msg.topic_id = 3U;
+    take_pending();
+    check(!gb_pending_valid, __LINE__);
+    check((failed + 1U) == g_status.publish_failed, __LINE__);
+    g_stub_get_result = MQTT_LINK_ERR_TIMEOUT;
+}
+
 /* The configuration check, run once per build of this file. */
 static int
 run_config_mode (bool b_expect_refusal)
@@ -918,6 +1021,7 @@ main (int argc, char * * pp_argv)
         test_poll_after_init();
         test_connect_info();
         test_backoff();
+        test_topic_mapping();
 
         if (0 == g_failures)
         {

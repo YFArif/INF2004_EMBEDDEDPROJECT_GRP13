@@ -42,7 +42,7 @@
  */
 #define WAIT_MAX_MSEC             0x7FFFFFFFU
 
-/* sizeof is a compile-time constant of a few hundred bytes, so converting
+/* sizeof is a compile-time constant of a few tens of bytes, so converting
  * it to uint32_t cannot lose any bits.
  */
 #define PUBLISH_RECORD_BYTES    ((uint32_t)sizeof(mqtt_queue_publish_t))
@@ -63,11 +63,11 @@
  * of 4 bytes, so a buffer holds exactly MQTT_LINK_QUEUE_DEPTH records when
  * it is MQTT_LINK_QUEUE_DEPTH times the cost of one:
  *
- *   publish:  80-byte record ->  80 + 4 =   84 bytes;  8 x  84 =  672 bytes
- *   command:  54-byte record ->  56 + 4 =   60 bytes;  8 x  60 =  480 bytes
- *   total static RAM for the two buffers                         1152 bytes
+ *   publish:  32-byte record ->  32 + 4 =   36 bytes;  8 x  36 =  288 bytes
+ *   command:   4-byte record ->   4 + 4 =    8 bytes;  8 x   8 =   64 bytes
+ *   total static RAM for the two buffers                          352 bytes
  *
- * NOTE: The figures above are for a depth of 8, MQTT_LINK_TOPIC_MAX 48,
+ * NOTE: The figures above are for a depth of 8, a one-byte topic ID,
  * MQTT_LINK_PAYLOAD_MAX 25 and MQTT_LINK_COMMAND_MAX 2 (both from
  * msg_layout.h). The macros recompute them if those constants change.
  */
