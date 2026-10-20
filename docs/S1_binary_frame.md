@@ -427,9 +427,8 @@ places `.bss.g_publish_buf` at 672 B (0x2a0) and `.bss.g_command_buf` at
 Not in these figures:
 
 - **The codec.** Nothing calls it yet, so it is neither in the image
-  nor a root. Its flash cost is a separate, computed line from its
-  object file: `msg_codec.o` 4124 B text, 0 data, 0 bss at the
-  profile's `-O2`.
+  nor a root. Its flash cost is measured separately (9.2, "Codec
+  flash").
 - **`mbf_event`.** Stage 3 builds it; until then its 2048 -> 240 B stays
   computed (9.2).
 
@@ -522,8 +521,9 @@ option A worked.
 ## 9. After
 
 9.1 is computed from the layout. In 9.2 the driver objects and the two
-message buffers are measured (20 Oct 2026, `d604644`); `mbf_event` stays
-computed until Stage 3 builds it.
+message buffers are measured (20 Oct 2026, `d604644`), and so is the
+codec's flash (S1-U08 build, `3814f93`); `mbf_event` stays computed
+until Stage 3 builds it.
 
 ### 9.1 Message sizes
 
@@ -585,9 +585,23 @@ image (3392 -> 1628 B, 8.3). The 3572 B difference of the total row
 also contains the computed `mbf_event` saving of 1808 B (2048 -> 240 B),
 which is only confirmed once Stage 3 builds `mbf_event`.
 
-**Codec flash (computed, separate):** `msg_codec.o` adds 4124 B of text
-(0 data, 0 bss) at the profile's `-O2` once Stage 4 calls it; until then
-it is not in the image.
+**Codec flash (measured, separate):** the `NET=lwip MQTT=1` image with
+the codec in it (the 11 public codec functions linked as roots) is
+4124 B of text larger than the baseline, 0 data, 0 bss (339368 -> 343492
+text; source: S1-U08 build log,
+`testing/subsystem1/logs/2026-10-20_s1u08_build.txt`). The real image
+gains this once Stage 4 calls the codec; until then it is not in the
+image. For the record only, `msg_codec.o` compiled alone at `-Os` is
+1774 B (same log); the build keeps `-O2`.
+
+**Codec timing (measured, S1-U08):** on the Pico W (core 1, the gated
+core), warm means are 26.778 to 27.444 us for telemetry put, 21.173 to
+21.283 us for telemetry get, 0.954 us for command put and 1.402 us for
+command get; a cold first call takes 165 to 166, 110 to 111, 10 to 11 and
+19 us. The worst core 1 call was 257 us, against the 1000 us gate. Core 0
+runs below the WiFi service and is reported only (worst call 8303 us).
+All figures are in the S1-U08 row of
+`testing/subsystem1/TEST_LOG.md` (2026-10-20, `3814f93`).
 
 The 49-byte topic now dominates the publish record (49 of 80 bytes).
 Cutting `MQTT_LINK_TOPIC_MAX` to fit the real suffixes would save more.
@@ -597,13 +611,16 @@ That is a separate decision and is not counted above.
 
 From both Version B (draft tables) and the submitted Tribunal 1 document.
 Test IDs are proposals; they go into `testing/subsystem1/TEST_LOG.md`
-before they are run.
+before they are run. The TEST_LOG rows S1-U01, S1-U02 and S1-U03 are the
+template's tests; "Week 6 plan S1-U0x" means the test the Week 6 report
+planned under that ID, which gets a new ID here.
 
 | Proposed ID | Test | Success criterion | Source |
 |---|---|---|---|
 | S1-U05 | Host round trip of every message type; cases listed in 10.1 | Every case in 10.1 gives its expected value; lengths match sections 3 to 6; bad version, type or length rejected | Version B (R3, "encode-decode test") |
 | INT (B1 + all) | Encode on the robot, decode on the dashboard, every packet type | Every decoded value matches what was sent; message sizes as in 9.1 | Version B tables |
-| S1-U06 (replaces S1-U03) | STOP over the binary command: 50 trials | Robot stops and the ack arrives in under 300 ms in at least 95 % of trials (NFR15) | Version B tables; Week 6 NFR15 |
+| S1-U06 (replaces Week 6 plan S1-U03) | STOP over the binary command: 50 trials | Robot stops and the ack arrives in under 300 ms in at least 95 % of trials (NFR15) | Version B tables; Week 6 NFR15 |
+| S1-U08 | On-target timing of the codec on the Pico W (standalone image): put and get of telemetry and command, 1000 calls each, on core 1 and core 0 | Core 1: every call round-trips and each operation's max is at most 1000 us (0.2 % of the 500 ms telemetry period, 0.33 % of the 300 ms NFR15 budget); core 0 reported only. Result: PASS on `3814f93` (TEST_LOG S1-U08 row, 2026-10-20) | Change requirement item 4 (correctness and performance); NFR15 |
 | INT (S4 + S1) | `imu_task` run time and lateness before and after packing, with WiFi telemetry running | Well inside 20 ms; never more than 60 ms late (no FIFO overflow) | Submitted document |
 | Week 13 | RAM and message size, before and after | Section 8 vs the same measurement after | Change requirement |
 
