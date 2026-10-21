@@ -21,7 +21,7 @@ subsystem, ask its owner or open a pull request for them to review.
 | 2   | _example:_ Producer: makes a sample every 300 ms      |            |                 | `app_program/subsystem2/` | `testing/subsystem2/` |
 | 3   | _example:_ Consumer: collects samples into statistics |            |                 | `app_program/subsystem3/` | `testing/subsystem3/` |
 | 4   | _example:_ Monitor: prints reports, pauses the LED    |            |                 | `app_program/subsystem4/` | `testing/subsystem4/` |
-| 5   |                                                       |            |                 | `app_program/subsystem5/` | `testing/subsystem5/` |
+| 5   | Obstacle scan, avoidance, vehicle controller          | 2502447    |                 | `app_program/subsystem5/` | `testing/subsystem5/` |
 
 Shared files (`app_program/app_main.c`, `app_program/app.h`, this file)
 are changed only by agreement of the team. The exception is claiming an empty
@@ -50,8 +50,8 @@ fixed.
 | GP23, GP24, GP25, GP29 | _reserved_    | Pico W radio                                           |
 | GP0                    |               | (taken whenever the team builds with `CRASH_REPORT=1`) |
 | GP1                    |               | (taken whenever the team builds with `CRASH_REPORT=1`) |
-| GP2                    |               |                                                        |
-| GP3                    |               |                                                        |
+| GP2                    | S5            | HC-SR04 TRIG, output (Grove 2 pin 1)                   |
+| GP3                    | S5            | HC-SR04 ECHO via 5 V to 3.3 V divider; PWM 1B gated in |
 | GP4                    |               |                                                        |
 | GP5                    |               |                                                        |
 | GP6                    |               |                                                        |
@@ -60,7 +60,7 @@ fixed.
 | GP9                    | S2            | left motor M1B (PWM slice 4B, 20 kHz)                  |
 | GP10                   | S2            | right motor M2A (PWM slice 5A, 20 kHz)                 |
 | GP11                   | S2            | right motor M2B (PWM slice 5B, 20 kHz)                 |
-| GP12                   |               |                                                        |
+| GP12                   | S5            | SG90 scan servo, PWM slice 6A, 50 Hz (servo port 1)    |
 | GP13                   |               |                                                        |
 | GP14                   |               |                                                        |
 | GP15                   |               |                                                        |
@@ -112,6 +112,7 @@ the drivers have no locking to stop it.
 | SPI1                     |                 |                             |                 |
 | ADC                      |                 |                             | GP26–GP28       |
 | PWM slices (list)        | S2              | motion_task                 | GP8-GP11 (4, 5) |
+| PWM slices 1, 6          | S5              | obstacle_task               | GP3 (1B), GP12 (6A) |
 | WiFi radio, TCP/IP, MQTT | _kernel_        | `cyw43_utk_task` (built in) | GP23–25, GP29   |
 
 ### WiFi and MQTT are special
@@ -150,7 +151,7 @@ change it only by team agreement. Write down every task you create.
 | 2         | 14–15         | _example:_ producer_task – 14 – core 1 |
 | 3         | 16–17         | _example:_ consumer_task – 16 – core 0 |
 | 4         | 18–19         | _example:_ monitor_task – 18 – any     |
-| 5         | 20–21         |                                        |
+| 5         | 20–21         | obstacle_task – 11 – core 0 (Week 6 report §3 proposal, pending team agreement) |
 
 Core: `TP_PRC1` = core 0, `TP_PRC2` = core 1, or "any".
 
@@ -179,11 +180,11 @@ limit there. The numbers below are the example's usage.
 
 | Object               | Limit | S1  | S2  | S3  | S4  | S5  |
 | -------------------- | ----- | --- | --- | --- | --- | --- |
-| Task                 | 32    | 1   | 1   | 1   | 1   |     |
+| Task                 | 32    | 1   | 1   | 1   | 1   | 1   |
 | Semaphore            | 16    |     | 1   |     |     |     |
-| Event flag           | 16    |     |     |     | 1   |     |
+| Event flag           | 16    |     |     |     | 1   | 3   |
 | Mailbox              | 12    |     |     | 1   |     |     |
-| Mutex                | 12    |     |     | 1   |     |     |
+| Mutex                | 12    |     |     | 1   |     | 1   |
 | Message buffer       | 12    |     |     |     | 1   |     |
 | Fixed memory pool    | 12    |     | 1   |     |     |     |
 | Variable memory pool | 12    |     |     |     |     |     |
