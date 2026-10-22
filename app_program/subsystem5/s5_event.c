@@ -58,26 +58,32 @@ s5_event_trace (char const * p_label, int32_t value_a, int32_t value_b)
 }
 
 /*!
- * @brief Print one ping: where the servo pointed and what it measured.
+ * @brief Print one ping: where the servo pointed, what it measured, the
+ *        raw echo time, and why there was no range if there was none.
  *
  * @param[in] servo_deg Servo angle, 0 (right) to 180 (left).
- * @param[in] range_mm  Range in mm, or a negative value for no echo.
+ * @param[in] range_mm  Range in mm, or a negative value for no range.
+ * @param[in] echo_us   Raw width of the ECHO pulse in microseconds.
+ * @param[in] p_why     Reason for no range; ignored when there is one.
  *
- * NOTE: The casts are safe: format strings are ASCII, and the angle and
- * range are far inside an int.
+ * NOTE: The casts are safe: format strings are ASCII, and the angle,
+ * range and echo time (at most 65535 us) are far inside an int.
  */
 void
-s5_event_log_ping (int32_t servo_deg, int32_t range_mm)
+s5_event_log_ping (int32_t servo_deg, int32_t range_mm, uint32_t echo_us,
+                   char const * p_why)
 {
     if (range_mm < 0)
     {
-        tm_printf((UB *) "[S5] PING servo=%3d deg  range=   no echo\n",
-                  (int) servo_deg);
+        tm_printf((UB *) "[S5] PING servo=%3d deg  range=  -- mm  "
+                  "echo=%5d us  %s\n",
+                  (int) servo_deg, (int) echo_us, p_why);
     }
     else
     {
-        tm_printf((UB *) "[S5] PING servo=%3d deg  range=%4d mm\n",
-                  (int) servo_deg, (int) range_mm);
+        tm_printf((UB *) "[S5] PING servo=%3d deg  range=%4d mm  "
+                  "echo=%5d us\n",
+                  (int) servo_deg, (int) range_mm, (int) echo_us);
     }
 }
 

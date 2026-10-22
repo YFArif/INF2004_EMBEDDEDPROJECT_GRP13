@@ -38,7 +38,8 @@ typedef enum
 
 void s5_event_post(s5_event_code_t code, uint32_t dist_mm, int32_t angle_deg);
 void s5_event_trace(char const * p_label, int32_t value_a, int32_t value_b);
-void s5_event_log_ping(int32_t servo_deg, int32_t range_mm);
+void s5_event_log_ping(int32_t servo_deg, int32_t range_mm, uint32_t echo_us,
+                       char const * p_why);
 
 #endif /* S5_EVENT_H */
 

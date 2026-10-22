@@ -110,6 +110,9 @@ static void           enter_fault(void);
 static void           set_state(subsystem5_obst_state_t state);
 static void           take_reading(s5_ranger_reading_t * p_reading);
 static void           log_ping(s5_ranger_reading_t const * p_reading);
+#if LOG_PINGS
+static char const *   ping_reason(s5_ranger_status_t status);
+#endif
 static void           point_servo(int32_t angle_deg);
 static void           request_estop(void);
 static int32_t        odom_dist_mm(void);
@@ -637,13 +640,59 @@ log_ping (s5_ranger_reading_t const * p_reading)
         // NOTE: The cast widens uint16_t, so no value is lost.
         s5_event_log_ping(drv_servo_angle(),
                           (S5_RANGER_OK == p_reading->status)
-                          ? (int32_t) p_reading->dist_mm : NO_RANGE);
+                          ? (int32_t) p_reading->dist_mm : NO_RANGE,
+                          p_reading->echo_us,
+                          ping_reason(p_reading->status));
     }
 #else
     // The cast marks the reading as unused while logging is off.
     (void) p_reading;
 #endif
 }
+
+#if LOG_PINGS
+/*!
+ * @brief Plain-language reason a ping gave no range, for the console.
+ *
+ * @param[in] status The ranger's status for the ping.
+ *
+ * @return A short explanation.
+ */
+static char const *
+ping_reason (s5_ranger_status_t status)
+{
+    char const * p_why = "unknown";
+
+    switch (status)
+    {
+        case S5_RANGER_OK:
+            p_why = "";
+        break;
+
+        case S5_RANGER_CLEAR:
+            p_why = "clear: no echo heard back within 4 m";
+        break;
+
+        case S5_RANGER_BUSY:
+            p_why = "busy: ECHO still high from the last ping";
+        break;
+
+        case S5_RANGER_INVALID:
+            p_why = "no answer: ECHO never went high";
+        break;
+
+        case S5_RANGER_FAULT:
+            p_why = "sensor fault";
+        break;
+
+        default:
+            // Keep "unknown".
+        break;
+    }
+
+    return (p_why);
+}
+#endif /* LOG_PINGS */
 
 /*!
  * @brief Turn the servo and wait until it has settled.

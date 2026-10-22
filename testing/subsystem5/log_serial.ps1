@@ -1,14 +1,15 @@
 <#
-    log_serial.ps1 - show the Pico's USB console and save it to
-    testing/subsystem5/logs/<date>_<Name>.txt
+    log_serial.ps1 - show the Pico's USB console and save it to a NEW file
+    testing/subsystem5/logs/<date>_<time>_<Name>.txt
+    e.g. 2026-10-22_1530_unit.txt. Every run gets its own file, so old
+    logs are never added to or overwritten.
 
     Run from the project folder (one line):
         powershell -ExecutionPolicy Bypass -File testing\subsystem5\log_serial.ps1 -Port COM5 -Name unit
 
+    -Name is a short label for what you are testing (unit, monitor, ...).
     Start it with the Pico UNPLUGGED, then plug the Pico in: the script
     waits for the port, so no line is missed. Stop with Ctrl+C.
-    Running it twice on the same day with the same -Name adds to the
-    same file; use another name (e.g. unit2) for a separate file.
 #>
 param(
     [Parameter(Mandatory = $true)][string]$Port,
@@ -16,7 +17,16 @@ param(
 )
 
 $logDir = Join-Path $PSScriptRoot 'logs'
-$log    = Join-Path $logDir ('{0}_{1}.txt' -f (Get-Date -Format 'yyyy-MM-dd'), $Name)
+$stamp  = Get-Date -Format 'yyyy-MM-dd_HHmm'
+$log    = Join-Path $logDir ('{0}_{1}.txt' -f $stamp, $Name)
+
+# Two runs started in the same minute: add a number instead of reusing.
+$count = 2
+while (Test-Path $log)
+{
+    $log    = Join-Path $logDir ('{0}_{1}_{2}.txt' -f $stamp, $Name, $count)
+    $count += 1
+}
 
 Write-Host "Saving to $log"
 Write-Host "Waiting for $Port ... plug the Pico in now."
