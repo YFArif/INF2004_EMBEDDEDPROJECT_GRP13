@@ -419,6 +419,7 @@ try
     $script:turnRun  = 0
     $script:u11Start = $null
     $script:u11Runs  = New-Object System.Collections.Generic.List[object]
+    $script:u03Runs  = New-Object System.Collections.Generic.List[object]
     $script:u11Gap   = $null
     $script:u06Side  = ''
 
@@ -480,7 +481,9 @@ try
                     $real   = $null
                     if (($null -ne $end) -and ($null -ne $start))
                     {
-                        $real = $end - $start
+                        # Signed like the command: a reverse run is negative,
+                        # whichever way the tape numbers run.
+                        $real = [math]::Sign($target) * [math]::Abs($end - $start)
                     }
                     # The tape is on the robot's left: a smaller gap means the
                     # robot moved left (+), a bigger gap means right (-).
@@ -493,7 +496,7 @@ try
                                $target, $script:moveRun, (Format-Value $real), $start, (Format-Value $end),
                                (Format-Value $side), (Format-Value $script:u11Gap), (Format-Value $gapEnd))
                     Write-Host "  Saved: travelled $(Format-Value $real) mm, sideways $(Format-Value $side) mm." -ForegroundColor Yellow
-                    if (($null -ne $real) -and ($null -ne $side) -and ([math]::Abs($real) -gt 100) -and ($odomL -ne 0) -and ($odomR -ne 0))
+                    if (($null -ne $real) -and ([math]::Abs($real) -gt 100) -and ($odomL -ne 0) -and ($odomR -ne 0))
                     {
                         $script:u11Runs.Add(@{ D = $real; Y = $side; L = $odomL; R = $odomR })
                     }
@@ -509,6 +512,10 @@ try
                     Write-Host "  Turn $($script:turnRun): measure with the protractor at the crossing." -ForegroundColor Yellow
                     $angle = Ask-Number "  Angle actually turned, deg (commanded $target; + = left)"
                     Write-Log ("[MEASURED] TURN {0} run {1}: measured {2} deg" -f $target, $script:turnRun, (Format-Value $angle))
+                    if (($null -ne $angle) -and ([math]::Abs($angle) -gt 20))
+                    {
+                        $script:u03Runs.Add(@{ Cmd = [double]$target; Meas = [double]$angle })
+                    }
                     Write-Host '  Saved. Line the pointer up on arm F again, then press BUTTON 1.' -ForegroundColor Yellow
                 }
             }
@@ -681,18 +688,34 @@ try
         $track = [double]([regex]::Match($hdr, 'S2_TRACK_MM\s+\((\d+)\)').Groups[1].Value)
         $kL = 0.0
         $kR = 0.0
+        $nL = 0
+        $nR = 0
         foreach ($r in $script:u11Runs)
         {
-            $theta = 2.0 * $r.Y / $r.D
             $kL += $r.D / $r.L
-            $kR += ($r.D + ($theta * $track)) / $r.R
+            $nL++
+            # The right wheel's travel needs the heading change, which only
+            # a long run with a measured sideways drift gives accurately.
+            if (($null -ne $r.Y) -and ([math]::Abs($r.D) -ge 800))
+            {
+                $theta = 2.0 * $r.Y / $r.D
+                $kR += ($r.D + ($theta * $track)) / $r.R
+                $nR++
+            }
         }
-        $kL /= $script:u11Runs.Count
-        $kR /= $script:u11Runs.Count
+        $kL /= $nL
+        if ($nR -gt 0)
+        {
+            $kR /= $nR
+        }
+        else
+        {
+            $kR = $kL
+        }
         $newL = [math]::Round($circL * $kL / 10) * 10
         $newR = [math]::Round($circR * $kR / 10) * 10
-        $msg  = ('[CALIBRATION] from {0} runs: left went {1:N2} %, right {2:N2} % further than counted' -f
-                 $script:u11Runs.Count, (($kL - 1) * 100), (($kR - 1) * 100))
+        $msg  = ('[CALIBRATION] left went {0:N2} % further than counted ({1} runs), right {2:N2} % ({3} long runs with a sideways gap)' -f
+                 (($kL - 1) * 100), $nL, (($kR - 1) * 100), $nR)
         Write-Log $msg
         Write-Log "[CALIBRATION] subsystem2.h now: S2_WHEEL_CIRC_UM_L ($circL), S2_WHEEL_CIRC_UM_R ($circR)"
         Write-Log "[CALIBRATION] suggested:       S2_WHEEL_CIRC_UM_L ($newL), S2_WHEEL_CIRC_UM_R ($newR)"
@@ -700,6 +723,10 @@ try
         Write-Host $msg.Replace('[CALIBRATION] ', '')
         Write-Host "  now:       S2_WHEEL_CIRC_UM_L ($circL)   S2_WHEEL_CIRC_UM_R ($circR)"
         Write-Host "  suggested: S2_WHEEL_CIRC_UM_L ($newL)   S2_WHEEL_CIRC_UM_R ($newR)"
+        if ($nR -eq 0)
+        {
+            Write-Host '  The right wheel could not be checked: answer the gap question for the 1000 mm runs.' -ForegroundColor Yellow
+        }
         if (([math]::Abs($kL - 1) -le 0.01) -and ([math]::Abs($kR - 1) -le 0.01))
         {
             Write-Host '  Both within 1 %: the calibration is good; no change needed.' -ForegroundColor Green
@@ -707,6 +734,49 @@ try
         else
         {
             Write-Host '  More than 1 % off: put the suggested values in app_program\subsystem2\subsystem2.h, commit, run u11 again.' -ForegroundColor Yellow
+        }
+    }
+
+    # -----------------------------------------------------------------
+    #  u03: the turn angle depends on the effective track width. A turn
+    #  of theta turns each wheel by theta x pi x track / 360, so the angle
+    #  really turned = commanded x track_in_firmware / track_effective.
+    #  Hence track_effective = track_in_firmware x commanded / measured.
+    # -----------------------------------------------------------------
+    if (($Test -eq 'u03') -and ($script:u03Runs.Count -gt 0))
+    {
+        $hdr   = [System.IO.File]::ReadAllText((Join-Path $s2Dir 'subsystem2.h'))
+        $track = [double]([regex]::Match($hdr, 'S2_TRACK_MM\s+\((\d+)\)').Groups[1].Value)
+        $sumRatio = 0.0
+        foreach ($r in $script:u03Runs)
+        {
+            $sumRatio += [math]::Abs($r.Cmd) / [math]::Abs($r.Meas)
+        }
+        $ratio = $sumRatio / $script:u03Runs.Count
+        $exact = $track * $ratio
+        $newTr = [math]::Round($exact)
+        Write-Step 'Turn calibration from your measurements'
+        foreach ($group in @(@('+90 left', 90), @('-90 right', -90), @('180', 180)))
+        {
+            $sel = @($script:u03Runs | Where-Object { $_.Cmd -eq $group[1] })
+            if ($sel.Count -gt 0)
+            {
+                $mean = ($sel | ForEach-Object { $_.Meas } | Measure-Object -Average).Average
+                $line = ('  {0,-10}: {1} turns, measured average {2:N1} deg' -f $group[0], $sel.Count, $mean)
+                Write-Host $line
+                Write-Log "[CALIBRATION] $line"
+            }
+        }
+        $msg = ('  S2_TRACK_MM is {0}; your turns say the effective track is {1:N1} mm (suggested S2_TRACK_MM ({2}))' -f $track, $exact, $newTr)
+        Write-Host $msg
+        Write-Log "[CALIBRATION] $msg"
+        if ([math]::Abs($ratio - 1) -le 0.02)
+        {
+            Write-Host '  Turns are within 2 %: no change needed.' -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host '  More than 2 % off: put the suggested number in app_program\subsystem2\subsystem2.h, commit, run u03 again.' -ForegroundColor Yellow
         }
     }
 

@@ -112,20 +112,25 @@ Every test image runs the automatic `unit` checks first (about 10 s, motors stil
 - **Why the wheel and not the body, and why the calibration matters:** see section 6.
 ### Test 5: `u03` turn accuracy (S2-U03). On the floor.
 
-- **Why:** NFR5 needs 90-degree turns within 5 degrees and 180-degree turns within 8 degrees. Barcode turns and Anna's bypass depend on it.
+- **What this test is (and is not):** the robot does **not** drive along the tape and does not decide where to turn. It stays in one spot and **spins on the spot**, like a turntable, by the exact angle the test commands. In the finished system the *vehicle controller* (Anna) decides when and which way to turn, for example after a barcode, and sends S2 the command "TURN 90". This test only checks that S2 turns by the angle it is told. No sensors are involved: the robot counts wheel ticks and stops when the wheels have travelled the right arc.
+- **Which way:** a **positive** angle is a **left** turn and a **negative** angle is a **right** turn. Left means anticlockwise when you look down on the car from above: stand behind the car and the nose swings to **your left**. The terminal banner says which one is next:
+  - `TURN +90 (LEFT)`: nose ends pointing at arm **L**.
+  - `TURN -90 (RIGHT)`: nose ends pointing at arm **R**.
+  - `TURN 180`: nose ends pointing at arm **B** (backward).
+- **Why it matters:** barcode turns (Sean to Anna to you) and Anna's 45-degree bypass turns depend on it (NFR5: 90 degrees within 5 degrees, 180 within 8).
 - **Setup:**
-  1. Make a `+` on the floor with two 40 cm strips of masking tape, crossing at exactly 90 degrees (lay the A4 corner in the crossing). Label the four arms F (forward), L (left), R (right), B (back).
+  1. Make a `+` on the floor with two 40 cm strips of masking tape, crossing at exactly 90 degrees (lay the A4 corner in the crossing). Label the four arms F (forward), L (left), R (right), B (back). F is the direction the robot faces at the start. Stand behind the robot so L is on your left.
   2. Tape the 30 cm ruler on top of the robot along its centre line, sticking out past the front. This is the **pointer**.
-  3. Place the robot so the middle of its axle (halfway between the two wheels) is over the crossing and the pointer lies exactly along arm F.
+  3. Place the robot so the middle of its axle (halfway between the two wheels) is over the crossing and the pointer lies exactly along arm F. The robot will turn around this point.
 - **Takes:** about 8 minutes (13 turns, each started by Button 1).
-- **What happens:** 5 turns of +90 (left), 5 of -90 (right), then 3 of 180.
-- **You do, after each turn:**
-  1. Put the protractor's centre on the crossing with its 0 line along the target arm: L after +90, R after -90, B after 180.
-  2. Read the angle between the arm and the pointer, then type the **total angle turned**. For +90 that stopped 3 degrees short, type `87`. For 2 degrees too far, type `92`. For right turns type a negative number (`-88`). For 180, type for example `176` or `183`.
-  3. If the robot slid a little off the crossing, read the pointer's **direction**, not where it is.
-  4. Line it up again on arm F, then press Button 1 for the next turn.
-- **Good result:** every `S2-U03` line PASS, and every number you typed within 85-95 (or -85 to -95) for 90-degree turns and 172-188 for 180. From your numbers I tune the stopping point and the track width.
-
+- **What happens:** 5 turns of +90 (left), 5 of -90 (right), then 3 of 180. Each turn takes about 1 second; the robot stays at the crossing.
+- **You do, for each turn:**
+  1. Put the robot back on the crossing with the pointer along arm F, then press Button 1. Watch it spin.
+  2. When the script asks, hold the protractor with its centre on the crossing and its 0 line along arm F. Read the angle from arm F to the pointer, counting **left as positive, right as negative**.
+  3. Type the **total angle turned**. A 90-degree left turn that stopped 3 degrees short: `87`. That went 2 degrees too far: `92`. A right turn that stopped 4 degrees short: `-86`. A 180 that overshot by 5: `185`.
+  4. If the robot slid off the crossing, read the pointer's direction, not where it is.
+- **Good result:** every `S2-U03` line PASS, and every 90-degree answer within 85 to 95 (or -85 to -95), every 180 within 172 to 188.
+- **The script calibrates the turns for you.** At the end it prints the average angle for left, right and 180 turns, and a suggested `S2_TRACK_MM`. If the turns are within 2 % it says no change is needed. Otherwise put the number into `app_program\subsystem2\subsystem2.h`, commit, and run u03 again. A consistent error is usually the effective track width: the tyres scrub a little when they turn on the spot, so the effective width is a bit bigger than the measured 112 mm.
 ### Test 6: `u12` braking, slow speeds, stall (S2-U12). On the floor.
 
 - **Why:** Anna's 150 mm stop distance only works if the robot brakes from 300 mm/s within 58 mm (NFR6). Her slow mode needs 150 mm/s to hold steady. A stalled wheel must stop everything (FR15).
