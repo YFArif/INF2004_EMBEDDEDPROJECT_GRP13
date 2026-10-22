@@ -1,0 +1,8 @@
+=== S2 test log ===
+test:     u11  (S2-U11 MOVE distance and straightness)
+date:     2026-10-23 00:12:27
+commit:   19c2410  (S2 code committed)
+tester:   Arif
+supply:   power bank on VIN + USB cable to the laptop; VIN = skipped V
+surface:  
+notes:    

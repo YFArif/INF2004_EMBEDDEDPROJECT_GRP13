@@ -94,17 +94,17 @@ Every test image runs the automatic `unit` checks first (about 10 s, motors stil
 - **Setup:**
   1. **Space:** a clear, flat strip **1.6 m long and 0.6 m wide**, plus the robot's own length behind the start, nothing at the far end, and slack in the cable.
   2. Lay the tape measure **beside the left wheel**, not under the car: flat, straight, parallel to the way the robot will drive, with its edge about 2 cm from the outside of the left tyre. Tape it down at both ends and in the middle.
-  3. Put the robot down with the **front edge of the left tyre exactly on 100 mm** (not 0: the hook end of a tape measure is not accurate), and both wheels parallel to the tape.
+  3. Choose a **start mark**: either a line on the floor that you call 0, or a reading on the tape such as 100 mm (the hook end of a tape measure is not accurate, so do not start on the hook). Put the robot down with the **front edge of the left tyre, where it touches the floor,** on that mark, and both wheels parallel to the tape. Any start reading is fine: the distance is the end reading minus the start reading. Use the same point of the tyre at both ends.
 - **Takes:** about 6 minutes (5 runs, each started by Button 1).
 - **What happens:** runs 1-3 are MOVE 1000 mm at 300 mm/s, run 4 is MOVE 1000 mm at 150 mm/s, and run 5 is MOVE -300 mm (reverse).
 - **You do, for each run:**
-  1. **Before pressing the button** the script asks the **gap** between the tape's edge and the outside of the left tyre, in mm (use a ruler; about 20). Type it, then press Button 1.
-  2. **After the run:** look straight down at the front edge of the left tyre and type the **tape reading** there, in mm (for example `1103`).
+  1. **Before pressing the button** the script asks your **start reading** (for example  ) and the **gap** between the tape's edge and the outside of the left tyre, in mm (use a ruler; about 20). Type both, then press Button 1.
+  2. **After the run:** look straight down at the same point of the left tyre and type the **reading** there, in mm (for example `1003` if you started at 0).
   3. Type the **gap** again, now at the end position.
   4. The script works out the real distance (reading - start) and the sideways drift (+ = drifted left, - = right) and saves both.
-  5. Put the robot back with the tyre front edge on 100.
+  5. Put the robot back on its start mark.
 
-  **Run 5 (reverse):** put the tyre front edge on **600** instead. It ends near 300.
+  **Run 5 (reverse):** the robot goes backward, so it moves **down** the tape numbers. Start it at **300 or more** (for example 400); it ends near 100. If your start line is 0, lay the tape so there is tape behind it, or use a different start mark for this run.
 - **Good result:** every `S2-U11` line PASS. Real distances within 1000 +/- 20 mm (run 5: 300 +/- 6 mm) and sideways drift under 30 mm. If the distances are all off by the same few percent, I correct the encoder calibration from your numbers.
 ### Test 5: `u03` turn accuracy (S2-U03). On the floor.
 

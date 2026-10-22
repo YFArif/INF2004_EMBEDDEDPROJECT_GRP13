@@ -103,7 +103,7 @@ subsystem2_floor_test (void)
     for (run = 1u; run <= 3u; run++)
     {
         subsystem2_step_ready("S2-U11 MOVE 1000 mm at 300 mm/s: left tyre"
-                              " front edge on 100, WATCH it");
+                              " on its start mark, WATCH it");
         travel(S2_CMD_MOVE, 1000, 0u, &result);
         TEST_CHECK("S2-U11", result.b_done &&
                    (magnitude(result.dist_mm - 1000) <=
@@ -112,15 +112,15 @@ subsystem2_floor_test (void)
                    "MOVE 1000: odometry within 2 %, heading within 3 deg");
     }
 
-    subsystem2_step_ready("S2-U11 MOVE 1000 mm at 150 mm/s: left tyre front"
-                          " edge on 100");
+    subsystem2_step_ready("S2-U11 MOVE 1000 mm at 150 mm/s: left tyre on"
+                          " its start mark");
     travel(S2_CMD_MOVE, 1000, 150u, &result);
     TEST_CHECK("S2-U11", result.b_done &&
                (magnitude(result.dist_mm - 1000) <= (10 * U11_TOL_MM_PERCENT)),
                "MOVE 1000 slow: odometry within 2 %");
 
-    subsystem2_step_ready("S2-U11 MOVE -300 mm (REVERSE): left tyre front"
-                          " edge on 600, clear space BEHIND");
+    subsystem2_step_ready("S2-U11 MOVE -300 mm (REVERSE): left tyre on"
+                          " its start mark, clear space BEHIND");
     travel(S2_CMD_MOVE, -300, 0u, &result);
     TEST_CHECK("S2-U11", result.b_done &&
                (magnitude(result.dist_mm + 300) <= 6),

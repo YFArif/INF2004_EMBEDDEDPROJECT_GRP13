@@ -72,8 +72,8 @@ $tests = @{
                 Setup = @('Clear floor: 1.6 m long x 0.6 m wide, plus the robot''s own length behind the start.',
                           'Tape measure flat and straight on the floor BESIDE the LEFT wheel (not under the car), about 2 cm from the tyre, taped down at both ends and the middle.',
                           'Reference point: the FRONT EDGE of the LEFT tyre where it touches the floor. Ignore the car''s nose and tail.',
-                          'Runs 1-4: tyre front edge on 100 mm. Run 5 (reverse): on 600 mm.',
-                          'Before each run the script asks the tyre-to-tape gap; after it, the tape reading and the gap again.',
+                          'Start mark: any reading you like (0 on a floor line, or 100 on the tape). Run 5 (reverse) goes DOWN the tape: start it at 300 or more.',
+                          'Before each run the script asks your start reading and the tyre-to-tape gap; after it, the end reading and the gap again.',
                           $button) }
     'u03'  = @{ Name = 'S2-U03 turn accuracy'
                 File = 'subsystem2_floor.c'; Switch = 'S2_FLOOR_TEST'; Value = 2
@@ -417,7 +417,7 @@ try
 
     $script:moveRun  = 0
     $script:turnRun  = 0
-    $script:u11Start = 100
+    $script:u11Start = $null
     $script:u11Gap   = $null
     $script:u06Side  = ''
 
@@ -448,13 +448,17 @@ try
                 # on a straight run, so the long nose and tail do not matter.
                 if ($line -match '^\[S2-STEP\] NEXT: S2-U11')
                 {
-                    $script:u11Start = 100
+                    # Any start reading works (0 on a floor line, 100 on the
+                    # tape, ...): the distance is end minus start. Use the same
+                    # point of the tyre at both ends.
+                    $hint = 'any reading, e.g. 0 on your start line'
                     if ($line -match 'REVERSE')
                     {
-                        $script:u11Start = 600
+                        $hint = 'the reverse run goes DOWN the tape: start at 300 or more, e.g. 400'
                     }
-                    Write-Host "  Place the robot: front edge of the LEFT tyre exactly on $($script:u11Start) mm, wheels parallel to the tape." -ForegroundColor Yellow
-                    $script:u11Gap = Ask-Number '  Gap between the tape''s edge and the outside of the LEFT tyre, mm (about 20; answer BEFORE pressing the button)'
+                    Write-Host '  Place the robot with the front edge of the LEFT tyre where it touches the floor on your start mark, wheels parallel to the tape.' -ForegroundColor Yellow
+                    $script:u11Start = Ask-Number "  Start reading at that point, mm ($hint)"
+                    $script:u11Gap   = Ask-Number '  Gap between the tape''s edge and the outside of the LEFT tyre, mm (about 20)'
                     Write-Host '  Now press BUTTON 1.' -ForegroundColor Yellow
                 }
                 elseif ($line -match '^\[S2-FLOOR\] MOVE (-?\d+):')
@@ -463,11 +467,11 @@ try
                     $target = [int]$Matches[1]
                     $start  = $script:u11Start
                     Look-AtRobot
-                    Write-Host "  Run $($script:moveRun): look straight down at the front edge of the LEFT tyre." -ForegroundColor Yellow
-                    $end    = Ask-Number "  Tape reading at the front edge of the left tyre now, mm (it started at $start)"
+                    Write-Host "  Run $($script:moveRun): look straight down at the same point of the LEFT tyre as at the start." -ForegroundColor Yellow
+                    $end    = Ask-Number "  Reading at that point now, mm (it started at $(Format-Value $start))"
                     $gapEnd = Ask-Number '  Gap between the tape''s edge and the outside of the left tyre now, mm'
                     $real   = $null
-                    if ($null -ne $end)
+                    if (($null -ne $end) -and ($null -ne $start))
                     {
                         $real = $end - $start
                     }
