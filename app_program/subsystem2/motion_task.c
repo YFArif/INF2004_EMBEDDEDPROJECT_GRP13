@@ -136,6 +136,10 @@ typedef struct
     subsystem2_state_t  state;
     int32_t             speed_mms;  /* Speed of the active command.       */
     int32_t             goal_um;    /* MOVE / TURN travel per wheel.      */
+    int32_t             head_l_um;  /* Wheel distances at the last        */
+    int32_t             head_r_um;  /* heading update.                    */
+    int32_t             head_um;    /* Heading as R - L at S2_TRACK_MM,   */
+                                    /* kept within one full turn.         */
     subsystem2_status_t status;
 } motion_t;
 
@@ -172,6 +176,7 @@ static void    enter_idle(void);
 static void    enter_estop(void);
 static void    stall_handle(void);
 static void    publish(uint32_t start_us);
+static int32_t heading_update(int32_t left_um, int32_t right_um);
 static int32_t heading_cdeg(int32_t diff_um);
 static int32_t turn_arc_um(int32_t angle_deg);
 static int32_t speed_pick(uint16_t requested_mms, int32_t default_mms);
@@ -600,17 +605,24 @@ wheel_drive (wheel_t * p_wheel, int32_t want_mms)
         }
     }
 
-    if (duty > 0)
+    // The encoders cannot see direction, so new ticks are counted in
+    // p_wheel->direction. A wheel cannot reverse without stopping, so the
+    // direction changes only once the wheel has stopped (no tick for
+    // 100 ms). Following the duty sign instead miscounted ticks whenever
+    // the controller braked a still-rolling wheel with reverse duty: at
+    // the end of a TURN the progress then went backward and forward, and
+    // one TURN on 2026-10-23 never finished (S2-U03, u03_2 log).
+    if ((0 == p_wheel->speed_mms) && (duty > 0))
     {
         p_wheel->direction = 1;
     }
-    else if (duty < 0)
+    else if ((0 == p_wheel->speed_mms) && (duty < 0))
     {
         p_wheel->direction = -1;
     }
     else
     {
-        // Braked: ticks while stopping still go the last way.
+        // Still rolling, or braked: ticks go the way it was moving.
     }
 
     p_wheel->speed_prev_mms = p_wheel->speed_mms;
@@ -740,8 +752,8 @@ publish (uint32_t start_us)
     odom.speed_l_mms  = p_left->speed_mms;
     odom.speed_r_mms  = p_right->speed_mms;
     odom.speed_mms    = (p_left->speed_mms + p_right->speed_mms) / 2;
-    odom.heading_cdeg = heading_cdeg(wheel_dist_um(p_right) -
-                                     wheel_dist_um(p_left));
+    odom.heading_cdeg = heading_update(wheel_dist_um(p_left),
+                                       wheel_dist_um(p_right));
 
     g_motion.status.state        = g_motion.state;
     g_motion.status.duty_l       = p_left->duty;
@@ -757,6 +769,47 @@ publish (uint32_t start_us)
     }
 
     subsystem2_odom_put(&odom, &g_motion.status);
+}
+
+/*!
+ * @brief Add this cycle's wheel motion to the heading.
+ *
+ * @param[in] left_um  Left wheel distance since power-up.
+ * @param[in] right_um Right wheel distance since power-up.
+ *
+ * @return Heading in centidegrees, + = left, -17999 ... 18000.
+ *
+ * NOTE: While the wheels turn opposite ways (spinning on the spot) the
+ * robot turns as if the track were S2_TURN_TRACK_LEFT/RIGHT_MM (S2-U03),
+ * so that part is scaled to S2_TRACK_MM before it is added.
+ */
+static int32_t
+heading_update (int32_t left_um, int32_t right_um)
+{
+    int32_t d_left  = left_um - g_motion.head_l_um;
+    int32_t d_right = right_um - g_motion.head_r_um;
+    int32_t diff    = d_right - d_left;
+
+    g_motion.head_l_um = left_um;
+    g_motion.head_r_um = right_um;
+
+    // A cycle moves a wheel at most ~10 mm, so diff x 150 fits easily.
+    if ((d_left < 0) && (d_right > 0))
+    {
+        diff = (diff * S2_TRACK_MM) / S2_TURN_TRACK_LEFT_MM;
+    }
+    else if ((d_left > 0) && (d_right < 0))
+    {
+        diff = (diff * S2_TRACK_MM) / S2_TURN_TRACK_RIGHT_MM;
+    }
+    else
+    {
+        // Driving, steering or still: the measured track applies.
+    }
+
+    g_motion.head_um = (g_motion.head_um + diff) % FULL_TURN_UM;
+
+    return (heading_cdeg(g_motion.head_um));
 }
 
 /*!
@@ -794,18 +847,27 @@ heading_cdeg (int32_t diff_um)
 /*!
  * @brief Arc each wheel travels in an on-the-spot turn.
  *
- * @param[in] angle_deg Signed angle; clipped to +/- TURN_MAX_DEG.
+ * @param[in] angle_deg Signed angle (+ = left); clipped to +/- TURN_MAX_DEG.
  *
- * @return |angle| x pi x track / 360, in micrometres.
+ * @return |angle| x pi x effective track / 360, in micrometres. Left and
+ *         right turns use their own effective track (S2-U03 calibration).
  */
 static int32_t
 turn_arc_um (int32_t angle_deg)
 {
-    // NOTE: The casts are safe: the angle is clipped to 0 ... 720, so
-    // 720 x 112 x 31416 = 2.53e9 fits in uint32_t and the result
-    // (703 mm = 703000 um) fits in int32_t.
+    // NOTE: The casts are safe: the angle is clipped to 0 ... 720 and the
+    // tracks are below 150 mm, so 720 x 150 x 31416 = 3.39e9 fits in
+    // uint32_t and the result (943 mm = 943000 um) fits in int32_t.
     uint32_t angle = (uint32_t) clamp(magnitude(angle_deg), 0, TURN_MAX_DEG);
-    uint32_t arc   = (angle * (uint32_t) S2_TRACK_MM * PI_X1E4) / 3600u;
+    uint32_t track = (uint32_t) S2_TURN_TRACK_LEFT_MM;
+    uint32_t arc   = 0u;
+
+    if (angle_deg < 0)
+    {
+        track = (uint32_t) S2_TURN_TRACK_RIGHT_MM;
+    }
+
+    arc = (angle * track * PI_X1E4) / 3600u;
 
     return ((int32_t) arc);
 }

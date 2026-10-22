@@ -1,0 +1,16 @@
+=== S2 test log ===
+test:     u03  (S2-U03 turn accuracy)
+date:     2026-10-23 01:58:28
+commit:   949f3a4  (S2 code committed)
+tester:   Arif
+supply:   power bank on VIN + USB cable to the laptop; VIN = skipped V
+surface:  
+notes:    
+[build] rc=0
+[build] ---- last lines of the build:
+[build]    text	   data	    bss	    dec	    hex	filename
+[build]  295908	    364	  26772	 323044	  4ede4	mtk3pico_smp1_usb_cdc_wifi_test.elf
+[build] tools/elf2uf2 mtk3pico_smp1_usb_cdc_wifi_test.elf mtk3pico_smp1_usb_cdc_wifi_test.uf2
+[build]  
+switch:   S2_FLOOR_TEST = 2 in subsystem2_floor.c, set for this build only
+image:    mtk3pico_smp1_usb_cdc_wifi_test.uf2, built 01:59:51

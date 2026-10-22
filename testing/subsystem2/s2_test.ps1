@@ -738,48 +738,51 @@ try
     }
 
     # -----------------------------------------------------------------
-    #  u03: the turn angle depends on the effective track width. A turn
-    #  of theta turns each wheel by theta x pi x track / 360, so the angle
-    #  really turned = commanded x track_in_firmware / track_effective.
-    #  Hence track_effective = track_in_firmware x commanded / measured.
+    #  u03: a turn of theta turns each wheel by theta x pi x track / 360,
+    #  so the angle really turned = commanded x track_used / track_real.
+    #  Hence track_real = track_used x measured / commanded, per direction
+    #  (left = positive, right = negative). Right turns typed without the
+    #  minus sign are fine: magnitudes are used.
     # -----------------------------------------------------------------
     if (($Test -eq 'u03') -and ($script:u03Runs.Count -gt 0))
     {
-        $hdr   = [System.IO.File]::ReadAllText((Join-Path $s2Dir 'subsystem2.h'))
-        $track = [double]([regex]::Match($hdr, 'S2_TRACK_MM\s+\((\d+)\)').Groups[1].Value)
-        $sumRatio = 0.0
-        foreach ($r in $script:u03Runs)
-        {
-            $sumRatio += [math]::Abs($r.Cmd) / [math]::Abs($r.Meas)
-        }
-        $ratio = $sumRatio / $script:u03Runs.Count
-        $exact = $track * $ratio
-        $newTr = [math]::Round($exact)
+        $hdr = [System.IO.File]::ReadAllText((Join-Path $s2Dir 'subsystem2.h'))
         Write-Step 'Turn calibration from your measurements'
-        foreach ($group in @(@('+90 left', 90), @('-90 right', -90), @('180', 180)))
+        foreach ($dir in @(@('LEFT', 1), @('RIGHT', -1)))
         {
-            $sel = @($script:u03Runs | Where-Object { $_.Cmd -eq $group[1] })
-            if ($sel.Count -gt 0)
+            $name  = "S2_TURN_TRACK_$($dir[0])_MM"
+            $track = [double]([regex]::Match($hdr, $name + '\s+\((\d+)\)').Groups[1].Value)
+            $sel   = @($script:u03Runs | Where-Object { [math]::Sign($_.Cmd) -eq $dir[1] })
+            if ($sel.Count -eq 0)
             {
-                $mean = ($sel | ForEach-Object { $_.Meas } | Measure-Object -Average).Average
-                $line = ('  {0,-10}: {1} turns, measured average {2:N1} deg' -f $group[0], $sel.Count, $mean)
-                Write-Host $line
-                Write-Log "[CALIBRATION] $line"
+                continue
+            }
+            $ratios = @($sel | ForEach-Object { [math]::Abs($_.Meas) / [math]::Abs($_.Cmd) })
+            $ratio  = ($ratios | Measure-Object -Average).Average
+            $spread = (($ratios | Measure-Object -Maximum).Maximum - ($ratios | Measure-Object -Minimum).Minimum) * 90
+            $newTr  = [math]::Round($track * $ratio)
+            $line   = ('{0,-5} turns: {1}, average {2:N1} % of the command (as a 90: {3:N1} deg), spread {4:N1} deg; {5} is {6}, suggested {7}' -f
+                       $dir[0], $sel.Count, ($ratio * 100), ($ratio * 90), $spread, $name, $track, $newTr)
+            Write-Host "  $line"
+            Write-Log "[CALIBRATION] $line"
+            if ($spread -gt 6)
+            {
+                Write-Host "    The $($dir[0]) turns vary by more than 6 deg: that is slip, not calibration. Check the ball caster and the floor first." -ForegroundColor Yellow
+            }
+            if ([math]::Abs($ratio - 1) -le 0.02)
+            {
+                Write-Host "    Within 2 %: no change needed." -ForegroundColor Green
+            }
+            elseif ($sel.Count -lt 3)
+            {
+                Write-Host "    Fewer than 3 turns: too few to change the calibration." -ForegroundColor Yellow
+            }
+            else
+            {
+                Write-Host "    Put $name ($newTr) in app_program\subsystem2\subsystem2.h, commit, run u03 again." -ForegroundColor Yellow
             }
         }
-        $msg = ('  S2_TRACK_MM is {0}; your turns say the effective track is {1:N1} mm (suggested S2_TRACK_MM ({2}))' -f $track, $exact, $newTr)
-        Write-Host $msg
-        Write-Log "[CALIBRATION] $msg"
-        if ([math]::Abs($ratio - 1) -le 0.02)
-        {
-            Write-Host '  Turns are within 2 %: no change needed.' -ForegroundColor Green
-        }
-        else
-        {
-            Write-Host '  More than 2 % off: put the suggested number in app_program\subsystem2\subsystem2.h, commit, run u03 again.' -ForegroundColor Yellow
-        }
     }
-
     # -----------------------------------------------------------------
     #  5. Summary
     # -----------------------------------------------------------------

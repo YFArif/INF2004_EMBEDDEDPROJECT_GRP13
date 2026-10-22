@@ -314,6 +314,7 @@ sim_cycle (void)
         double left_um  = g_sim[WHEEL_LEFT].pos_um;
         double right_um = g_sim[WHEEL_RIGHT].pos_um;
         double ds_mm    = 0.0;
+        double track    = 0.0;
 
         g_now_us += SIM_STEP_US;
         sim_wheel_step(&g_sim[WHEEL_LEFT], SIM_STEP_US / 1e6);
@@ -323,7 +324,15 @@ sim_cycle (void)
         left_um      = g_sim[WHEEL_LEFT].pos_um - left_um;
         right_um     = g_sim[WHEEL_RIGHT].pos_um - right_um;
         ds_mm        = (left_um + right_um) / 2000.0;
-        g_pose_th   += (right_um - left_um) / (1000.0 * S2_TRACK_MM);
+        // The floor model: spinning on the spot scrubs, so it turns as if
+        // the track were the calibrated one for that direction (S2-U03).
+        track = (double) S2_TRACK_MM;
+        if ((left_um * right_um) < 0.0)
+        {
+            track = (right_um > left_um) ? (double) S2_TURN_TRACK_LEFT_MM
+                                         : (double) S2_TURN_TRACK_RIGHT_MM;
+        }
+        g_pose_th   += (right_um - left_um) / (1000.0 * track);
         g_pose_x_mm += ds_mm * cos(g_pose_th);
         g_pose_y_mm += ds_mm * sin(g_pose_th);
     }
@@ -380,6 +389,14 @@ true_dist_mm (void)
 
 static double
 true_heading_deg (void)
+{
+    return (g_pose_th * (180.0 / SIM_PI));
+}
+
+/* Heading from the wheel distances with S2_TRACK_MM, as the firmware's
+ * odometry computes it. */
+static double
+wheel_heading_deg (void)
 {
     return (((g_sim[WHEEL_RIGHT].pos_um - g_sim[WHEEL_LEFT].pos_um) /
              (1000.0 * S2_TRACK_MM)) * (180.0 / SIM_PI));
