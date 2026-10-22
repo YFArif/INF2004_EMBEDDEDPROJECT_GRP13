@@ -1,100 +1,170 @@
-/*
- *	subsystem2.h
- *	Subsystem 2 -- Producer (sample source).  Student ID: <student ID>.
+/** @file subsystem2.h
  *
- *	Public interface of subsystem 2.  Other subsystems include it as
- *	"../subsystem2/subsystem2.h".
+ * @brief Subsystem 2 -- motion control. Student: Arif, 2501261.
+ *
+ * @par
+ * Public interface of subsystem 2: what other subsystems may use. Other
+ * subsystems include it as "../subsystem2/subsystem2.h". The section
+ * marked "Private to subsystem 2" is for S2's own files only.
+ *
+ * @par Units and signs
+ * Distance mm, angle degrees, speed mm/s, duty permille. A positive
+ * distance drives forward. A positive TURN angle and a positive steering
+ * correction both turn the robot left (the right wheel runs faster).
+ *
+ * @par Kernel objects (created in subsystem2_init)
+ * mbf_motion (IF-04 commands), flg_motion (IF-05 MF_ESTOP latch, plus a
+ * private 20 ms tick bit), mtx_odom (IF-06 odometry and status),
+ * mtx_steer (IF-02 steering) and cyc_motion (20 ms period). Except for
+ * the legacy flg_motion below, their IDs stay inside subsystem2.c;
+ * other subsystems use the functions below (BARR-C 4.2c).
+ *
+ * @par Deviations from BARR-C:2018 (same as S5; approval: project
+ *      manager, TBD)
+ * - micro T-Kernel types (ID, ER, INT, UINT, T_xxx) appear only where a
+ *   kernel call or the task entry signature requires them.
+ * - The template's build uses -std=gnu11 rather than C99 (rule 1.1a).
+ * - The template's file names subsystem1 ... subsystem5 are not unique in
+ *   their first 8 characters (rule 4.1b).
+ * - Legacy section: flg_motion is declared extern (rule 4.2c) and ODOM
+ *   is not a lower-case _t name (rule 5.1a). Both stay only until S5's
+ *   obstacle_task uses subsystem2_estop_set() and subsystem2_odom_get().
+ * - task_producer.c / .h are the course template's example, unchanged
+ *   apart from moving its objects there; they are deleted with the S3 /
+ *   S4 examples.
+ *
+ * @par Abbreviations used in S2 (BARR-C 1.5b)
+ * cmd: command; cyc: cyclic handler; dist: distance; enc: encoder;
+ * ff: feed-forward; flg: event flag; mbf: message buffer; mtx: mutex;
+ * mms: mm/s; odom: odometry; pri: priority; um: micrometre; us: microsecond.
  */
 
 #ifndef SUBSYSTEM2_H
 #define SUBSYSTEM2_H
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include "../app.h"
-
-#define S2_PRI_PRODUCER 14 /* priority band 14-15 (TEAM.md) */
-#define S2_PERIOD_MS 300   /* one sample every 300 ms */
+#include "task_producer.h"  /* Template example; see the note above.    */
 
 /* ---------------------------------------------------------------------
- *  IF-01 data format: one sample, sent to subsystem 3's mailbox.
- *  A mailbox message MUST start with a T_MSG header: the kernel links
- *  messages together through it, so the data itself is never copied.
- * --------------------------------------------------------------------- */
-typedef struct
-{
-	T_MSG hdr;	/* used by the kernel, do not touch */
-	UW seq;		/* sample sequence number */
-	UW time_ms; /* system time when the sample was taken */
-	INT value;	/* the "measurement", 0..100 */
-	INT prc;	/* processor (core) that produced it: 1 or 2 */
-} SAMPLE_MSG;
-
-#define S2_POOL_COUNT 4 /* at most 4 samples in flight */
-
-/* IF-02: the receiver of a sample gives its memory block back to
-   mpf_samples (tk_rel_mpf) and then a slot back to sem_slots
-   (tk_sig_sem, count 1).  Nothing else may use these two objects. */
-IMPORT ID sem_slots;
-IMPORT ID mpf_samples;
-
-/* ---------------------------------------------------------------------
- *  Motion control interfaces (IF-02, IF-04, IF-05, IF-06 in the report).
- *  Units: distance mm, angle degrees, speed mm/s.  Left is positive.
+ *  IF-04 mbf_motion: commands to motion_task, sent by vehicle_ctrl_task
+ *  (S5) with subsystem2_motion_send(). The message buffer copies each
+ *  command, so the sender may reuse its variable at once.
  * --------------------------------------------------------------------- */
 
-/* IF-04: commands to motion_task, sent only by vehicle_ctrl_task (S5).
-   A mailbox passes a pointer: take each message from your own static ring
-   and never reuse it before motion_task has received it. */
+/** Command types. */
 typedef enum
 {
-	MC_STOP,
-	MC_FOLLOW,
-	MC_MOVE,
-	MC_TURN,
-	MC_CLEAR
-} MC_TYPE;
+    S2_CMD_STOP = 0,    /* Brake now and cancel any MOVE / TURN / FOLLOW. */
+    S2_CMD_FOLLOW,      /* Drive at speed_mms, steered by line_task.      */
+    S2_CMD_MOVE,        /* Drive value mm straight; negative = reverse.   */
+    S2_CMD_TURN,        /* Turn on the spot value degrees; + = left.      */
+    S2_CMD_CLEAR        /* Leave the E-stop, once MF_ESTOP is cleared.    */
+} subsystem2_cmd_type_t;
 
+/** One command. */
 typedef struct
 {
-	T_MSG hdr; /* used by the kernel, must be first */
-	UB type;   /* MC_xxx */
-	H value;   /* MC_MOVE: mm, negative = reverse; MC_TURN: degrees, positive = left */
-	H speed;   /* mm/s, never negative; 0 = default speed */
-} MOTION_CMD;
+    uint8_t  type;      /* subsystem2_cmd_type_t.                          */
+    int16_t  value;     /* MOVE: mm. TURN: degrees. Otherwise 0.           */
+    uint16_t speed_mms; /* 0 = default. FOLLOW / MOVE: robot speed; TURN:  */
+                        /* wheel speed. A new FOLLOW only changes speed.   */
+} subsystem2_cmd_t;
 
-IMPORT ID mbx_motion;
+#define S2_SPEED_CRUISE_MMS     (300)   /* FOLLOW / MOVE default (App. D).*/
+#define S2_SPEED_TURN_MMS       (150)   /* TURN default wheel speed.      */
+#define S2_SPEED_MAX_MMS        (500)   /* Larger requests are clipped.   */
+#define S2_CMD_QUEUE_LEN        (8u)    /* Commands waiting at most.      */
 
-/* IF-05: bits of flg_motion */
-#define MF_ESTOP 0x00000001 /* S4/S5 set it to brake; only S5 clears it */
-IMPORT ID flg_motion;
+/* ---------------------------------------------------------------------
+ *  IF-05 flg_motion: the emergency-stop latch. S4 and S5 set it with
+ *  subsystem2_estop_set(); motion_task brakes at once and stays braked
+ *  (ESTOP_BRAKED). Only vehicle_ctrl_task clears it, then sends
+ *  S2_CMD_CLEAR. Commands sent before the CLEAR are discarded; commands
+ *  sent after it run in order.
+ * --------------------------------------------------------------------- */
+#define MF_ESTOP                (0x00000001u)
 
-/* IF-06: odometry, written by motion_task every 20 ms */
+/* ---------------------------------------------------------------------
+ *  IF-06 odometry, published by motion_task every 20 ms.
+ * --------------------------------------------------------------------- */
 typedef struct
 {
-	UW count_l; /* encoder rising edges since boot */
-	UW count_r;
-	W dist_mm;	   /* signed distance of the robot centre since boot */
-	W speed_mms;   /* robot speed, positive = forward */
-	W speed_l_mms; /* signed wheel speeds, used for the turn rate */
-	W speed_r_mms;
-} ODOM;
+    uint32_t count_l;       /* Encoder ticks since power-up (unsigned).   */
+    uint32_t count_r;
+    int32_t  dist_mm;       /* Signed distance of the robot centre.       */
+    int32_t  speed_mms;     /* Robot speed, positive = forward.           */
+    int32_t  speed_l_mms;   /* Signed wheel speeds, for the turn rate.    */
+    int32_t  speed_r_mms;
+} subsystem2_odom_t;
 
-IMPORT void s2_odom_put(const ODOM *in); /* motion_task only */
-IMPORT void s2_odom_get(ODOM *out);		 /* any task */
+/** motion_task states (Week 6 report 6.3). STALL_FAULT is not a state
+ *  of its own: a stall sets MF_ESTOP and ends in S2_STATE_ESTOP. */
+typedef enum
+{
+    S2_STATE_IDLE = 0,      /* IDLE_BRAKED.                                */
+    S2_STATE_FOLLOWING,     /* FOLLOWING.                                  */
+    S2_STATE_MOVING,        /* MOVING_DIST.                                */
+    S2_STATE_TURNING,       /* TURNING.                                    */
+    S2_STATE_ESTOP          /* ESTOP_BRAKED.                               */
+} subsystem2_state_t;
 
-/* IF-02: steering correction from line_task, latest value wins.
-   Positive turns the robot left (the right wheel runs faster). */
-IMPORT void s2_steer_set(H dv_mms); /* line_task */
-IMPORT H s2_steer_get(void);		/* motion_task */
+/** Live status of motion_task, for telemetry (S1) and the S2 tests. */
+typedef struct
+{
+    subsystem2_state_t state;
+    int32_t  duty_l;            /* Last output, permille, signed.          */
+    int32_t  duty_r;
+    int32_t  target_l_mms;      /* Wheel speed set-points.                 */
+    int32_t  target_r_mms;
+    uint32_t done_count;        /* MOVE / TURN commands completed.         */
+    uint32_t estop_count;       /* Entries into ESTOP_BRAKED.              */
+    uint32_t estop_brake_us;    /* 1 MHz timer when it last braked for     */
+                                /* the E-stop (S2-U05).                    */
+    uint32_t stall_count;       /* Stalls detected.                        */
+    uint32_t discarded_count;   /* Commands dropped in ESTOP_BRAKED.       */
+    uint32_t cycle_count;       /* 20 ms cycles run.                       */
+    uint32_t cycle_max_us;      /* Longest cycle (NFR11).                  */
+} subsystem2_status_t;
 
-/* Chassis constants.  Ticks per revolution are provisional (S2-U01 runs 1-2). */
-#define S2_WHEEL_DIA_MM 63
-#define S2_TRACK_MM 112		   /* centre of left tyre to centre of right tyre */
-#define S2_TICKS_PER_REV_L 639 /* encoder rising edges per wheel revolution */
-#define S2_TICKS_PER_REV_R 629
+/* Public functions: any task may call these, unless noted. */
+ER   subsystem2_motion_send(subsystem2_cmd_t const * p_cmd);   /* S5.    */
+void subsystem2_estop_set(void);                    /* S4, S5.           */
+void subsystem2_estop_clear(void);                  /* S5 vehicle_ctrl.  */
+bool subsystem2_estop_is_set(void);
+void subsystem2_odom_get(subsystem2_odom_t * p_odom);
+void subsystem2_status_get(subsystem2_status_t * p_status);
+void subsystem2_steer_set(int16_t dv_mms);          /* S3 line_task.     */
 
-/* Private to subsystem 2 */
-IMPORT void producer_task(INT stacd, void *exinf);
-IMPORT INT s2_make_value(UW seq);
-IMPORT ER s2_drive_demo_start(void); /* make DRIVE=1 only */
+/* Chassis. Ticks per revolution are provisional (S2-U01 runs 1-2). */
+#define S2_WHEEL_DIA_MM         (63)
+#define S2_TRACK_MM             (112)   /* Centre of tyre to centre.      */
+#define S2_TICKS_PER_REV_L      (639)   /* Debounced rising edges.        */
+#define S2_TICKS_PER_REV_R      (629)
+
+/* ---------------------------------------------------------------------
+ *  Legacy names used by S5 (origin/buddy5-ultrasonic, obstacle_task.c).
+ *  TODO: Remove once S5 switches to subsystem2_estop_set() and
+ *  subsystem2_odom_get().
+ * --------------------------------------------------------------------- */
+extern ID flg_motion;
+typedef subsystem2_odom_t ODOM;
+void s2_odom_get(subsystem2_odom_t * p_odom);
+
+/* ---------------------------------------------------------------------
+ *  Private to subsystem 2
+ * --------------------------------------------------------------------- */
+#define S2_PRI_MOTION           (9)     /* Week 6 report section 3.       */
+#define S2_MOTION_PERIOD_MS     (20u)
+
+void    subsystem2_cycle_wait(bool b_estop_wakes);
+bool    subsystem2_cmd_receive(subsystem2_cmd_t * p_cmd);
+void    subsystem2_odom_put(subsystem2_odom_t const * p_odom,
+                            subsystem2_status_t const * p_status);
+int16_t subsystem2_steer_get(void);
 
 #endif /* SUBSYSTEM2_H */
+
+/*** end of file ***/
