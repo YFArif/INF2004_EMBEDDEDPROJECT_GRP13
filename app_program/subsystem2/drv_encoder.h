@@ -48,6 +48,8 @@ typedef struct
 ER       drv_encoder_init(void);
 void     drv_encoder_get(drv_encoder_t wheel, drv_encoder_count_t * p_count);
 uint32_t drv_encoder_now_us(void);
+uint32_t drv_encoder_core(void);
+uint32_t drv_encoder_tick_was(void);
 
 #endif /* DRV_ENCODER_H */
 

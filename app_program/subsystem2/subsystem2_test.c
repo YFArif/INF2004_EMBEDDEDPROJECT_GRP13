@@ -32,13 +32,21 @@
 #define S2_U02_BENCH        (0)     /* Spins both motors, ~3 s.          */
 
 #define POLL_MS             (10u)   /* One kernel tick.                  */
-#define START_WAIT_MS       (1000u)
+#define ALIVE_WINDOW_MS     (1000u)
+#define ALIVE_MIN           (48u)   /* 50 cycles of 20 ms, +/- jitter.   */
+#define ALIVE_MAX           (52u)
 #define STATE_WAIT_MS       (200u)
 #define SETTLE_MS           (60u)   /* Three motion cycles.              */
 
 #define U05_TRIALS          (20u)
 #define U05_LIMIT_US        (20000u)    /* One motion cycle (NFR6).      */
 #define U07_STEPS           (4u)
+
+/* S2-U08: 1 MHz timer against the kernel clock. tk_dly_tsk() runs whole
+ * 10 ms ticks, so 1000 ms lasts 1000 ... 1010 ms; allow 3 % either way. */
+#define U08_WINDOW_MS       (1000u)
+#define U08_MIN_US          (970000u)
+#define U08_MAX_US          (1040000u)
 
 #define U01_REVS            (10u)
 #define U01_WINDOW_S        (40u)
@@ -53,6 +61,20 @@
 #define U02_BAND_MMS        (25)        /* ... and within +/- 10 %.      */
 #define U02_SAMPLE_MS       (20u)
 
+#if TM_CONSOLE_USB_CDC
+/* The USB console sends nothing a closed port can receive, so the tests
+ * wait for the PC to open it. tm_usb_state() is the kernel console's own
+ * link state (lib/libtm/.../usb_console.c); it has no header, hence the
+ * declaration here (BARR-C 4.2c deviation, test builds only). */
+#define HOST_WAIT_MS        (30000u)
+#define HOST_POLL_MS        (100u)
+#define HOST_SETTLE_MS      (1000u)     /* Let the terminal settle.      */
+#define USB_HOST_OPEN       (3u)        /* Enumerated and DTR asserted.  */
+
+extern UW tm_usb_state(void);
+#endif
+
+static void     host_wait(void);
 static bool     motion_alive(void);
 static bool     state_wait(subsystem2_state_t state, uint32_t timeout_ms);
 static void     cmd_send(subsystem2_cmd_type_t type, int16_t value,
@@ -60,6 +82,7 @@ static void     cmd_send(subsystem2_cmd_type_t type, int16_t value,
 static void     delay_ms(uint32_t ms);
 static bool     s2_u05_estop_latency(void);
 static bool     s2_u07_estop_latch(void);
+static bool     s2_u08_timer_rate(void);
 
 #if S2_U01_BENCH
 static bool     s2_u01_wheel(drv_encoder_t wheel, char const * p_name);
@@ -80,7 +103,19 @@ subsystem2_test (void)
 {
     TEST_INIT();
 
-    TEST_CHECK("S2-U05", motion_alive(), "motion_task runs every 20 ms");
+    host_wait();
+
+    // NOTE: The cast is safe: the core is 0, 1 or UINT32_MAX, printed as
+    // 0, 1 or -1.
+    tm_printf((UB *) "[TEST] S2 INFO encoder interrupt on core %d"
+              " (A4 wants core 1)\n", (int) drv_encoder_core());
+
+    // Every microsecond figure below depends on this one.
+    TEST_CHECK("S2-U08", s2_u08_timer_rate(),
+               "1 MHz timer runs at 1 MHz against the kernel clock");
+
+    TEST_CHECK("S2-U05", motion_alive(),
+               "motion_task runs every 20 ms (48-52 cycles per second)");
     TEST_CHECK("S2-U05", s2_u05_estop_latency(),
                "MF_ESTOP brakes within one cycle, 20 of 20 trials");
 
@@ -110,26 +145,79 @@ subsystem2_test (void)
 }
 
 /*!
- * @brief Wait until motion_task has run a few cycles.
+ * @brief Wait up to 30 s for the PC to open the serial port, so the S2
+ *        results are not sent to a closed port and lost.
+ */
+static void
+host_wait (void)
+{
+#if TM_CONSOLE_USB_CDC
+    uint32_t waited = 0u;
+
+    while ((USB_HOST_OPEN != tm_usb_state()) && (waited < HOST_WAIT_MS))
+    {
+        delay_ms(HOST_POLL_MS);
+        waited += HOST_POLL_MS;
+    }
+
+    delay_ms(HOST_SETTLE_MS);
+#endif
+
+    // NOTE: The cast is safe: the format string is ASCII.
+    tm_printf((UB *) "\n[TEST] subsystem2 tests start\n");
+}
+
+/*!
+ * @brief S2-U08: count the 1 MHz timer over a 1000 ms kernel delay.
  *
- * @return true if it is running.
+ * @return true if it counted 0.97 ... 1.04 million.
+ */
+static bool
+s2_u08_timer_rate (void)
+{
+    uint32_t start_us = drv_encoder_now_us();
+    uint32_t count    = 0u;
+
+    delay_ms(U08_WINDOW_MS);
+    count = drv_encoder_now_us() - start_us;
+
+    // NOTE: The casts are safe: the format string is ASCII, the count is
+    // printed as unsigned (%u) and the register is printed in hex.
+    tm_printf((UB *) "[TEST] S2-U08 INFO timer counted %u in %d ms;"
+              " WATCHDOG TICK at boot 0x%x (12 cycles = 0x..0c)\n",
+              (unsigned int) count, (int) U08_WINDOW_MS,
+              (unsigned int) drv_encoder_tick_was());
+
+    return ((count >= U08_MIN_US) && (count <= U08_MAX_US));
+}
+
+/*!
+ * @brief Check that motion_task runs once every 20 ms: about 50 cycles in
+ *        1000 ms (not fewer: it is stuck; not more: it is not sleeping).
+ *        Also reports the longest cycle so far (NFR11: <= 4000 us).
+ *
+ * @return true if it ran ALIVE_MIN ... ALIVE_MAX cycles.
  */
 static bool
 motion_alive (void)
 {
-    subsystem2_status_t status  = {0};
-    uint32_t            waited  = 0u;
+    subsystem2_status_t status = {0};
+    uint32_t            first  = 0u;
+    uint32_t            cycles = 0u;
 
     subsystem2_status_get(&status);
+    first = status.cycle_count;
+    delay_ms(ALIVE_WINDOW_MS);
+    subsystem2_status_get(&status);
+    cycles = status.cycle_count - first;
 
-    while ((status.cycle_count < 3u) && (waited < START_WAIT_MS))
-    {
-        delay_ms(POLL_MS);
-        waited += POLL_MS;
-        subsystem2_status_get(&status);
-    }
+    // NOTE: The casts are safe: the format string is ASCII; the cycle
+    // count is below 1000 and the time below 20000 us.
+    tm_printf((UB *) "[TEST] S2-U05 INFO %d motion cycles in %d ms,"
+              " longest cycle %d us\n", (int) cycles,
+              (int) ALIVE_WINDOW_MS, (int) status.cycle_max_us);
 
-    return (status.cycle_count >= 3u);
+    return ((cycles >= ALIVE_MIN) && (cycles <= ALIVE_MAX));
 }
 
 /*!
