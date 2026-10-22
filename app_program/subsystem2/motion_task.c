@@ -55,22 +55,33 @@
 #define SPEED_FINAL_MMS         (60)    /* Speed at the end of MOVE/TURN. */
 #define DECEL_PER_S             (4)     /* Limit = final + 4/s x left mm. */
 #define SYNC_PER_S              (3)     /* Left/right distance correction.*/
-#define ARRIVE_EARLY_UM         (0)     /* Stop early by the braking      */
-                                        /* travel, measured in S2-U03.    */
 #define TURN_MAX_DEG            (720)   /* Larger TURN angles are clipped.*/
+
+/* MOVE / TURN brake this long before the target, at the current speed,
+ * because the wheels roll on while braking and the decision is made only
+ * every 20 ms. Preliminary from S2-U09; tuned on the floor in S2-U03. */
+#ifndef STOP_LEAD_MS
+#define STOP_LEAD_MS            (40)
+#endif
 
 /* PID gains as fractions (preliminary until S2-U02). Feed-forward: S2-U06
  * gave about 0.8 mm/s per permille with the wheels off the ground, so
- * 1.25 permille per mm/s, and the integral term covers the load. */
+ * 1.25 permille per mm/s, and the integral term covers the load. The
+ * #ifndef lets the host test (S2-U09) try other gains. */
 #define FF_NUM                  (5)
 #define FF_DEN                  (4)
-#define KP_NUM                  (1)     /* 0.5 permille per mm/s.         */
-#define KP_DEN                  (2)
-#define KI_NUM                  (1)     /* 2.0 permille per mm/s per      */
-#define KI_DEN                  (25)    /* second = 0.04 per 20 ms cycle. */
+#ifndef KP_NUM
+#define KP_NUM                  (1)     /* 1.0 permille per mm/s.         */
+#define KP_DEN                  (1)
+#endif
+#ifndef KI_NUM
+#define KI_NUM                  (1)     /* 10 permille per mm/s per       */
+#define KI_DEN                  (5)     /* second = 0.2 per 20 ms cycle.  */
+#endif
 #define KD_NUM                  (0)     /* D on measurement, off for now. */
 #define KD_DEN                  (1)
-#define INTEGRAL_MAX            (10000) /* I term at most 400 permille.   */
+#define I_TERM_MAX              (400)   /* Permille the I term may add.   */
+#define INTEGRAL_MAX            ((I_TERM_MAX * KI_DEN) / KI_NUM)
 #define DUTY_LIMIT              (900)
 
 /* Stall (Week 6 report 6.3). */
@@ -88,6 +99,14 @@
 #define PI_X1E6                 (3141593)
 #define PI_X1E4                 (31416u)
 #define WHEEL_CIRC_UM           ((S2_WHEEL_DIA_MM * PI_X1E6) / UM_PER_MM)
+
+/* Heading: 2 pi x 112 mm = 703717 um of wheel difference per full turn;
+ * 1 rad = 5729.58 cdeg, kept as x10 to work in 0.1 mm. */
+#define FULL_TURN_UM            ((2 * S2_TRACK_MM * PI_X1E6) / UM_PER_MM)
+#define UM_PER_DMM              (100)
+#define CDEG_PER_RAD_X10        (57296)
+#define CDEG_HALF_TURN          (18000)
+#define CDEG_FULL_TURN          (36000)
 
 /** State of one wheel. */
 typedef struct
@@ -151,6 +170,7 @@ static void    enter_idle(void);
 static void    enter_estop(void);
 static void    stall_handle(void);
 static void    publish(uint32_t start_us);
+static int32_t heading_cdeg(int32_t diff_um);
 static int32_t turn_arc_um(int32_t angle_deg);
 static int32_t speed_pick(uint16_t requested_mms, int32_t default_mms);
 static int32_t clamp(int32_t value, int32_t low, int32_t high);
@@ -422,13 +442,15 @@ travel_targets (int32_t * p_want_left, int32_t * p_want_right)
                           p_left->travel_sign;
     int32_t   prog_r    = (wheel_dist_um(p_right) - p_right->start_um) *
                           p_right->travel_sign;
-    int32_t   remaining = g_motion.goal_um - ARRIVE_EARLY_UM -
-                          ((prog_l / 2) + (prog_r / 2));
+    int32_t   remaining = g_motion.goal_um - ((prog_l / 2) + (prog_r / 2));
+    int32_t   along_mms = ((p_left->speed_mms * p_left->travel_sign) +
+                           (p_right->speed_mms * p_right->travel_sign)) / 2;
     int32_t   speed     = 0;
     int32_t   sync      = 0;
     bool      b_running = true;
 
-    if (remaining <= 0)
+    // mm/s x ms = um: the travel while the brake takes hold.
+    if (remaining <= (magnitude(along_mms) * STOP_LEAD_MS))
     {
         enter_idle();
         g_motion.status.done_count++;
@@ -534,12 +556,14 @@ static void
 wheel_drive (wheel_t * p_wheel, int32_t want_mms)
 {
     int32_t error    = 0;
-    int32_t integral = 0;
+    int32_t integral = p_wheel->integral;
     int32_t raw      = 0;
     int32_t duty     = 0;
+    int32_t step     = clamp(want_mms - p_wheel->target_mms,
+                             -ACCEL_MMS_PER_CYCLE, ACCEL_MMS_PER_CYCLE);
+    bool    b_ramp   = (step != (want_mms - p_wheel->target_mms));
 
-    p_wheel->target_mms += clamp(want_mms - p_wheel->target_mms,
-                                 -ACCEL_MMS_PER_CYCLE, ACCEL_MMS_PER_CYCLE);
+    p_wheel->target_mms += step;
 
     if (0 == p_wheel->target_mms)
     {
@@ -547,9 +571,14 @@ wheel_drive (wheel_t * p_wheel, int32_t want_mms)
     }
     else
     {
-        error    = p_wheel->target_mms - p_wheel->speed_mms;
-        integral = clamp(p_wheel->integral + error, -INTEGRAL_MAX,
-                         INTEGRAL_MAX);
+        error = p_wheel->target_mms - p_wheel->speed_mms;
+
+        // While the set-point is still ramping the wheel always lags it;
+        // integrating that lag only winds up an overshoot.
+        if (!b_ramp)
+        {
+            integral = clamp(integral + error, -INTEGRAL_MAX, INTEGRAL_MAX);
+        }
 
         raw = ((p_wheel->target_mms * FF_NUM) / FF_DEN) +
               ((error * KP_NUM) / KP_DEN) +
@@ -697,13 +726,17 @@ publish (uint32_t start_us)
     subsystem2_odom_t odom    = {0};
     uint32_t          used_us = 0u;
 
-    odom.count_l     = p_left->ticks_seen;
-    odom.count_r     = p_right->ticks_seen;
-    odom.dist_mm     = ((wheel_dist_um(p_left) / 2) +
-                        (wheel_dist_um(p_right) / 2)) / UM_PER_MM;
-    odom.speed_l_mms = p_left->speed_mms;
-    odom.speed_r_mms = p_right->speed_mms;
-    odom.speed_mms   = (p_left->speed_mms + p_right->speed_mms) / 2;
+    odom.count_l      = p_left->ticks_seen;
+    odom.count_r      = p_right->ticks_seen;
+    odom.dist_l_mm    = wheel_dist_um(p_left) / UM_PER_MM;
+    odom.dist_r_mm    = wheel_dist_um(p_right) / UM_PER_MM;
+    odom.dist_mm      = ((wheel_dist_um(p_left) / 2) +
+                         (wheel_dist_um(p_right) / 2)) / UM_PER_MM;
+    odom.speed_l_mms  = p_left->speed_mms;
+    odom.speed_r_mms  = p_right->speed_mms;
+    odom.speed_mms    = (p_left->speed_mms + p_right->speed_mms) / 2;
+    odom.heading_cdeg = heading_cdeg(wheel_dist_um(p_right) -
+                                     wheel_dist_um(p_left));
 
     g_motion.status.state        = g_motion.state;
     g_motion.status.duty_l       = p_left->duty;
@@ -719,6 +752,38 @@ publish (uint32_t start_us)
     }
 
     subsystem2_odom_put(&odom, &g_motion.status);
+}
+
+/*!
+ * @brief Heading from the difference of the wheel distances.
+ *
+ * @param[in] diff_um Right wheel minus left wheel, micrometres.
+ *
+ * @return Centidegrees, + = left, -17999 ... 18000.
+ */
+static int32_t
+heading_cdeg (int32_t diff_um)
+{
+    // One full turn on the spot is 2 pi x track of difference. Reduce to
+    // one turn first, so the multiplication below cannot overflow:
+    // 7037 x 57296 < 2^31.
+    int32_t turn_dmm = (diff_um % FULL_TURN_UM) / UM_PER_DMM;
+    int32_t cdeg     = (turn_dmm * CDEG_PER_RAD_X10) / (S2_TRACK_MM * 100);
+
+    if (cdeg > CDEG_HALF_TURN)
+    {
+        cdeg -= CDEG_FULL_TURN;
+    }
+    else if (cdeg <= -CDEG_HALF_TURN)
+    {
+        cdeg += CDEG_FULL_TURN;
+    }
+    else
+    {
+        // Already in range.
+    }
+
+    return (cdeg);
 }
 
 /*!

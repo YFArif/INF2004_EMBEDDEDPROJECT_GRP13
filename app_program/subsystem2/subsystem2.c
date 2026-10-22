@@ -33,6 +33,20 @@
 #define MBF_SLOT_BYTES          (MBF_HEADER_BYTES + \
                                  ((sizeof(subsystem2_cmd_t) + 3u) & ~3u))
 
+/* motion_task's own stack, the same size the kernel would allocate
+ * (TASK_STACK_SIZE plus DEFAULT_SYS_STKSZ, 128 on the Cortex-M0+). It is
+ * filled with a pattern first, so the deepest use can be read back
+ * (NFR11: at most 75 %). uint64_t keeps it 8-byte aligned. */
+#define MOTION_STACK_WORDS      (S2_MOTION_STACK_BYTES / 8u)
+#define STACK_FILL              (0xDEADBEEFDEADBEEFull)
+
+_Static_assert(6u == sizeof(subsystem2_cmd_t),
+               "IF-04 command layout changed: tell S5");
+_Static_assert(0u == (S2_MOTION_STACK_BYTES % 8u),
+               "stack must be 8-byte sized");
+_Static_assert((TASK_STACK_SIZE + 128) == (int) S2_MOTION_STACK_BYTES,
+               "keep motion_task's stack equal to the other tasks'");
+
 ID                         flg_motion   = 0;    /* Legacy extern.      */
 static ID                  g_mbf_motion = 0;
 static ID                  g_mtx_odom   = 0;
@@ -41,7 +55,11 @@ static ID                  g_cyc_motion = 0;
 static subsystem2_odom_t   g_odom       = {0};
 static subsystem2_status_t g_status     = {0};
 static int16_t             g_steer_mms  = 0;
+static uint64_t            g_motion_stack[MOTION_STACK_WORDS];
 
+static ID   motion_task_create(void);
+static ER   cmd_send(subsystem2_cmd_type_t type, int16_t value,
+                     uint16_t speed_mms);
 static void motion_tick(void * p_exinf);
 
 /*!
@@ -127,8 +145,7 @@ ER
 subsystem2_start (void)
 {
     ER result = E_OK;
-    ID tid    = app_start_task(motion_task, S2_PRI_MOTION, TP_PRC2,
-                               "motion_task");
+    ID tid    = motion_task_create();
 
     if (tid < E_OK)
     {
@@ -160,6 +177,92 @@ subsystem2_motion_send (subsystem2_cmd_t const * p_cmd)
     // NOTE: The cast is safe: a command is 6 bytes.
     return (tk_snd_mbf(g_mbf_motion, p_cmd, (INT) sizeof(*p_cmd),
                        TMO_POL));
+}
+
+/*!
+ * @brief Brake now and cancel any MOVE / TURN / FOLLOW (IF-04).
+ *
+ * @return E_OK, or E_TMOUT if the command queue is full.
+ */
+ER
+subsystem2_stop (void)
+{
+    return (cmd_send(S2_CMD_STOP, 0, 0u));
+}
+
+/*!
+ * @brief Drive at a speed, steered by line_task (IF-04). Sent again while
+ *        following, it only changes the speed.
+ *
+ * @param[in] speed_mms Robot speed; 0 = S2_SPEED_CRUISE_MMS.
+ *
+ * @return E_OK, or E_TMOUT if the command queue is full.
+ */
+ER
+subsystem2_follow (uint16_t speed_mms)
+{
+    return (cmd_send(S2_CMD_FOLLOW, 0, speed_mms));
+}
+
+/*!
+ * @brief Drive straight by encoder distance; EV_MOTION_DONE at the end.
+ *
+ * @param[in] dist_mm   Negative = reverse.
+ * @param[in] speed_mms 0 = S2_SPEED_CRUISE_MMS.
+ *
+ * @return E_OK, or E_TMOUT if the command queue is full.
+ */
+ER
+subsystem2_move (int16_t dist_mm, uint16_t speed_mms)
+{
+    return (cmd_send(S2_CMD_MOVE, dist_mm, speed_mms));
+}
+
+/*!
+ * @brief Turn on the spot by encoder arc; EV_MOTION_DONE at the end.
+ *
+ * @param[in] angle_deg Positive = left; clipped to +/- 720.
+ * @param[in] speed_mms Wheel speed; 0 = S2_SPEED_TURN_MMS.
+ *
+ * @return E_OK, or E_TMOUT if the command queue is full.
+ */
+ER
+subsystem2_turn (int16_t angle_deg, uint16_t speed_mms)
+{
+    return (cmd_send(S2_CMD_TURN, angle_deg, speed_mms));
+}
+
+/*!
+ * @brief Leave the E-stop. Call subsystem2_estop_clear() first: a CLEAR
+ *        that arrives while MF_ESTOP is still set is discarded.
+ *
+ * @return E_OK, or E_TMOUT if the command queue is full.
+ */
+ER
+subsystem2_clear (void)
+{
+    return (cmd_send(S2_CMD_CLEAR, 0, 0u));
+}
+
+/*!
+ * @brief Deepest use of motion_task's stack so far (NFR11).
+ *
+ * @return Bytes used, out of S2_MOTION_STACK_BYTES.
+ */
+uint32_t
+subsystem2_stack_used (void)
+{
+    uint32_t untouched = 0u;
+
+    // The stack grows down: count the words at the bottom that still hold
+    // the fill pattern.
+    while ((untouched < MOTION_STACK_WORDS) &&
+           (STACK_FILL == g_motion_stack[untouched]))
+    {
+        untouched++;
+    }
+
+    return ((MOTION_STACK_WORDS - untouched) * 8u);
 }
 
 /*!
@@ -321,6 +424,76 @@ subsystem2_steer_get (void)
     CHECK(tk_unl_mtx(g_mtx_steer), "mtx_steer");
 
     return (dv_mms);
+}
+
+/*!
+ * @brief Create and start motion_task on core 1, on its own pre-filled
+ *        stack (S2_MOTION_STACK_BYTES).
+ *
+ * @return The task ID, or the kernel error.
+ */
+static ID
+motion_task_create (void)
+{
+    T_CTSK   ctsk   = {0};
+    ID       tid    = 0;
+    ER       result = E_OK;
+    uint32_t idx    = 0u;
+
+    for (idx = 0u; idx < MOTION_STACK_WORDS; idx++)
+    {
+        g_motion_stack[idx] = STACK_FILL;
+    }
+
+    // NOTE: The casts are safe: motion_task has the kernel's task entry
+    // signature, which FP stands for, and the stack is 2176 bytes.
+    ctsk.tskatr  = TA_HLNG | TA_RNG3 | TA_USERBUF;
+    ctsk.task    = (FP) motion_task;
+    ctsk.itskpri = S2_PRI_MOTION;
+    ctsk.stksz   = (SZ) sizeof(g_motion_stack);
+    ctsk.bufptr  = g_motion_stack;
+#if TK_SUPPORT_SMP
+    ctsk.tskatr |= TA_ASSPRC;
+    ctsk.assprc  = TP_PRC2;
+#endif
+
+    tid = tk_cre_tsk(&ctsk);
+
+    if (tid >= E_OK)
+    {
+        result = tk_sta_tsk(tid, 0);
+        if (E_OK != result)
+        {
+            tid = result;
+        }
+    }
+
+    CHECK(tid, "motion_task");
+
+    return (tid);
+}
+
+/*!
+ * @brief Build and queue one command.
+ *
+ * @param[in] type      Command type.
+ * @param[in] value     mm or degrees.
+ * @param[in] speed_mms 0 = default.
+ *
+ * @return E_OK, or E_TMOUT if the command queue is full.
+ */
+static ER
+cmd_send (subsystem2_cmd_type_t type, int16_t value, uint16_t speed_mms)
+{
+    // NOTE: The cast is safe: command types are 0 ... 4.
+    subsystem2_cmd_t const cmd =
+    {
+        .type      = (uint8_t) type,
+        .value     = value,
+        .speed_mms = speed_mms
+    };
+
+    return (subsystem2_motion_send(&cmd));
 }
 
 /*!

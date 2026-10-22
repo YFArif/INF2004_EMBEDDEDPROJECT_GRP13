@@ -4,13 +4,19 @@
  *        Record every run in testing/subsystem2/TEST_LOG.md.
  *
  * @par Automatic (motors stay braked; safe in every test build)
- * - S2-U05: MF_ESTOP to brake, software latency, 20 trials (NFR6).
+ * - S2-U08: the 1 MHz timer against the kernel clock.
+ * - S2-U05: motion_task period, and MF_ESTOP to brake latency, 20 trials
+ *   (NFR6).
  * - S2-U07: E-stop latch and CLEAR protocol (Week 6 report 6.3).
+ * - S2-U10: longest motion cycle and stack use (NFR11), run last.
  *
  * @par Bench (set the switch to 1, lift the wheels off the ground first)
  * - S2-U01: encoder ticks per wheel revolution, turned by hand (~90 s).
  * - S2-U06: open-loop drive of each motor (~35 s).
  * - S2-U02: closed-loop step 0 -> 250 mm/s on FOLLOW (~3 s).
+ *
+ * @par Floor (S2_FLOOR_TEST in subsystem2_floor.c)
+ * - S2-U11 distance, S2-U03 turns, S2-U12 braking / slow speed / stall.
  *
  * @par
  * S2-U01 and S2-U06 drive the hardware directly. That is allowed only
@@ -48,6 +54,10 @@
 #define U08_MIN_US          (970000u)
 #define U08_MAX_US          (1040000u)
 
+/* S2-U10 (NFR11): 20 % of the 20 ms period, 75 % of the stack. */
+#define U10_CYCLE_LIMIT_US  (4000u)
+#define U10_STACK_PCT       (75u)
+
 #define U01_REVS            (10u)
 #define U01_WINDOW_S        (40u)
 
@@ -83,6 +93,7 @@ static void     delay_ms(uint32_t ms);
 static bool     s2_u05_estop_latency(void);
 static bool     s2_u07_estop_latch(void);
 static bool     s2_u08_timer_rate(void);
+static bool     s2_u10_resources(void);
 
 #if S2_U01_BENCH
 static bool     s2_u01_wheel(drv_encoder_t wheel, char const * p_name);
@@ -141,7 +152,40 @@ subsystem2_test (void)
                "both wheels within +/-10 % of 250 mm/s after 0.5 s");
 #endif
 
+    // Floor tests: S2_FLOOR_TEST in subsystem2_floor.c, 0 = none.
+    subsystem2_floor_test();
+
+    // Last, so it covers everything that ran above (driving included).
+    TEST_CHECK("S2-U10", s2_u10_resources(),
+               "NFR11: longest motion cycle <= 4000 us, stack <= 75 %");
+
     TEST_SUMMARY("subsystem2");
+}
+
+/*!
+ * @brief S2-U10: motion_task's longest cycle and deepest stack use so far.
+ *
+ * @return true if both are inside NFR11 (20 % of 20 ms; 75 % of stack).
+ */
+static bool
+s2_u10_resources (void)
+{
+    subsystem2_status_t status = {0};
+    uint32_t            used   = subsystem2_stack_used();
+
+    subsystem2_status_get(&status);
+
+    // NOTE: The casts are safe: the format string is ASCII and all values
+    // are below 20000.
+    tm_printf((UB *) "[TEST] S2-U10 INFO longest cycle %d us (limit %d),"
+              " stack %d of %d bytes = %d %% (limit 75 %%), %d cycles\n",
+              (int) status.cycle_max_us, (int) U10_CYCLE_LIMIT_US,
+              (int) used, (int) S2_MOTION_STACK_BYTES,
+              (int) ((used * 100u) / S2_MOTION_STACK_BYTES),
+              (int) status.cycle_count);
+
+    return ((status.cycle_max_us <= U10_CYCLE_LIMIT_US) &&
+            ((used * 100u) <= (S2_MOTION_STACK_BYTES * U10_STACK_PCT)));
 }
 
 /*!

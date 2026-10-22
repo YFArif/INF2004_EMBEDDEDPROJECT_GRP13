@@ -98,6 +98,11 @@ typedef struct
     int32_t  speed_mms;     /* Robot speed, positive = forward.           */
     int32_t  speed_l_mms;   /* Signed wheel speeds, for the turn rate.    */
     int32_t  speed_r_mms;
+    int32_t  dist_l_mm;     /* Signed distance of each wheel.             */
+    int32_t  dist_r_mm;
+    int32_t  heading_cdeg;  /* Heading from the wheels, 1/100 degree,     */
+                            /* + = left of the power-up heading,          */
+                            /* -17999 ... 18000.                          */
 } subsystem2_odom_t;
 
 /** motion_task states (Week 6 report 6.3). STALL_FAULT is not a state
@@ -131,6 +136,11 @@ typedef struct
 
 /* Public functions: any task may call these, unless noted. */
 ER   subsystem2_motion_send(subsystem2_cmd_t const * p_cmd);   /* S5.    */
+ER   subsystem2_stop(void);                                     /* S5.    */
+ER   subsystem2_follow(uint16_t speed_mms);                     /* S5.    */
+ER   subsystem2_move(int16_t dist_mm, uint16_t speed_mms);      /* S5.    */
+ER   subsystem2_turn(int16_t angle_deg, uint16_t speed_mms);    /* S5.    */
+ER   subsystem2_clear(void);                                    /* S5.    */
 void subsystem2_estop_set(void);                    /* S4, S5.           */
 void subsystem2_estop_clear(void);                  /* S5 vehicle_ctrl.  */
 bool subsystem2_estop_is_set(void);
@@ -159,11 +169,17 @@ void s2_odom_get(subsystem2_odom_t * p_odom);
 #define S2_PRI_MOTION           (9)     /* Week 6 report section 3.       */
 #define S2_MOTION_PERIOD_MS     (20u)
 
-void    subsystem2_cycle_wait(bool b_estop_wakes);
-bool    subsystem2_cmd_receive(subsystem2_cmd_t * p_cmd);
-void    subsystem2_odom_put(subsystem2_odom_t const * p_odom,
-                            subsystem2_status_t const * p_status);
-int16_t subsystem2_steer_get(void);
+/* motion_task's stack: TASK_STACK_SIZE (2048) plus the kernel's
+ * DEFAULT_SYS_STKSZ (128 on the Cortex-M0+), as app_start_task() gives. */
+#define S2_MOTION_STACK_BYTES   (2176u)
+
+uint32_t subsystem2_stack_used(void);
+void     subsystem2_floor_test(void);       /* make TEST=1 only.          */
+void     subsystem2_cycle_wait(bool b_estop_wakes);
+bool     subsystem2_cmd_receive(subsystem2_cmd_t * p_cmd);
+void     subsystem2_odom_put(subsystem2_odom_t const * p_odom,
+                             subsystem2_status_t const * p_status);
+int16_t  subsystem2_steer_get(void);
 
 #endif /* SUBSYSTEM2_H */
 
