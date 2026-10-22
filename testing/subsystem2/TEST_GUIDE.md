@@ -98,14 +98,18 @@ Every test image runs the automatic `unit` checks first (about 10 s, motors stil
 - **Takes:** about 6 minutes (5 runs, each started by Button 1).
 - **What happens:** runs 1-3 are MOVE 1000 mm at 300 mm/s, run 4 is MOVE 1000 mm at 150 mm/s, and run 5 is MOVE -300 mm (reverse).
 - **You do, for each run:**
-  1. **Before pressing the button** the script asks your **start reading** (for example  ) and the **gap** between the tape's edge and the outside of the left tyre, in mm (use a ruler; about 20). Type both, then press Button 1.
+  1. **Before pressing the button** the script asks your **start reading** (Enter = 0) and the **gap** between the tape's edge and the outside of the left tyre, in mm. Putting the tyre right against the tape is fine: type `0`. If the robot then drifts left over the tape, type how far the tyre overlaps it as a negative number. Then press Button 1.
   2. **After the run:** look straight down at the same point of the left tyre and type the **reading** there, in mm (for example `1003` if you started at 0).
   3. Type the **gap** again, now at the end position.
   4. The script works out the real distance (reading - start) and the sideways drift (+ = drifted left, - = right) and saves both.
   5. Put the robot back on its start mark.
 
   **Run 5 (reverse):** the robot goes backward, so it moves **down** the tape numbers. Start it at **300 or more** (for example 400); it ends near 100. If your start line is 0, lay the tape so there is tape behind it, or use a different start mark for this run.
-- **Good result:** every `S2-U11` line PASS. Real distances within 1000 +/- 20 mm (run 5: 300 +/- 6 mm) and sideways drift under 30 mm. If the distances are all off by the same few percent, I correct the encoder calibration from your numbers.
+- **Good result:** every `S2-U11` line PASS. Real distances within 1000 +/- 10 mm (reverse: 300 +/- 3 mm) and sideways drift under 20 mm.
+- **The script calibrates the wheels for you.** At the end it prints, for example, `left went 0.40 % further than counted` and two lines for `subsystem2.h`:
+  `suggested: S2_WHEEL_CIRC_UM_L (208620)   S2_WHEEL_CIRC_UM_R (209010)`.
+  If both wheels are within 1 % it says no change is needed. Otherwise put the two suggested numbers into `app_program\subsystem2\subsystem2.h`, commit, and run u11 again. Straightness and distance are fixed together: the robot curves when one wheel's calibration is off by about 1 %, because the controller keeps the *counted* distances of both wheels equal.
+- **Why the wheel and not the body, and why the calibration matters:** see section 6.
 ### Test 5: `u03` turn accuracy (S2-U03). On the floor.
 
 - **Why:** NFR5 needs 90-degree turns within 5 degrees and 180-degree turns within 8 degrees. Barcode turns and Anna's bypass depend on it.
@@ -145,6 +149,8 @@ Runs `motion_task.c` against a simulated robot on the PC. No Pico is needed. Run
 
 ## 4. Chassis measurements (once, by hand)
 
+(The wheel calibration does not need a hand measurement: u11 works it out, see Test 4.)
+
 Write these down and send them with the logs.
 
 | What                               | How                                                                                                                                                                                                          |
@@ -168,3 +174,12 @@ Write these down and send them with the logs.
 | Uncommitted-changes warning                   | Commit first (or ask me), unless it is only a practice run.                                                                                                                      |
 | Pressing Button 1 does nothing                | Press firmly and hold for half a second. Button 1 is the one labelled GP20 (not GP21, not RESET). If still nothing, send me the log.                                             |
 | You started a step by mistake                 | Switch the robot off, run the test again, and tell me which log to use.                                                                                                          |
+
+## 6. Why the robot curved and what keeps it straight
+
+The first u11 run (2026-10-23) curved right by 38-85 mm over 1 m and went about 5 % too far, although the robot's own odometry said 999 mm and a heading change under 1 degree.
+
+- The motion controller keeps both wheels at the same **counted** distance. That only drives straight if each wheel's distance per tick is right.
+- The old values came from turning the wheels by hand (S2-U01): 63 mm and 639 ticks (left), 629 ticks (right). The floor showed both wheels really go further: a rolling diameter of about 66.5 mm, with 639 ticks on both sides. The right wheel's 629 made the firmware think the right wheel went 1.4 % further than it did, so it held the right wheel back and the robot turned right.
+- The S2-U09 simulation reproduces this: a 1.4 % right-wheel error gives 59 mm to the right over 1 m with a heading reading near 0 (check H19).
+- PID tuning cannot fix this; only calibration can. It is now one number per wheel, `S2_WHEEL_CIRC_UM_L/R`, and every u11 run checks it and prints corrected values. Re-run u11 if the tyres, wheels or floor change, or once a week before integration tests.

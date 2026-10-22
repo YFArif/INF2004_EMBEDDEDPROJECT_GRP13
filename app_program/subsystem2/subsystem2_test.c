@@ -523,12 +523,14 @@ s2_u06_run (drv_motor_t motor, int32_t duty)
     drv_encoder_count_t o_to   = {0};
     uint32_t            ticks  = 0u;
     uint32_t            tpr    = (uint32_t) S2_TICKS_PER_REV_L;
+    uint32_t            circ   = (uint32_t) S2_WHEEL_CIRC_UM_L;
 
     if (DRV_MOTOR_RIGHT == motor)
     {
         mine  = DRV_ENCODER_RIGHT;
         other = DRV_ENCODER_LEFT;
         tpr   = (uint32_t) S2_TICKS_PER_REV_R;
+        circ  = (uint32_t) S2_WHEEL_CIRC_UM_R;
     }
 
     drv_motor_set(motor, duty);
@@ -544,11 +546,11 @@ s2_u06_run (drv_motor_t motor, int32_t duty)
     ticks = m_to.ticks - m_from.ticks;
 
     // NOTE: The casts are safe: the format string is ASCII; ticks per
-    // second stay below 5000 and the speed below 2000 mm/s. 1979 is the
-    // wheel circumference in tenths of a millimetre.
+    // second stay below 5000 (x 209310 fits 32 bits) and the speed below
+    // 2000 mm/s.
     tm_printf((UB *) "[S2-U06]   duty %d: %d ticks/s = %d mm/s,"
               " other wheel %d ticks\n", (int) duty, (int) ticks,
-              (int) ((ticks * 1979u) / (tpr * 10u)),
+              (int) (((ticks * circ) / tpr) / 1000u),
               (int) (o_to.ticks - o_from.ticks));
 
     if (((o_to.ticks - o_from.ticks) * 100u) > ticks)

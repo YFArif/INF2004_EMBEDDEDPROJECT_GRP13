@@ -418,6 +418,7 @@ try
     $script:moveRun  = 0
     $script:turnRun  = 0
     $script:u11Start = $null
+    $script:u11Runs  = New-Object System.Collections.Generic.List[object]
     $script:u11Gap   = $null
     $script:u06Side  = ''
 
@@ -457,14 +458,20 @@ try
                         $hint = 'the reverse run goes DOWN the tape: start at 300 or more, e.g. 400'
                     }
                     Write-Host '  Place the robot with the front edge of the LEFT tyre where it touches the floor on your start mark, wheels parallel to the tape.' -ForegroundColor Yellow
-                    $script:u11Start = Ask-Number "  Start reading at that point, mm ($hint)"
-                    $script:u11Gap   = Ask-Number '  Gap between the tape''s edge and the outside of the LEFT tyre, mm (about 20)'
+                    $script:u11Start = Ask-Number "  Start reading at that point, mm ($hint; Enter = 0)"
+                    if ($null -eq $script:u11Start)
+                    {
+                        $script:u11Start = 0.0
+                    }
+                    $script:u11Gap   = Ask-Number '  Gap between the tape''s edge and the outside of the LEFT tyre, mm (0 = touching; negative if the tyre is over the tape)'
                     Write-Host '  Now press BUTTON 1.' -ForegroundColor Yellow
                 }
-                elseif ($line -match '^\[S2-FLOOR\] MOVE (-?\d+):')
+                elseif ($line -match '^\[S2-FLOOR\] MOVE (-?\d+): odometry (-?\d+) mm \(L (-?\d+) R (-?\d+)\)')
                 {
                     $script:moveRun++
                     $target = [int]$Matches[1]
+                    $odomL  = [double]$Matches[3]
+                    $odomR  = [double]$Matches[4]
                     $start  = $script:u11Start
                     Look-AtRobot
                     Write-Host "  Run $($script:moveRun): look straight down at the same point of the LEFT tyre as at the start." -ForegroundColor Yellow
@@ -486,6 +493,10 @@ try
                                $target, $script:moveRun, (Format-Value $real), $start, (Format-Value $end),
                                (Format-Value $side), (Format-Value $script:u11Gap), (Format-Value $gapEnd))
                     Write-Host "  Saved: travelled $(Format-Value $real) mm, sideways $(Format-Value $side) mm." -ForegroundColor Yellow
+                    if (($null -ne $real) -and ($null -ne $side) -and ([math]::Abs($real) -gt 100) -and ($odomL -ne 0) -and ($odomR -ne 0))
+                    {
+                        $script:u11Runs.Add(@{ D = $real; Y = $side; L = $odomL; R = $odomR })
+                    }
                 }
             }
             'u03'
@@ -655,6 +666,49 @@ try
     }
 
     $sp.Close()
+
+    # -----------------------------------------------------------------
+    #  u11: work out the wheel calibration from the measured runs.
+    #  Left wheel real travel = D (the left tyre was measured). Heading
+    #  change from the sideways drift: theta = 2 y / D (constant curve), so
+    #  right wheel real travel = D + theta x track. Scale = real / counted.
+    # -----------------------------------------------------------------
+    if (($Test -eq 'u11') -and ($script:u11Runs.Count -gt 0))
+    {
+        $hdr   = [System.IO.File]::ReadAllText((Join-Path $s2Dir 'subsystem2.h'))
+        $circL = [double]([regex]::Match($hdr, 'S2_WHEEL_CIRC_UM_L\s+\((\d+)\)').Groups[1].Value)
+        $circR = [double]([regex]::Match($hdr, 'S2_WHEEL_CIRC_UM_R\s+\((\d+)\)').Groups[1].Value)
+        $track = [double]([regex]::Match($hdr, 'S2_TRACK_MM\s+\((\d+)\)').Groups[1].Value)
+        $kL = 0.0
+        $kR = 0.0
+        foreach ($r in $script:u11Runs)
+        {
+            $theta = 2.0 * $r.Y / $r.D
+            $kL += $r.D / $r.L
+            $kR += ($r.D + ($theta * $track)) / $r.R
+        }
+        $kL /= $script:u11Runs.Count
+        $kR /= $script:u11Runs.Count
+        $newL = [math]::Round($circL * $kL / 10) * 10
+        $newR = [math]::Round($circR * $kR / 10) * 10
+        $msg  = ('[CALIBRATION] from {0} runs: left went {1:N2} %, right {2:N2} % further than counted' -f
+                 $script:u11Runs.Count, (($kL - 1) * 100), (($kR - 1) * 100))
+        Write-Log $msg
+        Write-Log "[CALIBRATION] subsystem2.h now: S2_WHEEL_CIRC_UM_L ($circL), S2_WHEEL_CIRC_UM_R ($circR)"
+        Write-Log "[CALIBRATION] suggested:       S2_WHEEL_CIRC_UM_L ($newL), S2_WHEEL_CIRC_UM_R ($newR)"
+        Write-Step 'Wheel calibration from your measurements'
+        Write-Host $msg.Replace('[CALIBRATION] ', '')
+        Write-Host "  now:       S2_WHEEL_CIRC_UM_L ($circL)   S2_WHEEL_CIRC_UM_R ($circR)"
+        Write-Host "  suggested: S2_WHEEL_CIRC_UM_L ($newL)   S2_WHEEL_CIRC_UM_R ($newR)"
+        if (([math]::Abs($kL - 1) -le 0.01) -and ([math]::Abs($kR - 1) -le 0.01))
+        {
+            Write-Host '  Both within 1 %: the calibration is good; no change needed.' -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host '  More than 1 % off: put the suggested values in app_program\subsystem2\subsystem2.h, commit, run u11 again.' -ForegroundColor Yellow
+        }
+    }
 
     # -----------------------------------------------------------------
     #  5. Summary

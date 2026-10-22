@@ -74,6 +74,10 @@ static uint32_t            g_stall_faults  = 0u;
 static bool                g_b_print       = false;
 static motion_t            g_motion_boot;
 static double              g_tau_s         = SIM_TAU_S;
+static double              g_scale_r       = 1.0;  /* True / believed R tick. */
+static double              g_pose_x_mm     = 0.0;
+static double              g_pose_y_mm     = 0.0;  /* + = robot's left.     */
+static double              g_pose_th       = 0.0;
 static uint32_t            g_pass          = 0u;
 static uint32_t            g_fail          = 0u;
 
@@ -228,10 +232,15 @@ sim_reset (double load, uint32_t start_us)
     (void) memset(g_sim, 0, sizeof(g_sim));
     g_sim[WHEEL_LEFT].gain  = SIM_GAIN_L * load;
     g_sim[WHEEL_RIGHT].gain = SIM_GAIN_R * load;
-    g_sim[WHEEL_LEFT].tick_um  = (S2_WHEEL_DIA_MM * SIM_PI * 1000.0) /
+    // The firmware's calibration, so the simulated robot is the one the
+    // firmware believes it drives.
+    g_sim[WHEEL_LEFT].tick_um  = (double) S2_WHEEL_CIRC_UM_L /
                                  S2_TICKS_PER_REV_L;
-    g_sim[WHEEL_RIGHT].tick_um = (S2_WHEEL_DIA_MM * SIM_PI * 1000.0) /
-                                 S2_TICKS_PER_REV_R;
+    g_sim[WHEEL_RIGHT].tick_um = ((double) S2_WHEEL_CIRC_UM_R /
+                                  S2_TICKS_PER_REV_R) * g_scale_r;
+    g_pose_x_mm = 0.0;
+    g_pose_y_mm = 0.0;
+    g_pose_th   = 0.0;
 
     for (idx = 0u; idx < WHEEL_COUNT; idx++)
     {
@@ -302,9 +311,21 @@ sim_cycle (void)
 
     for (step = 0u; step < SIM_STEPS; step++)
     {
+        double left_um  = g_sim[WHEEL_LEFT].pos_um;
+        double right_um = g_sim[WHEEL_RIGHT].pos_um;
+        double ds_mm    = 0.0;
+
         g_now_us += SIM_STEP_US;
         sim_wheel_step(&g_sim[WHEEL_LEFT], SIM_STEP_US / 1e6);
         sim_wheel_step(&g_sim[WHEEL_RIGHT], SIM_STEP_US / 1e6);
+
+        // Robot position on the floor, for straightness checks.
+        left_um      = g_sim[WHEEL_LEFT].pos_um - left_um;
+        right_um     = g_sim[WHEEL_RIGHT].pos_um - right_um;
+        ds_mm        = (left_um + right_um) / 2000.0;
+        g_pose_th   += (right_um - left_um) / (1000.0 * S2_TRACK_MM);
+        g_pose_x_mm += ds_mm * cos(g_pose_th);
+        g_pose_y_mm += ds_mm * sin(g_pose_th);
     }
 
     motion_cycle();
@@ -676,6 +697,38 @@ test_latest_wins (void)
           " command after EV_MOTION_DONE)");
 }
 
+/* The S2-U11 floor finding (2026-10-23): if the right wheel really goes
+ * 1.4 % less per tick than the firmware believes, the controller keeps the
+ * COUNTED distances equal, so the robot curves right, 40-90 mm over 1 m,
+ * while its own heading reads about 0. Calibration, not control, fixes it. */
+static void
+test_scale_error (void)
+{
+    double y_err  = 0.0;
+    double y_good = 0.0;
+
+    g_scale_r = 1.0 / 1.014;
+    sim_reset(SIM_LOAD_FLOOR, 0u);
+    send(S2_CMD_MOVE, 1000, 0u);
+    (void) sim_run_until_idle(1000u);
+    sim_run(SETTLE_CYCLES);
+    y_err = g_pose_y_mm;
+
+    g_scale_r = 1.0;
+    sim_reset(SIM_LOAD_FLOOR, 0u);
+    send(S2_CMD_MOVE, 1000, 0u);
+    (void) sim_run_until_idle(1000u);
+    sim_run(SETTLE_CYCLES);
+    y_good = g_pose_y_mm;
+
+    check("H19", (y_err < -40.0) && (y_err > -90.0) &&
+                 (fabs((double) g_odom.heading_cdeg) <= 100.0) &&
+                 (fabs(y_good) <= 5.0),
+          "MOVE 1000 with the right wheel 1.4 %% short per tick: %.0f mm"
+          " sideways (right), as on the floor; calibrated: %.1f mm",
+          y_err, y_good);
+}
+
 /* Long run: odometry keeps up and nothing overflows (sanitizers). */
 static void
 test_long_run (void)
@@ -786,6 +839,7 @@ main (void)
     (void) printf("-- measurement and robustness\n");
     test_speed_accuracy();
     test_long_run();
+    test_scale_error();
     test_speed_clip();
 
     (void) printf("S2-U09: %s (%u passed, %u failed)\n",

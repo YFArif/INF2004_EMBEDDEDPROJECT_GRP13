@@ -98,7 +98,6 @@
 #define UM_PER_MM               (1000)
 #define PI_X1E6                 (3141593)
 #define PI_X1E4                 (31416u)
-#define WHEEL_CIRC_UM           ((S2_WHEEL_DIA_MM * PI_X1E6) / UM_PER_MM)
 
 /* Heading: 2 pi x 112 mm = 703717 um of wheel difference per full turn;
  * 1 rad = 5729.58 cdeg, kept as x10 to work in 0.1 mm. */
@@ -114,6 +113,7 @@ typedef struct
     drv_encoder_t encoder;
     drv_motor_t   motor;
     int32_t       ticks_per_rev;
+    int32_t       circ_um;          /* Calibrated rolling circumference.  */
     uint32_t      ticks_seen;       /* Encoder ticks at the last cycle.   */
     uint32_t      tick_time_us;     /* Time of the latest tick seen.      */
     uint32_t      new_ticks;        /* Ticks during this cycle.           */
@@ -144,9 +144,11 @@ static motion_t g_motion =
     .wheel =
     {
         { .encoder = DRV_ENCODER_LEFT,  .motor = DRV_MOTOR_LEFT,
-          .ticks_per_rev = S2_TICKS_PER_REV_L, .direction = 1 },
+          .ticks_per_rev = S2_TICKS_PER_REV_L,
+          .circ_um = S2_WHEEL_CIRC_UM_L, .direction = 1 },
         { .encoder = DRV_ENCODER_RIGHT, .motor = DRV_MOTOR_RIGHT,
-          .ticks_per_rev = S2_TICKS_PER_REV_R, .direction = 1 }
+          .ticks_per_rev = S2_TICKS_PER_REV_R,
+          .circ_um = S2_WHEEL_CIRC_UM_R, .direction = 1 }
     },
     .state = S2_STATE_IDLE
 };
@@ -491,14 +493,17 @@ wheel_measure (wheel_t * p_wheel, uint32_t now_us)
 {
     drv_encoder_count_t count       = {0};
     uint32_t            tpr         = 0u;
+    uint32_t            circ        = 0u;
     uint32_t            um_per_tick = 0u;
     uint32_t            dt_us       = 0u;
     uint32_t            speed       = 0u;
     uint32_t            bound       = 0u;
 
-    // NOTE: The casts are safe: ticks per revolution are 629 / 639.
+    // NOTE: The casts are safe: ticks per revolution are about 640 and
+    // the circumference about 209000 um, both positive.
     tpr         = (uint32_t) p_wheel->ticks_per_rev;
-    um_per_tick = (uint32_t) WHEEL_CIRC_UM / tpr;
+    circ        = (uint32_t) p_wheel->circ_um;
+    um_per_tick = circ / tpr;
 
     drv_encoder_get(p_wheel->encoder, &count);
     p_wheel->new_ticks = count.ticks - p_wheel->ticks_seen;
@@ -514,9 +519,9 @@ wheel_measure (wheel_t * p_wheel, uint32_t now_us)
             dt_us = CYCLE_US;
         }
 
-        // At most ~50 ticks per cycle: 50 x 197920 and 15500 x 1000 both
+        // At most ~50 ticks per cycle: 50 x 209310 and 16400 x 1000 both
         // fit in 32 bits.
-        speed = (((p_wheel->new_ticks * (uint32_t) WHEEL_CIRC_UM) / tpr) *
+        speed = (((p_wheel->new_ticks * circ) / tpr) *
                  US_PER_MS) / dt_us;
         p_wheel->tick_time_us = count.tick_time_us;
     }
@@ -664,8 +669,8 @@ wheel_dist_um (wheel_t const * p_wheel)
     int32_t revs = p_wheel->ticks_signed / p_wheel->ticks_per_rev;
     int32_t part = p_wheel->ticks_signed % p_wheel->ticks_per_rev;
 
-    return ((revs * WHEEL_CIRC_UM) +
-            ((part * WHEEL_CIRC_UM) / p_wheel->ticks_per_rev));
+    return ((revs * p_wheel->circ_um) +
+            ((part * p_wheel->circ_um) / p_wheel->ticks_per_rev));
 }
 
 /*!

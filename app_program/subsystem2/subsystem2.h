@@ -148,11 +148,19 @@ void subsystem2_odom_get(subsystem2_odom_t * p_odom);
 void subsystem2_status_get(subsystem2_status_t * p_status);
 void subsystem2_steer_set(int16_t dv_mms);          /* S3 line_task.     */
 
-/* Chassis. Ticks per revolution are provisional (S2-U01 runs 1-2). */
-#define S2_WHEEL_DIA_MM         (63)
+/* Chassis. Distance per tick = circumference / ticks per revolution; only
+ * that ratio matters, so the circumference is the calibration value.
+ * Calibrated on the floor (S2-U11, 2026-10-23, log 2026-10-23_s2_u11_3):
+ * with 63 mm and 639 / 629 ticks the robot went 5.4 % (left) and 3.9 %
+ * (right) further than it counted, so it curved right (4-9 deg per metre).
+ * Both wheels fit 639 ticks and a rolling diameter of about 66.5 mm. The
+ * u11 run of s2_test.ps1 prints new values for these two lines.
+ * Overflow: 50 ticks x 209010 and 639 x 209010 fit 32 bits easily. */
 #define S2_TRACK_MM             (112)   /* Centre of tyre to centre.      */
 #define S2_TICKS_PER_REV_L      (639)   /* Debounced rising edges.        */
-#define S2_TICKS_PER_REV_R      (629)
+#define S2_TICKS_PER_REV_R      (639)
+#define S2_WHEEL_CIRC_UM_L      (208620)    /* 66.41 mm rolling diameter. */
+#define S2_WHEEL_CIRC_UM_R      (209010)    /* 66.53 mm rolling diameter. */
 
 /* ---------------------------------------------------------------------
  *  Legacy names used by S5 (origin/buddy5-ultrasonic, obstacle_task.c).
