@@ -32,3 +32,4 @@ Add a new row for every run. Never edit or delete old rows.
 | Date       | Test ID | Commit    | Tester | Result      | Log / evidence          | Notes |
 | ---------- | ------- | --------- | ------ | ----------- | ----------------------- | ----- |
 | YYYY-MM-DD | S2-U01  | `abc1234` |        | PASS / FAIL | `logs/YYYY-MM-DD_….txt` |       |
+| 2026-10-22 | S2-U09  | `0d5f601` | Arif (run by Copilot in WSL) | PASS | `logs/2026-10-22_host_test_motion.txt` | 32 of 32 checks; simulated robot, gcc 13.3 with ASan/UBSan. Earlier runs during development found the weak PI, the ramp wind-up and the 3 deg TURN overshoot, fixed in `081d9d7` |

@@ -1,0 +1,40 @@
+commit: 0d5f601
+compiler: gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+S2-U09 host test of motion_task.c (simulated robot)
+-- speed control (NFR4)
+[HOST] H01 PASS  step 0->250 mm/s, load 1.00: in band at 240 ms, worst error after 500 ms 0.9 (limit 25), overshoot 0% (limit 20%)
+[HOST] H02 PASS  step 0->250 mm/s, load 0.85: in band at 280 ms, worst error after 500 ms 4.1 (limit 25), overshoot 0% (limit 20%)
+[HOST] H03 PASS  step 0->250 mm/s, load 0.60: in band at 480 ms, worst error after 500 ms 20.2 (limit 25), overshoot 0% (limit 20%)
+[HOST] H11 PASS  step 0->250 mm/s, load 0.85: in band at 280 ms, worst error after 500 ms 4.1 (limit 25), overshoot 0% (limit 20%)
+[HOST] H18 PASS  step 0->250 mm/s, load 0.85: in band at 300 ms, worst error after 500 ms 8.0 (limit 25), overshoot 0% (limit 20%)
+[HOST] H18 PASS  step 0->250 mm/s, load 0.85: in band at 340 ms, worst error after 500 ms 10.8 (limit 25), overshoot 4% (limit 20%)
+[HOST] H18 PASS  step 0->250 mm/s, load 0.60: in band at 460 ms, worst error after 500 ms 12.0 (limit 25), overshoot 1% (limit 20%)
+-- MOVE and TURN (FR6, NFR5)
+[HOST] H04 PASS  MOVE 1000 mm @ 0: stopped at 999.6 mm (tol 10), heading -0.22 deg, odom 999 mm, 3640 ms, EV_MOTION_DONE x1
+[HOST] H04 PASS  MOVE 300 mm @ 150: stopped at 299.2 mm (tol 5), heading -0.07 deg, odom 299 mm, 2120 ms, EV_MOTION_DONE x1
+[HOST] H05 PASS  MOVE -100 mm @ 0: stopped at -99.9 mm (tol 5), heading -0.20 deg, odom -99 mm, 660 ms, EV_MOTION_DONE x1
+[HOST] H06 PASS  TURN 90 deg: turned 89.81 deg (tol 3), odom heading 89.72 deg, centre moved 0.1 mm, 720 ms, EV_MOTION_DONE x1
+[HOST] H06 PASS  TURN -90 deg: turned -89.81 deg (tol 3), odom heading -89.72 deg, centre moved -0.1 mm, 720 ms, EV_MOTION_DONE x1
+[HOST] H06 PASS  TURN 180 deg: turned 179.46 deg (tol 3), odom heading 179.30 deg, centre moved -0.0 mm, 1300 ms, EV_MOTION_DONE x1
+[HOST] H06 PASS  TURN 45 deg: turned 44.20 deg (tol 3), odom heading 44.04 deg, centre moved 0.1 mm, 420 ms, EV_MOTION_DONE x1
+[HOST] H06 PASS  TURN 360 deg: turned 360.32 deg (tol 3), odom heading 0.10 deg, centre moved -0.1 mm, 2480 ms, EV_MOTION_DONE x1
+[HOST] H06 PASS  TURN -540 deg: turned -539.69 deg (tol 3), odom heading -179.61 deg, centre moved 0.1 mm, 3640 ms, EV_MOTION_DONE x1
+-- commands, E-stop and faults (IF-04, IF-05, FR15)
+[HOST] H07 PASS  STOP during MOVE: IDLE and braked in the same cycle
+[HOST] H07 PASS  STOP cancels the MOVE: no EV_MOTION_DONE, stopped at 259 mm
+[HOST] H08 PASS  MF_ESTOP brakes in the first cycle that sees it
+[HOST] H08 PASS  while latched: MOVE discarded, CLEAR ignored, still braked
+[HOST] H08 PASS  flag cleared but no CLEAR yet: stays braked
+[HOST] H08 PASS  CLEAR then MOVE sent together: the MOVE runs
+[HOST] H08 PASS  and finishes with EV_MOTION_DONE
+[HOST] H09 PASS  left wheel held: stall after 300 ms (300 ms of high duty), MF_ESTOP set, S5_FAULT_STALL x1, EV_FAULT x1
+[HOST] H10 PASS  FOLLOW 250, steer +50: left 201 mm/s, right 300 mm/s, heading +64 deg (left)
+[HOST] H13 PASS  FOLLOW 300 -> 150 while following: L 150 R 150 mm/s after 0.8 s, never left FOLLOWING
+[HOST] H14 PASS  MOVE then TURN in one cycle: only the TURN runs (send the next command after EV_MOTION_DONE)
+[HOST] H17 PASS  unknown command type: discarded and counted, still FOLLOWING
+[HOST] H17 PASS  TURN 32767 deg is clipped to 720: turned 720 deg
+-- measurement and robustness
+[HOST] H12 PASS  measured wheel speed vs true at 300 mm/s: mean error L 0.5, R 0.4 mm/s (limit 9 = 3 %)
+[HOST] H15 PASS  60 s at 400 mm/s (timer wraps after 5 s): odom 23939 mm, true 23940 mm
+[HOST] H16 PASS  FOLLOW 900 is clipped to 500 mm/s: fastest 501 mm/s (limit +10%)
+S2-U09: PASS (32 passed, 0 failed)
