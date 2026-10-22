@@ -23,6 +23,7 @@
 
 /* Chassis geometry. TODO: measure the robot and update (S5-U04). */
 #define S5_ROBOT_WIDTH_MM       (150)   /* Outside of tyre to tyre.      */
+#define S5_ROBOT_LENGTH_MM      (200)   /* Front bumper to rear.         */
 #define S5_PATH_MARGIN_MM       (50)    /* Gap kept from the obstacle.   */
 
 /* Scan thresholds (Week 6 report 6.4, preliminary until S5-U04). */

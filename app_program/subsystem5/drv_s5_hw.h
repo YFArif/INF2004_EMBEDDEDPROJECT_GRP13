@@ -31,6 +31,7 @@ uint32_t drv_s5_hw_pwm_count(uint32_t slice);
 void     drv_s5_hw_pwm_clear_count(uint32_t slice);
 void     drv_s5_hw_pin_to_pwm(uint32_t pin, bool b_input);
 void     drv_s5_hw_pin_output(uint32_t pin);
+void     drv_s5_hw_pin_input_pullup(uint32_t pin);
 void     drv_s5_hw_pin_write(uint32_t pin, bool b_high);
 bool     drv_s5_hw_pin_read(uint32_t pin);
 uint32_t drv_s5_hw_now_us(void);

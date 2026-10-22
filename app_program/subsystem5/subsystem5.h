@@ -8,11 +8,17 @@
  * subsystems include it as "../subsystem5/subsystem5.h". The section
  * marked "Private to subsystem 5" is for S5's own files only.
  *
+ * @par Tasks
+ * obstacle_task (11, core 0): ultrasonic, servo, scan, profile.
+ * vehicle_ctrl_task (7, core 1): the mission state machine, obstacle
+ * avoidance, buttons, and the commands from the dashboard.
+ *
  * @par Kernel objects (created in subsystem5_init)
  * flg_mission (IF-03), flg_fault (S1 fault_mask), flg_obst (requests to
- * obstacle_task) and mtx_obst (IF-09). Their IDs stay inside
- * subsystem5.c; other subsystems use the functions below instead, so no
- * variable is declared extern here (BARR-C 4.2c).
+ * obstacle_task), mtx_obst (IF-09 and the controller state), mbf_nav
+ * (IF-01 barcode commands from S3) and mbf_cmd (commands from S1). Their
+ * IDs stay inside subsystem5.c; other subsystems use the functions below
+ * instead, so no variable is declared extern here (BARR-C 4.2c).
  *
  * @par Deviations from BARR-C:2018 (approval: project manager, TBD)
  * - micro T-Kernel types (ID, ER, INT, UINT, TMO, T_xxx) appear only
@@ -42,6 +48,7 @@
 #include "s5_profile.h"
 
 /* Task priorities (Week 6 report section 3; TEAM.md section 4). */
+#define S5_PRI_VEHICLE      (7)     /* vehicle_ctrl_task, core 1.        */
 #define S5_PRI_OBSTACLE     (11)    /* obstacle_task, core 0.            */
 
 /* ---------------------------------------------------------------------
@@ -64,6 +71,8 @@
 #define EV_OBSTACLE         (0x00002000u)   /* S5: stopped, MF_ESTOP.    */
 #define EV_PROFILE_READY    (0x00004000u)   /* S5: profile published.    */
 #define EV_OBST_PASSED      (0x00008000u)   /* S5: side watch finished.  */
+#define EV_COMMAND          (0x00010000u)   /* S1: a command is queued.  */
+#define EV_ALL              (0x0001FFFFu)
 
 /* ---------------------------------------------------------------------
  *  flg_fault: latched fault causes. Bit n is fault n, the numbering of
@@ -105,6 +114,49 @@ typedef enum
     S5_CTRL_FINISHED
 } subsystem5_ctrl_state_t;
 
+/** Why the controller entered FAULT (S5_EVENT_CTRL_FAULT). */
+typedef enum
+{
+    S5_CTRL_FAULT_NONE = 0,
+    S5_CTRL_FAULT_IMPACT,           /* S4 collision.                     */
+    S5_CTRL_FAULT_STALL,            /* S2 wheel stall.                   */
+    S5_CTRL_FAULT_SENSOR,           /* Ultrasonic failed.                */
+    S5_CTRL_FAULT_NO_PATH,          /* No side clear after 2 retries.    */
+    S5_CTRL_FAULT_LINE_NOT_FOUND,   /* Line not found again.             */
+    S5_CTRL_FAULT_MOTION_TIMEOUT,   /* A MOVE or TURN never finished.    */
+    S5_CTRL_FAULT_SCAN_TIMEOUT,     /* No profile after a scan request.  */
+    S5_CTRL_FAULT_OTHER
+} subsystem5_ctrl_fault_t;
+
+/* ---------------------------------------------------------------------
+ *  IF-01: barcode commands from S3 (subsystem5_nav_post). The message
+ *  buffer copies each message, so S3 needs no static ring.
+ * --------------------------------------------------------------------- */
+typedef enum
+{
+    S5_NAV_LEFT = 0,
+    S5_NAV_RIGHT,
+    S5_NAV_STRAIGHT,
+    S5_NAV_UTURN
+} subsystem5_nav_cmd_t;
+
+typedef struct
+{
+    uint8_t     cmd;            /* subsystem5_nav_cmd_t.                 */
+    char        letter;         /* Decoded Code 39 character.            */
+    bool        b_reversed;     /* Barcode was read right to left.       */
+    uint32_t    t_ms;           /* When it was decoded.                  */
+} subsystem5_nav_msg_t;
+
+/* ---------------------------------------------------------------------
+ *  Commands from the dashboard (S1, subsystem5_command_post). The
+ *  opcodes are S1's MSG_OP_xxx values. vehicle_ctrl_task answers each
+ *  one through S1's acknowledgement.
+ * --------------------------------------------------------------------- */
+#define S5_CMD_START        (1u)
+#define S5_CMD_STOP         (2u)
+#define S5_CMD_RESET        (3u)
+
 /** obstacle_task states (Week 6 report 6.4). */
 typedef enum
 {
@@ -133,6 +185,9 @@ uint32_t subsystem5_fault_get(void);
 void     subsystem5_obst_request(uint32_t requests);
 void     subsystem5_profile_get(s5_profile_t * p_profile);
 void     subsystem5_obst_status_get(subsystem5_obst_status_t * p_status);
+ER       subsystem5_nav_post(subsystem5_nav_msg_t const * p_msg);  /* S3. */
+ER       subsystem5_command_post(uint8_t opcode, uint8_t cmd_id);  /* S1. */
+subsystem5_ctrl_state_t subsystem5_ctrl_state_get(void);
 
 /* ---------------------------------------------------------------------
  *  Private to subsystem 5
@@ -152,6 +207,10 @@ bool     subsystem5_obst_pending(uint32_t requests);
 void     subsystem5_profile_put(s5_profile_t const * p_profile);
 void     subsystem5_obst_status_put(subsystem5_obst_status_t const * p_status);
 void     subsystem5_delay_ms(uint32_t delay_ms);
+uint32_t subsystem5_now_ms(void);
+bool     subsystem5_nav_take(subsystem5_nav_msg_t * p_msg);
+bool     subsystem5_command_take(uint8_t * p_opcode, uint8_t * p_cmd_id);
+void     subsystem5_ctrl_state_put(subsystem5_ctrl_state_t state);
 
 #endif /* SUBSYSTEM5_H */
 

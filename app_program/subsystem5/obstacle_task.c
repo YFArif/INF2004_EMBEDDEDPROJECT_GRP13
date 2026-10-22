@@ -9,8 +9,9 @@
  * - SLOW: still pinging. Three pings at 40 cm or more raise
  *   EV_OBSTACLE_CLEAR and return to MONITORING (the 5 cm gap stops
  *   flicker). From MONITORING or SLOW, two raw pings in a row under
- *   15 cm set MF_ESTOP directly in S2's flg_motion, raise EV_OBSTACLE
- *   and enter HOLD, so braking never waits for vehicle_ctrl_task (NFR6).
+ *   15 cm set S2's MF_ESTOP latch directly (subsystem2_estop_set), raise
+ *   EV_OBSTACLE and enter HOLD, so braking never waits for
+ *   vehicle_ctrl_task (NFR6).
  * - SCANNING: coarse and fine scan (s5_scan.c), then the profile is
  *   published with EV_PROFILE_READY and the task enters HOLD.
  * - WATCH: servo pointed at the obstacle's side while the robot drives
@@ -22,7 +23,12 @@
  * - HOLD: idle, servo ahead, no automatic stops. vehicle_ctrl_task must
  *   never be stopped by its own obstacle while it drives the bypass.
  * - FAULT: the sensor failed. MF_ESTOP is set, because a robot that
- *   cannot see must not move. Only OB_RESUME (after a RESET) leaves it.
+ *   cannot see must not move. OB_HOLD or OB_RESUME leaves it; OB_RESUME
+ *   also re-arms the sensor.
+ *
+ * @par Power-up
+ * The task waits in HOLD (BOOT_MONITORING 0) until vehicle_ctrl_task
+ * sends OB_RESUME at the start of a run.
  *
  * @par
  * Every transition is reported with s5_event_post() (FR16).
@@ -31,11 +37,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../subsystem2/subsystem2.h"   /* flg_motion, MF_ESTOP, odom.   */
 #include "drv_servo.h"
 #include "drv_ultrasonic.h"
 #include "obstacle_task.h"
 #include "s5_event.h"
+#include "s5_links.h"       /* S2: E-stop latch and odometry.           */
 #include "s5_math.h"
 #include "s5_profile.h"
 #include "s5_ranger.h"
@@ -54,6 +60,7 @@
 #define WATCH_SEEN_MM       (300u)      /* Obstacle beside the robot.    */
 #define WATCH_PASSED_MM     (400u)      /* Nothing beside: passed.       */
 #define WATCH_PASSED_PINGS  (2u)
+#define WATCH_UNSEEN_MM     (150)       /* Not seen this far: passed.    */
 
 /* Calibration sweep (S5-U03): hold each angle long enough to measure. */
 #define CAL_FIRST_DEG       (30)
@@ -73,11 +80,11 @@
 #define LOG_PINGS           (1)
 #define LOG_MONITOR_EVERY   (5u)
 
-/* TODO: Set to 0 once vehicle_ctrl_task sends OB_RESUME on EV_START.
- * Until then the task monitors from power-up, so the sensor can be
- * tested without the controller.
+/* 0: wait in HOLD until vehicle_ctrl_task sends OB_RESUME on START, so
+ * nothing near the robot at power-up sets MF_ESTOP before a run. Set to
+ * 1 only to watch the sensor without starting a run.
  */
-#define BOOT_MONITORING     (1)
+#define BOOT_MONITORING     (0)
 
 static subsystem5_obst_state_t  g_state          = S5_OBST_HOLD;
 static subsystem5_obst_status_t g_status         = {0};
@@ -114,8 +121,6 @@ static void           log_ping(s5_ranger_reading_t const * p_reading);
 static char const *   ping_reason(s5_ranger_status_t status);
 #endif
 static void           point_servo(int32_t angle_deg);
-static void           request_estop(void);
-static int32_t        odom_dist_mm(void);
 static uint32_t       count_run(uint32_t run, bool b_condition);
 
 /*!
@@ -180,18 +185,16 @@ handle_requests (uint32_t requests)
     {
         enter_hold();
     }
-    else if (S5_OBST_FAULT == g_state)
-    {
-        // In FAULT only OB_RESUME (sent after a RESET) is accepted.
-        if (0u != (requests & OB_RESUME))
-        {
-            s5_ranger_reset_fault();
-            enter_monitoring();
-        }
-    }
     else if (0u != (requests & OB_RESUME))
     {
+        // A RESUME follows a START, so it also re-arms a failed sensor;
+        // if the sensor is still broken it faults again within 0.3 s.
+        s5_ranger_reset_fault();
         enter_monitoring();
+    }
+    else if (S5_OBST_FAULT == g_state)
+    {
+        // In FAULT only OB_HOLD and OB_RESUME are accepted.
     }
     else if (0u != (requests & OB_SCAN_REQ))
     {
@@ -311,7 +314,7 @@ update_monitor (s5_ranger_reading_t const * p_reading)
 static void
 stop_robot (s5_ranger_reading_t const * p_reading)
 {
-    request_estop();
+    s5_links_motion_estop();
     subsystem5_mission_signal(EV_OBSTACLE);
     s5_event_post(S5_EVENT_OBST_STOP, p_reading->dist_mm,
                   DRV_SERVO_AHEAD_DEG);
@@ -440,7 +443,7 @@ static void
 start_watch (int32_t side_deg)
 {
     g_b_watch_seen   = false;
-    g_watch_start_mm = 0;
+    g_watch_start_mm = s5_links_odom_dist_mm();
     g_watch_far_run  = 0u;
     g_watch_deg      = side_deg;
 
@@ -468,11 +471,27 @@ watch_step (void)
     }
     else if (!g_b_watch_seen)
     {
-        // Stage 1: wait until the obstacle is beside the robot.
+        // Stage 1: wait until the obstacle is beside the robot. A shallow
+        // obstacle may already be behind the sensor: if it is not seen
+        // within WATCH_UNSEEN_MM, it counts as passed (depth unknown).
+        int32_t travelled = s5_math_abs(s5_links_odom_dist_mm()
+                                        - g_watch_start_mm);
+
         if (s5_ranger_is_within(&reading, WATCH_SEEN_MM))
         {
             g_b_watch_seen   = true;
-            g_watch_start_mm = odom_dist_mm();
+            g_watch_start_mm = s5_links_odom_dist_mm();
+        }
+        else if (travelled >= WATCH_UNSEEN_MM)
+        {
+            s5_event_trace("WATCH never seen beside: travelled_mm 0",
+                           travelled, 0);
+            g_watch_start_mm = s5_links_odom_dist_mm();
+            finish_watch();
+        }
+        else
+        {
+            // Keep looking.
         }
     }
     else
@@ -498,7 +517,8 @@ watch_step (void)
 static void
 finish_watch (void)
 {
-    int32_t depth_mm = s5_math_abs(odom_dist_mm() - g_watch_start_mm);
+    int32_t depth_mm = s5_math_abs(s5_links_odom_dist_mm()
+                                   - g_watch_start_mm);
 
     if (depth_mm > DEPTH_MAX_MM)
     {
@@ -575,7 +595,7 @@ static void
 enter_fault (void)
 {
     set_state(S5_OBST_FAULT);
-    request_estop();
+    s5_links_motion_estop();
     subsystem5_fault_set(S5_FAULT_NO_ECHO);
     subsystem5_mission_signal(EV_FAULT);
     s5_event_post(S5_EVENT_SENSOR_FAULT, 0u, drv_servo_angle());
@@ -703,31 +723,6 @@ static void
 point_servo (int32_t angle_deg)
 {
     subsystem5_delay_ms(drv_servo_move(angle_deg));
-}
-
-/*!
- * @brief Set S2's emergency-stop latch (IF-05). motion_task brakes on its
- *        next 20 ms cycle; only vehicle_ctrl_task clears the latch.
- */
-static void
-request_estop (void)
-{
-    CHECK(tk_set_flg(flg_motion, MF_ESTOP), "flg_motion");
-}
-
-/*!
- * @brief Distance driven since power-up, from S2's odometry (IF-06).
- *
- * @return Signed distance in mm.
- */
-static int32_t
-odom_dist_mm (void)
-{
-    ODOM odom = {0};
-
-    s2_odom_get(&odom);
-
-    return (odom.dist_mm);
 }
 
 /*!

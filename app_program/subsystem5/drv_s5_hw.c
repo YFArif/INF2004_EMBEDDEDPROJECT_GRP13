@@ -213,6 +213,26 @@ drv_s5_hw_pin_output (uint32_t pin)
 }
 
 /*!
+ * @brief Make a pin a plain input with the pad pull-up on, e.g. for a
+ *        button that pulls the pin to ground when pressed.
+ *
+ * @param[in] pin GPIO number.
+ *
+ * NOTE: The SIO output enable is left as it is (off after reset), so the
+ * pin is never driven.
+ */
+void
+drv_s5_hw_pin_input_pullup (uint32_t pin)
+{
+    uint32_t pad = pad_reg(pin);
+
+    out_w(pad + ALIAS_CLR, PAD_PDE_BIT);
+    out_w(pad + ALIAS_SET, PAD_IE_BIT | PAD_PUE_BIT);
+    out_w(IO_BANK0_ADDR + (IO_CTRL_STRIDE * pin) + IO_CTRL_OFFSET,
+          IO_FUNCSEL_SIO);
+}
+
+/*!
  * @brief Drive an output pin high or low.
  *
  * @param[in] pin    GPIO number set up with drv_s5_hw_pin_output().

@@ -41,6 +41,26 @@ s5_event_post (s5_event_code_t code, uint32_t dist_mm, int32_t angle_deg)
 }
 
 /*!
+ * @brief Report one controller event with two raw argument bytes.
+ *
+ * @param[in] code  The event (0x60 to 0x65).
+ * @param[in] arg_a First argument byte; values above 255 are clamped.
+ * @param[in] arg_b Second argument byte; values above 255 are clamped.
+ */
+void
+s5_event_post_args (s5_event_code_t code, uint32_t arg_a, uint32_t arg_b)
+{
+    uint32_t byte_a = (arg_a > ARG_MAX) ? ARG_MAX : arg_a;
+    uint32_t byte_b = (arg_b > ARG_MAX) ? ARG_MAX : arg_b;
+
+    // TODO: Send {code, byte_a, byte_b} to S1's mbf_event, as above.
+    // NOTE: The casts are safe: format strings are ASCII, and every value
+    // is 0 to 255.
+    tm_printf((UB *) "[S5] EVT 0x%02x a=%d b=%d\n",
+              (int) code, (int) byte_a, (int) byte_b);
+}
+
+/*!
  * @brief Print one labelled trace line with two numbers.
  *
  * @param[in] p_label Short label, e.g. "CAL".
