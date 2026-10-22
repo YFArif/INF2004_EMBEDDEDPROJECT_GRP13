@@ -1,164 +1,337 @@
-/*
- *	drv_encoder.c
- *	Subsystem 2 -- wheel encoder edge counter on GP16 (left) and GP17 (right).
+/** @file drv_encoder.c
  *
- *	One IO_IRQ_BANK0 handler counts rising and falling edges and stamps them
- *	with the RP2040 1 MHz timer.  The shared gpio_isr from the design report
- *	will replace this once the barcode and echo handlers join it.
+ * @brief Subsystem 2 -- wheel encoder interrupt handler and tick counter.
  *
- *	APIs shown: tk_def_int, EnableInt, ClearInt, tk_get_prc
+ * @par
+ * One IO_IRQ_BANK0 handler takes the edge events of GP16 and GP17 on the
+ * core that calls drv_encoder_init() (motion_task: core 1, as the Week 6
+ * report section 3 places it). Register addresses and bits are from the
+ * RP2040 datasheet: IO_BANK0 and PADS_BANK0 (2.19), SIO (2.3.1) and
+ * TIMER (4.6).
+ *
+ * @par Debouncing
+ * The S2-U01 runs showed edge gaps as short as 11 us, while real edges
+ * are hundreds of microseconds apart. The handler first clears the
+ * latched events, then reads the pin level. A level change is accepted
+ * only if it differs from the last accepted level and at least
+ * DRV_ENCODER_MIN_GAP_US have passed since that change; a change to high
+ * counts one tick. Every edge after the read latches a new event, so the
+ * final level of a burst of glitches is always seen.
+ *
+ * @par
+ * TODO: Merge into the team's shared gpio_isr (Week 6 report IF-11) once
+ * S3's barcode edges on GP6 need the same interrupt.
  */
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include <tk/tkernel.h>     /* tk_def_int(), in_w(), out_w().           */
+#include <tm/tmonitor.h>    /* tm_printf() console output.              */
+#include <bsp/libbsp.h>     /* gpio_set_pin().                           */
 
 #include "drv_encoder.h"
 
-#define INTNO_IO_BANK0 13 /* IO_IRQ_BANK0 */
-#define ENC_INT_LEVEL 2   /* same level as the kernel's UART/ADC/I2C drivers */
+/* Atomic register aliases for APB peripherals (datasheet 2.1.2). */
+#define ALIAS_SET           (0x2000u)
+#define ALIAS_CLR           (0x3000u)
 
-/* IO_BANK0 interrupt registers.  Register 2 covers GPIO16-23, 4 bits per pin. */
-#define IO_INTR2 (IO_BANK0_BASE + 0x0F8)
-#define IO_PROC0_INTE2 (IO_BANK0_BASE + 0x108)
-#define IO_PROC0_INTS2 (IO_BANK0_BASE + 0x128)
-#define IO_PROC1_INTE2 (IO_BANK0_BASE + 0x138)
-#define IO_PROC1_INTS2 (IO_BANK0_BASE + 0x158)
+/* IO_BANK0 interrupt registers; register 2 covers GPIO16 ... GPIO23. */
+#define IO_BANK0_ADDR       (0x40014000u)
+#define IO_INTR2_REG        (IO_BANK0_ADDR + 0x0F8u)
+#define IO_PROC0_INTE2_REG  (IO_BANK0_ADDR + 0x108u)
+#define IO_PROC0_INTS2_REG  (IO_BANK0_ADDR + 0x128u)
+#define IO_PROC1_INTE2_REG  (IO_BANK0_ADDR + 0x138u)
+#define IO_PROC1_INTS2_REG  (IO_BANK0_ADDR + 0x158u)
+#define IO_BITS_PER_PIN     (4u)
+#define IO_FIRST_PIN        (16u)       /* First pin of register 2.      */
+#define IO_EDGE_LOW_BIT     (0x4u)      /* Falling edge, per pin.        */
+#define IO_EDGE_HIGH_BIT    (0x8u)      /* Rising edge, per pin.         */
+#define IO_EDGE_BITS        (IO_EDGE_LOW_BIT | IO_EDGE_HIGH_BIT)
 
-#define EV_FALL(pin) (0x4U << (((pin) - 16) * 4))
-#define EV_RISE(pin) (0x8U << (((pin) - 16) * 4))
-#define ENC_EVENTS (EV_FALL(S2_ENC_LEFT_PIN) | EV_RISE(S2_ENC_LEFT_PIN) | \
-                    EV_FALL(S2_ENC_RIGHT_PIN) | EV_RISE(S2_ENC_RIGHT_PIN))
+/* PADS_BANK0: one word per pin after the voltage-select word. */
+#define PADS_BANK0_ADDR     (0x4001C000u)
+#define PADS_STRIDE         (4u)
+#define PADS_OFFSET         (4u)
+#define PAD_PUE_BIT         (0x08u)     /* Pull-up enable.               */
+#define PAD_PDE_BIT         (0x04u)     /* Pull-down enable.             */
 
-#define PAD_PUE (1 << 3) /* pad pull-up enable */
-#define PAD_PDE (1 << 2) /* pad pull-down enable */
+/* SIO input levels and the raw low word of the 1 MHz timer. */
+#define SIO_GPIO_IN_REG     (0xD0000004u)
+#define TIMER_RAWL_REG      (0x40054028u)
 
-LOCAL volatile S2_ENC enc[2];
-LOCAL UW reg_inte; /* PROCx_INTE2 of the core that takes the interrupt */
-LOCAL UW reg_ints; /* PROCx_INTS2 of the same core */
+/* Interrupt number of IO_IRQ_BANK0, and the level the kernel's own
+ * UART / ADC / I2C drivers use. */
+#define INTNO_IO_BANK0      (13u)
+#define ENCODER_INT_LEVEL   (2)
 
-LOCAL void enc_reset(volatile S2_ENC *e)
+/** Interrupt-side state of one wheel. */
+typedef struct
 {
-    e->rise = 0;
-    e->fall = 0;
-    e->t_rise_us = 0;
-    e->t_last_us = 0;
-    e->period_us = 0;
-    e->min_dt_us = 0xFFFFFFFFU;
-    e->glitches = 0;
-}
+    drv_encoder_count_t count;
+    uint32_t            pin;
+    uint32_t            last_edge_us;   /* Time of the last raw event.   */
+    uint32_t            change_us;      /* Time of the last accepted     */
+                                        /* level change.                 */
+    bool                b_level;        /* Last accepted level.          */
+    bool                b_any_edge;     /* min_gap_us is meaningful.     */
+} encoder_state_t;
 
-LOCAL void enc_edge(volatile S2_ENC *e, UW now, BOOL rising)
+static volatile encoder_state_t g_encoder[DRV_ENCODER_COUNT] =
 {
-    if ((e->rise | e->fall) != 0)
-    {
-        UW dt = now - e->t_last_us;
-        if (dt < e->min_dt_us)
-        {
-            e->min_dt_us = dt;
-        }
-        if (dt < S2_ENC_GLITCH_US)
-        {
-            e->glitches++;
-        }
-    }
-    e->t_last_us = now;
+    { .pin = DRV_ENCODER_LEFT_PIN  },
+    { .pin = DRV_ENCODER_RIGHT_PIN }
+};
 
-    if (rising)
-    {
-        if (e->rise != 0)
-        {
-            e->period_us = now - e->t_rise_us;
-        }
-        e->t_rise_us = now;
-        e->rise++;
-    }
-    else
-    {
-        e->fall++;
-    }
-}
+static uint32_t g_reg_ints  = IO_PROC0_INTS2_REG;
+static uint32_t g_all_edges = 0u;
 
-/* Interrupt context: no tm_printf, no waiting, keep it short. */
-LOCAL void enc_inthdr(UINT intno)
+static void     encoder_isr(UINT intno);
+static void     encoder_event(volatile encoder_state_t * p_state,
+                              uint32_t events, uint32_t levels,
+                              uint32_t now_us);
+static uint32_t edge_bits(uint32_t pin);
+static uint32_t pad_reg(uint32_t pin);
+
+/*!
+ * @brief Set up GP16 / GP17 and the edge interrupt on the calling core.
+ *
+ * @return E_OK, or the kernel error from tk_def_int().
+ *
+ * NOTE: Call once, from motion_task, so the interrupt runs on core 1.
+ */
+ER
+drv_encoder_init (void)
 {
-    UW ev, now;
-
-    (void)intno;
-
-    /* The SDK handler does the same: clear the source, never the NVIC bit. */
-    while ((ev = in_w(reg_ints) & ENC_EVENTS) != 0)
+    // NOTE: The casts are safe: the handler has the kernel's interrupt
+    // handler signature, void (UINT), which FP stands for.
+    T_DINT const dint =
     {
-        out_w(IO_INTR2, ev);        /* write 1 to clear a latched edge */
-        now = in_w(TIMER_TIMERAWL); /* raw read: does not latch the high word */
-
-        if (ev & EV_RISE(S2_ENC_LEFT_PIN))
-            enc_edge(&enc[S2_ENC_LEFT], now, TRUE);
-        if (ev & EV_FALL(S2_ENC_LEFT_PIN))
-            enc_edge(&enc[S2_ENC_LEFT], now, FALSE);
-        if (ev & EV_RISE(S2_ENC_RIGHT_PIN))
-            enc_edge(&enc[S2_ENC_RIGHT], now, TRUE);
-        if (ev & EV_FALL(S2_ENC_RIGHT_PIN))
-            enc_edge(&enc[S2_ENC_RIGHT], now, FALSE);
-    }
-}
-
-EXPORT ER s2_enc_init(void)
-{
-    const T_DINT dint = {
         .intatr = TA_HLNG,
-        .inthdr = (FP)enc_inthdr,
+        .inthdr = (FP) encoder_isr,
     };
-    const UINT pins[2] = {S2_ENC_LEFT_PIN, S2_ENC_RIGHT_PIN};
-    INT core = 0;
-    INT i;
-    ER er;
+    uint32_t core     = 0u;
+    uint32_t reg_inte = IO_PROC0_INTE2_REG;
+    uint32_t levels   = 0u;
+    uint32_t now_us   = 0u;
+    uint32_t idx      = 0u;
+    ER       result   = E_OK;
 
 #if TK_SUPPORT_SMP
-    core = tk_get_prc() - 1; /* tk_get_prc() counts from 1 */
+    // NOTE: The cast is safe: tk_get_prc() returns 1 or 2 here.
+    core = (uint32_t) tk_get_prc() - 1u;
 #endif
-    reg_inte = core ? IO_PROC1_INTE2 : IO_PROC0_INTE2;
-    reg_ints = core ? IO_PROC1_INTS2 : IO_PROC0_INTS2;
 
-    for (i = 0; i < 2; i++)
+    if (0u != core)
     {
-        gpio_set_pin(pins[i], GPIO_MODE_IN);
-        clr_w(GPIO(pins[i]), PAD_PDE); /* the pad resets with a pull-down on */
-        set_w(GPIO(pins[i]), PAD_PUE); /* needed if the encoder output is open-collector */
-        enc_reset(&enc[i]);
+        reg_inte   = IO_PROC1_INTE2_REG;
+        g_reg_ints = IO_PROC1_INTS2_REG;
     }
-    clr_w(reg_inte, ENC_EVENTS);
-    out_w(IO_INTR2, ENC_EVENTS);
 
-    er = tk_def_int(INTNO_IO_BANK0, &dint);
-    if (er < E_OK)
+    g_all_edges = edge_bits(DRV_ENCODER_LEFT_PIN) |
+                  edge_bits(DRV_ENCODER_RIGHT_PIN);
+
+    // NOTE: The cast is safe: DRV_ENCODER_COUNT is 2.
+    for (idx = 0u; idx < (uint32_t) DRV_ENCODER_COUNT; idx++)
     {
-        return er;
+        (void) gpio_set_pin(g_encoder[idx].pin, GPIO_MODE_IN);
+
+        // The pad resets with a pull-down; the encoder output may be
+        // open-collector, so use a pull-up instead.
+        out_w(pad_reg(g_encoder[idx].pin) + ALIAS_CLR, PAD_PDE_BIT);
+        out_w(pad_reg(g_encoder[idx].pin) + ALIAS_SET, PAD_PUE_BIT);
     }
-    ClearInt(INTNO_IO_BANK0);
-    set_w(reg_inte, ENC_EVENTS);
-    EnableInt(INTNO_IO_BANK0, ENC_INT_LEVEL); /* enables it on THIS core's NVIC */
 
-    tm_printf((UB *)"encoder: GP%d/GP%d edge interrupt on core %d\n",
-              S2_ENC_LEFT_PIN, S2_ENC_RIGHT_PIN, core);
-    return E_OK;
+    out_w(reg_inte + ALIAS_CLR, g_all_edges);
+    out_w(IO_INTR2_REG, g_all_edges);
+
+    // Start from the real level, so the first change is judged right.
+    levels = in_w(SIO_GPIO_IN_REG);
+    now_us = in_w(TIMER_RAWL_REG);
+
+    // NOTE: The cast is safe: DRV_ENCODER_COUNT is 2.
+    for (idx = 0u; idx < (uint32_t) DRV_ENCODER_COUNT; idx++)
+    {
+        g_encoder[idx].b_level   =
+            (0u != (levels & (1u << g_encoder[idx].pin)));
+        g_encoder[idx].change_us = now_us;
+        g_encoder[idx].count.min_gap_us = UINT32_MAX;
+    }
+
+    result = tk_def_int(INTNO_IO_BANK0, &dint);
+
+    if (E_OK == result)
+    {
+        ClearInt(INTNO_IO_BANK0);
+        out_w(reg_inte + ALIAS_SET, g_all_edges);
+        EnableInt(INTNO_IO_BANK0, ENCODER_INT_LEVEL);  /* This core.     */
+
+        // NOTE: The cast is safe: format strings are ASCII, and every
+        // value is below 32, which an int always holds.
+        tm_printf((UB *) "encoder: GP%d/GP%d edge interrupt on core %d\n",
+                  (int) DRV_ENCODER_LEFT_PIN, (int) DRV_ENCODER_RIGHT_PIN,
+                  (int) core);
+    }
+
+    return (result);
 }
 
-EXPORT void s2_enc_clear(void)
+/*!
+ * @brief Copy one wheel's counters.
+ *
+ * @param[in]  wheel   DRV_ENCODER_LEFT or DRV_ENCODER_RIGHT.
+ * @param[out] p_count The counters; ticks and tick_time_us always match.
+ *
+ * NOTE: Safe from any task on either core: the copy is repeated if a tick
+ * arrived while it was taken.
+ */
+void
+drv_encoder_get (drv_encoder_t wheel, drv_encoder_count_t * p_count)
 {
-    clr_w(reg_inte, ENC_EVENTS); /* no edges while the counters are zeroed */
-    enc_reset(&enc[S2_ENC_LEFT]);
-    enc_reset(&enc[S2_ENC_RIGHT]);
-    out_w(IO_INTR2, ENC_EVENTS);
-    set_w(reg_inte, ENC_EVENTS);
+    volatile encoder_state_t const * p_state = &g_encoder[DRV_ENCODER_LEFT];
+    uint32_t                         before  = 0u;
+
+    if (DRV_ENCODER_RIGHT == wheel)
+    {
+        p_state = &g_encoder[DRV_ENCODER_RIGHT];
+    }
+
+    do
+    {
+        before                = p_state->count.ticks;
+        p_count->ticks        = before;
+        p_count->tick_time_us = p_state->count.tick_time_us;
+        p_count->raw_rise     = p_state->count.raw_rise;
+        p_count->raw_fall     = p_state->count.raw_fall;
+        p_count->rejected     = p_state->count.rejected;
+        p_count->min_gap_us   = p_state->count.min_gap_us;
+    } while (before != p_state->count.ticks);
 }
 
-EXPORT void s2_enc_get(INT wheel, S2_ENC *out)
+/*!
+ * @brief Read the RP2040's free-running 1 MHz timer (low 32 bits).
+ *
+ * @return Microseconds; wraps every 71.6 minutes, so use differences.
+ */
+uint32_t
+drv_encoder_now_us (void)
 {
-    const volatile S2_ENC *e = &enc[wheel];
-
-    /* 32-bit reads are atomic on the M0+; the fields may differ by one tick while turning. */
-    out->rise = e->rise;
-    out->fall = e->fall;
-    out->t_rise_us = e->t_rise_us;
-    out->t_last_us = e->t_last_us;
-    out->period_us = e->period_us;
-    out->min_dt_us = e->min_dt_us;
-    out->glitches = e->glitches;
+    return (in_w(TIMER_RAWL_REG));
 }
+
+/*!
+ * @brief IO_IRQ_BANK0 handler. Interrupt context: no printing, no waits.
+ *
+ * @param[in] intno Interrupt number (unused).
+ */
+static void
+encoder_isr (UINT intno)
+{
+    uint32_t events = in_w(g_reg_ints) & g_all_edges;
+
+    (void) intno;
+
+    while (0u != events)
+    {
+        uint32_t levels = 0u;
+        uint32_t now_us = 0u;
+
+        // Clear first, then read the level: an edge after the read
+        // latches a new event and comes round this loop again.
+        out_w(IO_INTR2_REG, events);
+        now_us = in_w(TIMER_RAWL_REG);
+        levels = in_w(SIO_GPIO_IN_REG);
+
+        encoder_event(&g_encoder[DRV_ENCODER_LEFT], events, levels, now_us);
+        encoder_event(&g_encoder[DRV_ENCODER_RIGHT], events, levels,
+                      now_us);
+
+        events = in_w(g_reg_ints) & g_all_edges;
+    }
+}
+
+/*!
+ * @brief Handle the latched edge events of one wheel.
+ *
+ * @param[in,out] p_state The wheel.
+ * @param[in]     events  Latched INTR2 edge bits of both wheels.
+ * @param[in]     levels  SIO input levels read after clearing them.
+ * @param[in]     now_us  Timer value at the read.
+ */
+static void
+encoder_event (volatile encoder_state_t * p_state, uint32_t events,
+               uint32_t levels, uint32_t now_us)
+{
+    uint32_t shift  = (p_state->pin - IO_FIRST_PIN) * IO_BITS_PER_PIN;
+    uint32_t mine   = (events >> shift) & IO_EDGE_BITS;
+    bool     b_high = (0u != (levels & (1u << p_state->pin)));
+
+    if (0u != mine)
+    {
+        if (0u != (mine & IO_EDGE_HIGH_BIT))
+        {
+            p_state->count.raw_rise++;
+        }
+
+        if (0u != (mine & IO_EDGE_LOW_BIT))
+        {
+            p_state->count.raw_fall++;
+        }
+
+        if (p_state->b_any_edge &&
+            ((now_us - p_state->last_edge_us) < p_state->count.min_gap_us))
+        {
+            p_state->count.min_gap_us = now_us - p_state->last_edge_us;
+        }
+
+        p_state->b_any_edge   = true;
+        p_state->last_edge_us = now_us;
+
+        if ((b_high != p_state->b_level) &&
+            ((now_us - p_state->change_us) >= DRV_ENCODER_MIN_GAP_US))
+        {
+            p_state->b_level   = b_high;
+            p_state->change_us = now_us;
+
+            if (b_high)
+            {
+                p_state->count.tick_time_us = now_us;
+                p_state->count.ticks++;
+            }
+        }
+        else
+        {
+            // Back at the old level already, or too soon after the last
+            // change: a glitch.
+            p_state->count.rejected++;
+        }
+    }
+}
+
+/*!
+ * @brief INTR2 edge bits of one pin (GPIO16 ... GPIO23).
+ *
+ * @param[in] pin GPIO number, 16 ... 23.
+ *
+ * @return Its rising and falling edge bits.
+ */
+static uint32_t
+edge_bits (uint32_t pin)
+{
+    return (IO_EDGE_BITS << ((pin - IO_FIRST_PIN) * IO_BITS_PER_PIN));
+}
+
+/*!
+ * @brief Pad control register of a pin.
+ *
+ * @param[in] pin GPIO number, 0 ... 29.
+ *
+ * @return The register address.
+ */
+static uint32_t
+pad_reg (uint32_t pin)
+{
+    return (PADS_BANK0_ADDR + PADS_OFFSET + (PADS_STRIDE * pin));
+}
+
+/*** end of file ***/
