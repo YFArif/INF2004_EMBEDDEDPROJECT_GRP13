@@ -69,10 +69,11 @@ $tests = @{
     'u11'  = @{ Name = 'S2-U11 MOVE distance and straightness'
                 File = 'subsystem2_floor.c'; Switch = 'S2_FLOOR_TEST'; Value = 1
                 Minutes = 40; Floor = $true
-                Setup = @('Clear floor: 1.6 m long x 0.6 m wide (0.3 m each side of the tape), plus the robot''s own length behind the 0 mark.',
-                          'Tape measure flat and straight, 0 mark at the start, taped down at both ends and the middle.',
-                          'A tape marker with a pen line on the robot''s front, exactly in the middle; robot centre line over the tape.',
-                          'Runs 1-4: marker on 0. Run 5 (reverse): marker on 500.',
+                Setup = @('Clear floor: 1.6 m long x 0.6 m wide, plus the robot''s own length behind the start.',
+                          'Tape measure flat and straight on the floor BESIDE the LEFT wheel (not under the car), about 2 cm from the tyre, taped down at both ends and the middle.',
+                          'Reference point: the FRONT EDGE of the LEFT tyre where it touches the floor. Ignore the car''s nose and tail.',
+                          'Runs 1-4: tyre front edge on 100 mm. Run 5 (reverse): on 600 mm.',
+                          'Before each run the script asks the tyre-to-tape gap; after it, the tape reading and the gap again.',
                           $button) }
     'u03'  = @{ Name = 'S2-U03 turn accuracy'
                 File = 'subsystem2_floor.c'; Switch = 'S2_FLOOR_TEST'; Value = 2
@@ -416,6 +417,8 @@ try
 
     $script:moveRun  = 0
     $script:turnRun  = 0
+    $script:u11Start = 100
+    $script:u11Gap   = $null
     $script:u06Side  = ''
 
     # Before every question: the robot has just stopped, so give the
@@ -439,32 +442,46 @@ try
         {
             'u11'
             {
-                if ($line -match '^\[S2-FLOOR\] MOVE (-?\d+):')
+                # Reference point: the front edge of the LEFT tyre, where it
+                # touches the floor, read on a tape measure lying beside the
+                # left wheel. Every point of the robot moves the same distance
+                # on a straight run, so the long nose and tail do not matter.
+                if ($line -match '^\[S2-STEP\] NEXT: S2-U11')
+                {
+                    $script:u11Start = 100
+                    if ($line -match 'REVERSE')
+                    {
+                        $script:u11Start = 600
+                    }
+                    Write-Host "  Place the robot: front edge of the LEFT tyre exactly on $($script:u11Start) mm, wheels parallel to the tape." -ForegroundColor Yellow
+                    $script:u11Gap = Ask-Number '  Gap between the tape''s edge and the outside of the LEFT tyre, mm (about 20; answer BEFORE pressing the button)'
+                    Write-Host '  Now press BUTTON 1.' -ForegroundColor Yellow
+                }
+                elseif ($line -match '^\[S2-FLOOR\] MOVE (-?\d+):')
                 {
                     $script:moveRun++
                     $target = [int]$Matches[1]
-                    $start  = 0
-                    if ($target -lt 0)
-                    {
-                        $start = 500
-                    }
+                    $start  = $script:u11Start
                     Look-AtRobot
-                    Write-Host "  Run $($script:moveRun): read the tape at the robot's front marker." -ForegroundColor Yellow
-                    $end    = Ask-Number "  Tape reading now, mm (it started at $start)"
-                    $offset = Ask-Number '  Sideways offset of the marker from the tape line, mm (+ = robot''s left, - = right)'
+                    Write-Host "  Run $($script:moveRun): look straight down at the front edge of the LEFT tyre." -ForegroundColor Yellow
+                    $end    = Ask-Number "  Tape reading at the front edge of the left tyre now, mm (it started at $start)"
+                    $gapEnd = Ask-Number '  Gap between the tape''s edge and the outside of the left tyre now, mm'
                     $real   = $null
                     if ($null -ne $end)
                     {
                         $real = $end - $start
                     }
-                    Write-Log ("[MEASURED] MOVE {0} run {1}: real distance {2} mm (tape {3}, start {4}), sideways offset {5} mm" -f
-                               $target, $script:moveRun, (Format-Value $real), (Format-Value $end), $start, (Format-Value $offset))
-                    $next = 'marker on 0'
-                    if ($script:moveRun -eq 4)
+                    # The tape is on the robot's left: a smaller gap means the
+                    # robot moved left (+), a bigger gap means right (-).
+                    $side = $null
+                    if (($null -ne $gapEnd) -and ($null -ne $script:u11Gap))
                     {
-                        $next = 'marker on 500 (the next run is the REVERSE one)'
+                        $side = $script:u11Gap - $gapEnd
                     }
-                    Write-Host "  Saved. Put the robot back ($next), then press BUTTON 1." -ForegroundColor Yellow
+                    Write-Log ("[MEASURED] MOVE {0} run {1}: real distance {2} mm (left tyre front edge {3} -> {4}); sideways {5} mm, + = left (tyre gap {6} -> {7})" -f
+                               $target, $script:moveRun, (Format-Value $real), $start, (Format-Value $end),
+                               (Format-Value $side), (Format-Value $script:u11Gap), (Format-Value $gapEnd))
+                    Write-Host "  Saved: travelled $(Format-Value $real) mm, sideways $(Format-Value $side) mm." -ForegroundColor Yellow
                 }
             }
             'u03'
@@ -593,7 +610,14 @@ try
                 Write-Host ''
                 Write-Host ('#' * 70) -ForegroundColor Yellow
                 Write-Host "  NEXT: $($Matches[1])" -ForegroundColor Yellow
-                Write-Host '  Get the robot ready, then press BUTTON 1 on the robot.' -ForegroundColor Yellow
+                if ($Test -eq 'u11')
+                {
+                    Write-Host '  Place the robot and answer the question below FIRST, then press BUTTON 1.' -ForegroundColor Yellow
+                }
+                else
+                {
+                    Write-Host '  Get the robot ready, then press BUTTON 1 on the robot.' -ForegroundColor Yellow
+                }
                 Write-Host ('#' * 70) -ForegroundColor Yellow
             }
             elseif ($line -match '^\[S2-STEP\] press')

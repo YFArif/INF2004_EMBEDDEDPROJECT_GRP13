@@ -1,0 +1,166 @@
+=== S2 test log ===
+test:     u02  (S2-U02 speed step response 0 -> 250 mm/s)
+date:     2026-10-22 23:06:21
+commit:   c6a2824  (S2 code committed)
+tester:   Arif
+supply:   power bank on VIN + USB cable to the laptop; VIN = skipped V
+notes:    
+[build] rc=0
+[build] ---- last lines of the build:
+[build]    text	   data	    bss	    dec	    hex	filename
+[build]  295592	    356	  26772	 322720	  4eca0	mtk3pico_smp1_usb_cdc_wifi_test.elf
+[build] tools/elf2uf2 mtk3pico_smp1_usb_cdc_wifi_test.elf mtk3pico_smp1_usb_cdc_wifi_test.uf2
+[build]  
+switch:   S2_U02_BENCH = 1 in subsystem2_test.c, set for this build only
+image:    mtk3pico_smp1_usb_cdc_wifi_test.uf2, built 23:07:11
+port:     COM5
+=== Pico output and [MEASURED] values ===
+
+
+microT-Kernel Version 3.00
+
+
+=== micro T-Kernel on Raspberry Pi Pico W (spec 0x6300, product 0x0003) ===
+dual-core (SMP) build, usermain on core 0
+encoder: GP16/GP17 edge interrupt on core 1
+all subsystems started
+
+motion_task: core 1, period 20 ms
+[TEST] === test run start ===
+monitor: I am task 8
+[TEST] S1-U01 PASS  cyclic handler is running
+wifi: cyw43_utk_task starting (proc 1)
+wifi: cyw43_init() ...
+wifi: cyw43_init() returned, bringing interface up ...
+[TEST] S1-U02 PASS  LED task sleeps between ticks
+[TEST] subsystem1 SUMMARY 2 passed, 0 failed
+monitor: batch  n=5 last=40 from core 1
+monitor: t=3355771096 ms  samples=5  min=0 max=40 avg=20  free slots=3  free blocks=3
+
+[TEST] subsystem2 tests start
+[TEST] S2 INFO encoder interrupt on core 1 (A4 wants core 1)
+monitor: batch  n=10 last=90 from core 1
+monitor: t=3355772646 ms  samples=10  min=0 max=90 avg=45  free slots=4  free blocks=4
+[TEST] S2-U08 INFO timer counted 1009668 in 1000 ms; WATCHDOG TICK at boot 0x460c (12 cycles = 0x..0c)
+[TEST] S2-U08 PASS  1 MHz timer runs at 1 MHz against the kernel clock
+monitor: batch  n=15 last=60 from core 1
+monitor: t=3355774196 ms  samples=15  min=0 max=100 avg=56  free slots=4  free blocks=4
+[TEST] S2-U05 INFO 50 motion cycles in 1000 ms, longest cycle 310 us
+[TEST] S2-U05 PASS  motion_task runs every 20 ms (48-52 cycles per second)
+[TEST] S2-U05 INFO 20 trials: worst 191 us, mean 140 us (limit 20000 us)
+[TEST] S2-U05 PASS  MF_ESTOP brakes within one cycle, 20 of 20 trials
+[TEST] S2-U07 INFO 4 of 4 steps passed
+[TEST] S2-U07 PASS  E-stop latch and CLEAR protocol
+
+[S2-STEP] NEXT: S2-U02 both wheels run 1.5 s at 250 mm/s: WATCH that BOTH turn the way that drives the robot forward
+[S2-STEP] press BUTTON 1 (GP20) on the robot when ready
+monitor: batch  n=20 last=10 from core 1
+monitor: t=3355775746 ms  samples=20  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: batch  n=25 last=40 from core 1
+monitor: t=3355777296 ms  samples=25  min=0 max=100 avg=44  free slots=4  free blocks=4
+monitor: batch  n=30 last=90 from core 1
+monitor: t=3355778846 ms  samples=30  min=0 max=100 avg=48  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+monitor: batch  n=35 last=60 from core 1
+monitor: t=3355780396 ms  samples=35  min=0 max=100 avg=52  free slots=4  free blocks=4
+monitor: batch  n=40 last=10 from core 1
+monitor: t=3355781946 ms  samples=40  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: batch  n=45 last=40 from core 1
+monitor: t=3355783496 ms  samples=45  min=0 max=100 avg=46  free slots=4  free blocks=4
+monitor: batch  n=50 last=90 from core 1
+monitor: t=3355785046 ms  samples=50  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: batch  n=55 last=60 from core 1
+monitor: t=3355786596 ms  samples=55  min=0 max=100 avg=51  free slots=4  free blocks=4
+[S2-STEP] 3
+[S2-STEP] 2
+monitor: batch  n=60 last=10 from core 1
+monitor: t=3355788146 ms  samples=60  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: LED task resumed, state=RUN, pri=12
+[S2-STEP] 1
+monitor: batch  n=65 last=40 from core 1
+monitor: t=3355789696 ms  samples=65  min=0 max=100 avg=47  free slots=4  free blocks=4
+[S2-STEP] GO
+[S2-U02] t_ms,speed_l,speed_r,duty_l,duty_r
+[S2-U02] 20,0,0,67,67
+[S2-U02] 40,0,0,135,135
+[S2-U02] 60,28,0,242,270
+[S2-U02] 80,75,0,262,337
+[S2-U02] 100,141,66,331,406
+[S2-U02] 120,168,62,372,478
+[S2-U02] 140,218,106,361,519
+[S2-U02] 160,233,132,350,517
+[S2-U02] 180,247,154,338,536
+[S2-U02] 200,249,167,336,539
+[S2-U02] 220,249,209,336,518
+[S2-U02] 240,250,233,335,497
+[S2-U02] 260,252,290,333,429
+[S2-U02] 280,253,307,331,401
+[S2-U02] 300,255,314,327,368
+[S2-U02] 320,254,311,327,359
+[S2-U02] 340,257,302,322,346
+[S2-U02] 360,256,297,321,342
+[S2-U02] 380,255,287,321,336
+[S2-U02] 400,252,283,323,333
+[S2-U02] 420,252,275,323,331
+[S2-U02] 440,255,274,319,327
+[S2-U02] 460,252,270,320,322
+[S2-U02] 480,251,269,321,319
+[S2-U02] 500,251,263,320,320
+[S2-U02] 520,250,262,321,318
+[S2-U02] 540,250,260,321,316
+[S2-U02] 560,250,258,321,316
+[S2-U02] 580,251,257,320,314
+[S2-U02] 600,252,257,318,313
+[S2-U02] 620,250,255,320,313
+[S2-U02] 640,251,255,319,312
+[S2-U02] 660,251,253,318,313
+[S2-U02] 680,248,254,322,311
+[S2-U02] 700,252,253,317,311
+[S2-U02] 720,251,253,318,310
+[S2-U02] 740,249,253,321,309
+[S2-U02] 760,249,250,321,312
+[S2-U02] 780,250,251,320,311
+[S2-U02] 800,249,252,321,310
+[S2-U02] 820,252,251,317,311
+[S2-U02] 840,250,250,319,312
+[S2-U02] 860,250,251,320,310
+[S2-U02] 880,251,251,318,310
+[S2-U02] 900,249,251,321,310
+[S2-U02] 920,251,252,318,308
+monitor: batch  n=70 last=90 from core 1
+monitor: t=3355791246 ms  samples=70  min=0 max=100 avg=49  free slots=4  free blocks=4
+[S2-U02] 940,250,249,319,311
+[S2-U02] 960,250,251,319,309
+[S2-U02] 980,250,251,319,309
+[S2-U02] 1000,249,251,321,308
+[S2-U02] 1020,251,250,318,310
+[S2-U02] 1040,250,251,319,308
+[S2-U02] 1060,250,249,320,311
+[S2-U02] 1080,250,249,320,311
+[S2-U02] 1100,250,250,319,310
+[S2-U02] 1120,249,250,321,310
+[S2-U02] 1140,250,251,320,309
+[S2-U02] 1160,251,251,318,308
+[S2-U02] 1180,250,250,319,309
+[S2-U02] 1200,250,250,319,309
+[S2-U02] 1220,249,249,321,311
+[S2-U02] 1240,249,250,321,310
+[S2-U02] 1260,250,250,320,310
+[S2-U02] 1280,248,251,323,309
+[S2-U02] 1300,252,249,318,311
+[S2-U02] 1320,252,250,318,310
+[S2-U02] 1340,249,250,321,310
+[S2-U02] 1360,251,248,319,313
+[S2-U02] 1380,249,250,321,311
+[S2-U02] 1400,249,250,321,311
+[S2-U02] 1420,251,249,319,312
+[S2-U02] 1440,250,250,320,311
+[S2-U02] 1460,251,250,318,311
+[S2-U02] 1480,252,250,317,311
+[S2-U02] 1500,249,249,320,312
+[TEST] S2-U02 PASS  both wheels within +/-10 % of 250 mm/s after 0.5 s
+[MEASURED] both wheels turned forward: y
+[TEST] S2-U10 INFO longest cycle 310 us (limit 4000), stack 432 of 2176 bytes = 19 % (limit 75 %), 1132 cycles
+[TEST] S2-U10 PASS  NFR11: longest motion cycle <= 4000 us, stack <= 75 %
+[TEST] subsystem2 SUMMARY 6 passed, 0 failed
+[RESULT] finished: 6 S2 checks passed, 0 failed

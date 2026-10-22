@@ -6,8 +6,9 @@
  *
  * @par Groups (set S2_FLOOR_TEST, rebuild, flash, open the serial port)
  * - 1  S2-U11 distance and straightness: MOVE 1000 x3, MOVE 1000 slow,
- *      MOVE -300. Needs about 1.6 m x 0.6 m of clear floor. Measure every
- *      run with a tape: distance travelled and sideways offset.
+ *      MOVE -300. Needs about 1.6 m x 0.6 m of clear floor. A tape measure
+ *      lies beside the left wheel; the front edge of the left tyre is the
+ *      reference point (TEST_GUIDE.md).
  * - 2  S2-U03 turn accuracy: TURN +90 x5, -90 x5, 180 x3 (NFR5). Mark the
  *      robot's heading with a strip of tape or a protractor.
  * - 3  S2-U12 braking distance from 300 and 150 mm/s (STOP and E-stop),
@@ -101,8 +102,8 @@ subsystem2_floor_test (void)
     // S2-U11: three straight runs at cruise, one slow, one reverse.
     for (run = 1u; run <= 3u; run++)
     {
-        subsystem2_step_ready("S2-U11 MOVE 1000 mm at 300 mm/s: marker on 0,"
-                              " WATCH it drive straight");
+        subsystem2_step_ready("S2-U11 MOVE 1000 mm at 300 mm/s: left tyre"
+                              " front edge on 100, WATCH it");
         travel(S2_CMD_MOVE, 1000, 0u, &result);
         TEST_CHECK("S2-U11", result.b_done &&
                    (magnitude(result.dist_mm - 1000) <=
@@ -111,14 +112,15 @@ subsystem2_floor_test (void)
                    "MOVE 1000: odometry within 2 %, heading within 3 deg");
     }
 
-    subsystem2_step_ready("S2-U11 MOVE 1000 mm at 150 mm/s: marker on 0");
+    subsystem2_step_ready("S2-U11 MOVE 1000 mm at 150 mm/s: left tyre front"
+                          " edge on 100");
     travel(S2_CMD_MOVE, 1000, 150u, &result);
     TEST_CHECK("S2-U11", result.b_done &&
                (magnitude(result.dist_mm - 1000) <= (10 * U11_TOL_MM_PERCENT)),
                "MOVE 1000 slow: odometry within 2 %");
 
-    subsystem2_step_ready("S2-U11 MOVE -300 mm (REVERSE): marker on 500,"
-                          " clear space BEHIND the robot");
+    subsystem2_step_ready("S2-U11 MOVE -300 mm (REVERSE): left tyre front"
+                          " edge on 600, clear space BEHIND");
     travel(S2_CMD_MOVE, -300, 0u, &result);
     TEST_CHECK("S2-U11", result.b_done &&
                (magnitude(result.dist_mm + 300) <= 6),

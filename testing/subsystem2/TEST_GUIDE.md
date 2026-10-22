@@ -90,21 +90,22 @@ Every test image runs the automatic `unit` checks first (about 10 s, motors stil
 ### Test 4: `u11` MOVE distance and straightness (S2-U11). On the floor.
 
 - **Why:** everyone uses the robot's distance (Sean's junction and barcode distances, Kessler's hump height, Anna's obstacle depth). This test checks it against a tape measure.
+- **What to measure, and why the tyre:** on a straight run every point of the robot moves the same distance, so you can measure any point that is easy to read. The car's long nose and tail make the body hard to line up, so use the **front edge of the LEFT tyre where it touches the floor**. It sits on the floor, so there is no parallax, and it is exactly what the encoders measure. Do **not** count wheel turns instead: that only checks the encoder again and misses wheel slip, which is what this test is for.
 - **Setup:**
-  1. **Space:** a clear, flat strip **1.6 m long and 0.6 m wide** (0.3 m each side of the tape), plus the robot's own length behind the 0 mark, and no obstacle at the far end. The robot drives 1.0 m and can drift a few cm sideways; the extra length is for it stopping a little late and for the cable.
-  2. Lay the tape measure flat and straight down the middle of that strip. Tape it down at both ends and in the middle. The 0 mark is the start.
-  3. Stick a small piece of masking tape on the robot's front, exactly in the middle, with a pen line on it. This is the **marker**.
-  4. Place the robot so its centre line is over the tape (one wheel each side) and the marker is exactly on 0.
-- **Takes:** about 5 minutes (5 runs, each started by Button 1).
+  1. **Space:** a clear, flat strip **1.6 m long and 0.6 m wide**, plus the robot's own length behind the start, nothing at the far end, and slack in the cable.
+  2. Lay the tape measure **beside the left wheel**, not under the car: flat, straight, parallel to the way the robot will drive, with its edge about 2 cm from the outside of the left tyre. Tape it down at both ends and in the middle.
+  3. Put the robot down with the **front edge of the left tyre exactly on 100 mm** (not 0: the hook end of a tape measure is not accurate), and both wheels parallel to the tape.
+- **Takes:** about 6 minutes (5 runs, each started by Button 1).
 - **What happens:** runs 1-3 are MOVE 1000 mm at 300 mm/s, run 4 is MOVE 1000 mm at 150 mm/s, and run 5 is MOVE -300 mm (reverse).
-- **You do, after each run** (the script asks):
-  1. **Tape reading** at the marker, in mm (for example `1004`).
-  2. **Sideways offset:** with the ruler, how far the marker is from the tape's centre line, in mm. Use `+` if the robot ended to its own **left** of the line (as seen from behind the robot), `-` if right. Use `0` if exactly on it.
-  3. Put the robot back with the marker on 0, then press Button 1 for the next run.
+- **You do, for each run:**
+  1. **Before pressing the button** the script asks the **gap** between the tape's edge and the outside of the left tyre, in mm (use a ruler; about 20). Type it, then press Button 1.
+  2. **After the run:** look straight down at the front edge of the left tyre and type the **tape reading** there, in mm (for example `1103`).
+  3. Type the **gap** again, now at the end position.
+  4. The script works out the real distance (reading - start) and the sideways drift (+ = drifted left, - = right) and saves both.
+  5. Put the robot back with the tyre front edge on 100.
 
-  **Before run 5 (reverse):** place the marker on **500** instead. The script takes 500 as the start and works out the real distance.
-- **Good result:** every `S2-U11` line PASS. The real (tape) distances tell me how to correct the encoder calibration. The sideways offsets show whether the robot drives straight.
-
+  **Run 5 (reverse):** put the tyre front edge on **600** instead. It ends near 300.
+- **Good result:** every `S2-U11` line PASS. Real distances within 1000 +/- 20 mm (run 5: 300 +/- 6 mm) and sideways drift under 30 mm. If the distances are all off by the same few percent, I correct the encoder calibration from your numbers.
 ### Test 5: `u03` turn accuracy (S2-U03). On the floor.
 
 - **Why:** NFR5 needs 90-degree turns within 5 degrees and 180-degree turns within 8 degrees. Barcode turns and Anna's bypass depend on it.
