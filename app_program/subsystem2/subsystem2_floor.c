@@ -17,8 +17,10 @@
  * @par
  * Every step starts with a countdown of PLACE_S seconds to measure the
  * last step and put the robot back on its start mark, and ends with one
- * "[S2-FLOOR]" line with the robot's own odometry. Write your tape and
- * protractor readings next to those lines in the saved log.
+ * "[S2-FLOOR]" line with the robot's own odometry. Run the tests with
+ * testing/subsystem2/s2_test.ps1, which asks for your tape and protractor
+ * readings after each line and saves them in the same log
+ * (testing/subsystem2/TEST_GUIDE.md).
  *
  * @par Safety
  * The robot moves on its own. Keep a hand near the Robo Pico's power
@@ -35,7 +37,7 @@
 
 #define S2_FLOOR_TEST       (0)     /* 0 off; 1 U11; 2 U03; 3 U12.       */
 
-#define PLACE_S             (10u)   /* Countdown before each step.       */
+#define PLACE_S             (30u)   /* Countdown before each step.       */
 #define POLL_MS             (20u)
 #define SETTLE_MS           (600u)  /* Let it come to rest, then read.   */
 #define DONE_TIMEOUT_MS     (15000u)
@@ -179,7 +181,8 @@ subsystem2_floor_test (void)
                "holds 150 mm/s within 10 %");
 
     // S2-U12 c: stall detection with a wheel held.
-    countdown("STALL: FOLLOW 150, then HOLD the LEFT wheel firmly");
+    countdown("STALL: FOLLOW 150; when told, LIFT the robot and pinch the"
+              " LEFT tyre still");
     TEST_CHECK("S2-U12", stall_check(),
                "held wheel: STALL, braked and MF_ESTOP within 1 s");
 #endif
@@ -205,7 +208,7 @@ countdown (char const * p_next)
 
     for (sec = PLACE_S; sec > 0u; sec--)
     {
-        if (sec <= 3u)
+        if ((10u == sec) || (sec <= 3u))
         {
             tm_printf((UB *) "[S2-FLOOR] %d\n", (int) sec);
         }
@@ -390,7 +393,8 @@ stall_check (void)
     subsystem2_status_get(&status);
     stalls = status.stall_count;
     send(S2_CMD_FOLLOW, 0, 150u);
-    tm_printf((UB *) "[S2-FLOOR] HOLD the LEFT wheel now (10 s)\n");
+    tm_printf((UB *) "[S2-FLOOR] HOLD the LEFT wheel now: lift the robot,"
+              " pinch the left tyre (10 s)\n");
 
     do
     {
