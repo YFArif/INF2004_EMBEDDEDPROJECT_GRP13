@@ -35,7 +35,15 @@ CC=${CC:-gcc}
 OUT=$(mktemp -d "${TMPDIR:-/tmp}/s2_host.XXXXXX")
 trap 'rm -rf "$OUT"' EXIT
 
-echo "commit: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)$(git diff --quiet 2>/dev/null || echo ' (+ uncommitted changes)')"
+# core.autocrlf: a Windows checkout has CRLF endings, which Linux git would
+# otherwise report as changes. Only the S2 code and tests are compared.
+DIRTY=""
+if ! git -c core.autocrlf=true diff --quiet HEAD -- app_program/subsystem2 \
+        testing/subsystem2 2>/dev/null
+then
+    DIRTY=" (+ uncommitted changes in S2)"
+fi
+echo "commit: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)$DIRTY"
 echo "compiler: $($CC --version | head -1)"
 
 if ! $CC -std=gnu11 -O1 -g -Wall -Wextra -Wshadow -Werror \
