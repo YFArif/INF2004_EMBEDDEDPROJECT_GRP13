@@ -68,7 +68,7 @@ fixed.
 | GP17                   | S2            | right wheel encoder, edge interrupt (Grove 4 pin 2)    |
 | GP18                   |               |                                                        |
 | GP19                   | _example:_ S1 | external LED (LED + 330 Ω to GND)                      |
-| GP20                   |               |                                                        |
+| GP20                   | S5 (planned)  | start button (Button 1). S2 `make TEST=1` images only: read-only "next step" button (`subsystem2_step.c`) |
 | GP21                   |               |                                                        |
 | GP22                   |               |                                                        |
 | GP26                   |               | (ADC0 capable)                                         |

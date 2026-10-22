@@ -6,20 +6,20 @@
  *
  * @par Groups (set S2_FLOOR_TEST, rebuild, flash, open the serial port)
  * - 1  S2-U11 distance and straightness: MOVE 1000 x3, MOVE 1000 slow,
- *      MOVE -300. Needs about 1.2 m of clear floor. Measure every run with
- *      a tape: distance travelled and sideways offset.
+ *      MOVE -300. Needs about 1.6 m x 0.6 m of clear floor. Measure every
+ *      run with a tape: distance travelled and sideways offset.
  * - 2  S2-U03 turn accuracy: TURN +90 x5, -90 x5, 180 x3 (NFR5). Mark the
  *      robot's heading with a strip of tape or a protractor.
  * - 3  S2-U12 braking distance from 300 and 150 mm/s (STOP and E-stop),
  *      the slowest speeds it holds, and stall detection with a wheel held
- *      by hand. Needs about 0.8 m of clear floor.
+ *      by hand (robot on a box). Needs about 1 m of clear floor.
  *
  * @par
- * Every step starts with a countdown of PLACE_S seconds to measure the
- * last step and put the robot back on its start mark, and ends with one
- * "[S2-FLOOR]" line with the robot's own odometry. Run the tests with
- * testing/subsystem2/s2_test.ps1, which asks for your tape and protractor
- * readings after each line and saves them in the same log
+ * Every step waits for Button 1 on the robot (subsystem2_step_ready()),
+ * counts down 3 s, runs, and ends with one "[S2-FLOOR]" line with the
+ * robot's own odometry; the robot then waits for the button again. Run
+ * the tests with testing/subsystem2/s2_test.ps1, which asks for your tape
+ * and protractor readings after each line and saves them in the same log
  * (testing/subsystem2/TEST_GUIDE.md).
  *
  * @par Safety
@@ -37,7 +37,6 @@
 
 #define S2_FLOOR_TEST       (0)     /* 0 off; 1 U11; 2 U03; 3 U12.       */
 
-#define PLACE_S             (30u)   /* Countdown before each step.       */
 #define POLL_MS             (20u)
 #define SETTLE_MS           (600u)  /* Let it come to rest, then read.   */
 #define DONE_TIMEOUT_MS     (15000u)
@@ -64,7 +63,6 @@ typedef struct
 } floor_result_t;
 
 #if (0 != S2_FLOOR_TEST)
-static void    countdown(char const * p_next);
 static void    travel(subsystem2_cmd_type_t type, int16_t value,
                       uint16_t speed_mms, floor_result_t * p_result);
 static int32_t brake_from(uint16_t speed_mms, bool b_estop);
@@ -103,27 +101,28 @@ subsystem2_floor_test (void)
     // S2-U11: three straight runs at cruise, one slow, one reverse.
     for (run = 1u; run <= 3u; run++)
     {
-        countdown("MOVE 1000 mm at 300 mm/s: mark the start, ~1.2 m clear");
+        subsystem2_step_ready("S2-U11 MOVE 1000 mm at 300 mm/s: marker on 0,"
+                              " WATCH it drive straight");
         travel(S2_CMD_MOVE, 1000, 0u, &result);
         TEST_CHECK("S2-U11", result.b_done &&
                    (magnitude(result.dist_mm - 1000) <=
                     (10 * U11_TOL_MM_PERCENT)) &&
                    (magnitude(result.turn_cdeg) <= U11_DRIFT_CDEG),
-                   "MOVE 1000: odometry within 2 %, heading within 3 deg;"
-                   " now TAPE the real distance and sideways offset");
+                   "MOVE 1000: odometry within 2 %, heading within 3 deg");
     }
 
-    countdown("MOVE 1000 mm at 150 mm/s");
+    subsystem2_step_ready("S2-U11 MOVE 1000 mm at 150 mm/s: marker on 0");
     travel(S2_CMD_MOVE, 1000, 150u, &result);
     TEST_CHECK("S2-U11", result.b_done &&
                (magnitude(result.dist_mm - 1000) <= (10 * U11_TOL_MM_PERCENT)),
-               "MOVE 1000 slow: odometry within 2 %; TAPE it");
+               "MOVE 1000 slow: odometry within 2 %");
 
-    countdown("MOVE -300 mm (reverse): clear space BEHIND the robot");
+    subsystem2_step_ready("S2-U11 MOVE -300 mm (REVERSE): marker on 500,"
+                          " clear space BEHIND the robot");
     travel(S2_CMD_MOVE, -300, 0u, &result);
     TEST_CHECK("S2-U11", result.b_done &&
                (magnitude(result.dist_mm + 300) <= 6),
-               "MOVE -300: odometry within 2 %; TAPE it");
+               "MOVE -300: odometry within 2 %");
 
 #elif (2 == S2_FLOOR_TEST)
     // S2-U03: NFR5 wants +/-5 deg at 90 and +/-8 deg at 180, measured by
@@ -145,80 +144,69 @@ subsystem2_floor_test (void)
             // First five: left.
         }
 
-        countdown((angle > 0) ? "TURN left: line the robot up on the tape"
-                              : "TURN right: line the robot up on the tape");
+        if (90 == angle)
+        {
+            subsystem2_step_ready("S2-U03 TURN +90 (LEFT): pointer on arm F");
+        }
+        else if (-90 == angle)
+        {
+            subsystem2_step_ready("S2-U03 TURN -90 (RIGHT): pointer on arm F");
+        }
+        else
+        {
+            subsystem2_step_ready("S2-U03 TURN 180: pointer on arm F");
+        }
+
         travel(S2_CMD_TURN, angle, 0u, &result);
         error = result.turn_cdeg - (angle * 100);
         TEST_CHECK("S2-U03", result.b_done &&
                    (magnitude(error) <= U03_TOL_CDEG),
-                   "TURN: odometry within 2 deg; now MEASURE the real angle");
+                   "TURN: odometry within 2 deg");
     }
 
 #elif (3 == S2_FLOOR_TEST)
     // S2-U12 a: braking distance. NFR6 leaves 58 mm for braking.
-    countdown("FOLLOW 300 mm/s for 2 s, then STOP: ~0.7 m clear");
+    subsystem2_step_ready("S2-U12 drive 300 mm/s for 2 s, then STOP (~0.7 m"
+                          " clear): WATCH the wheels as it stops");
     brake = brake_from(300u, false);
     TEST_CHECK("S2-U12", brake <= U12_BRAKE_BUDGET_MM,
                "STOP from 300 mm/s within 58 mm (NFR6 budget)");
 
-    countdown("FOLLOW 300 mm/s for 2 s, then E-STOP");
+    subsystem2_step_ready("S2-U12 drive 300 mm/s for 2 s, then E-STOP:"
+                          " WATCH the wheels as it stops");
     brake = brake_from(300u, true);
     TEST_CHECK("S2-U12", brake <= U12_BRAKE_BUDGET_MM,
                "MF_ESTOP from 300 mm/s within 58 mm (NFR6 budget)");
 
-    countdown("FOLLOW 150 mm/s for 2 s, then STOP");
+    subsystem2_step_ready("S2-U12 drive 150 mm/s for 2 s, then STOP:"
+                          " WATCH the wheels as it stops");
     (void) brake_from(150u, false);
 
-    // S2-U12 b: slow speeds. 150 is S5's half speed near an obstacle.
-    countdown("slow speeds: 40, 60, 100, 150 mm/s for 2 s each (~0.7 m)");
+    // S2-U12 b: slow speeds, one step each so it can be watched. 150 is
+    // S5's half speed near an obstacle.
+    subsystem2_step_ready("S2-U12 drive 40 mm/s for 2 s: WATCH, smooth?");
     (void) hold_speed(40u);
+    subsystem2_step_ready("S2-U12 drive 60 mm/s for 2 s: WATCH, smooth?");
     (void) hold_speed(60u);
+    subsystem2_step_ready("S2-U12 drive 100 mm/s for 2 s: WATCH, smooth?");
     (void) hold_speed(100u);
+    subsystem2_step_ready("S2-U12 drive 150 mm/s for 2 s: WATCH, smooth?");
     speed = hold_speed(150u);
-    send(S2_CMD_STOP, 0, 0u);
     TEST_CHECK("S2-U12", magnitude(speed - 150) <= ((150 * U12_SLOW_TOL_PCT)
                                                      / 100),
                "holds 150 mm/s within 10 %");
 
     // S2-U12 c: stall detection with a wheel held.
-    countdown("STALL: FOLLOW 150; when told, LIFT the robot and pinch the"
-              " LEFT tyre still");
+    subsystem2_step_ready("S2-U12 STALL: put the robot on the BOX (wheels"
+                          " free); after GO pinch the LEFT tyre still");
     TEST_CHECK("S2-U12", stall_check(),
                "held wheel: STALL, braked and MF_ESTOP within 1 s");
 #endif
-
     TEST_SUMMARY("subsystem2 floor");
 #endif /* 0 != S2_FLOOR_TEST */
 }
 
 #if (0 != S2_FLOOR_TEST)
-/*!
- * @brief Print what comes next and count down PLACE_S seconds.
- *
- * @param[in] p_next What the next step does.
- */
-static void
-countdown (char const * p_next)
-{
-    uint32_t sec = 0u;
-
-    // NOTE: The casts are safe: the format strings are ASCII and the
-    // seconds are below 60.
-    tm_printf((UB *) "\n[S2-FLOOR] NEXT: %s\n", p_next);
-
-    for (sec = PLACE_S; sec > 0u; sec--)
-    {
-        if ((10u == sec) || (sec <= 3u))
-        {
-            tm_printf((UB *) "[S2-FLOOR] %d\n", (int) sec);
-        }
-
-        sleep_ms(1000u);
-    }
-
-    tm_printf((UB *) "[S2-FLOOR] GO\n");
-}
-
 /*!
  * @brief Run one MOVE or TURN and report the odometry change.
  *
@@ -374,6 +362,10 @@ hold_speed (uint16_t speed_mms)
               (int) (sum_l / samples), (int) (sum_r / samples),
               (int) (sum_dl / samples), (int) (sum_dr / samples));
 
+    // Stop before the next step, so nothing moves while the PC asks.
+    send(S2_CMD_STOP, 0, 0u);
+    sleep_ms(SETTLE_MS);
+
     return (((sum_l / samples) + (sum_r / samples)) / 2);
 }
 
@@ -393,8 +385,8 @@ stall_check (void)
     subsystem2_status_get(&status);
     stalls = status.stall_count;
     send(S2_CMD_FOLLOW, 0, 150u);
-    tm_printf((UB *) "[S2-FLOOR] HOLD the LEFT wheel now: lift the robot,"
-              " pinch the left tyre (10 s)\n");
+    tm_printf((UB *) "[S2-FLOOR] HOLD the LEFT tyre now: pinch it still"
+              " (10 s)\n");
 
     do
     {

@@ -424,13 +424,11 @@ s2_u01_wheel (drv_encoder_t wheel, char const * p_name)
         other = DRV_ENCODER_RIGHT;
     }
 
-    tm_printf((UB *) "\n[S2-U01] %s wheel: keep the other wheel still\n",
-              p_name);
-    for (sec = 3u; sec > 0u; sec--)
-    {
-        tm_printf((UB *) "[S2-U01] starting in %d\n", (int) sec);
-        delay_ms(1000u);
-    }
+    subsystem2_step_ready((DRV_ENCODER_LEFT == wheel) ?
+                          "S2-U01 turn the LEFT wheel 10 times by hand,"
+                          " right wheel still (40 s)" :
+                          "S2-U01 turn the RIGHT wheel 10 times by hand,"
+                          " left wheel still (40 s)");
 
     drv_encoder_get(wheel, &start);
     drv_encoder_get(other, &o_from);
@@ -477,17 +475,28 @@ s2_u06_motor (drv_motor_t motor, char const * p_name)
     uint32_t slow = 0u;
     uint32_t back = 0u;
     uint32_t fast = 0u;
+    bool     b_l  = (DRV_MOTOR_LEFT == motor);
 
-    tm_printf((UB *) "\n[S2-U06] %s motor: wheel must be off the ground\n",
-              p_name);
-    delay_ms(3000u);
+    (void) p_name;
 
-    tm_printf((UB *) "[S2-U06] %s FORWARD: should drive the robot forward\n",
-              p_name);
+    // Each phase waits for Button 1, so the tester answers the PC's
+    // questions while nothing moves, and watches the wheel when it does.
+    subsystem2_step_ready(b_l ? "S2-U06 LEFT FORWARD (3 s): WATCH the left"
+                                " wheel; does it drive the robot forward?"
+                              : "S2-U06 RIGHT FORWARD (3 s): WATCH the right"
+                                " wheel; does it drive the robot forward?");
     slow = s2_u06_run(motor, U06_DUTY);
-    tm_printf((UB *) "[S2-U06] %s REVERSE\n", p_name);
+
+    subsystem2_step_ready(b_l ? "S2-U06 LEFT REVERSE (3 s): WATCH the left"
+                                " wheel; the opposite way?"
+                              : "S2-U06 RIGHT REVERSE (3 s): WATCH the right"
+                                " wheel; the opposite way?");
     back = s2_u06_run(motor, -U06_DUTY);
-    tm_printf((UB *) "[S2-U06] %s FORWARD at double duty\n", p_name);
+
+    subsystem2_step_ready(b_l ? "S2-U06 LEFT FORWARD FAST (3 s): WATCH the"
+                                " left wheel; forward and faster?"
+                              : "S2-U06 RIGHT FORWARD FAST (3 s): WATCH the"
+                                " right wheel; forward and faster?");
     fast = s2_u06_run(motor, 2 * U06_DUTY);
 
     drv_motor_brake();
@@ -566,8 +575,9 @@ s2_u02_step (void)
     uint32_t            elapsed = 0u;
     bool                b_ok    = true;
 
-    tm_printf((UB *) "\n[S2-U02] wheels off the ground; starting in 3 s\n");
-    delay_ms(3000u);
+    subsystem2_step_ready("S2-U02 both wheels run 1.5 s at 250 mm/s: WATCH"
+                          " that BOTH turn the way that drives the robot"
+                          " forward");
     tm_printf((UB *) "[S2-U02] t_ms,speed_l,speed_r,duty_l,duty_r\n");
 
     subsystem2_steer_set(0);

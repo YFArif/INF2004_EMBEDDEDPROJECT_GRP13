@@ -41,50 +41,57 @@ $logDir   = Join-Path $PSScriptRoot 'logs'
 $image    = Join-Path $buildDir 'mtk3pico_smp1_usb_cdc_wifi_test.uf2'
 
 # Test table: the switch to set for the build, how long the Pico part may
-# take, and what to check before starting.
+# take (the steps wait for Button 1, so this is generous), and what to
+# check before starting.
+$button = 'Every step waits for you to press BUTTON 1 (GP20) on the Robo Pico, then counts down 3 s (with beeps) and runs. Nothing moves before that.'
 $tests = @{
     'unit' = @{ Name = 'S2-U08 U05 U07 U10 automatic checks'
                 File = ''; Switch = ''; Minutes = 3; Floor = $false
                 Setup = @('The motors stay braked: the robot can stand anywhere.') }
     'u06'  = @{ Name = 'S2-U06 open-loop motor drive'
                 File = 'subsystem2_test.c'; Switch = 'S2_U06_BENCH'; Value = 1
-                Minutes = 3; Floor = $false
+                Minutes = 20; Floor = $false
                 Setup = @('Put the robot on a box or book so BOTH wheels are off the table.',
-                          'Stand where you can see which way each wheel turns.') }
+                          'Stand BEHIND the robot (its front pointing away from you): forward = top of the tyre moves away from you.',
+                          $button) }
     'u02'  = @{ Name = 'S2-U02 speed step response 0 -> 250 mm/s'
                 File = 'subsystem2_test.c'; Switch = 'S2_U02_BENCH'; Value = 1
-                Minutes = 3; Floor = $false
-                Setup = @('Put the robot on a box or book so BOTH wheels are off the table.') }
+                Minutes = 10; Floor = $false
+                Setup = @('Put the robot on a box or book so BOTH wheels are off the table.',
+                          'Stand BEHIND the robot: both tyre tops must move away from you.',
+                          $button) }
     'u01'  = @{ Name = 'S2-U01 encoder ticks per wheel revolution'
                 File = 'subsystem2_test.c'; Switch = 'S2_U01_BENCH'; Value = 1
-                Minutes = 5; Floor = $false
+                Minutes = 10; Floor = $false
                 Setup = @('Put a small piece of tape on each tyre as a revolution marker.',
-                          'Lift the robot so you can turn each wheel by hand.') }
+                          'Lift the robot so you can turn each wheel by hand.',
+                          $button) }
     'u11'  = @{ Name = 'S2-U11 MOVE distance and straightness'
                 File = 'subsystem2_floor.c'; Switch = 'S2_FLOOR_TEST'; Value = 1
-                Minutes = 12; Floor = $true
-                Setup = @('Tape measure laid flat and straight on the floor, 0 mark at the start, taped down.',
-                          'A tape marker on the robot front centre; robot centre line over the tape.',
-                          'At least 1.5 m clear in front and 0.6 m behind; cable with slack.',
-                          'Each step: 30 s countdown. Measure, type the numbers, put the robot back at 0.') }
+                Minutes = 40; Floor = $true
+                Setup = @('Clear floor: 1.6 m long x 0.6 m wide (0.3 m each side of the tape), plus the robot''s own length behind the 0 mark.',
+                          'Tape measure flat and straight, 0 mark at the start, taped down at both ends and the middle.',
+                          'A tape marker with a pen line on the robot''s front, exactly in the middle; robot centre line over the tape.',
+                          'Runs 1-4: marker on 0. Run 5 (reverse): marker on 500.',
+                          $button) }
     'u03'  = @{ Name = 'S2-U03 turn accuracy'
                 File = 'subsystem2_floor.c'; Switch = 'S2_FLOOR_TEST'; Value = 2
-                Minutes = 15; Floor = $true
-                Setup = @('A "+" of two tape lines on the floor at exactly 90 deg (use a paper corner).',
-                          'A ruler taped on top of the robot along its centre line, pointing forward.',
-                          'Robot axle centre over the crossing, ruler along the FORWARD line.',
-                          'Protractor ready. Each turn: 30 s countdown to measure, type, and line up again.') }
+                Minutes = 40; Floor = $true
+                Setup = @('A "+" of two tape lines on the floor at exactly 90 deg (use a paper corner); label the arms F, L, R, B.',
+                          'A ruler taped on top of the robot along its centre line, pointing forward (the pointer).',
+                          'Robot axle centre over the crossing, pointer along arm F, before every turn.',
+                          $button) }
     'u12'  = @{ Name = 'S2-U12 braking distance, slow speeds, stall'
                 File = 'subsystem2_floor.c'; Switch = 'S2_FLOOR_TEST'; Value = 3
-                Minutes = 12; Floor = $true
-                Setup = @('At least 1 m clear in front; cable with slack.',
+                Minutes = 40; Floor = $true
+                Setup = @('At least 1 m clear in front; cable with slack. Put the robot back at the start before each step.',
                           'Watch the wheels when it stops: do they skid?',
-                          'Last step: when told, LIFT the robot and pinch the LEFT tyre still.') }
+                          'Last step (stall): robot on the BOX with the wheels free; after GO pinch the LEFT tyre still.',
+                          $button) }
     'u09'  = @{ Name = 'S2-U09 motion_task simulation on the PC'
                 File = ''; Switch = ''; Minutes = 0; Floor = $false
                 Setup = @('No Pico needed.') }
 }
-
 $t = $tests[$Test]
 
 # ---------------------------------------------------------------------
@@ -410,7 +417,21 @@ try
     $script:moveRun  = 0
     $script:turnRun  = 0
     $script:u06Side  = ''
-    $script:u06Asked = @{}
+
+    # Before every question: the robot has just stopped, so give the
+    # tester 3 s to look at it before the terminal needs attention. The
+    # Pico waits for Button 1 meanwhile, so nothing moves.
+    function Look-AtRobot
+    {
+        Write-Host '  Look at the robot now. Question in' -NoNewline -ForegroundColor Yellow
+        foreach ($n in 3, 2, 1)
+        {
+            Write-Host " $n.." -NoNewline -ForegroundColor Yellow
+            Start-Sleep -Seconds 1
+        }
+        Write-Host ''
+        [Console]::Beep(660, 120)
+    }
 
     function Ask-ForLine([string]$line)
     {
@@ -427,6 +448,7 @@ try
                     {
                         $start = 500
                     }
+                    Look-AtRobot
                     Write-Host "  Run $($script:moveRun): read the tape at the robot's front marker." -ForegroundColor Yellow
                     $end    = Ask-Number "  Tape reading now, mm (it started at $start)"
                     $offset = Ask-Number '  Sideways offset of the marker from the tape line, mm (+ = robot''s left, - = right)'
@@ -437,7 +459,12 @@ try
                     }
                     Write-Log ("[MEASURED] MOVE {0} run {1}: real distance {2} mm (tape {3}, start {4}), sideways offset {5} mm" -f
                                $target, $script:moveRun, (Format-Value $real), (Format-Value $end), $start, (Format-Value $offset))
-                    Write-Host '  Saved. Put the robot back on its start mark now.' -ForegroundColor Yellow
+                    $next = 'marker on 0'
+                    if ($script:moveRun -eq 4)
+                    {
+                        $next = 'marker on 500 (the next run is the REVERSE one)'
+                    }
+                    Write-Host "  Saved. Put the robot back ($next), then press BUTTON 1." -ForegroundColor Yellow
                 }
             }
             'u03'
@@ -446,39 +473,73 @@ try
                 {
                     $script:turnRun++
                     $target = [int]$Matches[1]
+                    Look-AtRobot
                     Write-Host "  Turn $($script:turnRun): measure with the protractor at the crossing." -ForegroundColor Yellow
                     $angle = Ask-Number "  Angle actually turned, deg (commanded $target; + = left)"
                     Write-Log ("[MEASURED] TURN {0} run {1}: measured {2} deg" -f $target, $script:turnRun, (Format-Value $angle))
-                    Write-Host '  Saved. Line the robot up on the FORWARD line again now.' -ForegroundColor Yellow
+                    Write-Host '  Saved. Line the pointer up on arm F again, then press BUTTON 1.' -ForegroundColor Yellow
                 }
             }
             'u12'
             {
                 if ($line -match 'braking distance')
                 {
+                    Look-AtRobot
                     $skid = Ask-YesNo '  Did the wheels skid or slide when it stopped?'
                     Write-Log "[MEASURED] wheels skidded: $skid  (for: $line)"
+                    Write-Host '  Saved. Put the robot back at the start, then press BUTTON 1.' -ForegroundColor Yellow
                 }
                 elseif ($line -match '^\[S2-FLOOR\] FOLLOW (\d+) mm/s:')
                 {
+                    Look-AtRobot
                     $smooth = Ask-YesNo "  At $($Matches[1]) mm/s did it move smoothly (no stopping or jerking)?"
                     Write-Log "[MEASURED] smooth at $($Matches[1]) mm/s: $smooth"
+                    Write-Host '  Saved. Put the robot back at the start, then press BUTTON 1.' -ForegroundColor Yellow
+                }
+                elseif ($line -match '^\[S2-FLOOR\] stall ')
+                {
+                    Look-AtRobot
+                    $stopped = Ask-YesNo '  Did both wheels stop by themselves while you held the left tyre?'
+                    Write-Log "[MEASURED] both wheels stopped by themselves: $stopped"
                 }
             }
             'u06'
             {
-                if ($line -match '^\[S2-U06\] (LEFT|RIGHT) FORWARD:')
+                if ($line -match '^\[S2-STEP\] NEXT: S2-U06 (LEFT|RIGHT)')
                 {
                     $script:u06Side = $Matches[1]
                 }
-                elseif ($line -match '^\[S2-U06\]\s+duty 400:' -and
-                        -not $script:u06Asked.ContainsKey($script:u06Side))
+                elseif ($line -match '^\[S2-U06\]\s+duty (-?\d+):')
                 {
-                    $script:u06Asked[$script:u06Side] = $true
+                    $duty = [int]$Matches[1]
                     $side = $script:u06Side
-                    $fwd  = Ask-YesNo "  In '$side FORWARD', did the $side wheel turn the way that drives the robot FORWARD?"
-                    $only = Ask-YesNo "  Did ONLY the $side wheel turn (the other one stayed still)?"
-                    Write-Log "[MEASURED] $side FORWARD drives the robot forward: $fwd; only that wheel turned: $only"
+                    Look-AtRobot
+                    if ($duty -eq 400)
+                    {
+                        $fwd  = Ask-YesNo "  FORWARD: did the $side wheel turn the way that drives the robot FORWARD?"
+                        $only = Ask-YesNo "  Did ONLY the $side wheel turn (the other one stayed still)?"
+                        Write-Log "[MEASURED] $side FORWARD drives the robot forward: $fwd; only that wheel turned: $only"
+                    }
+                    elseif ($duty -lt 0)
+                    {
+                        $back = Ask-YesNo "  REVERSE: did the $side wheel turn the OPPOSITE way (drives the robot backward)?"
+                        Write-Log "[MEASURED] $side REVERSE drives the robot backward: $back"
+                    }
+                    else
+                    {
+                        $fast = Ask-YesNo "  FAST: did the $side wheel turn FORWARD again, and faster?"
+                        Write-Log "[MEASURED] $side FAST forward and faster: $fast"
+                    }
+                    Write-Host '  Saved. Press BUTTON 1 for the next run.' -ForegroundColor Yellow
+                }
+            }
+            'u02'
+            {
+                if ($line -match '^\[TEST\] S2-U02 (PASS|FAIL)')
+                {
+                    Look-AtRobot
+                    $both = Ask-YesNo '  Did BOTH wheels turn the way that drives the robot FORWARD?'
+                    Write-Log "[MEASURED] both wheels turned forward: $both"
                 }
             }
             'u01'
@@ -491,7 +552,6 @@ try
             }
         }
     }
-
     $buffer   = ''
     $finished = $false
     $deadline = (Get-Date).AddMinutes($t.Minutes)
@@ -524,10 +584,37 @@ try
             Write-Log $line
 
             $color = 'Gray'
-            if ($line -match '^\[S2-FLOOR\] (NEXT|GO|HOLD)') { $color = 'Cyan' }
+            if ($line -match '^\[S2-FLOOR\] HOLD') { $color = 'Cyan' }
             if ($line -match '\bPASS\b') { $color = 'Green' }
             if ($line -match '\bFAIL\b|ERROR|STALL') { $color = 'Red' }
-            Write-Host $line -ForegroundColor $color
+
+            if ($line -match '^\[S2-STEP\] NEXT: (.*)$')
+            {
+                Write-Host ''
+                Write-Host ('#' * 70) -ForegroundColor Yellow
+                Write-Host "  NEXT: $($Matches[1])" -ForegroundColor Yellow
+                Write-Host '  Get the robot ready, then press BUTTON 1 on the robot.' -ForegroundColor Yellow
+                Write-Host ('#' * 70) -ForegroundColor Yellow
+            }
+            elseif ($line -match '^\[S2-STEP\] press')
+            {
+                [Console]::Beep(880, 120)
+                [Console]::Beep(880, 120)
+            }
+            elseif ($line -match '^\[S2-STEP\] ([123])$')
+            {
+                Write-Host "      $($Matches[1]) ...  WATCH THE ROBOT" -ForegroundColor Magenta
+                [Console]::Beep(1000, 150)
+            }
+            elseif ($line -match '^\[S2-STEP\] GO$')
+            {
+                Write-Host '      GO' -ForegroundColor Magenta
+                [Console]::Beep(1500, 400)
+            }
+            else
+            {
+                Write-Host $line -ForegroundColor $color
+            }
 
             Ask-ForLine $line
 

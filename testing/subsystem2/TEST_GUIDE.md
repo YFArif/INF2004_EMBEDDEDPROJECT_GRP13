@@ -47,8 +47,9 @@ Results can only be compared if they are taken the same way.
 3. Builds the test image in WSL with that test's switch turned on, then puts the switch back to 0 in the source straight away. The code in git never changes.
 4. Tells you to unplug the Pico, then hold BOOTSEL and plug it back in. It copies the image onto the `RPI-RP2` drive by itself.
 5. Opens the Pico's serial port as soon as it appears, so nothing is missed. It shows the output (PASS green, FAIL red) and saves every line.
-6. During floor and bench tests it asks for your measurement right after each step, and saves it in the log as a `[MEASURED]` line.
-7. Stops by itself at the end of the S2 tests and prints where the log is: `testing\subsystem2\logs\<date>_s2_<test>.txt`.
+6. **Every step that moves the robot waits for Button 1** (the button marked GP20 on the Robo Pico). The terminal shows a yellow `NEXT:` banner with what the step does and what to watch, and beeps twice. Get the robot ready, then press the button. It beeps `3`, `2`, `1` and a long `GO`: **look at the robot from the first beep**. Nothing moves before you press, so take as long as you need.
+7. When a step ends, the script says `Look at the robot now. Question in 3.. 2.. 1..`, then asks its question. The robot is stopped and waiting for the button, so you can answer, measure and reset the robot without hurrying. Each answer is saved as a `[MEASURED]` line.
+8. Stops by itself at the end of the S2 tests and prints where the log is: `testing\subsystem2\logs\<date>_s2_<test>.txt`.
 
 **Send me that log file.** It holds the commit, your setup, the Pico's output and your measurements, so nothing else is needed.
 
@@ -70,34 +71,36 @@ Every test image runs the automatic `unit` checks first (about 10 s, motors stil
 
 - **Why:** if a wheel turns the wrong way, every MOVE and TURN is wrong. Do this before any floor test.
 - **Setup:** put the robot on a box so both wheels hang free. Stand **behind** the robot, its front pointing away from you. "Forward" for a wheel then means the top of the tyre moves **away** from you.
-- **Takes:** about 40 s.
-- **What happens:** the LEFT wheel runs forward for 3 s, backward for 3 s, then forward faster for 3 s, with a 1 s pause after each. Then the RIGHT wheel does the same.
-- **You do:** watch. After each wheel's first run the script asks two questions:
-  1. Did that wheel turn the way that drives the robot **forward**?
-  2. Did **only** that wheel turn?
-- **Good result:** both `S2-U06` lines PASS and `y` to every question. If a wheel turned backward, do not do the floor tests; tell me and I flip that wheel in software.
+- **Takes:** about 2 minutes (6 runs, each started by Button 1).
+- **What happens:** LEFT forward, LEFT reverse, LEFT forward fast, then the same for RIGHT. Each run is 3 s.
+- **You do:** press Button 1 for each run and watch that wheel. After each run the script asks:
+  1. After FORWARD: did it turn the way that drives the robot **forward**, and did **only** that wheel turn?
+  2. After REVERSE: did it turn the **opposite** way?
+  3. After FAST: forward again, and faster?
+- **Good result:** every `S2-U06` line PASS and `y` to every question. The PASS only proves the encoder counted; the **direction is only checked by your eyes**, because the encoders cannot tell direction. If a wheel turns the wrong way, stop and tell me.
 
 ### Test 3: `u02` speed controller (S2-U02). Wheels lifted.
 
 - **Why:** first real check of the speed controller (NFR4: within 10 % of the target in 0.5 s).
 - **Setup:** same as `u06`.
-- **Takes:** about 10 s. Both wheels spin for 1.5 s.
-- **You do:** nothing.
-- **Good result:** `S2-U02 PASS`. The `[S2-U02]` lines are the speed every 20 ms, which I use to tune.
+- **Takes:** about 15 s after you press Button 1. Both wheels spin for 1.5 s.
+- **You do:** press Button 1, then watch both wheels from behind. Afterwards the script asks whether both turned the way that drives the robot **forward**.
+- **Good result:** `S2-U02 PASS` and `y`. The `[S2-U02]` lines are the speed every 20 ms, which I use to tune.
 
 ### Test 4: `u11` MOVE distance and straightness (S2-U11). On the floor.
 
 - **Why:** everyone uses the robot's distance (Sean's junction and barcode distances, Kessler's hump height, Anna's obstacle depth). This test checks it against a tape measure.
 - **Setup:**
-  1. Lay the tape measure flat and straight on the floor. Tape it down at both ends and in the middle. The 0 mark is the start. Leave 1.5 m clear ahead and 0.6 m behind.
-  2. Stick a small piece of masking tape on the robot's front, exactly in the middle, with a pen line on it. This is the **marker**.
-  3. Place the robot so its centre line is over the tape (one wheel each side) and the marker is exactly on 0.
-- **Takes:** about 4 minutes (5 runs, 30 s countdown each).
+  1. **Space:** a clear, flat strip **1.6 m long and 0.6 m wide** (0.3 m each side of the tape), plus the robot's own length behind the 0 mark, and no obstacle at the far end. The robot drives 1.0 m and can drift a few cm sideways; the extra length is for it stopping a little late and for the cable.
+  2. Lay the tape measure flat and straight down the middle of that strip. Tape it down at both ends and in the middle. The 0 mark is the start.
+  3. Stick a small piece of masking tape on the robot's front, exactly in the middle, with a pen line on it. This is the **marker**.
+  4. Place the robot so its centre line is over the tape (one wheel each side) and the marker is exactly on 0.
+- **Takes:** about 5 minutes (5 runs, each started by Button 1).
 - **What happens:** runs 1-3 are MOVE 1000 mm at 300 mm/s, run 4 is MOVE 1000 mm at 150 mm/s, and run 5 is MOVE -300 mm (reverse).
 - **You do, after each run** (the script asks):
   1. **Tape reading** at the marker, in mm (for example `1004`).
   2. **Sideways offset:** with the ruler, how far the marker is from the tape's centre line, in mm. Use `+` if the robot ended to its own **left** of the line (as seen from behind the robot), `-` if right. Use `0` if exactly on it.
-  3. Put the robot back with the marker on 0.
+  3. Put the robot back with the marker on 0, then press Button 1 for the next run.
 
   **Before run 5 (reverse):** place the marker on **500** instead. The script takes 500 as the start and works out the real distance.
 - **Good result:** every `S2-U11` line PASS. The real (tape) distances tell me how to correct the encoder calibration. The sideways offsets show whether the robot drives straight.
@@ -109,31 +112,31 @@ Every test image runs the automatic `unit` checks first (about 10 s, motors stil
   1. Make a `+` on the floor with two 40 cm strips of masking tape, crossing at exactly 90 degrees (lay the A4 corner in the crossing). Label the four arms F (forward), L (left), R (right), B (back).
   2. Tape the 30 cm ruler on top of the robot along its centre line, sticking out past the front. This is the **pointer**.
   3. Place the robot so the middle of its axle (halfway between the two wheels) is over the crossing and the pointer lies exactly along arm F.
-- **Takes:** about 7 minutes (13 turns, 30 s countdown each).
+- **Takes:** about 8 minutes (13 turns, each started by Button 1).
 - **What happens:** 5 turns of +90 (left), 5 of -90 (right), then 3 of 180.
 - **You do, after each turn:**
   1. Put the protractor's centre on the crossing with its 0 line along the target arm: L after +90, R after -90, B after 180.
   2. Read the angle between the arm and the pointer, then type the **total angle turned**. For +90 that stopped 3 degrees short, type `87`. For 2 degrees too far, type `92`. For right turns type a negative number (`-88`). For 180, type for example `176` or `183`.
   3. If the robot slid a little off the crossing, read the pointer's **direction**, not where it is.
-  4. Line it up again on arm F before the countdown ends.
+  4. Line it up again on arm F, then press Button 1 for the next turn.
 - **Good result:** every `S2-U03` line PASS, and every number you typed within 85-95 (or -85 to -95) for 90-degree turns and 172-188 for 180. From your numbers I tune the stopping point and the track width.
 
 ### Test 6: `u12` braking, slow speeds, stall (S2-U12). On the floor.
 
 - **Why:** Anna's 150 mm stop distance only works if the robot brakes from 300 mm/s within 58 mm (NFR6). Her slow mode needs 150 mm/s to hold steady. A stalled wheel must stop everything (FR15).
-- **Setup:** 1 m clear in front. Put the robot back at the start during each countdown. Each step drives about 0.3-0.7 m.
+- **Setup:** 1 m clear in front. Put the robot back at the start before pressing Button 1 for each step. Each step drives about 0.1-0.7 m. Have the box ready for the last step.
 - **Takes:** about 5 minutes.
 - **What happens and what you do:**
   1. Drive 300 mm/s, then STOP. Did the wheels skid? (y/n)
   2. Drive 300 mm/s, then emergency stop. Did the wheels skid? (y/n)
   3. Drive 150 mm/s, then STOP. Did the wheels skid? (y/n)
-  4. Drive at 40, 60, 100, then 150 mm/s for 2 s each. After each, did it move smoothly, without stopping or jerking? (y/n)
-  5. **Stall:** it drives at 150 mm/s and prints `HOLD the LEFT wheel now`. Pick the robot up (the wheels keep turning slowly in the air) and pinch the **left** tyre firmly between finger and thumb so it stops. Within about 1 s the motors stop and `STALL` appears. Let go and put the robot down.
+  4. Drive at 40, 60, 100, then 150 mm/s, 2 s each, one step each. After each, did it move smoothly, without stopping or jerking? (y/n)
+  5. **Stall:** put the robot on the box with both wheels free, then press Button 1. After `GO` both wheels turn slowly and it prints `HOLD the LEFT tyre now`. Pinch the **left** tyre firmly between finger and thumb so it stops. Within about 1 s both motors stop by themselves and `STALL` appears. Let go. The script asks whether both wheels stopped.
 - **Good result:** every `S2-U12` line PASS: braking distance from 300 mm/s of at most 58 mm, 150 mm/s held within 10 %, stall detected. Give the braking distance to Anna too.
 
 ### Optional: `u01` encoder ticks per wheel revolution (S2-U01)
 
-The calibration from 15 October is good enough, and `u11` checks it better. Do this only if I ask. Put a tape mark on each tyre. When `GO: turn the LEFT wheel` appears, turn the left wheel slowly by hand exactly 10 times (count the mark), keeping the right wheel still. Then do the same for the right wheel. Type how many turns you really made.
+The calibration from 15 October is good enough, and `u11` checks it better. Do this only if I ask. Put a tape mark on each tyre. At the `NEXT: S2-U01 turn the LEFT wheel` banner, press Button 1. After `GO`, turn the left wheel slowly by hand exactly 10 times (count the mark) within 40 s, keeping the right wheel still. Then do the same for the right wheel. Type how many turns you really made.
 
 ### PC only: `u09` simulation (S2-U09)
 
@@ -162,3 +165,5 @@ Write these down and send them with the logs.
 | The robot drives off or misbehaves            | Switch the Robo Pico off with its power switch. Send me the log (it is saved up to that moment).                                                                                 |
 | A step was measured wrongly                   | Finish the run, run the test again, and tell me which log to use.                                                                                                                |
 | Uncommitted-changes warning                   | Commit first (or ask me), unless it is only a practice run.                                                                                                                      |
+| Pressing Button 1 does nothing                | Press firmly and hold for half a second. Button 1 is the one labelled GP20 (not GP21, not RESET). If still nothing, send me the log.                                             |
+| You started a step by mistake                 | Switch the robot off, run the test again, and tell me which log to use.                                                                                                          |

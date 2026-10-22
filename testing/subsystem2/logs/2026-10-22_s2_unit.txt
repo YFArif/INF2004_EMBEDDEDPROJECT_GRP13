@@ -1,0 +1,54 @@
+=== S2 test log ===
+test:     unit  (S2-U08 U05 U07 U10 automatic checks)
+date:     2026-10-22 22:18:18
+commit:   de44e54  (S2 code committed)
+tester:   Arif
+supply:   power bank on VIN + USB cable to the laptop; VIN = skipped V
+notes:    
+[build] rc=0
+[build] ---- last lines of the build:
+[build] make: Nothing to be done for 'all'.
+switch:   none (automatic tests only)
+image:    mtk3pico_smp1_usb_cdc_wifi_test.uf2, built 22:11:46
+port:     COM5
+=== Pico output and [MEASURED] values ===
+
+
+microT-Kernel Version 3.00
+
+
+=== micro T-Kernel on Raspberry Pi Pico W (spec 0x6300, product 0x0003) ===
+dual-core (SMP) build, usermain on core 0
+encoder: GP16/GP17 edge interrupt on core 1
+all subsystems started
+
+motion_task: core 1, period 20 ms
+[TEST] === test run start ===
+monitor: I am task 8
+[TEST] S1-U01 PASS  cyclic handler is running
+wifi: cyw43_utk_task starting (proc 1)
+wifi: cyw43_init() ...
+wifi: cyw43_init() returned, bringing interface up ...
+[TEST] S1-U02 PASS  LED task sleeps between ticks
+[TEST] subsystem1 SUMMARY 2 passed, 0 failed
+monitor: batch  n=5 last=40 from core 1
+monitor: t=3355771096 ms  samples=5  min=0 max=40 avg=20  free slots=4  free blocks=4
+
+[TEST] subsystem2 tests start
+[TEST] S2 INFO encoder interrupt on core 1 (A4 wants core 1)
+monitor: batch  n=10 last=90 from core 1
+monitor: t=3355772646 ms  samples=10  min=0 max=90 avg=45  free slots=4  free blocks=4
+[TEST] S2-U08 INFO timer counted 1009672 in 1000 ms; WATCHDOG TICK at boot 0x660c (12 cycles = 0x..0c)
+[TEST] S2-U08 PASS  1 MHz timer runs at 1 MHz against the kernel clock
+monitor: batch  n=15 last=60 from core 1
+monitor: t=3355774196 ms  samples=15  min=0 max=100 avg=56  free slots=4  free blocks=4
+[TEST] S2-U05 INFO 50 motion cycles in 1000 ms, longest cycle 304 us
+[TEST] S2-U05 PASS  motion_task runs every 20 ms (48-52 cycles per second)
+[TEST] S2-U05 INFO 20 trials: worst 176 us, mean 135 us (limit 20000 us)
+[TEST] S2-U05 PASS  MF_ESTOP brakes within one cycle, 20 of 20 trials
+[TEST] S2-U07 INFO 4 of 4 steps passed
+[TEST] S2-U07 PASS  E-stop latch and CLEAR protocol
+[TEST] S2-U10 INFO longest cycle 304 us (limit 4000), stack 432 of 2176 bytes = 19 % (limit 75 %), 309 cycles
+[TEST] S2-U10 PASS  NFR11: longest motion cycle <= 4000 us, stack <= 75 %
+[TEST] subsystem2 SUMMARY 5 passed, 0 failed
+[RESULT] finished: 5 S2 checks passed, 0 failed

@@ -175,6 +175,7 @@ void s2_odom_get(subsystem2_odom_t * p_odom);
 
 uint32_t subsystem2_stack_used(void);
 void     subsystem2_floor_test(void);       /* make TEST=1 only.          */
+void     subsystem2_step_ready(char const * p_next);    /* TEST=1 only.  */
 void     subsystem2_cycle_wait(bool b_estop_wakes);
 bool     subsystem2_cmd_receive(subsystem2_cmd_t * p_cmd);
 void     subsystem2_odom_put(subsystem2_odom_t const * p_odom,

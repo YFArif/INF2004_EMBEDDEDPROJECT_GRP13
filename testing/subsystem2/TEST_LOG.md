@@ -33,3 +33,9 @@ Add a new row for every run. Never edit or delete old rows.
 | ---------- | ------- | --------- | ------ | ----------- | ----------------------- | ----- |
 | YYYY-MM-DD | S2-U01  | `abc1234` |        | PASS / FAIL | `logs/YYYY-MM-DD_….txt` |       |
 | 2026-10-22 | S2-U09  | `0d5f601` | Arif (run by Copilot in WSL) | PASS | `logs/2026-10-22_host_test_motion.txt` | 32 of 32 checks; simulated robot, gcc 13.3 with ASan/UBSan. Earlier runs during development found the weak PI, the ramp wind-up and the 3 deg TURN overshoot, fixed in `081d9d7` |
+| 2026-10-22 | S2-U08  | `de44e54` | Arif | PASS | `logs/2026-10-22_s2_unit.txt` | 1009672 counts in 1000 ms. Power bank on VIN + USB; VIN not measured |
+| 2026-10-22 | S2-U05  | `de44e54` | Arif | PASS | `logs/2026-10-22_s2_unit.txt` | 50 cycles/s; E-stop latency worst 176 us, mean 135 us (limit 20000) |
+| 2026-10-22 | S2-U07  | `de44e54` | Arif | PASS | `logs/2026-10-22_s2_unit.txt` | 4 of 4 steps |
+| 2026-10-22 | S2-U10  | `de44e54` | Arif | PASS | `logs/2026-10-22_s2_unit.txt` | longest cycle 304 us (limit 4000); stack 432 of 2176 B = 19 % (limit 75 %) |
+| 2026-10-22 | S2-U06  | `de44e54` | Arif | FAIL | `logs/2026-10-22_s2_u06.txt` | Encoder checks passed (L 1035 / 2042 ticks/s, R 1061 / 2067 at duty 400 / 800, other wheel 0), but the RIGHT wheel turned BACKWARD for a positive duty (seen by eye; the encoders cannot see direction). Fixed by `DRV_MOTOR_INVERT_RIGHT` = 1; re-run needed |
+| 2026-10-22 | S2-U02  | `de44e54` | Arif | FAIL | `logs/2026-10-22_s2_u02.txt`, `logs/2026-10-22_s2_u02_2.txt` | Speed control met NFR4 in both runs (within 10 % by 160-200 ms, steady +/-2 mm/s, no overshoot), but the right wheel ran backward (same cause as S2-U06), so the test is not valid. Re-run after the fix |

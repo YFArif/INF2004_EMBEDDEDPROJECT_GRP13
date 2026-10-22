@@ -31,9 +31,12 @@ typedef enum
 
 #define DRV_MOTOR_DUTY_MAX      (1000)  /* Permille, in either direction. */
 
-/* Set to 1 if that wheel turns backward for a positive duty (S2-U06). */
+/* Set to 1 if that wheel turns backward for a positive duty (S2-U06).
+ * Right: S2-U06 on 2026-10-22 (log 2026-10-22_s2_u06.txt) showed the right
+ * wheel turning backward for a positive duty. The single-phase encoders
+ * cannot see direction, so only that visual check can find this. */
 #define DRV_MOTOR_INVERT_LEFT   (0)
-#define DRV_MOTOR_INVERT_RIGHT  (0)
+#define DRV_MOTOR_INVERT_RIGHT  (1)
 
 void drv_motor_init(void);
 void drv_motor_set(drv_motor_t motor, int32_t duty_permille);
