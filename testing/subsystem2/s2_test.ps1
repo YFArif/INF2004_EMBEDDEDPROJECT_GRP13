@@ -308,13 +308,13 @@ try
         $switchNote = "$($t.Switch) = $($t.Value) in $($t.File), set for this build only"
     }
 
-    $started = Get-Date
     try
     {
         $result = Invoke-Wsl ("cd '$wslRoot/build_make' && " +
                               'export PICO_SDK_PATH=${PICO_SDK_PATH:-$HOME/pico/pico-sdk} && ' +
                               'make TEST=1 -j8 > /tmp/s2_make.log 2>&1; echo rc=$?; ' +
-                              'grep -iE ''error|warning'' /tmp/s2_make.log | head -20')
+                              'grep -iE ''error|warning'' /tmp/s2_make.log | head -20; ' +
+                              'echo ---- last lines of the build:; tail -n 4 /tmp/s2_make.log')
     }
     finally
     {
@@ -325,13 +325,16 @@ try
     }
 
     $result | ForEach-Object { Write-Host "  $_" }
-    if (-not ($result -contains 'rc=0') -or
-        ((Get-Item $image).LastWriteTime -lt $started))
+    $result | ForEach-Object { Write-Log "[build] $_" }
+
+    # make's own exit code decides. An unchanged source gives "up to date"
+    # and an image with an older time stamp, which is correct.
+    if (-not ($result -contains 'rc=0') -or -not (Test-Path $image))
     {
         throw 'The build failed (see the lines above, or /tmp/s2_make.log in WSL).'
     }
     $built = (Get-Item $image).LastWriteTime.ToString('HH:mm:ss')
-    Write-Host "Built $([System.IO.Path]::GetFileName($image)) at $built" -ForegroundColor Green
+    Write-Host "Using $([System.IO.Path]::GetFileName($image)) (built $built)" -ForegroundColor Green
     Write-Log "switch:   $switchNote"
     Write-Log "image:    $([System.IO.Path]::GetFileName($image)), built $built"
 
