@@ -1,0 +1,36 @@
+(Run 2 of the motion_task test image, 2026-10-22 18:45, uncommitted working tree.
+ Image: mtk3pico_smp1_usb_cdc_wifi_test.uf2 with S2-U08 added. Motors braked throughout.
+ WATCHDOG TICK 0x360c = 12 cycles, enabled, running: already 1 MHz at boot, so
+ drv_encoder_init() wrote nothing. Run 1's 1-2 us latency is therefore not explained
+ by the timer rate.)
+
+[TEST] subsystem2 tests start
+[TEST] S2 INFO encoder interrupt on core 1 (A4 wants core 1)
+monitor: batch  n=25 last=40 from core 1
+monitor: t=3355777296 ms  samples=25  min=0 max=100 avg=44  free slots=4  free blocks=4
+[TEST] S2-U08 INFO timer counted 1009751 in 1000 ms; WATCHDOG TICK was 0x360c at boot, now 12 cycles
+[TEST] S2-U08 PASS  1 MHz timer runs at 1 MHz against the kernel clock
+[TEST] S2-U05 PASS  motion_task runs every 20 ms
+[TEST] S2-U05 INFO 20 trials: worst 199 us, mean 53 us (limit 20000 us)
+[TEST] S2-U05 PASS  MF_ESTOP brakes within one cycle, 20 of 20 trials
+[TEST] S2-U07 INFO 4 of 4 steps passed
+[TEST] S2-U07 PASS  E-stop latch and CLEAR protocol
+[TEST] subsystem2 SUMMARY 4 passed, 0 failed
+monitor: batch  n=30 last=90 from core 1
+monitor: t=3355778846 ms  samples=30  min=0 max=100 avg=48  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+monitor: batch  n=35 last=60 from core 1
+monitor: t=3355780396 ms  samples=35  min=0 max=100 avg=52  free slots=4  free blocks=4
+[TEST] INT-01 PASS  samples flow from subsystem 2 to subsystem 3
+[TEST] S3-U01 PASS  min <= max, both within 0..100
+[TEST] subsystem3 SUMMARY 2 passed, 0 failed
+[TEST] S4-U01 PASS  message buffer max line = S4_SUMMARY_MAX
+monitor: batch  n=40 last=10 from core 1
+monitor: t=3355781946 ms  samples=40  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: batch  n=45 last=40 from core 1
+monitor: t=3355783496 ms  samples=45  min=0 max=100 avg=46  free slots=4  free blocks=4
+[TEST] INT-02 PASS  summary lines flow from subsystem 3 to subsystem 4
+[TEST] subsystem4 SUMMARY 2 passed, 0 failed
+[TEST] S5-U01 PASS  example: running in a task context
+[TEST] subsystem5 SUMMARY 1 passed, 0 failed
+[TEST] === test run end ===

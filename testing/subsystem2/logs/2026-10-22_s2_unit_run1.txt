@@ -1,0 +1,42 @@
+---- Opened the serial port COM5 ----
+(Run 1 of the motion_task test image, 2026-10-22 18:33, uncommitted working tree.
+ Image: mtk3pico_smp1_usb_cdc_wifi_test.uf2 built 17:54. Motors braked throughout.
+ The S2-U05 latency figure is not trusted: the TIMER tick was not yet set to 1 MHz; see S2-U08.)
+
+[TEST] subsystem2 tests start
+[TEST] S2 INFO encoder interrupt on core 1 (A4 wants core 1)
+[TEST] S2-U05 PASS  motion_task runs every 20 ms
+monitor: alarm -- no batch for 2000 ms
+monitor: t=3355773876 ms  samples=4  min=0 max=30 avg=15  free slots=0  free blocks=0
+[TEST] S2-U05 INFO 20 trials: worst 2 us, mean 1 us (limit 20000 us)
+[TEST] S2-U05 PASS  MF_ESTOP brakes within one cycle, 20 of 20 trials
+[TEST] S2-U07 INFO 4 of 4 steps passed
+[TEST] S2-U07 PASS  E-stop latch and CLEAR protocol
+[TEST] subsystem2 SUMMARY 3 passed, 0 failed
+monitor: alarm -- no batch for 2000 ms
+monitor: t=3355775886 ms  samples=4  min=0 max=30 avg=15  free slots=0  free blocks=0
+[TEST] INT-01 FAIL  samples flow from subsystem 2 to subsystem 3   (../app_program/subsystem3/subsystem3_test.c:34)
+[TEST] S3-U01 PASS  min <= max, both within 0..100
+[TEST] subsystem3 SUMMARY 1 passed, 1 failed
+[TEST] S4-U01 PASS  message buffer max line = S4_SUMMARY_MAX
+monitor: batch  n=5 last=40 from core 1
+monitor: t=3355776346 ms  samples=8  min=0 max=70 avg=35  free slots=3  free blocks=4
+monitor: batch  n=10 last=90 from core 1
+monitor: t=3355776656 ms  samples=10  min=0 max=90 avg=45  free slots=4  free blocks=4
+monitor: batch  n=15 last=60 from core 1
+monitor: t=3355778206 ms  samples=15  min=0 max=100 avg=56  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+monitor: batch  n=20 last=10 from core 1
+monitor: t=3355779756 ms  samples=20  min=0 max=100 avg=50  free slots=4  free blocks=4
+[TEST] INT-02 PASS  summary lines flow from subsystem 3 to subsystem 4
+[TEST] subsystem4 SUMMARY 2 passed, 0 failed
+[TEST] S5-U01 PASS  example: running in a task context
+[TEST] subsystem5 SUMMARY 1 passed, 0 failed
+[TEST] === test run end ===
+monitor: batch  n=25 last=40 from core 1
+monitor: t=3355781306 ms  samples=25  min=0 max=100 avg=44  free slots=4  free blocks=4
+monitor: batch  n=30 last=90 from core 1
+monitor: t=3355782856 ms  samples=30  min=0 max=100 avg=48  free slots=4  free blocks=4
+monitor: batch  n=35 last=60 from core 1
+monitor: t=3355784406 ms  samples=35  min=0 max=100 avg=52  free slots=4  free blocks=4
+---- Closed the serial port COM5 ----

@@ -1,0 +1,120 @@
+=== S2 test log ===
+test:     u06  (S2-U06 open-loop motor drive)
+date:     2026-10-22 22:23:10
+commit:   de44e54  (S2 code committed)
+tester:   Arif
+supply:   power bank on VIN + USB cable to the laptop; VIN = skipped V
+notes:    
+[build] rc=0
+[build] ---- last lines of the build:
+[build]    text	   data	    bss	    dec	    hex	filename
+[build]  295180	    356	  26768	 322304	  4eb00	mtk3pico_smp1_usb_cdc_wifi_test.elf
+[build] tools/elf2uf2 mtk3pico_smp1_usb_cdc_wifi_test.elf mtk3pico_smp1_usb_cdc_wifi_test.uf2
+[build]  
+switch:   S2_U06_BENCH = 1 in subsystem2_test.c, set for this build only
+image:    mtk3pico_smp1_usb_cdc_wifi_test.uf2, built 22:23:46
+port:     COM5
+=== Pico output and [MEASURED] values ===
+
+
+microT-Kernel Version 3.00
+
+
+=== micro T-Kernel on Raspberry Pi Pico W (spec 0x6300, product 0x0003) ===
+dual-core (SMP) build, usermain on core 0
+encoder: GP16/GP17 edge interrupt on core 1
+all subsystems started
+
+motion_task: core 1, period 20 ms
+[TEST] === test run start ===
+monitor: I am task 8
+[TEST] S1-U01 PASS  cyclic handler is running
+wifi: cyw43_utk_task starting (proc 1)
+wifi: cyw43_init() ...
+wifi: cyw43_init() returned, bringing interface up ...
+[TEST] S1-U02 PASS  LED task sleeps between ticks
+[TEST] subsystem1 SUMMARY 2 passed, 0 failed
+monitor: batch  n=5 last=40 from core 1
+monitor: t=3355771096 ms  samples=5  min=0 max=40 avg=20  free slots=4  free blocks=4
+
+[TEST] subsystem2 tests start
+[TEST] S2 INFO encoder interrupt on core 1 (A4 wants core 1)
+monitor: batch  n=10 last=90 from core 1
+monitor: t=3355772646 ms  samples=10  min=0 max=90 avg=45  free slots=4  free blocks=4
+[TEST] S2-U08 INFO timer counted 1009731 in 1000 ms; WATCHDOG TICK at boot 0x2e0c (12 cycles = 0x..0c)
+[TEST] S2-U08 PASS  1 MHz timer runs at 1 MHz against the kernel clock
+[TEST] S2-U05 INFO 51 motion cycles in 1000 ms, longest cycle 315 us
+[TEST] S2-U05 PASS  motion_task runs every 20 ms (48-52 cycles per second)
+monitor: batch  n=15 last=60 from core 1
+monitor: t=3355774196 ms  samples=15  min=0 max=100 avg=56  free slots=4  free blocks=4
+[TEST] S2-U05 INFO 20 trials: worst 102 us, mean 59 us (limit 20000 us)
+[TEST] S2-U05 PASS  MF_ESTOP brakes within one cycle, 20 of 20 trials
+[TEST] S2-U07 INFO 4 of 4 steps passed
+[TEST] S2-U07 PASS  E-stop latch and CLEAR protocol
+
+[S2-U06] LEFT motor: wheel must be off the ground
+monitor: batch  n=20 last=10 from core 1
+monitor: t=3355775746 ms  samples=20  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: batch  n=25 last=40 from core 1
+monitor: t=3355777296 ms  samples=25  min=0 max=100 avg=44  free slots=4  free blocks=4
+[S2-U06] LEFT FORWARD: should drive the robot forward
+monitor: batch  n=30 last=90 from core 1
+monitor: t=3355778846 ms  samples=30  min=0 max=100 avg=48  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+monitor: batch  n=35 last=60 from core 1
+monitor: t=3355780396 ms  samples=35  min=0 max=100 avg=52  free slots=4  free blocks=4
+monitor: batch  n=40 last=10 from core 1
+monitor: t=3355781946 ms  samples=40  min=0 max=100 avg=50  free slots=4  free blocks=4
+[S2-U06]   duty 400: 1035 ticks/s = 320 mm/s, other wheel 0 ticks
+[MEASURED] LEFT FORWARD drives the robot forward: y; only that wheel turned: y
+[S2-U06] LEFT REVERSE
+monitor: batch  n=45 last=40 from core 1
+monitor: t=3355783496 ms  samples=45  min=0 max=100 avg=46  free slots=4  free blocks=4
+monitor: batch  n=50 last=90 from core 1
+monitor: t=3355785046 ms  samples=50  min=0 max=100 avg=49  free slots=4  free blocks=4
+[S2-U06]   duty -400: 1030 ticks/s = 318 mm/s, other wheel 0 ticks
+[S2-U06] LEFT FORWARD at double duty
+monitor: batch  n=55 last=60 from core 1
+monitor: t=3355786596 ms  samples=55  min=0 max=100 avg=51  free slots=4  free blocks=4
+monitor: batch  n=60 last=10 from core 1
+monitor: t=3355788146 ms  samples=60  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: LED task resumed, state=RUN, pri=12
+monitor: batch  n=65 last=40 from core 1
+monitor: t=3355789696 ms  samples=65  min=0 max=100 avg=47  free slots=4  free blocks=4
+[S2-U06]   duty 800: 2042 ticks/s = 632 mm/s, other wheel 0 ticks
+[TEST] S2-U06 PASS  left motor turned the left encoder
+
+[S2-U06] RIGHT motor: wheel must be off the ground
+monitor: batch  n=70 last=90 from core 1
+monitor: t=3355791246 ms  samples=70  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: batch  n=75 last=60 from core 1
+monitor: t=3355792796 ms  samples=75  min=0 max=100 avg=51  free slots=4  free blocks=4
+[S2-U06] RIGHT FORWARD: should drive the robot forward
+monitor: batch  n=80 last=10 from core 1
+monitor: t=3355794346 ms  samples=80  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: batch  n=85 last=40 from core 1
+monitor: t=3355795896 ms  samples=85  min=0 max=100 avg=48  free slots=4  free blocks=4
+[S2-U06]   duty 400: 1061 ticks/s = 333 mm/s, other wheel 0 ticks
+[MEASURED] RIGHT FORWARD drives the robot forward: n; only that wheel turned: y
+[S2-U06] RIGHT REVERSE
+monitor: batch  n=90 last=90 from core 1
+monitor: t=3355797446 ms  samples=90  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+monitor: batch  n=95 last=60 from core 1
+monitor: t=3355798996 ms  samples=95  min=0 max=100 avg=51  free slots=4  free blocks=4
+monitor: batch  n=100 last=10 from core 1
+monitor: t=3355800546 ms  samples=100  min=0 max=100 avg=50  free slots=4  free blocks=4
+[S2-U06]   duty -400: 1056 ticks/s = 332 mm/s, other wheel 0 ticks
+[S2-U06] RIGHT FORWARD at double duty
+monitor: batch  n=105 last=40 from core 1
+monitor: t=3355802096 ms  samples=105  min=0 max=100 avg=48  free slots=4  free blocks=4
+monitor: batch  n=110 last=90 from core 1
+monitor: t=3355803646 ms  samples=110  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: batch  n=115 last=60 from core 1
+monitor: t=3355805196 ms  samples=115  min=0 max=100 avg=50  free slots=4  free blocks=4
+[S2-U06]   duty 800: 2067 ticks/s = 650 mm/s, other wheel 0 ticks
+[TEST] S2-U06 PASS  right motor turned the right encoder
+[TEST] S2-U10 INFO longest cycle 315 us (limit 4000), stack 432 of 2176 bytes = 19 % (limit 75 %), 1793 cycles
+[TEST] S2-U10 PASS  NFR11: longest motion cycle <= 4000 us, stack <= 75 %
+[TEST] subsystem2 SUMMARY 7 passed, 0 failed
+[RESULT] finished: 7 S2 checks passed, 0 failed

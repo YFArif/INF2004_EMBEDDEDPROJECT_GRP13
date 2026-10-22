@@ -60,6 +60,16 @@
 #define SIO_GPIO_IN_REG     (0xD0000004u)
 #define TIMER_RAWL_REG      (0x40054028u)
 
+/* WATCHDOG TICK (datasheet 4.7.6): the tick generator that clocks the
+ * TIMER. The kernel does not set it; on this board it was already 12
+ * cycles at boot (S2-U08 read 0x360c). It is checked and enforced here
+ * because every encoder time depends on it: clk_ref is the 12 MHz
+ * crystal (kernel cpu_clock.c), and 12 cycles per tick give 1 MHz. */
+#define WATCHDOG_TICK_REG   (0x4005802Cu)
+#define TICK_ENABLE_BIT     (0x00000200u)
+#define TICK_CYCLES_MASK    (0x000001FFu)
+#define TICK_CYCLES_1MHZ    (12u)
+
 /* Interrupt number of IO_IRQ_BANK0, and the level the kernel's own
  * UART / ADC / I2C drivers use. */
 #define INTNO_IO_BANK0      (13u)
@@ -85,7 +95,10 @@ static volatile encoder_state_t g_encoder[DRV_ENCODER_COUNT] =
 
 static uint32_t g_reg_ints  = IO_PROC0_INTS2_REG;
 static uint32_t g_all_edges = 0u;
+static uint32_t g_core      = UINT32_MAX;   /* Not set up yet.          */
+static uint32_t g_tick_was  = 0u;           /* TICK before the fix.     */
 
+static void     timer_tick_setup(void);
 static void     encoder_isr(UINT intno);
 static void     encoder_event(volatile encoder_state_t * p_state,
                               uint32_t events, uint32_t levels,
@@ -122,6 +135,7 @@ drv_encoder_init (void)
     core = (uint32_t) tk_get_prc() - 1u;
 #endif
 
+    timer_tick_setup();
     if (0u != core)
     {
         reg_inte   = IO_PROC1_INTE2_REG;
@@ -165,6 +179,7 @@ drv_encoder_init (void)
         ClearInt(INTNO_IO_BANK0);
         out_w(reg_inte + ALIAS_SET, g_all_edges);
         EnableInt(INTNO_IO_BANK0, ENCODER_INT_LEVEL);  /* This core.     */
+        g_core = core;
 
         // NOTE: The cast is safe: format strings are ASCII, and every
         // value is below 32, which an int always holds.
@@ -217,6 +232,47 @@ uint32_t
 drv_encoder_now_us (void)
 {
     return (in_w(TIMER_RAWL_REG));
+}
+
+/*!
+ * @brief Core that takes the encoder interrupt (evidence for A4).
+ *
+ * @return 0 or 1, or UINT32_MAX if drv_encoder_init() has not succeeded.
+ */
+uint32_t
+drv_encoder_core (void)
+{
+    return (g_core);
+}
+
+/*!
+ * @brief WATCHDOG TICK register as it was before drv_encoder_init() set
+ *        it (evidence for the S2-U08 finding).
+ *
+ * @return The register value.
+ */
+uint32_t
+drv_encoder_tick_was (void)
+{
+    return (g_tick_was);
+}
+
+/*!
+ * @brief Make sure the TIMER counts at 1 MHz.
+ *
+ * NOTE: Writes only if the tick is not already 12 cycles and enabled.
+ * Only the tick generator is touched; the watchdog itself stays off.
+ */
+static void
+timer_tick_setup (void)
+{
+    g_tick_was = in_w(WATCHDOG_TICK_REG);
+
+    if ((TICK_CYCLES_1MHZ != (g_tick_was & TICK_CYCLES_MASK)) ||
+        (0u == (g_tick_was & TICK_ENABLE_BIT)))
+    {
+        out_w(WATCHDOG_TICK_REG, TICK_ENABLE_BIT | TICK_CYCLES_1MHZ);
+    }
 }
 
 /*!
