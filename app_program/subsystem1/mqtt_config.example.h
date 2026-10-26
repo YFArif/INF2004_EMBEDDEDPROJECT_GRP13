@@ -47,7 +47,7 @@
  */
 #define MQTT_LINK_CFG_CLIENT_ID         "robocar-buddy1"
 
-/* Topic prefix, at most 48 characters, with no leading or trailing slash and
+/* Topic prefix, at most 32 characters, with no leading or trailing slash and
  * no wildcard characters. Every topic the car publishes starts with it, and
  * it subscribes to "<prefix>/cmd/#".
  */

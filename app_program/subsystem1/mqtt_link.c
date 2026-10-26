@@ -84,8 +84,15 @@
  */
 #define CONNECT_TIMEOUT_MSEC    5000U
 
-/* MQTT keep-alive in seconds. lwIP drops a silent broker after 1.5 times
- * this, which is 7.5 s.
+/* MQTT keep-alive in seconds. lwIP checks it on a 5 s timer
+ * (MQTT_CYCLIC_TIMER_INTERVAL, mqtt_cyclic_timer() in lwIP's mqtt.c). With
+ * the keep-alive equal to the timer period, one tick always reaches it, so
+ * lwIP sends a PINGREQ on every tick, whatever else it has sent. It drops a
+ * silent broker on the second tick with nothing received from it (its test
+ * is ticks x 5 > 5 + 5 / 2 in whole seconds), so the car gives up 5 to 10 s
+ * after the last byte from the broker. The broker, for its part, publishes
+ * the last will once it has heard nothing from the car for 1.5 times this,
+ * 7.5 s (MQTT 3.1.1, section 3.1.2.10).
  */
 #define KEEPALIVE_SECONDS       5U
 
