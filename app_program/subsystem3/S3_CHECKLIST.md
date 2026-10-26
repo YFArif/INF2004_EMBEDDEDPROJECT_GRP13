@@ -2,15 +2,16 @@
 
 Tick a box only with evidence: a pasted log in `testing/subsystem3/TEST_LOG.md` and the git commit hash.
 
-## Builds (set `S3_TEST` at the top of `s3_bringup.c`, or flash the ready .uf2)
+## Builds (switches in `s3_config.h`)
 
-| S3_TEST | File | Wiring | Use |
-|---|---|---|---|
-| 0 | `S3_RUN_robot.uf2` | barcode DOUT GP6, AOUT GP26; Centre AOUT GP27; outer (robot's RIGHT) AOUT GP28 | the real subsystem |
-| 1 | `S3_TEST_BARCODE_desk.uf2` | DOUT GP26, AOUT GP27 | barcode bench test |
-| 2 | `S3_TEST_CENTRE_desk.uf2` | AOUT GP27 | one line sensor |
-| 3 | `S3_TEST_LEFT_desk.uf2` | AOUT GP28 | one line sensor |
-| 4 | `S3_ALL_robot_raw.uf2` | as 0 | raw numbers only |
+| Switch | main | Use |
+|---|---|---|
+| `S3_DRIVE_TEST` | 0 | 1 = Button 1 starts line following on Buddy 2's motors |
+| `S3_LINE_VERBOSE` | 1 | `S3 LINE` status every 200 ms (both sensors: zone, permille, calibration range) + events |
+| `S3_JUNC_DEBUG` | 1 | one `S3 JDBG` line per pass of the outer sensor over black |
+| `S3_BC_VERBOSE` | 0 | 1 = print every barcode attempt (digital and analogue result, fusion) for barcode tuning |
+
+The v15 desk builds (`S3_TEST` 1 to 4, one sensor on GP26/27/28) were removed in v16: the robot wiring with `S3_LINE_VERBOSE` and `S3_BC_VERBOSE` shows the same numbers.
 
 ## A. Barcode (write-up: barcode detection, decoding, navigation command generation)
 
@@ -57,14 +58,14 @@ Tick a box only with evidence: a pasted log in `testing/subsystem3/TEST_LOG.md` 
 
 - [ ] D1 Copy IF-01, IF-02, IF-07, IF-S3b..f from `s3_api.h` into TEAM.md section 5; team agrees
 - [ ] D2 Buddy 2 calls `s3_set_odometry()`; C6 passes after that
-- [ ] D3 Vehicle Controller (Anna) receives the 4-byte `S3_NAV_MSG` from `mbf_nav`, uses `s3_nav_msg_char()`, and turns correctly, 10/10
+- [ ] D3 Vehicle Controller (Anna) receives the 4-byte `s3_nav_msg_t` from `mbf_nav`, uses `s3_nav_msg_char()`, and turns correctly, 10/10
 - [ ] D4 Motion (Arif) reads `s3_get_steer_sp()` every control step and stops trusting it when `seq` stops changing (B5/B6)
 - [ ] D10 Vehicle Controller sets `flg_line` in the documented order (`LF_ENABLE` first, then clear `LF_SEARCH_x`)
 - [ ] D5 Buddy 1 publishes line state + last barcode over MQTT (telemetry)
 - [ ] D6 Shared GPIO interrupt (IO_IRQ_BANK0) merged with Buddy 2/5 encoders/ultrasonic (only ONE `tk_def_int` on IRQ 13 is allowed)
 - [ ] D7 ADC owner = S3 sampler interrupt; nobody else reads the ADC (TEAM.md section 3). Ask the team whether DEVCNF_USE_ADC can be set to 0 so the kernel ADC driver cannot be opened by mistake
 - [ ] D8 Tuning: Buddy 1's MQTT command handler calls `s3_set_line_gains(kp, kd)` / `s3_request_recalibrate()` (IF-S3e); tune from MQTT Explorer or a phone MQTT app — no custom frontend
-- [ ] D9 Only the Vehicle Controller waits on `flg_s3`; telemetry uses the counters in `S3_STATUS`
+- [ ] D9 Only the Vehicle Controller waits on `flg_s3`; telemetry uses the counters in `s3_line_status_t`
 
 ## E. Evidence for the Tribunal
 

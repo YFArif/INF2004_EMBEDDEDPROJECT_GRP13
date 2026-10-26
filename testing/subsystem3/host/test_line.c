@@ -2,7 +2,7 @@
  *	test_line.c -- host (laptop) unit test for s3_line.c and s3_nav.c
  *
  *	  gcc -std=c99 -Wall -Wextra -I../../../app_program/subsystem3 test_line.c \
- *	      ../../../app_program/subsystem3/s3_line.c ../../../app_program/subsystem3/s3_nav.c \
+ *	      ../../../app_program/subsystem3/s3_line.c ../../../app_program/subsystem3/s3_ir_cal.c ../../../app_program/subsystem3/s3_nav.c \
  *	      ../../../app_program/subsystem3/s3_code39.c \
  *	      -o tline && ./tline
  *
@@ -50,7 +50,7 @@ int main (void)
 {
     s3_line_t     ln;
     s3_line_out_t o;
-    s3_cal_t      c;
+    s3_ir_cal_t      c;
     int           i, ev, ok;
     int32_t       s10, s20;
 
@@ -118,19 +118,19 @@ int main (void)
     check("S3-L11", (0 == ev) && (S3_LN_FOLLOW == o.state), "30 mm white gap -> not lost");
 
     /* L12: relax never drops below the trusted range */
-    s3_cal_init(&c); s3_cal_learn(&c, 300U); s3_cal_learn(&c, 1000U);
-    for (i = 0; i < 200; i++) { s3_cal_learn(&c, 300U); s3_cal_learn(&c, 700U); s3_cal_relax(&c); }
+    s3_ir_cal_init(&c); s3_ir_cal_learn(&c, 300U); s3_ir_cal_learn(&c, 1000U);
+    for (i = 0; i < 200; i++) { s3_ir_cal_learn(&c, 300U); s3_ir_cal_learn(&c, 700U); s3_ir_cal_relax(&c); }
     check("S3-L12", (1U == c.valid) && ((uint32_t)(c.black - c.white) >= S3_LN_MIN_RANGE),
           "calibration relax keeps >= 600 counts range");
 
     /* L13: a one-off extreme (car lifted: 4000) fades once normal black returns */
-    s3_cal_init(&c); s3_cal_learn(&c, 200U); s3_cal_learn(&c, 4000U);
-    for (i = 0; i < 30; i++) { s3_cal_learn(&c, 200U); s3_cal_learn(&c, 3000U); s3_cal_relax(&c); }
+    s3_ir_cal_init(&c); s3_ir_cal_learn(&c, 200U); s3_ir_cal_learn(&c, 4000U);
+    for (i = 0; i < 30; i++) { s3_ir_cal_learn(&c, 200U); s3_ir_cal_learn(&c, 3000U); s3_ir_cal_relax(&c); }
     check("S3-L13", (c.black < 3100U) && (c.black >= 3000U), "lifted-car extreme fades to real black in 30 s");
 
     /* L14: a sensor that sees only white keeps its black level (Left sensor) */
-    s3_cal_init(&c); s3_cal_learn(&c, 200U); s3_cal_learn(&c, 3000U);
-    for (i = 0; i < 120; i++) { s3_cal_learn(&c, 210U); s3_cal_relax(&c); }
+    s3_ir_cal_init(&c); s3_ir_cal_learn(&c, 200U); s3_ir_cal_learn(&c, 3000U);
+    for (i = 0; i < 120; i++) { s3_ir_cal_learn(&c, 210U); s3_ir_cal_relax(&c); }
     check("S3-L14", 3000U == c.black, "2 min of white only -> black level unchanged");
 
     /* L15: drift onto the line / hard left curve: Centre black long before Left
@@ -173,9 +173,9 @@ int main (void)
     check("S3-L19", 0 == ev, "overshoot recovery (Left black first while Centre white) -> no junction");
 
     /* L20: stuck extreme (car lifted, black=3999) fades with real 500/2500 readings */
-    s3_cal_init(&c); s3_cal_learn(&c, 500U); s3_cal_learn(&c, 3999U);
-    for (i = 0; i < 60; i++) { s3_cal_learn(&c, 500U); s3_cal_learn(&c, 2500U); s3_cal_relax(&c); }
-    check("S3-L20", (c.black < 2600U) && (s3_cal_norm(&c, 2500U) > S3_LN_BLACK),
+    s3_ir_cal_init(&c); s3_ir_cal_learn(&c, 500U); s3_ir_cal_learn(&c, 3999U);
+    for (i = 0; i < 60; i++) { s3_ir_cal_learn(&c, 500U); s3_ir_cal_learn(&c, 2500U); s3_ir_cal_relax(&c); }
+    check("S3-L20", (c.black < 2600U) && (s3_ir_cal_norm(&c, 2500U) > S3_LN_BLACK),
           "black stuck at 3999 recovers within 60 s; real black reads black again");
 
     /* L21: coming back from LOST gives no D kick (steer = P only) */
@@ -259,9 +259,9 @@ int main (void)
     }
 
     /* L26: Change Requirement 1 -- packed sizes */
-    printf("  sizeof(s3_cal_t)=%u (was 14)  sizeof(s3_line_t)=%u (was 80)\n",
-           (unsigned)sizeof(s3_cal_t), (unsigned)sizeof(s3_line_t));
-    check("S3-L26", (8U == sizeof(s3_cal_t)) && (sizeof(s3_line_t) <= 44U), "calibration 14 -> 8 B, line state 80 -> <= 44 B");
+    printf("  sizeof(s3_ir_cal_t)=%u (was 14)  sizeof(s3_line_t)=%u (was 80)\n",
+           (unsigned)sizeof(s3_ir_cal_t), (unsigned)sizeof(s3_line_t));
+    check("S3-L26", (8U == sizeof(s3_ir_cal_t)) && (sizeof(s3_line_t) <= 44U), "calibration 14 -> 8 B, line state 80 -> <= 44 B");
 
     /* N01: barcode letter -> command */
     check("S3-N01", (S3_NAV_LEFT == s3_nav_from_char('A')) && (S3_NAV_RIGHT == s3_nav_from_char('B')) &&

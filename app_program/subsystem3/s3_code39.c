@@ -1,11 +1,16 @@
-/*
- *	s3_code39.c
- *	Subsystem 3 -- Code 39 frame decoder (pure C, no kernel calls).
+/** @file s3_code39.c
  *
- *	Speed-independent: in every 9-element symbol exactly 3 elements are
- *	wide, so the 3 longest durations are taken as wide.  A constant robot
- *	speed scales all durations equally and cancels out.
+ * @brief Subsystem 3 -- Code 39 frame decoder. See s3_code39.h.
+ *
+ * @par
+ * Speed-independent: in every 9-element symbol exactly 3 elements are
+ * wide, so the 3 longest durations are taken as wide. A constant robot
+ * speed scales all durations equally and cancels out.
  */
+
+#include <stddef.h>
+#include <stdint.h>
+
 #include "s3_code39.h"
 
 /* Element patterns, bar/space alternating starting with a bar, MSB first,
@@ -30,39 +35,41 @@ static s3_c39_entry_t const g_c39_table[] =
 };
 
 #define C39_TABLE_LEN   (sizeof(g_c39_table) / sizeof(g_c39_table[0]))
-#define SYMBOL_LEN      9U
+#define SYMBOL_LEN      (9u)
+#define WIDE_PER_SYMBOL (3u)
+#define SYMBOLS         (3u)    /* start, character, stop */
 
 static s3_c39_result_t
 decode_symbol (uint32_t const * p_el, char * p_char, uint32_t * p_min_wide)
 {
-    uint8_t  is_wide[SYMBOL_LEN] = {0U};
+    uint8_t  is_wide[SYMBOL_LEN] = {0u};
     uint32_t min_wide   = UINT32_MAX;
-    uint32_t max_narrow = 0U;
-    uint16_t pattern    = 0U;
+    uint32_t max_narrow = 0u;
+    uint16_t pattern    = 0u;
     uint32_t k;
     uint32_t i;
 
     /* Mark the 3 longest elements as wide. */
-    for (k = 0U; k < 3U; k++)
+    for (k = 0u; k < WIDE_PER_SYMBOL; k++)
     {
         uint32_t best = SYMBOL_LEN;
 
-        for (i = 0U; i < SYMBOL_LEN; i++)
+        for (i = 0u; i < SYMBOL_LEN; i++)
         {
-            if ((0U == is_wide[i]) &&
+            if ((0u == is_wide[i]) &&
                 ((SYMBOL_LEN == best) || (p_el[i] > p_el[best])))
             {
                 best = i;
             }
         }
-        is_wide[best] = 1U;
+        is_wide[best] = 1u;
     }
 
-    for (i = 0U; i < SYMBOL_LEN; i++)
+    for (i = 0u; i < SYMBOL_LEN; i++)
     {
         pattern = (uint16_t)((pattern << 1) | is_wide[i]);
 
-        if (1U == is_wide[i])
+        if (1u == is_wide[i])
         {
             min_wide = (p_el[i] < min_wide) ? p_el[i] : min_wide;
         }
@@ -72,12 +79,12 @@ decode_symbol (uint32_t const * p_el, char * p_char, uint32_t * p_min_wide)
         }
     }
 
-    if ((min_wide * 10U) < (max_narrow * S3_C39_RATIO_X10))
+    if ((min_wide * 10u) < (max_narrow * S3_C39_RATIO_X10))
     {
         return S3_C39_BAD_RATIO;
     }
 
-    for (i = 0U; i < C39_TABLE_LEN; i++)
+    for (i = 0u; i < C39_TABLE_LEN; i++)
     {
         if (g_c39_table[i].pattern == pattern)
         {
@@ -93,14 +100,15 @@ decode_symbol (uint32_t const * p_el, char * p_char, uint32_t * p_min_wide)
 static s3_c39_result_t
 decode_frame (uint32_t const * p_dur, char * p_char)
 {
-    char            sym[3];
-    uint32_t        min_wide[3];
+    char            sym[SYMBOLS];
+    uint32_t        min_wide[SYMBOLS];
     uint32_t        s;
     s3_c39_result_t res;
 
-    for (s = 0U; s < 3U; s++)
+    for (s = 0u; s < SYMBOLS; s++)
     {
-        res = decode_symbol(&p_dur[s * (SYMBOL_LEN + 1U)], &sym[s], &min_wide[s]);
+        res = decode_symbol(&p_dur[s * (SYMBOL_LEN + 1u)], &sym[s],
+                            &min_wide[s]);
         if (S3_C39_OK != res)
         {
             return res;
@@ -108,7 +116,8 @@ decode_frame (uint32_t const * p_dur, char * p_char)
     }
 
     /* The two inter-character gaps must be narrow. */
-    if ((p_dur[9] >= min_wide[0]) || (p_dur[19] >= min_wide[1]))
+    if ((p_dur[SYMBOL_LEN] >= min_wide[0]) ||
+        (p_dur[(2u * SYMBOL_LEN) + 1u] >= min_wide[1]))
     {
         return S3_C39_BAD_RATIO;
     }
@@ -130,7 +139,8 @@ s3_code39_decode (uint32_t const * p_dur, uint32_t count,
     uint32_t        i;
     s3_c39_result_t res;
 
-    if ((0 == p_dur) || (S3_C39_ELEMENTS != count))
+    if ((NULL == p_dur) || (NULL == p_char) || (NULL == p_reversed) ||
+        (S3_C39_ELEMENTS != count))
     {
         return S3_C39_BAD_COUNT;
     }
@@ -138,18 +148,18 @@ s3_code39_decode (uint32_t const * p_dur, uint32_t count,
     res = decode_frame(p_dur, p_char);
     if (S3_C39_OK == res)
     {
-        *p_reversed = 0U;
+        *p_reversed = 0u;
         return res;
     }
 
-    for (i = 0U; i < S3_C39_ELEMENTS; i++)
+    for (i = 0u; i < S3_C39_ELEMENTS; i++)
     {
-        rev[i] = p_dur[S3_C39_ELEMENTS - 1U - i];
+        rev[i] = p_dur[S3_C39_ELEMENTS - 1u - i];
     }
 
     if (S3_C39_OK == decode_frame(rev, p_char))
     {
-        *p_reversed = 1U;
+        *p_reversed = 1u;
         return S3_C39_OK;
     }
 
@@ -160,7 +170,7 @@ int s3_code39_pattern (char ch, uint16_t * p_pattern)
 {
     uint32_t i;
 
-    for (i = 0U; i < C39_TABLE_LEN; i++)
+    for (i = 0u; i < C39_TABLE_LEN; i++)
     {
         if (g_c39_table[i].ch == ch)
         {
@@ -175,7 +185,7 @@ uint8_t s3_code39_index (char ch)
 {
     uint32_t i;
 
-    for (i = 0U; i < C39_TABLE_LEN; i++)
+    for (i = 0u; i < C39_TABLE_LEN; i++)
     {
         if (g_c39_table[i].ch == ch)
         {
@@ -189,3 +199,5 @@ char s3_code39_char (uint8_t idx)
 {
     return (idx < C39_TABLE_LEN) ? g_c39_table[idx].ch : '?';
 }
+
+/*** end of file ***/

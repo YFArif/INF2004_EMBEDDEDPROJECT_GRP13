@@ -1,14 +1,40 @@
 /*
  *	task_consumer.c
- *	Subsystem 3 -- the consumer task.
+ *	Course template example (subsystem 3 "consumer"), unchanged apart
+ *	from moving its objects here from subsystem3.c.  See task_consumer.h.
  *
- *	APIs shown: tk_rcv_mbx, tk_rel_mpf, tk_sig_sem, tk_loc_mtx,
- *	            tk_unl_mtx, tk_snd_mbf, tk_set_flg
+ *	APIs shown: tk_cre_mbx, tk_cre_mtx, tk_rcv_mbx, tk_rel_mpf,
+ *	            tk_sig_sem, tk_loc_mtx, tk_unl_mtx, tk_snd_mbf, tk_set_flg
  */
 
 #include "subsystem3.h"
 #include "../subsystem2/subsystem2.h"	/* IF-01/02: SAMPLE_MSG, pool, slots */
 #include "../subsystem4/subsystem4.h"	/* IF-03: mbf_summary, flg_events */
+
+EXPORT ID		mbx_samples;	/* IF-01 */
+EXPORT ID		mtx_stats;	/* IF-04 */
+EXPORT APP_STATS	app_stats;
+
+EXPORT ER consumer_init(void)
+{
+	T_CMBX	cmbx = {0};
+	T_CMTX	cmtx = {0};
+
+	/* Mailbox: passes a POINTER to a message (zero copy).  The message
+	   memory must stay valid until the receiver is done with it, which
+	   is why subsystem 2 takes it from its memory pool. */
+	cmbx.mbxatr = TA_TFIFO | TA_MFIFO;	/* FIFO waiters, FIFO messages */
+	mbx_samples = tk_cre_mbx(&cmbx);
+	if (mbx_samples < E_OK) {
+		return mbx_samples;
+	}
+
+	/* Mutex: only one task at a time may touch app_stats.  TA_INHERIT
+	   (priority inheritance) avoids priority inversion. */
+	cmtx.mtxatr = TA_INHERIT;
+	mtx_stats = tk_cre_mtx(&cmtx);
+	return (mtx_stats < E_OK) ? mtx_stats : E_OK;
+}
 
 EXPORT void consumer_task(INT stacd, void *exinf)
 {

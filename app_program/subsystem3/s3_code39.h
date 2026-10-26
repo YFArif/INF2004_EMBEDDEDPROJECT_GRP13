@@ -1,18 +1,23 @@
-/*
- *	s3_code39.h
- *	Subsystem 3 -- Code 39 frame decoder (pure C, no kernel calls).
+/** @file s3_code39.h
  *
- *	Kept free of micro T-Kernel headers on purpose so the same file can be
- *	compiled and unit-tested on a laptop (testing/subsystem3/host/).
+ * @brief Subsystem 3 -- Code 39 frame decoder (pure C, no kernel calls,
+ *        unit-tested on a laptop: testing/subsystem3/host/test_code39.c).
+ *
+ * @par
+ * One frame is *X*: start, one character, stop = 3 symbols of 9 elements
+ * plus 2 narrow gaps = 29 durations. Both the digital and the analogue
+ * barcode path feed their durations here. Every character decodes read
+ * forwards or backwards.
  */
 #ifndef S3_CODE39_H
 #define S3_CODE39_H
 
 #include <stdint.h>
 
-#define S3_C39_ELEMENTS     29U   /* *X* = 3 symbols x 9 + 2 gaps          */
+#define S3_C39_ELEMENTS     (29u)   /* *X* = 3 symbols x 9 + 2 gaps          */
 #ifndef S3_C39_RATIO_X10
-#define S3_C39_RATIO_X10    13U   /* shortest wide >= 1.3 x longest narrow (sim: 0 wrong decodes) */
+#define S3_C39_RATIO_X10    (13u)   /* Shortest wide >= 1.3 x longest    */
+                                    /* narrow (sim: 0 wrong decodes).    */
 #endif
 
 typedef enum
@@ -42,10 +47,13 @@ s3_c39_result_t s3_code39_decode(uint32_t const * p_dur, uint32_t count,
 int s3_code39_pattern(char ch, uint16_t * p_pattern);
 
 /* 6-bit character code for packed messages (Change Requirement 1):
-   index 0..43 into the Code 39 table ('0'..'9','A'..'Z','-','.',' ','*','$','/','+','%').
+   index 0..43 into the Code 39 table
+   ('0'..'9', 'A'..'Z', '-', '.', ' ', '*', '$', '/', '+', '%').
    s3_code39_index returns 63 if the character is not in the table. */
-#define S3_C39_IDX_NONE   63U
+#define S3_C39_IDX_NONE     (63u)
 uint8_t s3_code39_index(char ch);
 char    s3_code39_char(uint8_t idx);     /* '?' for an invalid index */
 
 #endif /* S3_CODE39_H */
+
+/*** end of file ***/

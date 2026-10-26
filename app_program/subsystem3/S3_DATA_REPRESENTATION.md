@@ -1,6 +1,6 @@
 # Subsystem 3 (Buddy 3, Sean): Minimum-Bit Data Representation (Change Requirement 1)
 
-This covers firmware v14 (v14b after the review fixes). All numbers come from the build in `build_make` (`arm-none-eabi-size`) and the host tests in `testing/subsystem3/host`. Anything not measured is marked **UNVERIFIED**.
+This covers firmware v14 (v14b after the review fixes). v16 renamed the types to BARR-C names (`S3_NAV_MSG` → `s3_nav_msg_t`, `S3_STATUS` → `s3_line_status_t`, `s3_cal_t` → `s3_ir_cal_t`); sizes are unchanged. All numbers come from the build in `build_make` (`arm-none-eabi-size`) and the host tests in `testing/subsystem3/host`. Anything not measured is marked **UNVERIFIED**.
 
 ## 1. Summary
 
@@ -8,24 +8,24 @@ This covers firmware v14 (v14b after the review fixes). All numbers come from th
 |---|---|---|---|
 | S3 static RAM (data + bss of s3_*.o, RUN build) | 67,790 B | 9,678 B | −85.7 % |
 | Whole-firmware bss (RUN) | 92,260 B | 34,148 B | −58,112 B |
-| `S3_NAV_MSG` (S3 → Vehicle Controller) | 12 B | 4 B | −67 % |
+| `s3_nav_msg_t` (S3 → Vehicle Controller) | 12 B | 4 B | −67 % |
 | `mbf_nav` buffer (4 messages deep) | 64 B | 32 B | −50 % |
-| `S3_STATUS` (telemetry) | 32 B (16-bit steer/pos/n, 32-bit counters, 4-char map) | 16 B | −50 % |
+| `s3_line_status_t` (telemetry) | 32 B (16-bit steer/pos/n, 32-bit counters, 4-char map) | 16 B | −50 % |
 | `steer_sp` (S3 → Motion) | part of the 32 B status, read under a mutex | one 32-bit word, lock-free | — |
 | `s3_line_t` (line-follow state) | 80 B | 36 B | −55 % |
-| `s3_cal_t` (one sensor's calibration) | 14 B | 8 B | −43 % |
+| `s3_ir_cal_t` (one sensor's calibration) | 14 B | 8 B | −43 % |
 | Digital edge buffer | 64 × 32-bit timestamps = 256 B + 32-bit count | 64 × 16-bit gaps = 128 B + 3 index bytes | −50 % |
 | Analogue sample ring (RUN) | 16,384 × 16-bit = 32 KB (8 s) | 4,096 × 8-bit = 4 KB (2 s) | −87.5 % |
 | Analogue pass copy `g_win` (RUN) | 16,384 × 16-bit = 32 KB | 4,096 × 8-bit = 4 KB | −87.5 % |
 | Analogue extrema table | 640 B | 320 B | −50 % |
 
-Size checks in code: compile-time asserts in `s3_bringup.c` (NAV = 4 B, STATUS = 16 B, line ≤ 40 B), and host test S3-L26 (cal = 8 B, line ≤ 44 B; prints 36).
+Size checks in code: compile-time asserts in `s3_api.c` (NAV = 4 B, STATUS = 16 B, line ≤ 40 B), and host test S3-L26 (cal = 8 B, line ≤ 44 B; prints 36).
 
 ## 2. Field table
 
 The rule: each field gets the fewest bits that still hold its full range. Signed fields use `INT` (signed) bit-fields.
 
-### IF-01 `S3_NAV_MSG`: 32 bits, copied through message buffer `mbf_nav`
+### IF-01 `s3_nav_msg_t`: 32 bits, copied through message buffer `mbf_nav`
 
 | Field | Range | Bits | Representation |
 |---|---|---|---|
@@ -46,7 +46,7 @@ The rule: each field gets the fewest bits that still hold its full range. Signed
 
 Steering keeps full precision: dv is computed in 32-bit and only the result is packed.
 
-### IF-S3b `S3_STATUS`: 4 × 32 bits = 16 B
+### IF-S3b `s3_line_status_t`: 4 × 32 bits = 16 B
 
 | Field | Range | Bits |
 |---|---|---|
@@ -72,9 +72,9 @@ These are event-flag bitmasks. `flg_line` uses 3 bits (`LF_ENABLE`, `LF_SEARCH_L
 |---|---|---|
 | IR samples (barcode, Centre, outer) | 8-bit, `(adc + 8) >> 4` rounded, clamped to 255 | The black/white difference is ≥ 800 counts (12-bit), which is 50 steps at 8-bit. Quantisation error is ≤ 8 counts (0.2 % of full scale). |
 | Line sensor pair `g_line_lc` | outer bits 0–7, Centre bits 8–15, one 16-bit store | The ISR writes both with one store, so the task can never read a torn pair. |
-| Edge gaps `g_gap[64]` | 16-bit, 16 µs units, saturating | Holds up to 1.048 s. That is above the 300 ms end-of-pass quiet time (RUN) and the 1 s quiet time (desk). The narrowest bar at 0.3 m/s is about 3 ms, which is about 190 units, so resolution is 0.5 %. |
+| Edge gaps `g_gap[64]` | 16-bit, 16 µs units, saturating | Holds up to 1.048 s. That is above the 300 ms end-of-pass quiet time (RUN). The narrowest bar at 0.3 m/s is about 3 ms, which is about 190 units, so resolution is 0.5 %. |
 | Edge ring indices | `g_gap_wr` (ISR only) and `g_gap_rd` (task only) in separate bytes | single-producer, single-consumer; no lock |
-| `s3_cal_t` | white:12, black:12, valid:1, started:1, filt:12, win_lo:8, win_hi:8 | 12-bit ADC range |
+| `s3_ir_cal_t` | white:12, black:12, valid:1, started:1, filt:12, win_lo:8, win_hi:8 | 12-bit ADC range |
 | `s3_line_t` | int16 gains/error, saturating uint16 µm distances (max 65 mm, longer than any rule threshold), state:3, mode:2, req_mode:2, 6 one-bit flags | |
 | Activity flags `g_act` | bit0 open, bit1 AOUT, bit2 DOUT | |
 
@@ -85,8 +85,8 @@ Packing more than one field into a word makes it a shared object, so each one ne
 | Object | Writers | Readers | Rule |
 |---|---|---|---|
 | `steer_sp` word | line task only | Motion (any core) | One aligned 32-bit store and one 32-bit load. This is atomic on the Cortex-M0+, so no lock is needed. |
-| `S3_STATUS` | line task and barcode task | anyone through `s3_get_line_status()` | Every write and every copy is done under `mtx_s3`. Never read the struct directly. |
-| `S3_NAV_MSG` | barcode task | Vehicle Controller | The message buffer copies the 4 bytes, so the receiver owns its copy. |
+| `s3_line_status_t` | line task and barcode task | anyone through `s3_get_line_status()` | Every write and every copy is done under `mtx_s3`. Never read the struct directly. |
+| `s3_nav_msg_t` | barcode task | Vehicle Controller | The message buffer copies the 4 bytes, so the receiver owns its copy. |
 | `g_gap[]` + wr/rd | GPIO ISR (data, then `wr`) | barcode task (`rd`) | SPSC ring: data is stored before the index, both are volatile, and the ISR and task run on the same core. Full ring → newest edge dropped and counted in `g_gap_lost`. |
 | `g_glitches`, `g_gap_lost` | GPIO ISR | barcode task | free-running 8-bit counters; the task takes differences |
 | `g_ring[]`, `g_idx` | sampler ISR | barcode task | Indices are snapshotted with interrupts off. The copy runs with interrupts on and stays at least 64 samples (32 ms) ahead of the writer (`S3_COPY_GUARD`). |

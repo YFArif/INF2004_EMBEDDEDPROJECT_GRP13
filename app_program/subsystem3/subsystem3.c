@@ -1,48 +1,46 @@
-/*
- *	subsystem3.c
- *	Subsystem 3 -- Consumer: creates its objects and starts its task.
+/** @file subsystem3.c
  *
- *	APIs shown: tk_cre_mbx, tk_cre_mtx
+ * @brief Subsystem 3 -- creates its kernel objects and starts its tasks.
+ *        See subsystem3.h for the file map.
  */
+
+#include "../app.h"
 
 #include "subsystem3.h"
 
-EXPORT ID		mbx_samples;	/* IF-01 */
-EXPORT ID		mtx_stats;	/* IF-04 */
-EXPORT APP_STATS	app_stats;
-
-EXPORT ER subsystem3_init(void)
+/*!
+ * @brief Create subsystem 3's kernel objects (called before any task).
+ *
+ * @return E_OK or the first kernel error.
+ */
+ER
+subsystem3_init (void)
 {
-	T_CMBX	cmbx = {0};
-	T_CMTX	cmtx = {0};
+    ER er = consumer_init();    /* Template example (S2 / S4 use it).    */
 
-	/* Mailbox: passes a POINTER to a message (zero copy).  The message
-	   memory must stay valid until the receiver is done with it, which
-	   is why subsystem 2 takes it from its memory pool. */
-	cmbx.mbxatr = TA_TFIFO | TA_MFIFO;	/* FIFO waiters, FIFO messages */
-	mbx_samples = tk_cre_mbx(&cmbx);
-	if (mbx_samples < E_OK) {
-		return mbx_samples;
-	}
-
-	/* Mutex: only one task at a time may touch app_stats.  TA_INHERIT
-	   (priority inheritance) avoids priority inversion: a low-priority
-	   holder is temporarily raised to the waiter's priority. */
-	cmtx.mtxatr = TA_INHERIT;
-	mtx_stats = tk_cre_mtx(&cmtx);
-	if (mtx_stats < E_OK) {
-		return mtx_stats;
-	}
-	return s3_init();	/* Buddy 3: mbf_nav, mtx_s3, flg_s3 (s3_api.h) */
+    if (er < E_OK)
+    {
+        return er;
+    }
+    return s3_init();           /* mbf_nav, mtx_s3, flg_s3, flg_line.    */
 }
 
-EXPORT ER subsystem3_start(void)
+/*!
+ * @brief Start subsystem 3's tasks.
+ *
+ * @return E_OK or the first kernel error.
+ */
+ER
+subsystem3_start (void)
 {
-	/* Pinned to core 0 (TP_PRC1): opposite core to the producer */
-	ID tid = app_start_task(consumer_task, S3_PRI_CONSUMER, TP_PRC1,
-				"consumer_task");
-	if (tid < E_OK) {
-		return tid;
-	}
-	return s3_bringup_start();	/* Buddy 3: sensor bring-up task */
+    ID tid = app_start_task((FP) consumer_task, S3_PRI_CONSUMER, TP_PRC1,
+                            "consumer_task");   /* Template example.     */
+
+    if (tid < E_OK)
+    {
+        return tid;
+    }
+    return s3_start();          /* task_barcode, then task_line.         */
 }
+
+/*** end of file ***/
