@@ -1020,7 +1020,7 @@ LOCAL void s3_drive_task (INT stacd, void *exinf)
 		  (INT)g_drive_gains[g_drive_preset][0], (INT)g_drive_gains[g_drive_preset][1]);
 
 	while (1) {
-		tm_printf((UB *)"S3 DRIVE: sweep the car sideways across the line until calibrated, put the Centre on the %s edge (C=EDGE outer=WHITE), then press BUTTON 1 (GP20). BUTTON 2 = next gain preset.\n", S3_EDGE_TXT);
+		tm_printf((UB *)"S3 DRIVE: sweep the car sideways across the line until calibrated, put the car on the line (Centre on the line or its %s edge), then press BUTTON 1 (GP20). BUTTON 2 = next gain preset.\n", S3_EDGE_TXT);
 		s3_drive_wait_press();
 		for (i = 3U; i > 0U; i--) {
 			tm_printf((UB *)"S3 DRIVE %d\n", (INT)i);
@@ -1034,10 +1034,14 @@ LOCAL void s3_drive_task (INT stacd, void *exinf)
 				  s3_state_txt((UW)st.state, 0U), S3_EDGE_TXT);
 			continue;
 		}
-		/* n_centre is 0..255: EDGE band 25..75 % = 64..191 */
-		if ((st.n_centre < 64U) || (st.n_centre > 191U)) {
-			tm_printf((UB *)"S3 DRIVE NOT STARTED: Centre is not on the edge (C=%d of 1000). Put the Centre on the %s edge so the log shows C=EDGE.\n",
-				  (INT)((st.n_centre * 1000U) / 255U), S3_EDGE_TXT);
+		/* The car may start anywhere the code can tell which side the line
+		   is on: Centre on the edge or on the line (not WHITE), or the outer
+		   sensor on the line.  Only "both white" is refused: the line could
+		   then be on either side and the first turn could be the wrong way.
+		   n_centre / n_outer are 0..255: WHITE < 64, BLACK > 191. */
+		if ((st.n_centre < 64U) && (st.n_outer <= 191U)) {
+			tm_printf((UB *)"S3 DRIVE NOT STARTED: neither sensor is on the line (C=%d, outer=%d of 1000). Put the car so the Centre or the outer sensor is over the black line.\n",
+				  (INT)((st.n_centre * 1000U) / 255U), (INT)((st.n_outer * 1000U) / 255U));
 			continue;
 		}
 		start_mm = s3_odom_mm();
