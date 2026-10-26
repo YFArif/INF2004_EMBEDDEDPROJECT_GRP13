@@ -1,0 +1,38 @@
+diff --git a/app_program/subsystem3/s3_bringup.c b/app_program/subsystem3/s3_bringup.c
+index 1188bf0..13979de 100644
+--- a/app_program/subsystem3/s3_bringup.c
++++ b/app_program/subsystem3/s3_bringup.c
+@@ -34,6 +34,7 @@
+ #include "s3_analog.h"
+ #include "s3_line.h"
+ #include "s3_nav.h"
++#include "../subsystem2/subsystem2.h"	/* subsystem2_gpio_isr_register() */
+ 
+ /* ---------------------------------------------------------------- config */
+ /* Which build this is:
+@@ -289,18 +290,21 @@ LOCAL ER s3_irq_init (void)
+ 	T_DINT dint = {0};
+ 	ER     er;
+ 
+-	dint.intatr = TA_HLNG;
+-	dint.inthdr = (FP)s3_gpio_isr;
+-	er = tk_def_int(S3_INTNO_IO_BANK0, &dint);
++	/* IO_IRQ_BANK0 is owned by Subsystem 2 (it takes the wheel encoders on
++	   the same interrupt). Only one tk_def_int() per interrupt number is
++	   allowed, so S3's handler is attached to S2's. Returns once S2's handler
++	   is installed; our own pin interrupt is enabled only after that. */
++	er = subsystem2_gpio_isr_register(s3_gpio_isr);
+ 	if (er < E_OK) {
+ 		return er;
+ 	}
+ 	if (S3_USE_BARCODE) {			/* line-only tests leave the DOUT pin alone */
+ 		out_w(S3_IO_INTR, S3_BC_EDGE_BITS);
+ 		set_w(S3_IO_PROC1_INTE, S3_BC_EDGE_BITS);
+-		EnableInt(S3_INTNO_IO_BANK0, S3_INT_LEVEL);
+ 	}
+ 
++	dint.intatr = TA_HLNG;
++
+ 	dint.inthdr = (FP)s3_sampler_isr;
+ 	er = tk_def_int(S3_INTNO_TIMER1, &dint);
+ 	if (er < E_OK) {

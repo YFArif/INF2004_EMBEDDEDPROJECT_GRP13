@@ -106,3 +106,13 @@ Without S5's `vehicle_ctrl_task`, nothing sends commands in the normal image, so
 10. Report updates: the PWM-reset finding (A5), A4 evidence, the Buddy 2 Section 8.1 row, the power row (power bank, not LiPo), the GP16/GP17 "TBC" pins, and `mbx_motion` -> `mbf_motion`.
 
 Also edited in shared files: `TEAM.md` (claims for GP8-GP11, GP16-GP17 and PWM slices 4/5; S2 member row and `motion_task` priority row) and `testing/subsystem2/TEST_LOG.md`.
+
+## 7. Integration with S3 (Sean, `origin/buddy3-line-barcode`, 2026-10-26)
+
+Merged with `buddy2-motion` in a scratch copy: no conflicts, both the normal and the `TEST=1` image build, and S3's `s3_get_steer_sp` / `s3_set_odometry` link to S2's code.
+
+- **Shared GPIO interrupt (must fix before both run together).** S2 (encoders GP16/17) and S3 (barcode GP6) both called `tk_def_int()` for IO_IRQ_BANK0. Only one handler can own an interrupt: the second registration replaces the first, and the other subsystem's edges are never cleared, so the interrupt fires forever and the robot locks up. S2 now owns it; `subsystem2_gpio_isr_register(handler)` attaches S3's handler after the encoder edges and returns once S2's handler is installed. `testing/subsystem2/s3_gpio_isr.patch` is the one-function change to `s3_irq_init()` in `s3_bringup.c` (verified to apply cleanly and to build). It is Sean's file, so Sean applies it.
+- **Steering.** `motion_task` reads `s3_get_steer_sp()` every 20 ms while FOLLOWING. S3's dv is positive = turn RIGHT and S2's is positive = left, so the sign flips (`S2_S3_STEER_PERCENT`, default 100, scales it). Left wheel = speed + dv and right wheel = speed - dv for a right turn. A value whose sequence number has not changed for 100 ms is ignored, also for `subsystem2_steer_set()` (used by the S2 tests). **To confirm with Sean:** is dv the offset of EACH wheel, or the difference between the two wheels (then S2_S3_STEER_PERCENT should be 50)?
+- **Odometry.** `subsystem2_odom_total_mm()` is passed to `s3_set_odometry()` at start-up (weak link, so S2 also works without S3). It is a 32-bit modular distance in mm; S3 uses differences.
+- **FOLLOW is still needed.** S3 steers only while `motion_task` is FOLLOWING, and only `vehicle_ctrl_task` (S5, not written yet) sends FOLLOW. For a bench line-following test someone must call `subsystem2_follow(speed)`.
+- **Automatic test S2-U13** checks the steering freshness rule at every boot.

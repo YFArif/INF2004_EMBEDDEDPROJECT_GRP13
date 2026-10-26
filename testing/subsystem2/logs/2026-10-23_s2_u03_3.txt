@@ -1,0 +1,44 @@
+=== S2 test log ===
+test:     u03  (S2-U03 turn accuracy)
+date:     2026-10-23 02:48:13
+commit:   057bed3  (S2 code committed)
+tester:   Arif
+supply:   ; VIN = skipped V
+surface:  
+notes:    
+[build] rc=0
+[build] ---- last lines of the build:
+[build]    text	   data	    bss	    dec	    hex	filename
+[build]  296088	    376	  26776	 323240	  4eea8	mtk3pico_smp1_usb_cdc_wifi_test.elf
+[build] tools/elf2uf2 mtk3pico_smp1_usb_cdc_wifi_test.elf mtk3pico_smp1_usb_cdc_wifi_test.uf2
+[build]  
+switch:   S2_FLOOR_TEST = 2 in subsystem2_floor.c, set for this build only
+image:    mtk3pico_smp1_usb_cdc_wifi_test.uf2, built 02:48:58
+port:     COM5
+=== Pico output and [MEASURED] values ===
+
+
+microT-Kernel Version 3.00
+
+
+=== micro T-Kernel on Raspberry Pi Pico W (spec 0x6300, product 0x0003) ===
+dual-core (SMP) build, usermain on core 0
+encoder: GP16/GP17 edge interrupt on core 1
+all subsystems started
+
+motion_task: core 1, period 20 ms
+[TEST] === test run start ===
+monitor: I am task 8
+[TEST] S1-U01 PASS  cyclic handler is running
+wifi: cyw43_utk_task starting (proc 1)
+wifi: cyw43_init() ...
+wifi: cyw43_init() returned, bringing interface up ...
+[TEST] S1-U02 PASS  LED task sleeps between ticks
+[TEST] subsystem1 SUMMARY 2 passed, 0 failed
+monitor: batch  n=5 last=40 from core 1
+monitor: t=3355771096 ms  samples=5  min=0 max=40 avg=20  free slots=4  free blocks=4
+monitor: batch  n=10 last=90 from core 1
+monitor: t=3355772646 ms  samples=10  min=0 max=90 avg=45  free slots=4  free blocks=4
+
+[TEST] subsystem2 tests start
+[TEST] S2 INFO encoder interrupt on core 1 (A4 wants core 1)
