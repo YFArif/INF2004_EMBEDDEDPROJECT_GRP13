@@ -870,7 +870,9 @@ LOCAL void s3_line_task (INT stacd, void *exinf)
 		/* One line per pass of the outer sensor over black, to see how close
 		   each junction attempt came to the rules in s3_line.c:
 		   Centre black at most S3_LN_JUNC_LEAD_MM before, both black >= S3_LN_JUNC_MM. */
-		if (o.n_l > S3_LN_BLACK) {
+		if ((0U == o.calibrated) || ((S3_LN_FOLLOW != o.state) && (S3_LN_JUNCTION != o.state))) {
+			jd_outer_black = FALSE;		/* report only while really tracking (no noise when uncalibrated) */
+		} else if (o.n_l > S3_LN_BLACK) {
 			if (!jd_outer_black) {
 				jd_outer_black = TRUE;
 				jd_both_max_um = 0U;
@@ -967,7 +969,7 @@ LOCAL void s3_drive_wait_press (void)
 
 LOCAL void s3_drive_task (INT stacd, void *exinf)
 {
-	S3_STATUS	st;
+	S3_STATUS	st = {0};
 	UW		start_mm, moved_mm, ms, i;
 	char const	*why;
 	ER		er;
@@ -984,6 +986,14 @@ LOCAL void s3_drive_task (INT stacd, void *exinf)
 		for (i = 3U; i > 0U; i--) {
 			tm_printf((UB *)"S3 DRIVE %d\n", (INT)i);
 			tk_dly_tsk(1000);
+		}
+		/* Only start from a calibrated sensor that is on the line: an
+		   UNCALIBRATED car gets no steering (drives blind), and a LOST car
+		   keeps its last correction (spins on the spot). */
+		if ((E_OK != s3_get_line_status(&st)) || (S3_LINE_FOLLOW != st.state)) {
+			tm_printf((UB *)"S3 DRIVE NOT STARTED: line state is %s. Sweep the car sideways across the line until it is calibrated, then put the Centre on the RIGHT edge.\n",
+				  s3_state_txt((UW)st.state, 0U));
+			continue;
 		}
 		start_mm = s3_odom_mm();
 		moved_mm = 0U;
