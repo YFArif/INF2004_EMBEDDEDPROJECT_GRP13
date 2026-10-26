@@ -245,6 +245,19 @@ int main (void)
     check("S3-L27", ok && (S3_LN_SEARCH == o.state),
           "found line stays FOLLOW while LF_SEARCH_x still set (5/5 steps, 0 extra FOUND); new request re-searches");
 
+    /* L28: curve boost -- Centre fully white gives (near) full lock; on the
+            edge the steering stays gentle (straight line unchanged) */
+    s3_line_init(&ln, S3_LN_EDGE_LEFT); calibrate(&ln, &o);
+    s3_line_set_gains(&ln, 100, 300);
+    (void)feed(&ln, W, MID, STEP, 5, &o);
+    {
+        int32_t edge_steer = o.steer;
+        (void)feed(&ln, W, W, STEP, 3, &o);   /* 9 mm of white: not lost yet */
+        check("S3-L28", (S3_LN_FOLLOW == o.state) && (edge_steer > -300) && (edge_steer < 300) &&
+                        ((o.steer >= 950) || (o.steer <= -950)),
+              "curve boost: Centre all white -> >= 95 % lock; on the edge |steer| < 300");
+    }
+
     /* L26: Change Requirement 1 -- packed sizes */
     printf("  sizeof(s3_cal_t)=%u (was 14)  sizeof(s3_line_t)=%u (was 80)\n",
            (unsigned)sizeof(s3_cal_t), (unsigned)sizeof(s3_line_t));

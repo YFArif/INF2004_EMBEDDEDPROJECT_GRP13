@@ -272,6 +272,18 @@ void s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
     }
     e      = p_out->n_c - 500;
     p_term = (int32_t)p_ln->kp_x100 * e;
+    /* Curve boost: outside the EDGE band the Centre has left the edge, which
+       on a curve means the line is bending away.  Extra steering grows to
+       full lock at all-white / all-black, so curves get full authority while
+       the EDGE band (straight line) keeps the gentle Kp. */
+    if (e > (S3_LN_BLACK - 500))
+    {
+        p_term += S3_LN_BOOST_X100 * (e - (S3_LN_BLACK - 500));
+    }
+    else if (e < (S3_LN_WHITE - 500))
+    {
+        p_term += S3_LN_BOOST_X100 * (e - (S3_LN_WHITE - 500));
+    }
     d_term = 0;
     if ((0U != p_ln->e_prev_valid) && (dt_us > 0U))
     {

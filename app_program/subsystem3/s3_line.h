@@ -42,6 +42,7 @@
 #define S3_LN_LOST_MM        40U    /* L and C both white this far = line lost       */
 #define S3_LN_KP_X100        150    /* default gains: steer = -(Kp*e + Kd*de) / 100  */
 #define S3_LN_KD_X100        400    /* de is per 10 ms, whatever the real period     */
+#define S3_LN_BOOST_X100     300    /* extra steer per permille outside the EDGE band (curves) */
 #define S3_LN_D_LIMIT        600    /* the D term alone never exceeds this           */
 #define S3_LN_REF_DT_US      10000U /* gains are defined for a 10 ms step            */
 
