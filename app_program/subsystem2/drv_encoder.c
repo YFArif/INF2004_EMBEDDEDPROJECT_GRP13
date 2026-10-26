@@ -97,6 +97,8 @@ static uint32_t g_reg_ints  = IO_PROC0_INTS2_REG;
 static uint32_t g_all_edges = 0u;
 static uint32_t g_core      = UINT32_MAX;   /* Not set up yet.          */
 static uint32_t g_tick_was  = 0u;           /* TICK before the fix.     */
+static volatile drv_encoder_hook_t g_hook = NULL;  /* Other GPIO users. */
+static volatile bool g_b_isr_ready = false;
 
 static void     timer_tick_setup(void);
 static void     encoder_isr(UINT intno);
@@ -179,7 +181,8 @@ drv_encoder_init (void)
         ClearInt(INTNO_IO_BANK0);
         out_w(reg_inte + ALIAS_SET, g_all_edges);
         EnableInt(INTNO_IO_BANK0, ENCODER_INT_LEVEL);  /* This core.     */
-        g_core = core;
+        g_core        = core;
+        g_b_isr_ready = true;
 
         // NOTE: The cast is safe: format strings are ASCII, and every
         // value is below 32, which an int always holds.
@@ -189,6 +192,32 @@ drv_encoder_init (void)
     }
 
     return (result);
+}
+
+/*!
+ * @brief Attach another subsystem's handler for IO_IRQ_BANK0.
+ *
+ * @param[in] p_hook Called from the interrupt after the encoder edges,
+ *                   with the interrupt number; NULL removes it.
+ *
+ * NOTE: Task context only. The hook runs in interrupt context on the core
+ * that took drv_encoder_init() (core 1), at the same level as the encoder.
+ */
+void
+drv_encoder_hook_set (drv_encoder_hook_t p_hook)
+{
+    g_hook = p_hook;
+}
+
+/*!
+ * @brief Whether the shared interrupt handler is installed and enabled.
+ *
+ * @return true once drv_encoder_init() has succeeded.
+ */
+bool
+drv_encoder_isr_ready (void)
+{
+    return (g_b_isr_ready);
 }
 
 /*!
@@ -285,8 +314,6 @@ encoder_isr (UINT intno)
 {
     uint32_t events = in_w(g_reg_ints) & g_all_edges;
 
-    (void) intno;
-
     while (0u != events)
     {
         uint32_t levels = 0u;
@@ -303,6 +330,14 @@ encoder_isr (UINT intno)
                       now_us);
 
         events = in_w(g_reg_ints) & g_all_edges;
+    }
+
+    // Other users of IO_IRQ_BANK0 (S3's barcode edge on GP6) run here: only
+    // one handler can own an interrupt number, so they share this one. The
+    // hook clears its own pins, as every handler of this interrupt must.
+    if (NULL != g_hook)
+    {
+        g_hook(intno);
     }
 }
 

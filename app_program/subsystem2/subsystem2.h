@@ -146,7 +146,20 @@ void subsystem2_estop_clear(void);                  /* S5 vehicle_ctrl.  */
 bool subsystem2_estop_is_set(void);
 void subsystem2_odom_get(subsystem2_odom_t * p_odom);
 void subsystem2_status_get(subsystem2_status_t * p_status);
-void subsystem2_steer_set(int16_t dv_mms);          /* S3 line_task.     */
+void subsystem2_steer_set(int16_t dv_mms);  /* S2 tests only; see below.     */
+uint32_t subsystem2_odom_total_mm(void);    /* Given to S3 at start-up.      */
+
+/* IF-11: the shared GPIO interrupt (IO_IRQ_BANK0, interrupt 13). S2 owns it
+ * (it also takes the wheel encoders). Other subsystems attach with this
+ * call and must never call tk_def_int() for it. See drv_encoder.c. */
+ER   subsystem2_gpio_isr_register(void (* p_hook)(UINT intno));        /* S3. */
+
+/* IF-02 steering. motion_task reads S3's s3_get_steer_sp() every 20 ms
+ * while FOLLOWING (weak link: no S3 in the image = no steering). S3's dv is
+ * positive = turn RIGHT; S2 converts to its own positive = left. Left wheel
+ * = speed + dv, right wheel = speed - dv for a right turn. A value whose
+ * sequence number has not changed for 100 ms is ignored. */
+#define S2_S3_STEER_PERCENT     (100)   /* Per-wheel offset = dv x this.  */
 
 /* Chassis. Distance per tick = circumference / ticks per revolution; only
  * that ratio matters, so the circumference is the calibration value.

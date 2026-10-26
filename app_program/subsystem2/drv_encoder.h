@@ -16,6 +16,7 @@
 #ifndef DRV_ENCODER_H
 #define DRV_ENCODER_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include <tk/tkernel.h>     /* ER for the kernel error code.            */
@@ -45,7 +46,12 @@ typedef struct
     uint32_t min_gap_us;    /* Shortest gap between two raw edge events. */
 } drv_encoder_count_t;
 
+/** Another subsystem's part of the shared IO_IRQ_BANK0 handler. */
+typedef void (* drv_encoder_hook_t)(UINT intno);
+
 ER       drv_encoder_init(void);
+void     drv_encoder_hook_set(drv_encoder_hook_t p_hook);
+bool     drv_encoder_isr_ready(void);
 void     drv_encoder_get(drv_encoder_t wheel, drv_encoder_count_t * p_count);
 uint32_t drv_encoder_now_us(void);
 uint32_t drv_encoder_core(void);

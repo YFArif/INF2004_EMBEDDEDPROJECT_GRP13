@@ -58,6 +58,9 @@
 #define U10_CYCLE_LIMIT_US  (4000u)
 #define U10_STACK_PCT       (75u)
 
+/* S2-U13: the steering value goes stale after 100 ms. */
+#define STEER_STALE_WAIT_MS (150u)
+
 #define U01_REVS            (10u)
 #define U01_WINDOW_S        (40u)
 
@@ -94,6 +97,7 @@ static bool     s2_u05_estop_latency(void);
 static bool     s2_u07_estop_latch(void);
 static bool     s2_u08_timer_rate(void);
 static bool     s2_u10_resources(void);
+static bool     s2_u13_steering(void);
 
 #if S2_U01_BENCH
 static bool     s2_u01_wheel(drv_encoder_t wheel, char const * p_name);
@@ -130,6 +134,9 @@ subsystem2_test (void)
     TEST_CHECK("S2-U05", s2_u05_estop_latency(),
                "MF_ESTOP brakes within one cycle, 20 of 20 trials");
 
+    TEST_CHECK("S2-U13", s2_u13_steering(),
+               "steering: a set value is used, then ignored after 100 ms");
+
     TEST_CHECK("S2-U07", s2_u07_estop_latch(),
                "E-stop latch and CLEAR protocol");
 
@@ -160,6 +167,35 @@ subsystem2_test (void)
                "NFR11: longest motion cycle <= 4000 us, stack <= 75 %");
 
     TEST_SUMMARY("subsystem2");
+}
+
+/*!
+ * @brief S2-U13: a fresh subsystem2_steer_set() value is what motion_task
+ *        reads, and it is ignored once it is older than 100 ms (a stopped
+ *        line_task must not leave the robot steering on an old value).
+ *
+ * @return true if both held.
+ */
+static bool
+s2_u13_steering (void)
+{
+    bool b_fresh = false;
+    bool b_stale = false;
+
+    subsystem2_steer_set(40);
+    b_fresh = (40 == subsystem2_steer_get());
+
+    delay_ms(STEER_STALE_WAIT_MS);
+    b_stale = (40 != subsystem2_steer_get());
+
+    subsystem2_steer_set(0);
+
+    // NOTE: The casts are safe: the format string is ASCII and the
+    // values are 0 or 1.
+    tm_printf((UB *) "[TEST] S2-U13 INFO fresh value used %d, old value"
+              " ignored %d\n", (int) b_fresh, (int) b_stale);
+
+    return (b_fresh && b_stale);
 }
 
 /*!

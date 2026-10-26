@@ -20,9 +20,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "drv_encoder.h"     /* drv_encoder_now_us(): the 1 MHz timer.    */
 #include "drv_motor.h"
 #include "motion_task.h"
 #include "subsystem2.h"
+
+/* A steering value older than this is ignored (10 x line_task's 10 ms). */
+#define STEER_STALE_US          (100000u)
+
+/* subsystem2_gpio_isr_register() waits this long for S2's handler. */
+#define GPIO_HOOK_WAIT_MS       (2000u)
 
 /* Private bit of flg_motion: one 20 ms period has passed. */
 #define MF_TICK                 (0x80000000u)
@@ -47,6 +54,12 @@ _Static_assert(0u == (S2_MOTION_STACK_BYTES % 8u),
 _Static_assert((TASK_STACK_SIZE + 128) == (int) S2_MOTION_STACK_BYTES,
                "keep motion_task's stack equal to the other tasks'");
 
+/* S3's interface (app_program/subsystem3/s3_api.h). Declared weak so this
+ * file builds and runs with or without S3 in the image: without it the
+ * address is NULL and the steering stays at 0 (BARR-C 4.2c deviation). */
+extern BOOL s3_get_steer_sp(H * p_dv_mms, UB * p_seq) __attribute__((weak));
+extern void s3_set_odometry(UW (* fn)(void)) __attribute__((weak));
+
 ID                         flg_motion   = 0;    /* Legacy extern.      */
 static ID                  g_mbf_motion = 0;
 static ID                  g_mtx_odom   = 0;
@@ -55,9 +68,15 @@ static ID                  g_cyc_motion = 0;
 static subsystem2_odom_t   g_odom       = {0};
 static subsystem2_status_t g_status     = {0};
 static int16_t             g_steer_mms  = 0;
+static uint32_t            g_steer_us   = 0u;  /* When it was set.       */
+static bool                g_steer_ever = false;
+static uint8_t             g_s3_seq     = 0u;  /* Last S3 sequence seen. */
+static uint32_t            g_s3_us      = 0u;  /* When it last changed.  */
+static bool                g_s3_seen    = false;
 static uint64_t            g_motion_stack[MOTION_STACK_WORDS];
 
 static ID   motion_task_create(void);
+static int16_t s3_steer_read(void);
 static ER   cmd_send(subsystem2_cmd_type_t type, int16_t value,
                      uint16_t speed_mms);
 static void motion_tick(void * p_exinf);
@@ -159,6 +178,12 @@ subsystem2_start (void)
     if (E_OK == result)
     {
         result = producer_start();  /* Template example.               */
+    }
+
+    // S3's line task measures distance moved with this (IF-S3d).
+    if (NULL != s3_set_odometry)
+    {
+        s3_set_odometry(subsystem2_odom_total_mm);
     }
 
     return (result);
@@ -337,7 +362,9 @@ void
 subsystem2_steer_set (int16_t dv_mms)
 {
     CHECK(tk_loc_mtx(g_mtx_steer, TMO_FEVR), "mtx_steer");
-    g_steer_mms = dv_mms;
+    g_steer_mms  = dv_mms;
+    g_steer_us   = drv_encoder_now_us();
+    g_steer_ever = true;
     CHECK(tk_unl_mtx(g_mtx_steer), "mtx_steer");
 }
 
@@ -412,18 +439,122 @@ subsystem2_odom_put (subsystem2_odom_t const * p_odom,
 /*!
  * @brief Read the steering correction (motion_task only).
  *
- * @return mm/s; positive turns left.
+ * @return mm/s; positive turns left. 0 if line_task has not set it within
+ *         the last STEER_STALE_US, so a stopped line_task never leaves
+ *         the robot steering on an old value.
  */
 int16_t
 subsystem2_steer_get (void)
 {
     int16_t dv_mms = 0;
 
+    bool    b_set  = false;
+
     CHECK(tk_loc_mtx(g_mtx_steer, TMO_FEVR), "mtx_steer");
-    dv_mms = g_steer_mms;
+    if (g_steer_ever &&
+        ((drv_encoder_now_us() - g_steer_us) <= STEER_STALE_US))
+    {
+        dv_mms = g_steer_mms;
+        b_set  = true;
+    }
     CHECK(tk_unl_mtx(g_mtx_steer), "mtx_steer");
 
+    // A fresh subsystem2_steer_set() (the S2 tests) wins; otherwise S3.
+    if (!b_set)
+    {
+        dv_mms = s3_steer_read();
+    }
+
     return (dv_mms);
+}
+
+/*!
+ * @brief Read S3's steering value (IF-02) and convert it to S2's sign.
+ *
+ * @return mm/s, positive = left (S2's convention). 0 if S3 is not in the
+ *         image, is not steering (uncalibrated, disabled, searching), or
+ *         its sequence number has not changed for STEER_STALE_US.
+ *
+ * NOTE: S3 reports dv with positive = turn RIGHT; S2's positive is left,
+ * so the sign flips. S2_S3_STEER_PERCENT scales it to the per-wheel offset
+ * (left = speed + offset, right = speed - offset for a right turn).
+ * Called only by motion_task.
+ */
+static int16_t
+s3_steer_read (void)
+{
+    H       dv_mms = 0;
+    UB      seq    = 0;
+    int32_t out    = 0;
+    uint32_t now   = drv_encoder_now_us();
+
+    if ((NULL != s3_get_steer_sp) && s3_get_steer_sp(&dv_mms, &seq))
+    {
+        if ((!g_s3_seen) || (seq != g_s3_seq))
+        {
+            g_s3_seen = true;
+            g_s3_seq  = (uint8_t) seq;
+            g_s3_us   = now;
+        }
+
+        if ((now - g_s3_us) <= STEER_STALE_US)
+        {
+            out = -(((int32_t) dv_mms * S2_S3_STEER_PERCENT) / 100);
+        }
+    }
+
+    // NOTE: The cast is safe: S3's value is 10-bit (+/-511) and the
+    // percentage is at most a few hundred.
+    return ((int16_t) out);
+}
+
+/*!
+ * @brief Total distance of the robot centre, for S3's line task.
+ *
+ * @return Millimetres since power-up as a 32-bit value that wraps; S3
+ *         uses differences. Negative distances (reversing) wrap upward.
+ */
+uint32_t
+subsystem2_odom_total_mm (void)
+{
+    subsystem2_odom_t odom = {0};
+
+    subsystem2_odom_get(&odom);
+
+    // NOTE: The cast is safe: modular arithmetic on the distance is the
+    // intent (S3 differences it).
+    return ((uint32_t) odom.dist_mm);
+}
+
+/*!
+ * @brief Attach a handler to the shared IO_IRQ_BANK0 interrupt (IF-11).
+ *
+ * @param[in] p_hook Handler, interrupt context, called with the interrupt
+ *                   number after the encoder edges. It must clear the
+ *                   pins it owns itself.
+ *
+ * @return E_OK once S2's handler is installed (so it is now safe to enable
+ *         the caller's own pin interrupts), or E_TMOUT after 2 s.
+ *
+ * NOTE: Task context. Only one handler can own an interrupt number, so a
+ * subsystem must NOT call tk_def_int() for IO_IRQ_BANK0 (13) itself: that
+ * would silently replace this one and leave the other's edges uncleared,
+ * and the interrupt would fire forever.
+ */
+ER
+subsystem2_gpio_isr_register (void (* p_hook)(UINT intno))
+{
+    uint32_t waited = 0u;
+
+    drv_encoder_hook_set(p_hook);
+
+    while ((!drv_encoder_isr_ready()) && (waited < GPIO_HOOK_WAIT_MS))
+    {
+        CHECK(tk_dly_tsk(10), "tk_dly_tsk");
+        waited += 10u;
+    }
+
+    return (drv_encoder_isr_ready() ? E_OK : E_TMOUT);
 }
 
 /*!
