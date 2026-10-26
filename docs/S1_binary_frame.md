@@ -782,8 +782,8 @@ zeros = `00`.
 
 ## 11. Other open points found while writing this
 
-- `mqtt_config.example.h` says the topic prefix may be up to 48
-  characters, but `mqtt_link.c` caps it at 32 (`PREFIX_MAX_LEN`).
+- Resolved: `mqtt_config.example.h` now gives the topic prefix limit as
+  32 characters, the same as `mqtt_link.c` (`PREFIX_MAX_LEN`).
 - The retained status payload is text ("online" / "offline",
   `mqtt_link.h`). It is a session marker rather than application data.
   Decide whether to keep it as text or make it one byte.
