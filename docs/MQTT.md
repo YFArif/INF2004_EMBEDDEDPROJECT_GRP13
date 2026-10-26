@@ -28,9 +28,10 @@ Today a `NET=lwip MQTT=1` build runs the template's demo client,
 `mqtt_utk.c`, instead: one topic (`MQTT_TOPIC` in
 `config/wifi_secrets.h`), a text heartbeat every 5 s
 (`MQTT_UTK_HEARTBEAT_MS`) and a 60 s keep-alive (`MQTT_UTK_KEEPALIVE_S`).
-Nothing else in this document applies to that demo. The "Start-up" note
-in `mqtt_link.h` describes the planned wiring: `subsystem1_init()` does
-not call `mqtt_link_init()` yet.
+Nothing else in this document applies to that demo. In `MQTT=1` builds
+`subsystem1_init()` calls `mqtt_link_init()`, which creates the driver's
+two message buffers, but nothing polls the driver until Stage 3 replaces
+the demo client (the "Start-up" note in `mqtt_link.h`).
 
 ## 2. Configuration
 

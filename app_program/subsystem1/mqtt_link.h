@@ -26,14 +26,27 @@
  *
  * @par Start-up
  * subsystem1_init() (app_program/subsystem1/subsystem1.c) calls
- * mqtt_link_init() exactly once. app_main.c's usermain() runs every
- * subsystemN_init() before any subsystemN_start(), so this still
- * happens before any application task is created; the radio service
- * task already exists and may call mqtt_link_poll() earlier, which
- * does nothing until init succeeds. app_main.c itself never calls
- * mqtt_link_init(). Until init has succeeded, mqtt_link_poll() does
- * nothing and the application-facing functions return
- * MQTT_LINK_ERR_NOT_READY.
+ * mqtt_link_init() once, in MQTT=1 builds only. It runs in the initial task
+ * (usermain(), priority 1, core 0), and app_main.c runs every
+ * subsystemN_init() before any subsystemN_start(), so no application task
+ * exists yet. The radio service task, cyw43_utk_task (priority 4,
+ * processor 1 = core 0), is created earlier, from devinit.c. It calls
+ * mqtt_link_poll(netif_default) through mqtt_utk_start()
+ * (lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c) on every pass of its 2 ms
+ * poll loop while the link is CYW43_LINK_UP. Both run on core 0 and the
+ * initial task has the higher priority (a lower number is a higher
+ * priority), so init normally finishes before the first poll, but the
+ * driver does not rely on that: until init has succeeded, mqtt_link_poll()
+ * does nothing and the application-facing functions return
+ * MQTT_LINK_ERR_NOT_READY. While the link is not up, mqtt_link_poll() is
+ * not called at all, so the snapshot's last_poll_msec stops advancing:
+ * mqtt_link_get_status() reports b_stale once MQTT_LINK_STALE_MSEC has
+ * passed since the last poll, and, until the first poll after init, at the
+ * latest MQTT_LINK_STALE_MSEC after init. app_main.c never calls
+ * mqtt_link_init().
+ *
+ * NOTE: Until Stage 3 replaces the body of mqtt_utk.c (today the
+ * template's demo client), nothing calls mqtt_link_poll().
  *
  * @par Commands
  * Exactly one task, the application dispatcher, calls
@@ -297,8 +310,8 @@ bool mqtt_link_get_status(mqtt_link_status_t * p_status);
  * ones are kept, publish_queue_full is incremented and MQTT_LINK_ERR_FULL
  * is returned.
  *
- * It builds the queue record on the caller's stack, so it uses about 200
- * bytes of it.
+ * It builds the queue record on the caller's stack; the WARNING below gives
+ * how much stack that takes.
  *
  * WARNING: measured with -fstack-usage against this port's real build
  * flags: this function's own frame plus mqtt_queue_put_publish()'s is

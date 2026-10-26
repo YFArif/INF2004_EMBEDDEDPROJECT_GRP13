@@ -6,6 +6,7 @@
  */
 
 #include "subsystem1.h"
+#include "mqtt_link.h"	/* empty unless TM_MQTT (MQTT=1 builds) */
 
 EXPORT ID	tid_led;	/* IF-05, see subsystem1.h */
 EXPORT ID	cyc_led;
@@ -13,6 +14,14 @@ EXPORT ID	cyc_led;
 EXPORT ER subsystem1_init(void)
 {
 	T_CCYC	ccyc = {0};
+
+#if TM_MQTT
+	/* MQTT driver: creates its two message buffers; no lwIP calls. A failure
+	   leaves the car running without MQTT; mqtt_link_get_status() shows why. */
+	if (MQTT_LINK_OK != mqtt_link_init()) {
+		tm_printf((UB*)"S1: mqtt_link_init failed\n");
+	}
+#endif
 
 	/* Cyclic handler: once started, the kernel calls led_cyclic_handler
 	   every S1_TICK_MS.  Without TA_STA it is created stopped; it is
