@@ -56,7 +56,11 @@
    is on the robot's RIGHT, so the Centre sensor rides the RIGHT edge of the line
    and junctions are detected on the right.  Barcode sensor is on the left. */
 #ifndef S3_EDGE_SIDE
-#define S3_EDGE_SIDE        S3_LN_EDGE_LEFT   /* 26 Oct: a car centred on the line has the Centre near the LEFT edge (Week 6 design) */
+/* MUST be the side the OUTER sensor is on (robot's RIGHT on our car): the
+   overshoot and junction rules in s3_line.c assume the outer sensor sits
+   beyond the ridden edge.  Riding the LEFT edge with the outer on the right
+   steers the wrong way on overshoot and leaves left curves blind (26 Oct log). */
+#define S3_EDGE_SIDE        S3_LN_EDGE_RIGHT
 #endif
 #define S3_EDGE_TXT         ((S3_LN_EDGE_RIGHT == S3_EDGE_SIDE) ? "RIGHT" : "LEFT")
 #define S3_STEER_MAX_MMS    200     /* steer_sp at full lock (+-1000 permille), mm/s; <= 511 (10-bit) */
