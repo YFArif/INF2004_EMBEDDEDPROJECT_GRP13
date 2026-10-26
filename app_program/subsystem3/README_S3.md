@@ -29,7 +29,7 @@ Copy the whole folder `app_program/subsystem3/` and the folder `testing/subsyste
 ## 3. Rules the team must keep
 
 1. **ADC:** S3's sampler interrupt (timer alarm 1) is the only ADC user. Nobody else may open the kernel ADC driver.
-2. **GPIO interrupt (IO_IRQ_BANK0, IRQ 13):** S3 currently registers its own handler. Only one `tk_def_int` on IRQ 13 is allowed. When Buddy 2 (encoders) or Buddy 5 (ultrasonic) add theirs, merge all of them into one shared `gpio_isr` at the same interrupt level. If the levels differ, the `g_act` rule in `S3_DATA_REPRESENTATION.md` section 3 must be re-checked.
+2. **GPIO interrupt (IO_IRQ_BANK0, IRQ 13):** Subsystem 2 owns it (IF-11). `s3_irq_init()` attaches S3's handler with `subsystem2_gpio_isr_register()` (Buddy 2's `testing/subsystem2/s3_gpio_isr.patch`, applied) and never calls `tk_def_int(13)`. **Needs Buddy 2's `buddy2-motion` code in the same build** (older `main` has no `subsystem2_gpio_isr_register` and will not link).
 3. S3 tasks use priorities 16–17.
 
 ## 4. How other buddies use S3

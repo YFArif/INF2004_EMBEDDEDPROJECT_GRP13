@@ -3,6 +3,7 @@
  *
  *	  gcc -std=c99 -Wall -Wextra -I../../../app_program/subsystem3 test_line.c \
  *	      ../../../app_program/subsystem3/s3_line.c ../../../app_program/subsystem3/s3_nav.c \
+ *	      ../../../app_program/subsystem3/s3_code39.c \
  *	      -o tline && ./tline
  *
  *	Raw levels below are like the robot: white ~200, black ~3000 counts.

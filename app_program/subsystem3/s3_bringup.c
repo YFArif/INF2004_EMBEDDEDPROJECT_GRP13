@@ -34,6 +34,7 @@
 #include "s3_analog.h"
 #include "s3_line.h"
 #include "s3_nav.h"
+#include "../subsystem2/subsystem2.h"	/* subsystem2_gpio_isr_register() */
 
 /* ---------------------------------------------------------------- config */
 /* Which build this is:
@@ -59,7 +60,13 @@
 #define S3_LINE_PERIOD_MS   10      /* line_task period                                  */
 #define S3_ASSUMED_SPEED_MM_S 100   /* used only until Buddy 2 calls s3_set_odometry()   */
 #define S3_BC_COOLDOWN_MS   1500    /* ignore further barcodes this long after publishing */
-#define S3_RUN_VERBOSE      1       /* 1 = print status every 500 ms + every event       */
+#define S3_RUN_VERBOSE      1       /* 1 = print status every S3_STATUS_MS + every event */
+#define S3_STATUS_MS        200     /* status line period, ms (was 500)                  */
+#define S3_JUNC_DEBUG       1       /* 1 = print one "S3 JDBG" line per outer-black episode */
+#define S3_BC_VERBOSE_RUN   0       /* RUN: 1 = print every barcode attempt (barcode tuning);
+                                       0 = quiet, only "S3 NAV" on a decode (line tuning) */
+#define S3_BC_VERBOSE       ((!S3_RUN) || (0 != S3_BC_VERBOSE_RUN))  /* desk tests always print */
+#define S3_BC_LOG(...)      do { if (S3_BC_VERBOSE) { tm_printf(__VA_ARGS__); } } while (0)
 #define S3_PRI_LINE         16      /* S3 band 16-17 (TEAM.md section 4) */
 #define S3_LINE_BLACK_PCT   75      /* line sensors: n > 75 % = BLACK (design doc 6.1) */
 #define S3_LINE_WHITE_PCT   25      /* line sensors: n < 25 % = WHITE */
@@ -289,17 +296,20 @@ LOCAL ER s3_irq_init (void)
 	T_DINT dint = {0};
 	ER     er;
 
-	dint.intatr = TA_HLNG;
-	dint.inthdr = (FP)s3_gpio_isr;
-	er = tk_def_int(S3_INTNO_IO_BANK0, &dint);
+	/* IO_IRQ_BANK0 is owned by Subsystem 2 (it takes the wheel encoders on
+	   the same interrupt). Only one tk_def_int() per interrupt number is
+	   allowed, so S3's handler is attached to S2's. Returns once S2's handler
+	   is installed; our own pin interrupt is enabled only after that. */
+	er = subsystem2_gpio_isr_register(s3_gpio_isr);
 	if (er < E_OK) {
 		return er;
 	}
 	if (S3_USE_BARCODE) {			/* line-only tests leave the DOUT pin alone */
 		out_w(S3_IO_INTR, S3_BC_EDGE_BITS);
 		set_w(S3_IO_PROC1_INTE, S3_BC_EDGE_BITS);
-		EnableInt(S3_INTNO_IO_BANK0, S3_INT_LEVEL);
 	}
+
+	dint.intatr = TA_HLNG;
 
 	dint.inthdr = (FP)s3_sampler_isr;
 	er = tk_def_int(S3_INTNO_TIMER1, &dint);
@@ -460,30 +470,34 @@ LOCAL BOOL s3_process_pass (char *p_ch, UB *p_rev, UB *p_src)
 #if S3_RAW_DUMP
 	s3_console_wait();
 #endif
-	tm_printf((UB *)"S3 PASS digital: edges=%d chatter=%d dropped=%d -> ", (INT)n_dig, (INT)glitches, (INT)lost);
-	s3_print_result("", res_d, ch_d);
-	tm_printf((UB *)"S3 PASS analog : window=%dms (opened by %s)%s stripes=%d white=%d black=%d P=%d -> ",
+	S3_BC_LOG((UB *)"S3 PASS digital: edges=%d chatter=%d dropped=%d -> ", (INT)n_dig, (INT)glitches, (INT)lost);
+	if (S3_BC_VERBOSE) {
+		s3_print_result("", res_d, ch_d);
+	}
+	S3_BC_LOG((UB *)"S3 PASS analog : window=%dms (opened by %s)%s stripes=%d white=%d black=%d P=%d -> ",
 		  (INT)((n_win * S3_SAMPLE_US) / 1000U),
 		  (3U == src) ? "both" : ((1U == src) ? "AOUT" : ((2U == src) ? "DOUT" : "-")),
 		  clipped ? " TOO SLOW, start lost" : "",
 		  (INT)m, (INT)st.min << 4, (INT)st.max << 4, (INT)st.prominence << 4);
-	s3_print_result("", res_a, ch_a);
+	if (S3_BC_VERBOSE) {
+		s3_print_result("", res_a, ch_a);
+	}
 
 	if ((S3_C39_OK == res_d) && (S3_C39_OK == res_a)) {
 		if (ch_d == ch_a) {
-			tm_printf((UB *)"S3 RESULT ACCEPT '%c' (both agree)\n", ch_d);
+			S3_BC_LOG((UB *)"S3 RESULT ACCEPT '%c' (both agree)\n", ch_d);
 			*p_ch = ch_d; *p_rev = rev_a; *p_src = 1U; ok = TRUE;
 		} else {
-			tm_printf((UB *)"S3 RESULT REJECT (digital '%c' vs analog '%c' disagree)\n", ch_d, ch_a);
+			S3_BC_LOG((UB *)"S3 RESULT REJECT (digital '%c' vs analog '%c' disagree)\n", ch_d, ch_a);
 		}
 	} else if (S3_C39_OK == res_a) {
-		tm_printf((UB *)"S3 RESULT ACCEPT '%c' (analog only)\n", ch_a);
+		S3_BC_LOG((UB *)"S3 RESULT ACCEPT '%c' (analog only)\n", ch_a);
 		*p_ch = ch_a; *p_rev = rev_a; *p_src = 2U; ok = TRUE;
 	} else if (S3_C39_OK == res_d) {
-		tm_printf((UB *)"S3 RESULT ACCEPT '%c' (digital only)\n", ch_d);
+		S3_BC_LOG((UB *)"S3 RESULT ACCEPT '%c' (digital only)\n", ch_d);
 		*p_ch = ch_d; *p_rev = rev_d; *p_src = 3U; ok = TRUE;
 	} else {
-		tm_printf((UB *)"S3 RESULT REJECT (neither decoded)\n");
+		S3_BC_LOG((UB *)"S3 RESULT REJECT (neither decoded)\n");
 	}
 	return ok;
 }
@@ -719,6 +733,18 @@ LOCAL char const * s3_state_txt (UW st, UB overshoot)
 	}
 }
 
+/* What one line sensor sees, using the same bands as s3_line.c. */
+LOCAL char const * s3_zone_txt (INT n_permille)
+{
+	if (n_permille < S3_LN_WHITE) {
+		return "WHITE";
+	}
+	if (n_permille > S3_LN_BLACK) {
+		return "BLACK";
+	}
+	return "EDGE ";
+}
+
 /* line_task: every 10 ms -- calibration, PD steering, junction, line lost. */
 LOCAL void s3_line_task (INT stacd, void *exinf)
 {
@@ -728,6 +754,9 @@ LOCAL void s3_line_task (INT stacd, void *exinf)
 	UW		t_prev = in_w(TIMER_TIMERAWL);
 	UW		t_now, dt_us, odom_prev = 0U, odom_now, moved_um;
 	UW		relax_ms = 0U, print_ms = 0U, st, seq = 0U;
+	BOOL		jd_outer_black = FALSE;	/* S3_JUNC_DEBUG: outer sensor black last step */
+	UW		jd_both_max_um = 0U;
+	UW		jd_c_before_um = 0U;
 	INT		dv;
 	BOOL		odom_started = FALSE;
 	S3_ODOM_FN	fn;
@@ -786,11 +815,18 @@ LOCAL void s3_line_task (INT stacd, void *exinf)
 			s3_line_step(&ln, (UH)((lc & 0xFFU) << 4), (UH)((lc >> 8) << 4), moved_um, dt_us, &o);
 		}
 
+		/* Calibration can always WIDEN (s3_cal_learn above), but it only
+		   SHRINKS while line following is off (turn / bypass / search).
+		   While following, the Centre rides the edge and never sees pure
+		   white, so relaxing then dragged "white" up towards the edge value
+		   (bench log 26 Oct: 581 -> 1199 counts in ~4 s). */
 		relax_ms += dt_us / 1000U;
-		if (relax_ms >= 1000U) {		/* follow slow lighting/height drift */
+		if (relax_ms >= 1000U) {
 			relax_ms = 0U;
-			s3_cal_relax(&ln.cal_l);
-			s3_cal_relax(&ln.cal_c);
+			if ((S3_LN_DISABLED == o.state) || (S3_LN_SEARCH == o.state)) {
+				s3_cal_relax(&ln.cal_l);
+				s3_cal_relax(&ln.cal_c);
+			}
 		}
 
 		/* IF-02 steer_sp: permille -> mm/s, 10-bit signed, one atomic store */
@@ -823,6 +859,30 @@ LOCAL void s3_line_task (INT stacd, void *exinf)
 		if (0U != o.line_found_event) {
 			tk_set_flg(flg_s3, FLG_S3_LINE_FOUND);
 		}
+#if S3_JUNC_DEBUG
+		/* One line per pass of the outer sensor over black, to see how close
+		   each junction attempt came to the rules in s3_line.c:
+		   Centre black at most S3_LN_JUNC_LEAD_MM before, both black >= S3_LN_JUNC_MM. */
+		if (o.n_l > S3_LN_BLACK) {
+			if (!jd_outer_black) {
+				jd_outer_black = TRUE;
+				jd_both_max_um = 0U;
+				jd_c_before_um = ln.c_black_at_l;	/* 0xFFFF = Centre was white */
+			}
+			if (ln.both_black_um > jd_both_max_um) {
+				jd_both_max_um = ln.both_black_um;
+			}
+		} else if (jd_outer_black) {
+			jd_outer_black = FALSE;
+			if (0xFFFFU == jd_c_before_um) {
+				tm_printf((UB *)"S3 JDBG outer black: Centre was WHITE -> overshoot, not a junction\n");
+			} else {
+				tm_printf((UB *)"S3 JDBG outer black: Centre black %d mm before (max %d), both black %d mm (need %d)\n",
+					  (INT)(jd_c_before_um / 1000U), (INT)S3_LN_JUNC_LEAD_MM,
+					  (INT)(jd_both_max_um / 1000U), (INT)S3_LN_JUNC_MM);
+			}
+		}
+#endif
 #if S3_RUN_VERBOSE
 		if (0U != o.junction_event) {
 			tm_printf((UB *)"S3 EVENT JUNCTION\n");
@@ -834,12 +894,14 @@ LOCAL void s3_line_task (INT stacd, void *exinf)
 			tm_printf((UB *)"S3 EVENT LINE FOUND\n");
 		}
 		print_ms += dt_us / 1000U;
-		if (print_ms >= 500U) {
+		if (print_ms >= S3_STATUS_MS) {
 			print_ms = 0U;
-			tm_printf((UB *)"S3 LINE outer=%4d C=%4d  nO=%4d nC=%4d  pos=%4d steer=%5d (%4d mm/s)  %s  cal O[%d..%d] C[%d..%d]\n",
-				  (INT)S3_LINE_L(), (INT)S3_LINE_C(), (INT)o.n_l, (INT)o.n_c, (INT)o.pos, (INT)o.steer, dv,
+			/* e.g.  S3 LINE  C=EDGE   512  outer=WHITE   12  -> turn RIGHT    40 mm/s  FOLLOW   cal C 150-2500  O 130-3300 */
+			tm_printf((UB *)"S3 LINE  C=%s %4d  outer=%s %4d  -> turn %s %4d mm/s  %s   cal C %d-%d  O %d-%d\n",
+				  s3_zone_txt((INT)o.n_c), (INT)o.n_c, s3_zone_txt((INT)o.n_l), (INT)o.n_l,
+				  (dv > 0) ? "RIGHT   " : ((dv < 0) ? "LEFT    " : "STRAIGHT"), (dv < 0) ? -dv : dv,
 				  s3_state_txt(st, o.overshoot),
-				  (INT)ln.cal_l.white, (INT)ln.cal_l.black, (INT)ln.cal_c.white, (INT)ln.cal_c.black);
+				  (INT)ln.cal_c.white, (INT)ln.cal_c.black, (INT)ln.cal_l.white, (INT)ln.cal_l.black);
 		}
 #else
 		(void)print_ms;
