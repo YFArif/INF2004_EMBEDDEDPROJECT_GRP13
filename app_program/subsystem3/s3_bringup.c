@@ -63,6 +63,13 @@
 #define S3_RUN_VERBOSE      1       /* 1 = print status every S3_STATUS_MS + every event */
 #define S3_STATUS_MS        200     /* status line period, ms (was 500)                  */
 #define S3_JUNC_DEBUG       1       /* 1 = print one "S3 JDBG" line per outer-black episode */
+#ifndef S3_DRIVE_TEST
+#define S3_DRIVE_TEST       0       /* TEST ONLY: 1 = Button 1 starts FOLLOW on Buddy 2's motors */
+#endif
+#define S3_DRIVE_MMS        150     /* drive test: robot speed, mm/s                       */
+#define S3_DRIVE_MAX_MM     3000U   /* drive test: stop after this distance                */
+#define S3_DRIVE_MAX_MS     30000U  /* drive test: stop after this time                    */
+#define S3_DRIVE_BTN_PIN    20U     /* Robo Pico Button 1 (S5's start button; read only)   */
 #define S3_BC_VERBOSE_RUN   0       /* RUN: 1 = print every barcode attempt (barcode tuning);
                                        0 = quiet, only "S3 NAV" on a decode (line tuning) */
 #define S3_BC_VERBOSE       ((!S3_RUN) || (0 != S3_BC_VERBOSE_RUN))  /* desk tests always print */
@@ -932,6 +939,86 @@ LOCAL void s3_print_line (char const * p_name, UH v, UH * p_lo, UH * p_hi)
 		  (INT)*p_lo, (INT)*p_hi);
 }
 
+#if S3_RUN && S3_DRIVE_TEST
+/* TEST ONLY (S3_DRIVE_TEST 1): line following on Buddy 2's motors before the
+   Vehicle Controller exists.  Button 1 (GP20, read only with the pad pull-up,
+   as in Buddy 2's subsystem2_step.c) starts FOLLOW at S3_DRIVE_MMS.  The car
+   stops on Button 1 again, on LINE LOST, or at the distance / time limit. */
+LOCAL BOOL s3_drive_btn_down (void)
+{
+	return (0U == gpio_get_val(S3_DRIVE_BTN_PIN)) ? TRUE : FALSE;
+}
+
+LOCAL void s3_drive_wait_press (void)
+{
+	UW held = 0U;
+
+	while (s3_drive_btn_down()) {		/* let go of the last press first */
+		tk_dly_tsk(20);
+	}
+	while (held < 60U) {			/* 60 ms held = a real press */
+		tk_dly_tsk(20);
+		held = s3_drive_btn_down() ? (held + 20U) : 0U;
+	}
+	while (s3_drive_btn_down()) {
+		tk_dly_tsk(20);
+	}
+}
+
+LOCAL void s3_drive_task (INT stacd, void *exinf)
+{
+	S3_STATUS	st;
+	UW		start_mm, moved_mm, ms, i;
+	char const	*why;
+	ER		er;
+
+	(void)stacd; (void)exinf;
+	(void)gpio_set_pin(S3_DRIVE_BTN_PIN, GPIO_MODE_IN);
+	clr_w(GPIO(S3_DRIVE_BTN_PIN), GPIO_PDE);
+	set_w(GPIO(S3_DRIVE_BTN_PIN), GPIO_PUE);
+	tk_dly_tsk(100);
+
+	while (1) {
+		tm_printf((UB *)"S3 DRIVE: put the Centre on the RIGHT edge (C=EDGE outer=WHITE), then press BUTTON 1 (GP20)\n");
+		s3_drive_wait_press();
+		for (i = 3U; i > 0U; i--) {
+			tm_printf((UB *)"S3 DRIVE %d\n", (INT)i);
+			tk_dly_tsk(1000);
+		}
+		start_mm = s3_odom_mm();
+		moved_mm = 0U;
+		ms       = 0U;
+		why      = "?";
+		er = subsystem2_follow((uint16_t)S3_DRIVE_MMS);
+		tm_printf((UB *)"S3 DRIVE GO %d mm/s (er=%d). Press BUTTON 1 to stop.\n", (INT)S3_DRIVE_MMS, (INT)er);
+		while (1) {
+			tk_dly_tsk(20);
+			ms += 20U;
+			moved_mm = s3_odom_mm() - start_mm;	/* reversing wraps huge -> distance stop */
+			if (s3_drive_btn_down()) {
+				why = "button";
+				break;
+			}
+			if ((E_OK == s3_get_line_status(&st)) && (S3_LINE_LOST == st.state)) {
+				why = "LINE LOST";
+				break;
+			}
+			if (moved_mm >= S3_DRIVE_MAX_MM) {
+				why = "distance limit";
+				break;
+			}
+			if (ms >= S3_DRIVE_MAX_MS) {
+				why = "time limit";
+				break;
+			}
+		}
+		(void)subsystem2_stop();
+		tm_printf((UB *)"S3 DRIVE STOP (%s) after %d mm, %d ms\n", why, (INT)moved_mm, (INT)ms);
+		tk_dly_tsk(500);
+	}
+}
+#endif
+
 LOCAL void s3_bringup_task (INT stacd, void *exinf)
 {
 	ER   er;
@@ -966,6 +1053,9 @@ LOCAL void s3_bringup_task (INT stacd, void *exinf)
 		ccyc.cycphs = S3_LINE_PERIOD_MS;
 		g_cyc_line  = tk_cre_cyc(&ccyc);
 		CHECK(g_cyc_line, "cyc_line");
+#if S3_DRIVE_TEST
+		CHECK(app_start_task(s3_drive_task, S3_PRI_BRINGUP, TP_PRC1, "s3_drive_task"), "s3_drive_task");
+#endif
 	}
 #else
 	tm_printf((UB *)"S3 ALL (robot wiring): barcode DOUT=GP%d AOUT=ADC%d, Left=ADC2, Centre=ADC1\n",
