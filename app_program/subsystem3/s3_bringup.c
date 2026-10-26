@@ -74,8 +74,6 @@
 #define S3_DRIVE_MAX_MS     30000U  /* drive test: stop after this time                    */
 #define S3_DRIVE_BTN_PIN    20U     /* Robo Pico Button 1 (S5's start button; read only)   */
 #define S3_DRIVE_BTN2_PIN   21U     /* Robo Pico Button 2: next gain preset (read only)   */
-#define S3_SWEEP_DEG        35      /* drive test self-calibration: turn +-this on the spot */
-#define S3_SWEEP_MMS        100     /* drive test self-calibration: wheel speed, mm/s      */
 #define S3_BC_VERBOSE_RUN   0       /* RUN: 1 = print every barcode attempt (barcode tuning);
                                        0 = quiet, only "S3 NAV" on a decode (line tuning) */
 #define S3_BC_VERBOSE       ((!S3_RUN) || (0 != S3_BC_VERBOSE_RUN))  /* desk tests always print */
@@ -998,42 +996,6 @@ LOCAL void s3_drive_wait_press (void)
 	}
 }
 
-/* One on-the-spot turn with Buddy 2's TURN command; waits until it ends. */
-LOCAL BOOL s3_drive_turn (INT deg)
-{
-	subsystem2_status_t ss;
-	UW ms = 0U;
-
-	if (E_OK != subsystem2_turn((int16_t)deg, (uint16_t)S3_SWEEP_MMS)) {
-		return FALSE;
-	}
-	tk_dly_tsk(60);				/* motion_task picks it up in its next 20 ms cycle */
-	do {
-		tk_dly_tsk(20);
-		ms += 20U;
-		subsystem2_status_get(&ss);
-	} while ((S2_STATE_TURNING == ss.state) && (ms < 4000U));
-	return (S2_STATE_TURNING != ss.state) ? TRUE : FALSE;
-}
-
-/* Self-calibration (Week 6 CALIBRATING "IR sweep"): swing the sensors across
-   the line, left then right, and back.  s3_cal_learn() widens the white/black
-   range from whatever the sensors pass over. */
-LOCAL void s3_drive_sweep (void)
-{
-	S3_STATUS st = {0};
-	BOOL ok;
-
-	tm_printf((UB *)"S3 DRIVE SWEEP: turning +-%d deg on the spot to calibrate. Car must be on the line.\n", (INT)S3_SWEEP_DEG);
-	ok = s3_drive_turn(S3_SWEEP_DEG);
-	ok = ok && s3_drive_turn(-2 * S3_SWEEP_DEG);
-	ok = ok && s3_drive_turn(S3_SWEEP_DEG);
-	(void)subsystem2_stop();
-	(void)s3_get_line_status(&st);
-	tm_printf((UB *)"S3 DRIVE SWEEP %s: line state %s\n", ok ? "done" : "TURN FAILED",
-		  s3_state_txt((UW)st.state, 0U));
-}
-
 LOCAL void s3_drive_task (INT stacd, void *exinf)
 {
 	S3_STATUS	st = {0};
@@ -1054,14 +1016,8 @@ LOCAL void s3_drive_task (INT stacd, void *exinf)
 		  (INT)g_drive_gains[g_drive_preset][0], (INT)g_drive_gains[g_drive_preset][1]);
 
 	while (1) {
-		tm_printf((UB *)"S3 DRIVE: BUTTON 1 = %s. Centre on the %s edge (C=EDGE outer=WHITE) to drive. BUTTON 2 = next gain preset.\n",
-			  (E_OK == s3_get_line_status(&st) && (S3_LINE_UNCAL == st.state)) ? "self-calibrate (car on the line)" : "drive",
-			  S3_EDGE_TXT);
+		tm_printf((UB *)"S3 DRIVE: sweep the car sideways across the line until calibrated, put the Centre on the %s edge (C=EDGE outer=WHITE), then press BUTTON 1 (GP20). BUTTON 2 = next gain preset.\n", S3_EDGE_TXT);
 		s3_drive_wait_press();
-		if ((E_OK == s3_get_line_status(&st)) && (S3_LINE_UNCAL == st.state)) {
-			s3_drive_sweep();		/* first press after power-up: calibrate, then wait again */
-			continue;
-		}
 		for (i = 3U; i > 0U; i--) {
 			tm_printf((UB *)"S3 DRIVE %d\n", (INT)i);
 			tk_dly_tsk(1000);
