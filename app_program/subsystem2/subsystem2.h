@@ -159,7 +159,7 @@ ER   subsystem2_gpio_isr_register(void (* p_hook)(UINT intno));        /* S3. */
  * positive = turn RIGHT; S2 converts to its own positive = left. Left wheel
  * = speed + dv, right wheel = speed - dv for a right turn. A value whose
  * sequence number has not changed for 100 ms is ignored. */
-#define S2_S3_STEER_PERCENT     (100)   /* Per-wheel offset = dv x this.  */
+#define S2_S3_STEER_PERCENT     (50)    /* S3 dv = L-R difference: 50 %.  */
 
 /* Chassis. Distance per tick = circumference / ticks per revolution; only
  * that ratio matters, so the circumference is the calibration value.
