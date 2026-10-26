@@ -164,6 +164,21 @@ uint32_t mqtt_queue_full_count(void);
  */
 uint32_t mqtt_queue_now_msec(void);
 
+/**
+ * @brief Make this core's earlier memory accesses visible to the other core
+ *        before its later ones.
+ *
+ * Safe from any task on either core. mqtt_link.c calls it around its status
+ * seqlock: it cannot include <tk/smp.h> (see this file's own "Why this is
+ * a separate module" note), so this is where that barrier lives. In a
+ * dual-core build it is the kernel's mp_memory_barrir(); a single-core
+ * build has no other core, and it does nothing.
+ *
+ * NOTE: It is not a compiler barrier on a single-core build. A caller that
+ * needs its accesses kept in order must make them volatile.
+ */
+void mqtt_queue_barrier(void);
+
 #endif /* TM_MQTT */
 
 #endif /* MQTT_QUEUE_H */

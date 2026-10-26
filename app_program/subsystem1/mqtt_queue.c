@@ -343,6 +343,15 @@ mqtt_queue_now_msec (void)
 }
 
 /*!
+ * @brief Order memory accesses for the other core (see mqtt_queue.h).
+ */
+void
+mqtt_queue_barrier (void)
+{
+    memory_barrier();
+}
+
+/*!
  * @brief Create both message buffers, or neither.
  *
  * @return MQTT_LINK_OK, or MQTT_LINK_ERR_KERNEL.

@@ -14,18 +14,6 @@
  * @par Build gate
  * NOTE: The whole body is gated on TM_MQTT (default 0) -- see mqtt_link.h.
  *
- * @par Deviation from BARR-C:2018 rule 1.1.c
- * memory_barrier() uses the GCC builtin __atomic_thread_fence(), which is a
- * compiler extension. It is the only one in this module and it is confined
- * to that one function. On the Cortex-M0+ it compiles to a single dmb
- * instruction and needs no library. The port's own barrier,
- * mp_memory_barrir(), cannot be used here: it is declared by a kernel
- * header, which this file must not include, and on a single-core build it
- * does not exist at all. Proposed by Buddy 1, pending lecturer
- * confirmation.
- * TODO: Record the approver's name here, as rule 1.1 of the deviation
- * procedure requires.
- *
  * @par Port assert hook
  * NOTE: lwip_utk_assert() (lib/liblwip/sysdepend/pico_rp2040/sys_arch.c)
  * prints the message, then loops forever in the calling task -- it does
@@ -223,7 +211,10 @@ typedef enum
 
 /* Everything below is touched only by the radio service task, from
  * mqtt_link_poll() and from the lwIP callbacks that run inside it, with two
- * exceptions: g_published and g_version, which the seqlock protects.
+ * exceptions: g_published and g_version, which the seqlock protects. Both
+ * are volatile, so the compiler keeps every access to them in program
+ * order, and mqtt_queue_barrier() adds the barrier the other core needs
+ * in a dual-core build.
  *
  * WARNING: start_link() (called from mqtt_link_init(), on whatever task
  * calls it -- not necessarily the radio service task) is the one other
@@ -237,7 +228,7 @@ typedef enum
  * or two tasks could write the seqlock at once.
  */
 static mqtt_link_status_t       g_status = { MQTT_LINK_STATE_IDLE };
-static mqtt_link_status_t       g_published = { MQTT_LINK_STATE_IDLE };
+static volatile mqtt_link_status_t g_published = { MQTT_LINK_STATE_IDLE };
 static volatile uint32_t        g_version = 0U;
 static mqtt_client_t *          gp_client = NULL;
 static ip_addr_t                g_broker_addr;
@@ -271,7 +262,6 @@ static const char * const       g_topic_suffix[] =
 typedef uint8_t mqtt_link_check_table_t[((sizeof(g_topic_suffix) \
     / sizeof(g_topic_suffix[0])) == MQTT_LINK_TOPIC_COUNT) ? 1 : -1];
 
-static void memory_barrier(void);
 static void publish_status(void);
 static void build_topics(void);
 static int32_t check_config(void);
@@ -397,9 +387,9 @@ mqtt_link_get_status (mqtt_link_status_t * p_status)
              * changes if one happens during the copy.
              */
             before = g_version;
-            memory_barrier();
+            mqtt_queue_barrier();
             *p_status = g_published;
-            memory_barrier();
+            mqtt_queue_barrier();
             b_steady = ((0U == (before & 1U)) && (before == g_version));
         }
 
@@ -504,18 +494,6 @@ mqtt_link_receive_command (mqtt_link_command_t * p_command,
 }
 
 /*!
- * @brief Order this core's writes before the other core's reads.
- *
- * NOTE: This is the one compiler extension in the module; see the
- * deviation in the file header.
- */
-static void
-memory_barrier (void)
-{
-    __atomic_thread_fence(__ATOMIC_SEQ_CST);
-}
-
-/*!
  * @brief Copy the working status to the copy that readers see.
  *
  * The version is odd while the copy is in progress. Only the radio service
@@ -525,9 +503,9 @@ static void
 publish_status (void)
 {
     g_version++;
-    memory_barrier();
+    mqtt_queue_barrier();
     g_published = g_status;
-    memory_barrier();
+    mqtt_queue_barrier();
     g_version++;
 }
 

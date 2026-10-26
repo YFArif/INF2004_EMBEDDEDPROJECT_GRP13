@@ -44,6 +44,7 @@
  * includes mqtt_queue_now_msec(): the stub returns a test-controlled
  * g_stub_now_msec instead of reading the kernel's clock, so staleness
  * behaviour (including a 32-bit wraparound) can be driven exactly. The
+ * mqtt_queue_barrier() stub does nothing: the test runs on one thread. The
  * lwIP functions mqtt_link.c calls (sys_now, dns_gethostbyname,
  * ip4addr_aton, mqtt_client_new, mqtt_set_inpub_callback,
  * mqtt_client_connect, mqtt_disconnect, mqtt_publish and mqtt_sub_unsub)
@@ -296,6 +297,12 @@ uint32_t
 mqtt_queue_now_msec (void)
 {
     return (g_stub_now_msec);
+}
+
+void
+mqtt_queue_barrier (void)
+{
+    /* The host test runs on one thread: there is nothing to order. */
 }
 
 /* The lwIP stubs. Only test_connect_info() and test_topic_mapping() reach
