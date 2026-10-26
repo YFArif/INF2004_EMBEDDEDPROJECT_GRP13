@@ -73,7 +73,7 @@
 #ifndef S3_DRIVE_TEST
 #define S3_DRIVE_TEST       0       /* TEST ONLY: 1 = Button 1 starts FOLLOW on Buddy 2's motors */
 #endif
-#define S3_DRIVE_MMS        150     /* drive test: robot speed, mm/s                       */
+#define S3_DRIVE_LOST_MM    300U    /* drive test: stop only after LOST for this far (S3 keeps turning back) */
 #define S3_DRIVE_MAX_MM     3000U   /* drive test: stop after this distance                */
 #define S3_DRIVE_MAX_MS     30000U  /* drive test: stop after this time                    */
 #define S3_DRIVE_BTN_PIN    20U     /* Robo Pico Button 1 (S5's start button; read only)   */
@@ -952,8 +952,9 @@ LOCAL void s3_print_line (char const * p_name, UH v, UH * p_lo, UH * p_hi)
 #if S3_RUN && S3_DRIVE_TEST
 /* TEST ONLY (S3_DRIVE_TEST 1): line following on Buddy 2's motors before the
    Vehicle Controller exists.  Button 1 (GP20, read only with the pad pull-up,
-   as in Buddy 2's subsystem2_step.c) starts FOLLOW at S3_DRIVE_MMS.  The car
-   stops on Button 1 again, on LINE LOST, or at the distance / time limit. */
+   as in Buddy 2's subsystem2_step.c) starts FOLLOW at the preset's speed.  The
+   car stops on Button 1 again, after S3_DRIVE_LOST_MM of LINE LOST, or at the
+   distance / time limit. */
 LOCAL BOOL s3_drive_btn_down (void)
 {
 	return (0U == gpio_get_val(S3_DRIVE_BTN_PIN)) ? TRUE : FALSE;
@@ -966,12 +967,12 @@ LOCAL BOOL s3_drive_btn2_down (void)
 
 /* Steering gain presets for tuning on the floor without re-flashing:
    Button 2 moves to the next one while the car is waiting. */
-LOCAL const H g_drive_gains[][2] = {	/* {Kp, Kd} x100 */
-	{150, 400}, {100, 300}, {75, 200}, {50, 100}, {100, 0}
+LOCAL const H g_drive_gains[][3] = {	/* {Kp x100, Kd x100, speed mm/s} */
+	{100, 300, 150}, {100, 300, 120}, {100, 300, 100}, {150, 400, 100}, {150, 400, 80}
 };
 #define S3_DRIVE_N_GAINS    (sizeof(g_drive_gains) / sizeof(g_drive_gains[0]))
 
-LOCAL UW g_drive_preset = 1U;		/* start at {100, 300}: the default weaved (26 Oct) */
+LOCAL UW g_drive_preset = 2U;		/* 100 mm/s: at 150 every run weaved off within ~0.5 m (26 Oct) */
 
 /* Wait for Button 1; every Button 2 press selects the next gain preset. */
 LOCAL void s3_drive_wait_press (void)
@@ -990,7 +991,8 @@ LOCAL void s3_drive_wait_press (void)
 		if (b2 && !b2_was) {
 			g_drive_preset = (g_drive_preset + 1U) % S3_DRIVE_N_GAINS;
 			s3_set_line_gains(g_drive_gains[g_drive_preset][0], g_drive_gains[g_drive_preset][1]);
-			tm_printf((UB *)"S3 DRIVE GAINS preset %d: kp=%d kd=%d (x100)\n", (INT)g_drive_preset,
+			tm_printf((UB *)"S3 DRIVE PRESET %d: %d mm/s, kp=%d kd=%d (x100)\n", (INT)g_drive_preset,
+				  (INT)g_drive_gains[g_drive_preset][2],
 				  (INT)g_drive_gains[g_drive_preset][0], (INT)g_drive_gains[g_drive_preset][1]);
 		}
 		b2_was = b2;
@@ -1003,7 +1005,7 @@ LOCAL void s3_drive_wait_press (void)
 LOCAL void s3_drive_task (INT stacd, void *exinf)
 {
 	S3_STATUS	st = {0};
-	UW		start_mm, moved_mm, ms, i;
+	UW		start_mm, moved_mm, ms, i, lost_from;
 	char const	*why;
 	ER		er;
 
@@ -1016,7 +1018,8 @@ LOCAL void s3_drive_task (INT stacd, void *exinf)
 	set_w(GPIO(S3_DRIVE_BTN2_PIN), GPIO_PUE);
 	tk_dly_tsk(100);
 	s3_set_line_gains(g_drive_gains[g_drive_preset][0], g_drive_gains[g_drive_preset][1]);
-	tm_printf((UB *)"S3 DRIVE GAINS preset %d: kp=%d kd=%d (x100)\n", (INT)g_drive_preset,
+	tm_printf((UB *)"S3 DRIVE PRESET %d: %d mm/s, kp=%d kd=%d (x100)\n", (INT)g_drive_preset,
+		  (INT)g_drive_gains[g_drive_preset][2],
 		  (INT)g_drive_gains[g_drive_preset][0], (INT)g_drive_gains[g_drive_preset][1]);
 
 	while (1) {
@@ -1048,8 +1051,9 @@ LOCAL void s3_drive_task (INT stacd, void *exinf)
 		moved_mm = 0U;
 		ms       = 0U;
 		why      = "?";
-		er = subsystem2_follow((uint16_t)S3_DRIVE_MMS);
-		tm_printf((UB *)"S3 DRIVE GO %d mm/s (er=%d). Press BUTTON 1 to stop.\n", (INT)S3_DRIVE_MMS, (INT)er);
+		lost_from = 0U;
+		er = subsystem2_follow((uint16_t)g_drive_gains[g_drive_preset][2]);
+		tm_printf((UB *)"S3 DRIVE GO %d mm/s (er=%d). Press BUTTON 1 to stop.\n", (INT)g_drive_gains[g_drive_preset][2], (INT)er);
 		while (1) {
 			tk_dly_tsk(20);
 			ms += 20U;
@@ -1058,9 +1062,17 @@ LOCAL void s3_drive_task (INT stacd, void *exinf)
 				why = "button";
 				break;
 			}
+			/* LOST keeps the last (full) correction, so the car usually turns
+			   back onto the line by itself; stop only if it stays lost. */
 			if ((E_OK == s3_get_line_status(&st)) && (S3_LINE_LOST == st.state)) {
-				why = "LINE LOST";
-				break;
+				if (0U == lost_from) {
+					lost_from = moved_mm + 1U;
+				} else if ((moved_mm + 1U - lost_from) >= S3_DRIVE_LOST_MM) {
+					why = "LINE LOST, not found again";
+					break;
+				}
+			} else {
+				lost_from = 0U;
 			}
 			if (moved_mm >= S3_DRIVE_MAX_MM) {
 				why = "distance limit";
