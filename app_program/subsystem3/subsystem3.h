@@ -10,6 +10,7 @@
 #define SUBSYSTEM3_H
 
 #include "../app.h"
+#include "s3_api.h"		/* Buddy 3 public interface: mbf_nav, steer_sp, flg_line, s3_get_line_status */
 
 #define S3_PRI_CONSUMER		16	/* priority band 16-17 (TEAM.md) */
 #define S3_BATCH_SIZE		5	/* report to subsystem 4 every N samples */

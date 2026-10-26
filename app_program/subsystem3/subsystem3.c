@@ -30,7 +30,10 @@ EXPORT ER subsystem3_init(void)
 	   holder is temporarily raised to the waiter's priority. */
 	cmtx.mtxatr = TA_INHERIT;
 	mtx_stats = tk_cre_mtx(&cmtx);
-	return (mtx_stats < E_OK) ? mtx_stats : E_OK;
+	if (mtx_stats < E_OK) {
+		return mtx_stats;
+	}
+	return s3_init();	/* Buddy 3: mbf_nav, mtx_s3, flg_s3 (s3_api.h) */
 }
 
 EXPORT ER subsystem3_start(void)
@@ -38,5 +41,8 @@ EXPORT ER subsystem3_start(void)
 	/* Pinned to core 0 (TP_PRC1): opposite core to the producer */
 	ID tid = app_start_task(consumer_task, S3_PRI_CONSUMER, TP_PRC1,
 				"consumer_task");
-	return (tid < E_OK) ? tid : E_OK;
+	if (tid < E_OK) {
+		return tid;
+	}
+	return s3_bringup_start();	/* Buddy 3: sensor bring-up task */
 }
