@@ -2,3 +2,6 @@
 # mqtt_config.example.h to mqtt_config.h (same folder) and fill in your
 # own broker's host, port, client ID and login. See CLAUDE.md "Secrets".
 mqtt_config.h
+
+# Python byte-code from importing dashboard/s1_decode.py.
+__pycache__/
