@@ -1,7 +1,7 @@
 /** @file task_line.c
  *
- * @brief Subsystem 3 -- task_line: calibration, PD steering, junction and
- *        line lost, every S3_LINE_PERIOD_MS.
+ * @brief Subsystem 3 -- task_line: calibration, PD steering and
+ *        line lost (both sensors on the line), every S3_LINE_PERIOD_MS.
  *
  * @par Timing
  * A cyclic handler wakes the task every 10 ms, so the period is fixed
@@ -11,10 +11,10 @@
  *
  * @par Calibration relax
  * Calibration can always WIDEN (every step), but it only SHRINKS while
- * line following is off (turn, bypass, search). While following, the
- * Centre rides the edge and never sees pure white, so relaxing then
- * dragged "white" up towards the edge value (bench log 26 Oct: 581 ->
- * 1199 counts in about 4 s).
+ * line following is off (turn, bypass, search). While following, both
+ * sensors sit on the black line and seldom see pure white, so relaxing
+ * then would drag "white" up (bench log 26 Oct: 581 -> 1199 counts in
+ * about 4 s with the old layout).
  */
 
 #include <stdbool.h>
@@ -23,20 +23,15 @@
 #include "../app.h"
 
 #include "drv_adc.h"
-#include "drv_ir_centre.h"
-#include "drv_ir_left.h"
 #include "s3_api.h"
 #include "s3_config.h"
 #include "s3_line.h"
 #include "s3_private.h"
-#include "task_line.h"
 
 #define US_PER_MS       (1000u)
 #define UM_PER_MM       (1000u)
 #define PERMILLE        (1000)
 #define SEQ_MASK        (0xFFu)
-#define C_WHITE_AT_L    (0xFFFFu)   /* s3_line_t.c_black_at_l: Centre was */
-                                    /* white when L turned black.         */
 
 static ID g_tid_line;
 static ID g_cyc_line;
@@ -45,11 +40,8 @@ static void         line_task(INT stacd, void * p_exinf);
 static void         line_cyclic(void * p_exinf);
 static uint32_t     moved_um_get(uint32_t dt_us);
 static void         requests_apply(s3_line_t * p_ln);
-static void         raw_read(uint16_t * p_left, uint16_t * p_centre);
 static s3_ln_mode_t mode_from_flags(UINT pattern);
 static void         events_publish(s3_line_out_t const * p_out);
-static void         junction_debug(s3_line_t const * p_ln,
-                                   s3_line_out_t const * p_out);
 static void         status_print(s3_line_t const * p_ln,
                                  s3_line_out_t const * p_out,
                                  int32_t dv, uint32_t state);
@@ -61,8 +53,9 @@ static char const * zone_txt(int32_t n_permille);
 /*!
  * @brief Create task_line and its 10 ms cyclic handler.
  *
- * NOTE: Call from a task on core 1 after drv_adc_init(): raw_read()
- * disables interrupts on its own core to read both sensors together.
+ * NOTE: Call from a task on core 1 after drv_adc_init():
+ * drv_adc_ir_read() disables interrupts on its own core to read both
+ * sensors together.
  */
 ER
 task_line_start (void)
@@ -109,7 +102,7 @@ line_task (INT stacd, void * p_exinf)
 
     (void) stacd;
     (void) p_exinf;
-    s3_line_init(&ln, S3_EDGE_SIDE);
+    s3_line_init(&ln, S3_IR_L_SIDE);
 
     for (;;)
     {
@@ -128,7 +121,7 @@ line_task (INT stacd, void * p_exinf)
         }
         requests_apply(&ln);
 
-        raw_read(&raw_l, &raw_c);
+        drv_adc_ir_read(&raw_l, &raw_c);
         s3_line_step(&ln, raw_l, raw_c, moved_um_get(dt_us), dt_us, &out);
         timing_report(t_now, dt_us);
 
@@ -167,7 +160,6 @@ line_task (INT stacd, void * p_exinf)
         s3_status_set_line(&rep);
 
         events_publish(&out);
-        junction_debug(&ln, &out);
         status_print(&ln, &out, dv, state);
     }
 }
@@ -230,21 +222,6 @@ requests_apply (s3_line_t * p_ln)
     }
 }
 
-/*!
- * @brief Both sensors from the SAME 10 ms sample: the sampler interrupt
- *        runs on this core, so it cannot run between the two reads.
- */
-static void
-raw_read (uint16_t * p_left, uint16_t * p_centre)
-{
-    UINT imask;
-
-    DI(imask);
-    *p_left   = drv_ir_left_raw();
-    *p_centre = drv_ir_centre_raw();
-    EI(imask);
-}
-
 static s3_ln_mode_t
 mode_from_flags (UINT pattern)
 {
@@ -295,68 +272,9 @@ events_publish (s3_line_out_t const * p_out)
 }
 
 /*!
- * @brief S3_JUNC_DEBUG: one line per pass of the Left IR over black,
- *        showing how close it came to the junction rules in s3_line.c
- *        (Centre black at most S3_LN_JUNC_LEAD_MM before, both black for
- *        at least S3_LN_JUNC_MM). Only while really tracking.
- */
-static void
-junction_debug (s3_line_t const * p_ln, s3_line_out_t const * p_out)
-{
-#if (1 == S3_JUNC_DEBUG)
-    static bool     b_outer_black;
-    static uint32_t both_max_um;
-    static uint32_t c_before_um;
-
-    if ((0u == p_out->calibrated) ||
-        ((S3_LN_FOLLOW != p_out->state) && (S3_LN_JUNCTION != p_out->state)))
-    {
-        b_outer_black = false;
-    }
-    else if (p_out->n_l > S3_LN_BLACK)
-    {
-        if (!b_outer_black)
-        {
-            b_outer_black = true;
-            both_max_um   = 0u;
-            c_before_um   = p_ln->c_black_at_l;
-        }
-        if (p_ln->both_black_um > both_max_um)
-        {
-            both_max_um = p_ln->both_black_um;
-        }
-    }
-    else if (b_outer_black)
-    {
-        b_outer_black = false;
-        if (C_WHITE_AT_L == c_before_um)
-        {
-            tm_printf((UB *) "S3 JDBG outer black: Centre was WHITE -> "
-                             "outer on the line (drift), not a junction\n");
-        }
-        else
-        {
-            tm_printf((UB *) "S3 JDBG outer black: Centre black %d mm before "
-                             "(max %d), both black %d mm (need %d)\n",
-                      (INT) (c_before_um / UM_PER_MM),
-                      (INT) S3_LN_JUNC_LEAD_MM,
-                      (INT) (both_max_um / UM_PER_MM), (INT) S3_LN_JUNC_MM);
-        }
-    }
-    else
-    {
-        ;   /* Outer sensor not on black. */
-    }
-#else
-    (void) p_ln;
-    (void) p_out;
-#endif
-}
-
-/*!
  * @brief S3_LINE_VERBOSE: one status line every S3_STATUS_PRINT_MS, e.g.
- *   S3 LINE  C=EDGE   512  outer=WHITE   12  -> turn RIGHT    40 mm/s
- *   FOLLOW   cal C 150-2500  O 130-3300
+ *   S3 LINE  GP27=BLACK  980  GP26=EDGE   512  -> turn RIGHT  20 mm/s
+ *   FOLLOW   cal GP27 150-2500  GP26 130-3300
  */
 static void
 status_print (s3_line_t const * p_ln, s3_line_out_t const * p_out,
@@ -384,8 +302,8 @@ status_print (s3_line_t const * p_ln, s3_line_out_t const * p_out,
     {
         ;   /* Straight. */
     }
-    tm_printf((UB *) "S3 LINE  C=%s %4d  outer=%s %4d  -> turn %s %4d mm/s"
-                     "  %s   cal C %d-%d  O %d-%d\n",
+    tm_printf((UB *) "S3 LINE  GP27=%s %4d  GP26=%s %4d  -> turn %s %4d mm/s"
+                     "  %s   cal GP27 %d-%d  GP26 %d-%d\n",
               zone_txt(p_out->n_c), (INT) p_out->n_c,
               zone_txt(p_out->n_l), (INT) p_out->n_l,
               p_turn, (INT) ((dv < 0) ? -dv : dv),

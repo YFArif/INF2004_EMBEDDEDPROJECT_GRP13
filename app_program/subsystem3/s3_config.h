@@ -5,7 +5,7 @@
  *
  * @par
  * Pins and ADC channels are NOT here: each driver header owns its own
- * (drv_ir_left.h, drv_ir_centre.h, drv_barcode.h). Line-following
+ * (drv_adc.h for the two line IR sensors, drv_barcode.h). Line-following
  * thresholds and gains are in s3_line.h, barcode decoding limits in
  * s3_code39.h and s3_analog.h.
  *
@@ -17,22 +17,27 @@
 #ifndef S3_CONFIG_H
 #define S3_CONFIG_H
 
-#include "s3_line.h"        /* S3_LN_EDGE_RIGHT / S3_LN_EDGE_LEFT.      */
+#include "s3_line.h"        /* S3_LN_L_ON_LEFT / S3_LN_L_ON_RIGHT.      */
 
 /* ---------------------------------------------------------------------
- *  Edge the Centre sensor rides (v19 STRADDLE layout, s3_line.h).
- *  The Centre rides the edge AWAY from the outer ("Left IR") sensor, and
- *  the outer sensor sits just outside the other edge. On our car (Sean,
- *  photo 28 Oct) the outer sensor is on the robot's RIGHT, so the Centre
- *  rides the LEFT edge:      C |##########| O
- *  If the outer sensor is moved to the robot's LEFT, set
- *  S3_LN_EDGE_RIGHT here. Nothing else changes.
+ *  Line sensor layout (v25 CENTRED PAIR, s3_line.h). Both sensors sit ON
+ *  the line, 12 mm apart centre to centre, the pair centred on the car:
+ *
+ *        white |####  L  ####  R  ####| white     (looking down, car
+ *                     <-12 mm->                    pointing up the page)
+ *
+ *  On our car the GP26 ("Left IR") sensor is on the robot's RIGHT and
+ *  GP27 ("Centre IR") on its LEFT. If they are mounted the other way
+ *  round, set S3_LN_L_ON_LEFT here. Nothing else changes. Wrong setting:
+ *  the car steers AWAY from the line at once.
  * --------------------------------------------------------------------- */
-#ifndef S3_EDGE_SIDE
-#define S3_EDGE_SIDE            (S3_LN_EDGE_LEFT)
+#ifndef S3_IR_L_SIDE
+#define S3_IR_L_SIDE            (S3_LN_L_ON_RIGHT)
 #endif
-#define S3_EDGE_TXT             ((S3_LN_EDGE_RIGHT == S3_EDGE_SIDE) ? \
-                                 "RIGHT" : "LEFT")
+#define S3_IR_SPACING_MM        (12)    /* Mounting: centre to centre.   */
+#define S3_LAYOUT_TXT           ((S3_LN_L_ON_LEFT == S3_IR_L_SIDE) ? \
+                                 "both on line, GP26 LEFT" :           \
+                                 "both on line, GP26 RIGHT")
 
 /* ---------------------------------------------------------------------
  *  Tasks (Week 6 report section 3, TEAM.md section 4). Both run on core 1
@@ -79,13 +84,14 @@
 /* ---------------------------------------------------------------------
  *  Debug prints (0 = off, 1 = on). Console only, behaviour unchanged.
  * --------------------------------------------------------------------- */
-#define S3_LINE_VERBOSE         (1)     /* "S3 LINE" status + events.    */
-#define S3_JUNC_DEBUG           (1)     /* One "S3 JDBG" line per pass   */
-                                        /* of the outer sensor on black. */
+#ifndef S3_DRIVE_TEST
+#define S3_DRIVE_TEST           (0)
+#endif
+#define S3_LINE_VERBOSE         (!S3_DRIVE_TEST) /* Drive task owns logs. */
 #define S3_BC_VERBOSE           (0)     /* 1 = every barcode attempt;    */
                                         /* 0 = only "S3 NAV" lines.      */
 #ifndef S3_TIMING
-#define S3_TIMING               (1)     /* Every 5 s, "S3 TIME": longest */
+#define S3_TIMING               (!S3_DRIVE_TEST) /* Quiet drive prompts. */
                                         /* sampler interrupt and line    */
                                         /* step, plus each decode time.  */
 #endif
@@ -95,21 +101,25 @@
  *  TEST ONLY: line following on Buddy 2's motors before the Vehicle
  *  Controller exists (task_drive_test.c). Keep 0 in main.
  * --------------------------------------------------------------------- */
-#ifndef S3_DRIVE_TEST
-#define S3_DRIVE_TEST           (0)
-#endif
 #define S3_DRIVE_LOST_MM        (300u)  /* Stop after LOST this far.     */
 #define S3_DRIVE_LOST_MS        (2000u) /* ... or LOST this long (a car  */
                                         /* that stopped never got far).  */
 #define S3_DRIVE_STILL_MS       (2000u) /* Stop if the odometry has not  */
                                         /* changed this long.            */
 #define S3_DRIVE_MAX_MM         (3000u) /* Stop after this distance.     */
-#define S3_DRIVE_MAX_MS         (30000u)/* Stop after this time.         */
-#define S3_DRIVE_BTN1_PIN       (20u)   /* Robo Pico Button 1: start /   */
-                                        /* stop (read only).             */
-#define S3_DRIVE_BTN2_PIN       (21u)   /* Button 2: next gain preset.   */
-#define S3_DRIVE_RECAL_MS       (4000u) /* Hold Button 1 this long while */
-                                        /* waiting = recalibrate.        */
+#define S3_DRIVE_BTN1_PIN       (20u)   /* Button 1 (GP20): PRESS = start */
+                                        /* (no hold); any press while    */
+                                        /* driving = stop. Read only.    */
+#define S3_DRIVE_BTN2_PIN       (21u)   /* Button 2 (GP21): press = next */
+                                        /* gain preset.                  */
+#define S3_DRIVE_RECAL_MS       (2000u) /* Hold Button 2 this long while */
+                                        /* waiting = recalibrate (after  */
+                                        /* the countdown below).         */
+#define S3_DRIVE_CAL_COUNT_S    (10u)   /* Countdown before calibration  */
+                                        /* starts (power-up, recal, or   */
+                                        /* START while not READY).       */
+#define S3_DRIVE_GO_COUNT_S     (3u)    /* Countdown after START.        */
+#define S3_DRIVE_LOG_MS         (100u)  /* "S3 LOG" line while driving.  */
 #define S3_DRIVE_CAL_BLACK_MIN  (2500u) /* Refuse to start until BOTH    */
                                         /* sensors' black level is at    */
                                         /* least this (raw). Car 28 Oct: */

@@ -620,13 +620,16 @@ test_stall (void)
           (unsigned) g_fault_events);
 }
 
-/* IF-02: positive steering turns left (right wheel faster). */
+/* IF-02: positive steering turns left (right wheel faster). Corner
+ * slow-down: base = 250 - (50 - DEADBAND) = 210 (floor 175), so the
+ * wheels run at 210 -/+ 50. */
 static void
 test_steer (void)
 {
-    double   sum_l = 0.0;
-    double   sum_r = 0.0;
-    uint32_t idx   = 0u;
+    double   sum_l  = 0.0;
+    double   sum_r  = 0.0;
+    uint32_t idx    = 0u;
+    double   base   = 250.0 - (double) (50 - S2_CORNER_DEADBAND_MMS);
 
     sim_reset(SIM_LOAD_FLOOR, 0u);
     g_steer_mms = 50;
@@ -640,12 +643,12 @@ test_steer (void)
         sum_r += g_sim[WHEEL_RIGHT].speed_mms;
     }
 
-    check("H10", (fabs((sum_l / 25.0) - 200.0) <= 15.0) &&
-                 (fabs((sum_r / 25.0) - 300.0) <= 15.0) &&
+    check("H10", (fabs((sum_l / 25.0) - (base - 50.0)) <= 15.0) &&
+                 (fabs((sum_r / 25.0) - (base + 50.0)) <= 15.0) &&
                  (true_heading_deg() > 0.0),
-          "FOLLOW 250, steer +50: left %.0f mm/s, right %.0f mm/s, heading"
-          " %+.0f deg (left)", sum_l / 25.0, sum_r / 25.0,
-          true_heading_deg());
+          "FOLLOW 250, steer +50 (corner slow-down to %.0f): left %.0f mm/s,"
+          " right %.0f mm/s, heading %+.0f deg (left)", base, sum_l / 25.0,
+          sum_r / 25.0, true_heading_deg());
 }
 
 /* Edge-timed speed against the true speed. */

@@ -161,6 +161,18 @@ ER   subsystem2_gpio_isr_register(void (* p_hook)(UINT intno));        /* S3. */
  * sequence number has not changed for 100 ms is ignored. */
 #define S2_S3_STEER_PERCENT     (50)    /* S3 dv = L-R difference: 50 %.  */
 
+/* FOLLOW corner slow-down: the harder the line steers, the slower the
+ * robot goes, so it has time to make the corner. Robot speed = speed -
+ * (|steer| - DEADBAND) x PERCENT / 100, never below MIN_PERCENT of speed.
+ * Normal small corrections (|steer| <= DEADBAND) keep the full speed.
+ * Example, 80 mm/s and full lock (steer 50): 80 - 40 x 1.0 = 40 ->
+ * clipped to 56 (70 %). The wheel ramp smooths the change. Host sim
+ * (sim_track.c, 28 Oct): 70 % passes every track and bump test; 60 % ran
+ * wide on one sharp corner, 80 % failed a bump test. UNVERIFIED on car. */
+#define S2_CORNER_DEADBAND_MMS  (10)    /* No slow-down up to this steer. */
+#define S2_CORNER_SLOW_PERCENT  (100)   /* mm/s slower per mm/s of steer. */
+#define S2_CORNER_MIN_PERCENT   (70)    /* Never below this x speed.      */
+
 /* Chassis. Distance per tick = circumference / ticks per revolution; only
  * that ratio matters, so the circumference is the calibration value.
  * Calibrated on the floor (S2-U11, 2026-10-23, log 2026-10-23_s2_u11_3):

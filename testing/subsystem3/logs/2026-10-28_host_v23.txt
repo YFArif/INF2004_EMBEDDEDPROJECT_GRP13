@@ -1,0 +1,224 @@
+commit: a9707e4 (+ uncommitted changes in S3)
+compiler: gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+===== code39
+[TEST] sample *A*                   PASS  (res=0 ch=A rev=0)
+[TEST] sample *Z*                   PASS  (res=0 ch=Z rev=0)
+[TEST] *A* read backwards           PASS  (res=0 ch=A rev=1)
+[TEST] *A* at quarter speed         PASS  (res=0 ch=A rev=0)
+[TEST] *A* gradual slow-down        PASS  (res=0 ch=A rev=0)
+[TEST] only 27 elements             PASS  (res=1 ch=? rev=9)
+[TEST] blurred bar -> reject        PASS  (res=2 ch=? rev=9)
+[TEST] all-equal noise -> reject    PASS  (res=2 ch=? rev=9)
+ALL PASSED: 0 failure(s)
+===== code39_all
+[TEST] S3-C03   PASS  all 44 table entries match python-barcode
+[TEST] S3-C04   PASS  A-Z decode forwards (rev 0) and backwards (rev 1)
+  forwards 10320/10320, backwards 10320/10320, wrong letters 0
+[TEST] S3-C05   PASS  all 43 chars x 2 directions x 12 settings x 20 trials, 0 wrong
+ALL PASSED: 0 failure(s)
+===== nav
+[TEST] S3-C01   PASS  all 43 Code 39 characters decode forwards and backwards (ratio 3 and 2)
+[TEST] S3-C02   PASS  every character survives the 6-bit index round trip; unknown -> 63
+[TEST] S3-N01   PASS  default map ABCD
+[TEST] S3-N02   PASS  "DCBA" -> D=LEFT C=RIGHT B=STRAIGHT A=U-TURN
+[TEST] S3-N03   PASS  "zx1w" accepted (upper-cased); letters not in the map -> NONE
+[TEST] S3-N04   PASS  short/long/repeat/'*'/invalid/NULL rejected, old map kept
+ALL PASSED: 0 failure(s)
+===== analog
+[TEST] sharp *A* at 0.30 m/s              PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 27 ms)
+[TEST] blurred 1.5 mm *A* at 0.30 m/s     PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 16 ms)
+[TEST] blurred 1.8 mm *Z* at 0.15 m/s     PASS  (elements=29 extrema=31 res=0 ch=Z, trigger gap max 27 ms)
+[TEST] blurred 1.5 mm *A* reversed        PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 16 ms)
+[TEST] blurred 1.5 mm *A* at 0.40 m/s     PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 12 ms)
+[TEST] too blurred (3 mm) -> reject       PASS  (elements=13 extrema=15 res=1 ch=?, trigger gap max 22 ms)
+[TEST] hand 25 mm/s, swing 1500, blur 1.5 PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 194 ms)
+[TEST] hand 50 mm/s, swing 1500, blur 1.8 PASS  (elements=29 extrema=31 res=0 ch=Z, trigger gap max 121 ms)
+[TEST] plain white -> no edges            PASS  (elements=0)
+ALL PASSED: 0 failure(s)
+===== line
+[TEST] S3-L01   PASS  uncalibrated -> steer 0
+[TEST] S3-L02   PASS  Centre on edge -> steer ~0, FOLLOW, no D kick
+[TEST] S3-L03   PASS  drifted onto line (C darker) -> steer LEFT (negative)
+[TEST] S3-L04   PASS  drifted off line (C whiter) -> steer RIGHT (positive)
+[TEST] S3-L05   PASS  right-edge follow: C darker -> steer RIGHT
+[TEST] S3-L06   PASS  30 mm of junction -> 1 event, JUNCTION, steer 0
+[TEST] S3-L07   PASS  6 mm of black -> no junction
+[TEST] S3-L08   PASS  stopped on black -> no junction
+[TEST] S3-L09   PASS  re-arm only after 30 mm off the junction
+[TEST] S3-L10   PASS  75 mm white -> LOST once, still steering back (right)
+[TEST] S3-L11   PASS  30 mm white gap -> not lost
+[TEST] S3-L12   PASS  calibration relax keeps >= 600 counts range
+[TEST] S3-L13   PASS  lifted-car extreme fades to real black in 30 s
+[TEST] S3-L14   PASS  2 min of white only -> black level unchanged
+[TEST] S3-L15   PASS  curve/drift (C black 30 mm before L) -> no junction, steer hard left
+[TEST] S3-L16   PASS  outer on line -> steer RIGHT >= 600
+[TEST] S3-L17   PASS  D per 10 ms: 20 ms step gives half the D of a 10 ms step
+[TEST] S3-L18   PASS  18 mm crossing line detected at 0.30 and 0.40 m/s
+[TEST] S3-L19   PASS  overshoot recovery (Left black first while Centre white) -> no junction
+[TEST] S3-L41   PASS  car lifted (4050) not learned: tape 2700 reads black
+[TEST] S3-L20   PASS  black stuck at 3999 recovers within 60 s; real black reads black again
+[TEST] S3-L21   PASS  LOST -> FOLLOW: steer from P only (no D kick)
+[TEST] S3-L22   PASS  right edge: junction 1 event; outer (on the left) on line -> steer LEFT
+[TEST] S3-L23   PASS  disabled: steer 0, no events
+[TEST] S3-L24   PASS  search from right (right edge): LINE FOUND at the first (correct) edge
+[TEST] S3-L25   PASS  search from left (right edge): ignores the wrong edge, LINE FOUND after crossing
+[TEST] S3-L27   PASS  found line stays FOLLOW while LF_SEARCH_x still set (5/5 steps, 0 extra FOUND); new request re-searches
+[TEST] S3-L28   PASS  curve boost: Centre all white -> >= 95 % lock; on the edge |steer| < 300
+[TEST] S3-L29   PASS  dt 1 us, Kd max: D term saturates to steer -600 (no 32-bit overflow)
+[TEST] S3-L30   PASS  outer on the line (drift left) -> steer RIGHT >= 600, no junction
+[TEST] S3-L31   PASS  far left (outer saw line last) -> full RIGHT, LOST keeps it
+[TEST] S3-L32   PASS  far right (Centre saw line last) -> full LEFT, LOST keeps it
+[TEST] S3-L33   PASS  sharp left turn -> full LEFT; slight drift left -> RIGHT
+[TEST] S3-L34   PASS  sharp right turn (outer saw it last) -> RIGHT, not left
+[TEST] S3-L35   PASS  edge wobble: no OUTER/OFF LINE; junction still 1 event
+  OUTER push: outer 500 -> steer 200, outer 300 -> steer 40
+[TEST] S3-L36   PASS  OUTER push proportional: outer 500 -> ~200, 300 -> ~40, white -> 0
+[TEST] S3-L38   PASS  slow exit over the far edge -> LEFT (v20: RIGHT)
+[TEST] S3-L39   PASS  settled 40 mm on a new edge, then off it -> RIGHT
+[TEST] S3-L40   PASS  outer sensor grey after a dark Centre -> near side -> RIGHT
+[TEST] S3-L37   PASS  dv: follow 80, OFF LINE / LOST x 5/4 = 100, clamp 511
+  sizeof(s3_ir_cal_t)=8 (was 14)  sizeof(s3_line_t)=44 (was 80)
+[TEST] S3-L26   PASS  calibration 14 -> 8 B, line state 80 -> <= 48 B
+[TEST] S3-N01   PASS  A/B/C/D -> L/R/S/U, others NONE
+ALL PASSED: 0 failure(s)
+===== sim
+== layout: OUR CAR: outer RIGHT 20 mm, Centre 5 mm left, LEFT edge (car centre +4 mm from the line centre when on track)
+  straight 2 m                80 mm/s steer  80 lookahead 40: 100 % of track, max err   0.0 mm, Centre on edge 100 %, LOST 0
+  straight 2 m                80 mm/s steer  80 lookahead 60: 100 % of track, max err   0.0 mm, Centre on edge 100 %, LOST 0
+  straight 2 m                80 mm/s steer  80 lookahead 80: 100 % of track, max err   0.0 mm, Centre on edge 100 %, LOST 0
+[TEST] S3-S01   PASS  straight 2 m: >= 98 % of the track, axle within 25 mm of the line
+  left curve r200             80 mm/s steer  80 lookahead 40: 100 % of track, max err   3.2 mm, Centre on edge 100 %, LOST 0
+  left curve r200             80 mm/s steer  80 lookahead 60: 100 % of track, max err   8.5 mm, Centre on edge 100 %, LOST 0
+  left curve r200             80 mm/s steer  80 lookahead 80: 100 % of track, max err  15.6 mm, Centre on edge 100 %, LOST 0
+[TEST] S3-S02   PASS  left curve r200: >= 98 % of the track, axle within 30 mm of the line
+  right curve r200            80 mm/s steer  80 lookahead 40: 100 % of track, max err   2.8 mm, Centre on edge 100 %, LOST 0
+  right curve r200            80 mm/s steer  80 lookahead 60: 100 % of track, max err   4.0 mm, Centre on edge 100 %, LOST 0
+  right curve r200            80 mm/s steer  80 lookahead 80: 100 % of track, max err   6.3 mm, Centre on edge 100 %, LOST 0
+[TEST] S3-S03   PASS  right curve r200: >= 98 % of the track, axle within 30 mm of the line
+  sharp RIGHT 90              80 mm/s steer  80 lookahead 40: 100 % of track, max err  24.2 mm, Centre on edge  74 %, LOST 1
+  sharp RIGHT 90              80 mm/s steer  80 lookahead 60: 100 % of track, max err   7.4 mm, Centre on edge  81 %, LOST 1
+  sharp RIGHT 90              80 mm/s steer  80 lookahead 80: 100 % of track, max err  17.9 mm, Centre on edge  83 %, LOST 1
+[TEST] S3-S04   PASS  sharp RIGHT 90: >= 95 % of the track, axle within 60 mm of the line
+  sharp LEFT 90               80 mm/s steer  80 lookahead 40: 100 % of track, max err  19.0 mm, Centre on edge  72 %, LOST 1
+  sharp LEFT 90               80 mm/s steer  80 lookahead 60: 100 % of track, max err  14.9 mm, Centre on edge  79 %, LOST 1
+  sharp LEFT 90               80 mm/s steer  80 lookahead 80: 100 % of track, max err  24.5 mm, Centre on edge  82 %, LOST 1
+[TEST] S3-S05   PASS  sharp LEFT 90: >= 95 % of the track, axle within 60 mm of the line
+  S-bend r150                 80 mm/s steer  80 lookahead 40: 100 % of track, max err   4.4 mm, Centre on edge  89 %, LOST 0
+  S-bend r150                 80 mm/s steer  80 lookahead 60: 100 % of track, max err  11.0 mm, Centre on edge  91 %, LOST 0
+  S-bend r150                 80 mm/s steer  80 lookahead 80: 100 % of track, max err  18.3 mm, Centre on edge  91 %, LOST 0
+[TEST] S3-S06   PASS  S-bend r150: >= 98 % of the track, axle within 35 mm of the line
+== layout: OUR CAR as in the photo: outer RIGHT ~33 mm, LEFT edge (car centre +4 mm from the line centre when on track)
+  straight 2 m                80 mm/s steer  80 lookahead 40: 100 % of track, max err   0.0 mm, Centre on edge 100 %, LOST 0
+  straight 2 m                80 mm/s steer  80 lookahead 60: 100 % of track, max err   0.0 mm, Centre on edge 100 %, LOST 0
+  straight 2 m                80 mm/s steer  80 lookahead 80: 100 % of track, max err   0.0 mm, Centre on edge 100 %, LOST 0
+[TEST] S3-S11   PASS  straight 2 m: >= 98 % of the track, axle within 25 mm of the line
+  left curve r200             80 mm/s steer  80 lookahead 40: 100 % of track, max err   3.2 mm, Centre on edge 100 %, LOST 0
+  left curve r200             80 mm/s steer  80 lookahead 60: 100 % of track, max err   8.5 mm, Centre on edge 100 %, LOST 0
+  left curve r200             80 mm/s steer  80 lookahead 80: 100 % of track, max err  15.6 mm, Centre on edge 100 %, LOST 0
+[TEST] S3-S12   PASS  left curve r200: >= 98 % of the track, axle within 30 mm of the line
+  right curve r200            80 mm/s steer  80 lookahead 40: 100 % of track, max err   2.8 mm, Centre on edge 100 %, LOST 0
+  right curve r200            80 mm/s steer  80 lookahead 60: 100 % of track, max err   4.0 mm, Centre on edge 100 %, LOST 0
+  right curve r200            80 mm/s steer  80 lookahead 80: 100 % of track, max err   6.3 mm, Centre on edge 100 %, LOST 0
+[TEST] S3-S13   PASS  right curve r200: >= 98 % of the track, axle within 30 mm of the line
+  sharp RIGHT 90              80 mm/s steer  80 lookahead 40: 100 % of track, max err  24.7 mm, Centre on edge  74 %, LOST 1
+  sharp RIGHT 90              80 mm/s steer  80 lookahead 60: 100 % of track, max err   7.4 mm, Centre on edge  81 %, LOST 1
+  sharp RIGHT 90              80 mm/s steer  80 lookahead 80: 100 % of track, max err  17.6 mm, Centre on edge  81 %, LOST 0
+[TEST] S3-S14   PASS  sharp RIGHT 90: >= 95 % of the track, axle within 60 mm of the line
+  sharp LEFT 90               80 mm/s steer  80 lookahead 40: 100 % of track, max err  19.0 mm, Centre on edge  75 %, LOST 1
+  sharp LEFT 90               80 mm/s steer  80 lookahead 60: 100 % of track, max err  15.4 mm, Centre on edge  80 %, LOST 1
+  sharp LEFT 90               80 mm/s steer  80 lookahead 80: 100 % of track, max err  25.2 mm, Centre on edge  82 %, LOST 1
+[TEST] S3-S15   PASS  sharp LEFT 90: >= 95 % of the track, axle within 60 mm of the line
+  S-bend r150                 80 mm/s steer  80 lookahead 40: 100 % of track, max err   4.4 mm, Centre on edge  89 %, LOST 0
+  S-bend r150                 80 mm/s steer  80 lookahead 60: 100 % of track, max err  11.0 mm, Centre on edge  95 %, LOST 0
+  S-bend r150                 80 mm/s steer  80 lookahead 80: 100 % of track, max err  18.4 mm, Centre on edge  98 %, LOST 0
+[TEST] S3-S16   PASS  S-bend r150: >= 98 % of the track, axle within 35 mm of the line
+== layout: mirror: outer LEFT 21 mm, Centre 5 mm left, RIGHT edge (car centre -14 mm from the line centre when on track)
+  straight 2 m                80 mm/s steer  80 lookahead 40: 100 % of track, max err   0.0 mm, Centre on edge 100 %, LOST 0
+  straight 2 m                80 mm/s steer  80 lookahead 60: 100 % of track, max err   0.0 mm, Centre on edge 100 %, LOST 0
+  straight 2 m                80 mm/s steer  80 lookahead 80: 100 % of track, max err   0.0 mm, Centre on edge 100 %, LOST 0
+[TEST] S3-S21   PASS  straight 2 m: >= 98 % of the track, axle within 25 mm of the line
+  left curve r200             80 mm/s steer  80 lookahead 40: 100 % of track, max err   2.9 mm, Centre on edge 100 %, LOST 0
+  left curve r200             80 mm/s steer  80 lookahead 60: 100 % of track, max err   7.7 mm, Centre on edge 100 %, LOST 0
+  left curve r200             80 mm/s steer  80 lookahead 80: 100 % of track, max err  14.0 mm, Centre on edge 100 %, LOST 0
+[TEST] S3-S22   PASS  left curve r200: >= 98 % of the track, axle within 30 mm of the line
+  right curve r200            80 mm/s steer  80 lookahead 40: 100 % of track, max err   3.1 mm, Centre on edge 100 %, LOST 0
+  right curve r200            80 mm/s steer  80 lookahead 60: 100 % of track, max err   8.4 mm, Centre on edge 100 %, LOST 0
+  right curve r200            80 mm/s steer  80 lookahead 80: 100 % of track, max err  15.6 mm, Centre on edge 100 %, LOST 0
+[TEST] S3-S23   PASS  right curve r200: >= 98 % of the track, axle within 30 mm of the line
+  sharp RIGHT 90              80 mm/s steer  80 lookahead 40: 100 % of track, max err  14.0 mm, Centre on edge  70 %, LOST 1
+  sharp RIGHT 90              80 mm/s steer  80 lookahead 60: 100 % of track, max err  13.9 mm, Centre on edge  78 %, LOST 1
+  sharp RIGHT 90              80 mm/s steer  80 lookahead 80: 100 % of track, max err  19.8 mm, Centre on edge  80 %, LOST 1
+[TEST] S3-S24   PASS  sharp RIGHT 90: >= 95 % of the track, axle within 60 mm of the line
+  sharp LEFT 90               80 mm/s steer  80 lookahead 40: 100 % of track, max err  14.9 mm, Centre on edge  78 %, LOST 1
+  sharp LEFT 90               80 mm/s steer  80 lookahead 60: 100 % of track, max err  13.6 mm, Centre on edge  83 %, LOST 1
+  sharp LEFT 90               80 mm/s steer  80 lookahead 80: 100 % of track, max err  13.8 mm, Centre on edge  85 %, LOST 1
+[TEST] S3-S25   PASS  sharp LEFT 90: >= 95 % of the track, axle within 60 mm of the line
+  S-bend r150                 80 mm/s steer  80 lookahead 40: 100 % of track, max err   4.4 mm, Centre on edge  85 %, LOST 0
+  S-bend r150                 80 mm/s steer  80 lookahead 60: 100 % of track, max err  11.3 mm, Centre on edge  89 %, LOST 0
+  S-bend r150                 80 mm/s steer  80 lookahead 80: 100 % of track, max err  20.0 mm, Centre on edge  91 %, LOST 0
+[TEST] S3-S26   PASS  S-bend r150: >= 98 % of the track, axle within 35 mm of the line
+== layout: OUR CAR 20 mm, LEFT edge, sensor noise (car centre +4 mm from the line centre when on track)
+  noise +- 0 raw  v19 Kp 150 Kd 400: 100 % of track, max err   7.7 mm, Centre on edge  58 %, dv sign flips  0 % of steps
+  noise +- 0 raw  v20 Kp 250 Kd  50: 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips  0 % of steps
+  noise +-40 raw  v19 Kp 150 Kd 400: 100 % of track, max err   7.7 mm, Centre on edge  57 %, dv sign flips 23 % of steps
+  noise +-40 raw  v20 Kp 250 Kd  50: 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips 12 % of steps
+  noise +-80 raw  v19 Kp 150 Kd 400: 100 % of track, max err   7.7 mm, Centre on edge  59 %, dv sign flips 27 % of steps
+  noise +-80 raw  v20 Kp 250 Kd  50: 100 % of track, max err   8.4 mm, Centre on edge  99 %, dv sign flips 17 % of steps
+[TEST] S3-S90   PASS  S-bend r200 with noise 0/40/80: v20 gains on track and flip sign no more often than v19
+== layout: OUR CAR 20 mm, LEFT edge, wheel lag + 8-bit readings (car centre +4 mm from the line centre when on track)
+  -- straight 2 m
+  lag  40 ms noise +-40  v20 chain                  : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 34 %
+  lag  40 ms noise +-40  v21: oversample 4          : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 19 %
+  lag  40 ms noise +-40  not adopted: S2 slew 120   : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 34 %
+  lag  40 ms noise +-80  v20 chain                  : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 43 %
+  lag  40 ms noise +-80  v21: oversample 4          : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 33 %
+  lag  40 ms noise +-80  not adopted: S2 slew 120   : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 42 %
+  lag  80 ms noise +-40  v20 chain                  : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 34 %
+  lag  80 ms noise +-40  v21: oversample 4          : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 20 %
+  lag  80 ms noise +-40  not adopted: S2 slew 120   : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 34 %
+  lag  80 ms noise +-80  v20 chain                  : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 42 %
+  lag  80 ms noise +-80  v21: oversample 4          : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 33 %
+  lag  80 ms noise +-80  not adopted: S2 slew 120   : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 42 %
+  lag 120 ms noise +-40  v20 chain                  : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 33 %
+  lag 120 ms noise +-40  v21: oversample 4          : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 19 %
+  lag 120 ms noise +-40  not adopted: S2 slew 120   : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 34 %
+  lag 120 ms noise +-80  v20 chain                  : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 41 %
+  lag 120 ms noise +-80  v21: oversample 4          : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 31 %
+  lag 120 ms noise +-80  not adopted: S2 slew 120   : 100 % of track, max err   0.0 mm, Centre on edge 100 %, dv sign flips 40 %
+  -- S-bend r200
+  lag  40 ms noise +-40  v20 chain                  : 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips 11 %
+  lag  40 ms noise +-40  v21: oversample 4          : 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips  5 %
+  lag  40 ms noise +-40  not adopted: S2 slew 120   : 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips 11 %
+  lag  40 ms noise +-80  v20 chain                  : 100 % of track, max err   8.4 mm, Centre on edge  99 %, dv sign flips 17 %
+  lag  40 ms noise +-80  v21: oversample 4          : 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips 10 %
+  lag  40 ms noise +-80  not adopted: S2 slew 120   : 100 % of track, max err   8.4 mm, Centre on edge  99 %, dv sign flips 17 %
+  lag  80 ms noise +-40  v20 chain                  : 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips 11 %
+  lag  80 ms noise +-40  v21: oversample 4          : 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips  5 %
+  lag  80 ms noise +-40  not adopted: S2 slew 120   : 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips 12 %
+  lag  80 ms noise +-80  v20 chain                  : 100 % of track, max err   8.4 mm, Centre on edge  99 %, dv sign flips 17 %
+  lag  80 ms noise +-80  v21: oversample 4          : 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips 10 %
+  lag  80 ms noise +-80  not adopted: S2 slew 120   : 100 % of track, max err   8.4 mm, Centre on edge  99 %, dv sign flips 16 %
+  lag 120 ms noise +-40  v20 chain                  : 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips 10 %
+  lag 120 ms noise +-40  v21: oversample 4          : 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips  5 %
+  lag 120 ms noise +-40  not adopted: S2 slew 120   : 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips 11 %
+  lag 120 ms noise +-80  v20 chain                  : 100 % of track, max err   8.4 mm, Centre on edge  99 %, dv sign flips 18 %
+  lag 120 ms noise +-80  v21: oversample 4          : 100 % of track, max err   8.4 mm, Centre on edge 100 %, dv sign flips 11 %
+  lag 120 ms noise +-80  not adopted: S2 slew 120   : 100 % of track, max err   8.4 mm, Centre on edge  99 %, dv sign flips 17 %
+  mean over the sweep  v20 chain                  : Centre on edge  99.8 %, dv sign flips  25.9 %
+  mean over the sweep  v21: oversample 4          : Centre on edge 100.0 %, dv sign flips  16.8 %
+  mean over the sweep  not adopted: S2 slew 120   : Centre on edge  99.8 %, dv sign flips  25.8 %
+[TEST] S3-S91   PASS  v21 (IR oversample 4): on track at lag 40-120 ms, noise 40-80; more on the edge, fewer flips than v20
+== layout: OUR CAR 20 mm, LEFT edge, disturbed once (car centre +4 mm from the line centre when on track)
+  -- straight 1.2 m
+  lag  60 ms undisturbed: 100 % of track, RMS err  0.0 mm, max  0.0 mm, dv flips 27 %
+  lag 120 ms undisturbed: 100 % of track, RMS err  0.0 mm, max  0.0 mm, dv flips 27 %
+  -- S-bend r200 (right first)
+  lag  60 ms undisturbed: 100 % of track, RMS err  3.8 mm, max  8.4 mm, dv flips  7 %
+  lag 120 ms undisturbed: 100 % of track, RMS err  3.8 mm, max  8.4 mm, dv flips  7 %
+  -- S-bend r150 (left first)
+  lag  60 ms undisturbed: 100 % of track, RMS err  4.8 mm, max 11.4 mm, dv flips  8 %
+  lag 120 ms undisturbed: 100 % of track, RMS err  4.8 mm, max 11.4 mm, dv flips  9 %
+  disturbed runs finished: 216 of 216; straight weave RMS 0.0 mm
+[TEST] S3-S92   PASS  after a bump or slip the car finishes the track (216 of 216 runs)
+ALL PASSED: 0 failure(s)
+S3 HOST: PASS (6 of 6 programs, all checks passed)

@@ -165,6 +165,7 @@ static void    travel_begin(subsystem2_state_t state, int32_t goal_um,
                             int32_t sign_left, int32_t sign_right,
                             int32_t speed_mms);
 static void    control_run(void);
+static int32_t corner_speed(int32_t speed_mms, int32_t steer_mms);
 static bool    travel_targets(int32_t * p_want_left,
                               int32_t * p_want_right);
 static void    wheel_measure(wheel_t * p_wheel, uint32_t now_us);
@@ -385,6 +386,7 @@ control_run (void)
     int32_t want_left  = 0;
     int32_t want_right = 0;
     int32_t steer_mms  = 0;
+    int32_t base_mms   = 0;
     bool    b_drive    = false;
     bool    b_stall_l  = false;
     bool    b_stall_r  = false;
@@ -393,9 +395,10 @@ control_run (void)
     {
         case S2_STATE_FOLLOWING:
             steer_mms  = subsystem2_steer_get();
-            want_left  = clamp(g_motion.speed_mms - steer_mms,
+            base_mms   = corner_speed(g_motion.speed_mms, steer_mms);
+            want_left  = clamp(base_mms - steer_mms,
                                -S2_SPEED_MAX_MMS, S2_SPEED_MAX_MMS);
-            want_right = clamp(g_motion.speed_mms + steer_mms,
+            want_right = clamp(base_mms + steer_mms,
                                -S2_SPEED_MAX_MMS, S2_SPEED_MAX_MMS);
             b_drive    = true;
         break;
@@ -430,6 +433,30 @@ control_run (void)
             stall_handle();
         }
     }
+}
+
+/*!
+ * @brief FOLLOW robot speed for this steering (corner slow-down, see
+ *        S2_CORNER_* in subsystem2.h).
+ *
+ * @param[in] speed_mms  Commanded FOLLOW speed, >= 0.
+ * @param[in] steer_mms  Per-wheel steering offset, signed.
+ *
+ * @return Speed to use this cycle, MIN_PERCENT x speed ... speed.
+ */
+static int32_t
+corner_speed (int32_t speed_mms, int32_t steer_mms)
+{
+    int32_t excess = magnitude(steer_mms) - S2_CORNER_DEADBAND_MMS;
+    int32_t floor  = (speed_mms * S2_CORNER_MIN_PERCENT) / 100;
+    int32_t speed  = speed_mms;
+
+    if (excess > 0)
+    {
+        speed = speed_mms - ((excess * S2_CORNER_SLOW_PERCENT) / 100);
+    }
+
+    return ((speed < floor) ? floor : speed);
 }
 
 /*!

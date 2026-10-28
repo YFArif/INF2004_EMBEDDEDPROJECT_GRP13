@@ -1,5 +1,9 @@
 # Subsystem 2 (motion control) handover
 
+For the current 2026-10-28 motor commands, calibration, limitations and Sean's
+sensor integration, read [MOTOR_S3_REFERENCE.md](MOTOR_S3_REFERENCE.md).
+The older bring-up statements below are historical and may be superseded there.
+
 Written 2026-10-15 by Buddy 2 (Arif); updated 2026-10-22 when the drive demo was replaced by `motion_task`. Everything below is what exists today in `app_program/subsystem2/`. `motion_task` builds and its software tests are defined, but it has not run on the car yet.
 
 ## 1. Hardware and wiring

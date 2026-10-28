@@ -13,8 +13,6 @@
 
 #include "drv_adc.h"
 #include "drv_barcode.h"
-#include "drv_ir_centre.h"
-#include "drv_ir_left.h"
 #include "s3_config.h"
 
 /* ADC registers (datasheet 4.9.6). */
@@ -42,14 +40,27 @@
 #error "two S3 sensors on the same ADC channel"
 #endif
 
-/* g_ir_countdown is 8 bits. */
-typedef char drv_adc_chk_ir_every_t[((DRV_ADC_IR_EVERY >= 1u) &&
-                                     (DRV_ADC_IR_EVERY <= 256u)) ? 1 : -1];
+/* g_ir_countdown is 8 bits; the IR samples must divide 10 ms evenly, and
+ * the 12-bit sums must fit 16 bits. */
+typedef char drv_adc_chk_ir_every_t[((DRV_ADC_IR_STRIDE >= 1u) &&
+                                     (DRV_ADC_IR_STRIDE <= 256u) &&
+                                     ((DRV_ADC_IR_STRIDE *
+                                       DRV_ADC_IR_SAMPLES) ==
+                                      DRV_ADC_IR_EVERY) &&
+                                     ((1u << DRV_ADC_IR_SHIFT) ==
+                                      DRV_ADC_IR_SAMPLES) &&
+                                     ((DRV_ADC_IR_SAMPLES * 4095u) <=
+                                      0xFFFFu)) ? 1 : -1];
 
 static volatile uint32_t g_sample_idx;  /* Samples taken (monotonic).   */
 static volatile uint32_t g_alarm_next;  /* Next alarm time, us.         */
 static uint8_t           g_ir_countdown; /* Samples until the next line */
-                                         /* sensor reading (ISR only).  */
+                                         /* sensor sample (ISR only).   */
+static uint8_t           g_ir_count;    /* IR samples in the sums.      */
+static uint16_t          g_ir_left_sum; /* 12-bit sums (ISR only).      */
+static uint16_t          g_ir_centre_sum;
+static volatile uint8_t  g_ir_left8;    /* Latest averaged readings,    */
+static volatile uint8_t  g_ir_centre8;  /* 8-bit. Only the ISR writes.  */
 
 #if (1 == S3_TIMING)
 static volatile uint16_t g_isr_max_us;  /* Longest sampler run, us.     */
@@ -115,6 +126,35 @@ drv_adc_isr_max_us_take (void)
 #endif
 
 /*!
+ * @brief Make both line IR pins analogue inputs. Sampling starts with
+ *        drv_adc_init().
+ */
+void
+drv_adc_ir_init (void)
+{
+    drv_adc_pin_analog(DRV_IR_LEFT_PIN);
+    drv_adc_pin_analog(DRV_IR_CENTRE_PIN);
+}
+
+/*!
+ * @brief Both line IR readings from the SAME 10 ms sample, on the 12-bit
+ *        scale (0 ... 4080), higher = darker.
+ *
+ * NOTE: Call on core 1 only: the sampler interrupt runs there, so
+ * disabling interrupts keeps it from running between the two reads.
+ */
+void
+drv_adc_ir_read (uint16_t * p_left, uint16_t * p_centre)
+{
+    UINT imask;
+
+    DI(imask);
+    *p_left   = (uint16_t) ((uint16_t) g_ir_left8 << 4);
+    *p_centre = (uint16_t) ((uint16_t) g_ir_centre8 << 4);
+    EI(imask);
+}
+
+/*!
  * @brief Enable the ADC and start the sampler on the calling core.
  *
  * @return E_OK, or the kernel error from tk_def_int().
@@ -144,11 +184,14 @@ drv_adc_init (void)
 
 /*!
  * @brief Timer alarm 1: re-arm, then sample the barcode every time and
- *        the two line sensors every DRV_ADC_IR_EVERY samples (10 ms).
+ *        the two line sensors every DRV_ADC_IR_STRIDE samples; every
+ *        DRV_ADC_IR_SAMPLES line sensor samples (10 ms) publish their
+ *        averages.
  *
- * A countdown replaces "idx % DRV_ADC_IR_EVERY": the Cortex-M0+ has no
- * divide instruction, so % called the library divide 2000 times a
- * second. The first sample (idx 0) still reads the line sensors.
+ * A countdown replaces "idx % DRV_ADC_IR_STRIDE", and the average is a
+ * shift: the Cortex-M0+ has no divide instruction, so % or / would call
+ * the library divide in this 2 kHz interrupt. The first sample (idx 0)
+ * still samples the line sensors.
  */
 S3_RAM_FUNC(sampler_isr) static void
 sampler_isr (UINT intno)
@@ -168,9 +211,27 @@ sampler_isr (UINT intno)
     drv_barcode_sample_isr(idx);
     if (0u == g_ir_countdown)
     {
-        g_ir_countdown = (uint8_t) (DRV_ADC_IR_EVERY - 1u);
-        drv_ir_left_sample_isr();
-        drv_ir_centre_sample_isr();
+        g_ir_countdown   = (uint8_t) (DRV_ADC_IR_STRIDE - 1u);
+        g_ir_left_sum    = (uint16_t) (g_ir_left_sum +
+                                       drv_adc_convert(DRV_IR_LEFT_ADC_CH));
+        g_ir_centre_sum  = (uint16_t) (g_ir_centre_sum +
+                                       drv_adc_convert(DRV_IR_CENTRE_ADC_CH));
+        g_ir_count++;
+        if (g_ir_count >= DRV_ADC_IR_SAMPLES)
+        {
+            // Rounded to nearest, then 8 bits like a single sample.
+            g_ir_left8      = drv_adc_to8((uint16_t)
+                                  ((g_ir_left_sum +
+                                    (DRV_ADC_IR_SAMPLES / 2u)) >>
+                                   DRV_ADC_IR_SHIFT));
+            g_ir_centre8    = drv_adc_to8((uint16_t)
+                                  ((g_ir_centre_sum +
+                                    (DRV_ADC_IR_SAMPLES / 2u)) >>
+                                   DRV_ADC_IR_SHIFT));
+            g_ir_left_sum   = 0u;
+            g_ir_centre_sum = 0u;
+            g_ir_count      = 0u;
+        }
     }
     else
     {

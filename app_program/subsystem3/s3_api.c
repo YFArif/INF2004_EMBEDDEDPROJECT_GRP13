@@ -19,9 +19,7 @@
 #include "s3_code39.h"
 #include "s3_config.h"
 #include "s3_line.h"
-#include "s3_nav.h"
 #include "s3_private.h"
-#include "task_barcode.h"
 
 /* IF-02 steer_sp: one aligned 32-bit word, single writer (task_line).
  * Bits 0-9 dv (10-bit two's complement, mm/s), 10-17 seq, 18 valid. */
@@ -479,7 +477,7 @@ s3_state_txt (uint32_t state, uint8_t overshoot)
     switch (state)
     {
         case S3_LINE_FOLLOW:
-            p_txt = (0u != overshoot) ? "FOLLOW (outer near line)" : "FOLLOW";
+            p_txt = (0u != overshoot) ? "FOLLOW (one sensor off line)" : "FOLLOW";
             break;
         case S3_LINE_JUNCTION:
             p_txt = "JUNCTION";

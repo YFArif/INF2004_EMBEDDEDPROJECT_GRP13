@@ -1,10 +1,70 @@
-# Subsystem 3 (Buddy 3, Sean): integration guide (v20)
+# Subsystem 3 (Buddy 3, Sean): integration guide (v25)
 
-S3 covers IR line following, junction and line-lost detection, Code 39 barcode decoding, and the navigation command.
+S3 covers IR line following, line-lost detection (junction detection is off in the v25 layout), Code 39 barcode decoding, and the navigation command.
 
+## v27 drive test (28 Oct, Arif): quiet, clearly separated test stages
+
+- Flash `build_make/S3_v27_CLEAR_STEPS.uf2` for this test.
+- Background `S3 LINE` and `S3 TIME` prints are disabled in drive-test builds only. Normal builds retain them. Waiting output prints only when calibration readiness changes, not whenever a sensor level changes.
+- Follow the large banners: **STEP 1 GET READY** (10-second countdown), **STEP 2 SWEEP NOW**, **STEP 3 CALIBRATION READY** (park both sensors on black, then tap and release GP20), **STEP 4 RUNNING** (GP20 stops).
+- READY requires both black levels >= 2500 and both white-to-black ranges >= 600, matching the controller's contrast requirement. Readiness is not confirmation that the car is positioned on the line.
+- After a run, the stop summary is followed by the waiting prompt. Calibration does not automatically reset after a run. Hold GP21 for 2 seconds when waiting to restart calibration.
+- Detailed `S3 LOG` output remains at 100 ms while driving; steering, speed and safety limits are unchanged.
+
+## v26 drive test (28 Oct, Arif): countdown, one-press start, run logs
+
+- **Calibration countdown:** at power-up (and when asked) the serial monitor counts down `S3 CAL 10 ... 1`, then forgets the old levels and prints `SWEEP NOW`: sweep until `S3 DRIVE CAL ... READY`.
+- **GP20: tap and release to start** (no long hold), then a 3-second countdown and it drives. Release before the countdown finishes: a held button stops the run. Press GP20 while driving to stop. Pressing START before READY starts a new calibration countdown instead.
+- **GP21:** press = next gain preset; hold 2 s = recalibrate (with the countdown).
+- **`S3 LOG` every 100 ms while driving:** time, distance, left / right sensor (0 white ... 1000 black) and zone (B / G / W), line state, dv sent to S2, each wheel's target speed, measured speed and PWM duty, encoder ticks and heading.
+- **`S3 SUMMARY` + `S3 DIAG` after every run:** % of time both sensors black / one white / both white (longest both-white stretch), steering side changes per metre, mean wheel speed error. `S3 DIAG` lines name the likely cause: SENSORS (both seldom black together: too far apart), LINE BETWEEN SENSORS, OVERSTEER / WEAVE, or MOTORS (wheels not following their set-points).
+
+## v25 (28 Oct, Arif): BOTH SENSORS ON THE LINE (replaces the edge-riding layout)
+
+**Re-mount the two line sensors before flashing v25.** Both now sit over the black line, **12 mm apart centre to centre**, the pair centred on the car (6 mm each side of the car's centre line), same height, side by side:
+
+    white |####   GP27      GP26   ####| white     (car driving up the page)
+                  <--- 12 mm --->
+          line 18 mm wide; each sensor about 3 mm inside its edge
+
+- **How it steers:** e = (right sensor darkness) − (left sensor darkness). Both black = centred, go straight. The car drifts → the sensor on that side reaches the edge and greys → it steers back, harder the further it drifts. One sensor white + the other black = full lock. Left and right corners use the same rule, so they behave the same.
+- **Line lost (both white):** full lock towards the side the line was last seen on (the sensor that stayed black longest). There is no near-edge / far-edge to confuse, which is what made the old layout spin. After 40 mm both white the state is LOST (event raised), still turning that way until a sensor sees the line.
+- **Which sensor is where:** on our car GP26 is on the robot's RIGHT and GP27 on its LEFT (`S3_IR_L_SIDE` in `s3_config.h`). If you mount them the other way round, set `S3_LN_L_ON_LEFT`. Wrong setting = the car steers away from the line at once.
+- **Gains:** Kp 100, Kd 0 by default (full lock when one sensor is white). Drive-test presets: 0 = 100/0, 1 = 75/0 softer, 2 = 150/0 stronger, 3 = 100/25, 4 = 200/0. All at 40 mm/s, steer max 40, S2 corner slow-down on.
+- **Junctions are NOT detected in this layout:** both sensors are black on every part of the line, so a crossing looks like plain line. `junction_event` is always 0. FR3 junction reporting needs another method (e.g. the barcode before each junction); the design report's "sensors more than 18 mm apart" rule no longer applies and must be updated.
+- **Host evidence** (`testing/subsystem3/logs/2026-10-28_host_v25.txt`, model only): 6 tracks × 3 lookaheads × 40 and 80 mm/s × 4 mountings (12 mm both ways round, 10 mm, 14 mm) all pass; sharp LEFT and RIGHT 90 give identical errors; start 8–15 mm off the line pulls on; wheel lag 40–120 ms + noise + 8-bit readings stay within 30 mm; 216 of 216 bump/slip runs finish. Not yet run on the car.
+- Removed: the straddle rules (OUTER push, far-edge flag, tie / last-seen rules, junction distance trackers and `S3 JDBG` prints). Calibration (incl. the lifted-car guard), 4-sample averaging, the drive test (40 mm/s, no time limit) and the barcode path are unchanged.
 ## 1. What to copy into the team repo
 
 Copy the whole folder `app_program/subsystem3/` and the folder `testing/subsystem3/host/`. Nothing outside these two folders needs to change. The build compiles every `app_program/*/*.c` (`build_make/mtkernel_3/app_program/subdir.mk`), and `app_main.c` already calls `subsystem3_init()` and `subsystem3_start()`.
+
+v23 (28 Oct, Arif):
+
+- **"Full black reads 60 % grey" fixed.** A friend's `S3 VIEW` log showed tape at 2500–2900 raw but a learned black of ~4050: the car had been lifted during the calibration sweep (no floor = darkest reading). The controller then saw the tape as ~60 %, never "black" (> 750): junctions could not fire, and a Centre fully on the line looked only slightly past the edge, so steering was weak and the car drifted across the line in corners. Calibration now ignores readings ≥ 3700 raw (`S3_IR_CAL_LIFT_RAW`). Test S3-L41. **Still sweep with the wheels on the floor.**
+- **Corner slow-down (in Buddy 2's S2 FOLLOW).** Speed drops as steering grows: speed − (|steer| − 10) mm/s, never below 70 % of speed (`S2_CORNER_*` in `subsystem2.h`). Straight-line tracking keeps full speed. Simulator: sharp-left error 45 → 11 mm on our 20 mm layout; every track and bump test passes. Not yet run on the car.
+
+v22 (28 Oct, Arif with Sean's consent; normal driving, fixes the sudden 180s / circles / wrong-way turns seen on the car):
+
+- **Cause found (host model, not yet confirmed on the car).** The Centre rides the line's LEFT edge. If a bump, slip or curve carries it right across the 18 mm line, it comes out on the FAR (right) edge, which also reads half black. When both sensors then go white, `off_line_dir()` rule 3 decides which way to turn using a "Centre went dark" flag, and v20 cleared that flag after only 5 mm of mid grey. A slow exit over the far edge passes that much mid grey, so the car turned RIGHT, away from the line, at full lock, and LOST kept turning: a 180 or a circle.
+- **Fix:** the flag (now `c_far`) is cleared only when the outer sensor is darker than WHITE (that can only happen on the near side) or after the Centre sat **40 mm** in mid grey (`S3_LN_FAR_SETTLE_MM`; the far edge is unstable under the PD, so a long settle means the near edge, e.g. the new line after a sharp corner). 5, 10 and 20 mm still fail the new stress test; 40 passes it.
+- **New simulator stress test S3-S92:** one bump (heading ±15–35° or slide ±15–30 mm, spread over 0.3 s) on a straight and two S-bends, 3 lookaheads, wheel lag 60 / 120 ms, noise, 4-sample averaging, 8-bit readings: 216 runs. v21: 202 of 216 finish (the 14 failures are 180s / circles). v22: **216 of 216**. All 18 track cases still pass.
+- **New unit tests S3-L38 … L40:** a slow far-edge exit turns back LEFT (fails on v21), and the two ways the flag must still clear (settled on a new edge; outer sensor grey) turn RIGHT.
+- **Tried and NOT adopted:** blocking all PD steering towards the outer side while the flag is set. It broke the sharp LEFT 90° case (S3-S05), where the Centre legitimately crosses to the new edge.
+- **Drive-test preset 1 is now Kp 150 / Kd 50** (was 200 / 50). In a host gain sweep it had the fewest steering sign flips of the gains that still pass every track; 200 was barely different from the default 250. The default is unchanged (250 / 50). The model does not reproduce the visible weave on the car, so use preset 1 vs 0 on the car to decide.
+- LOST recovery itself (full lock until the correct edge is found) is unchanged; it now starts in the right direction.
+
+v21 (28 Oct, Arif with Sean's consent; normal driving only, the LOST / recovery logic is unchanged):
+
+- **Fewer files (36 → 23 in this folder).** Small files that had one user were merged into it. Nothing outside S3 changes, and every public function keeps its name:
+  - `drv_ir_left` and `drv_ir_centre` (two 40-line drivers) → `drv_adc`, which already owned the ADC and the sampler interrupt that reads them. `drv_adc_ir_read()` returns both sensors from the same sample.
+  - `s3_ir_cal` (one sensor's calibration) → `s3_line`, its only user.
+  - `s3_nav` (letter → command map) → `s3_code39`, and reformatted to the BARR-C layout used everywhere else.
+  - `task_line.h`, `task_barcode.h`, `task_drive_test.h` (one prototype each) → `s3_private.h`.
+  - `S3_CHECKLIST.md` and `S3_DATA_REPRESENTATION.md` → `testing/subsystem3/`, with the other test evidence.
+  - The host tests give byte-identical output before and after the merge.
+- **Line IR oversampling (the one behaviour change).** Each 10 ms reading is now the average of 4 ADC samples taken 2.5 ms apart, instead of one sample. Noise was turning into left/right steering flips. In the simulation (new check S3-S91: wheel lag 40–120 ms, 8-bit readings, noise ±40/±80 raw) steering sign flips drop from 26 % to 17 % of steps and the Centre stays on the edge more often. Readings are still published every 10 ms (NFR1) as 8 bits (Change Requirement 1), and the longest sampler interrupt is expected to stay about the same (not measured on the Pico). Not yet run on the car.
+- **Tried and not adopted:** letting S2 change the steering faster than its 30 mm/s per 20 ms ramp. It made no measurable difference in S3-S91, so Buddy 2's code is unchanged.
+- **New runner:** `sh testing/subsystem3/run_host_tests.sh` builds and runs all six host programs with `-Werror` (the line test and simulation under sanitizers).
 
 v16 splits the old `s3_bringup.c` into one driver per sensor, a combiner and two tasks, in BARR-C:2018 style (deviations are listed at the top of `subsystem3.h`). The line and barcode logic gives byte-identical host-test output to v15; the on-car behaviour still needs re-checking. The desk-test builds (`S3_TEST` 1 to 4) are removed.
 
@@ -43,43 +103,34 @@ v17 (28 Oct) changes on top of v16. All four existing host tests give byte-ident
 
 | File | Layer | What it does |
 |---|---|---|
+| `subsystem3.c` / `.h` | build | `subsystem3_init()` → `s3_init()`, `subsystem3_start()` → `s3_start()`. File map and BARR-C deviations. |
 | `s3_api.h` / `s3_api.c` | interface | Public interface (other subsystems include `../subsystem3/subsystem3.h`), kernel objects, status, steering word. |
 | `s3_config.h` | settings | Priorities, periods, edge side, debug prints, `S3_DRIVE_TEST`. |
-| `drv_ir_left.c` / `.h` | driver | Left IR line sensor, GP28 / ADC2 (mounted on the robot's right). |
-| `drv_ir_centre.c` / `.h` | driver | Centre line sensor, GP27 / ADC1. |
-| `drv_barcode.c` / `.h` | driver | Barcode sensor: DOUT GP6 edge interrupt (on S2's shared handler), AOUT GP26 sample ring, pass detection. |
-| `drv_adc.c` / `.h` | driver | ADC owner and the 2 kHz sampler interrupt that feeds the three drivers. |
-| `s3_ir_cal.c` / `.h` | logic (pure C) | Calibration of one line sensor: filter, learn, relax, normalise. |
-| `s3_line.c` / `.h` | logic (pure C) | Combiner: PD steering, curve boost, overshoot, junction, lost, search. |
-| `s3_code39.c` / `.h` | logic (pure C) | Code 39 decoder: all 43 characters plus `*`, forwards and backwards. |
+| `s3_private.h` | internal | Helpers and task start-up shared inside S3 only. |
+| `drv_adc.c` / `.h` | driver | ADC owner, the 2 kHz sampler interrupt, and both line IR sensors: outer ("Left IR") GP26 / ADC0 on the robot's right, Centre GP27 / ADC1. Each 10 ms reading averages 4 samples. |
+| `drv_barcode.c` / `.h` | driver | Barcode sensor: DOUT GP7 edge interrupt (on S2's shared handler), AOUT GP28 / ADC2 sample ring, pass detection. |
+| `s3_line.c` / `.h` | logic (pure C) | Per-sensor calibration (filter, learn, relax, normalise) and the combiner: PD steering, curve boost, overshoot, junction, lost, search. |
+| `s3_code39.c` / `.h` | logic (pure C) | Code 39 decoder (all 43 characters plus `*`, forwards and backwards) and the run-time letter → command map. |
 | `s3_analog.c` / `.h` | logic (pure C) | Analogue barcode widths. |
-| `s3_nav.c` / `.h` | logic (pure C) | Letter → command, map settable at run time. |
-| `task_line.c` / `.h` | task | 10 ms line task (core 1, priority 8). |
-| `task_barcode.c` / `.h` | task | Hardware set-up, then barcode decode, fusion and publish (core 1, priority 12). |
-| `task_drive_test.c` / `.h` | test | Only with `S3_DRIVE_TEST 1`. |
-| `s3_private.h` | internal | Helpers shared inside S3 only. |
-| `subsystem3.c` / `.h` | build | `subsystem3_init()` → `s3_init()`, `subsystem3_start()` → `s3_start()`. |
+| `task_line.c` | task | 10 ms line task (core 1, priority 8). |
+| `task_barcode.c` | task | Hardware set-up, then barcode decode, fusion and publish (core 1, priority 12). |
+| `task_drive_test.c` | test | Only with `S3_DRIVE_TEST 1`. |
 | `task_consumer.c` / `.h`, `subsystem3_test.c` | template | Template demo objects (`mbx_samples`, `mtx_stats`, `app_stats`). Subsystems 2 and 4 still use them, so **do not delete** these until the template demo is removed. |
-| `S3_CHECKLIST.md`, `S3_DATA_REPRESENTATION.md`, this file | docs | not compiled |
-| `testing/subsystem3/host/*.c` | laptop tests | `gcc`, no Pico needed. Pure-C files only. |
+| this file | docs | not compiled |
+| `testing/subsystem3/` | tests and evidence | `run_host_tests.sh` and `host/*.c` (laptop tests, no Pico), `S3_CHECKLIST.md`, `S3_DATA_REPRESENTATION.md`, `TEST_LOG.md`, `S3_ATTEMPTS_LOG.md`, `logs/`. |
 
-## 2. Wiring and sensor layout (robot, 28 Oct)
+## 2. Wiring and sensor layout (robot, v25)
 
 | Sensor | Signal | Pin | Where on the car |
 |---|---|---|---|
-| Centre line IR | AOUT | GP27 (ADC1) | middle of the sensor bar, slightly left of the car's centre |
-| Outer line IR ("Left IR" in the code) | AOUT | GP26 (ADC0) | on the bar, to the **right** of the Centre |
+| Line IR "Centre" | AOUT | GP27 (ADC1) | over the line, 6 mm LEFT of the car's centre line |
+| Line IR "Left IR" in the code | AOUT | GP26 (ADC0) | over the line, 6 mm RIGHT of the car's centre line |
 | Barcode IR | AOUT / DOUT | GP28 (ADC2) / GP7 | robot's left, 20 mm beside the line |
 
-Seen from above (car driving up the page):
-
-    C |##########| O        C = Centre on the line's LEFT edge (S3_EDGE_SIDE = LEFT)
-                            O = outer sensor just OUTSIDE the RIGHT edge
-
-- **Spacing, Centre to outer:** 20–24 mm (line width 18 mm plus 2–6 mm). The outer sensor then turns black after only a few mm of drift to the left. On the car (28 Oct) about 33 mm tracked badly (Centre on the edge 14–21 % of prints) and **20 mm** (centre to centre) worked best; keep 20 mm.
-- Both sensors at the same height above the floor.
-- If the outer sensor is ever moved to the robot's **left**, set `S3_EDGE_SIDE` to `S3_LN_EDGE_RIGHT` in `s3_config.h`. Nothing else changes.
-
+- **Spacing:** 12 mm centre to centre (10–14 mm also pass in the model). Closer than about 6 mm: both stay black until the car is well off the line (late, hard corrections). Wider than about 16 mm: a sensor sits on an edge all the time (noisy).
+- Both sensors at the same height above the floor, side by side (not one in front of the other), as far in front of the wheels as the bracket allows.
+- Mounted the other way round (GP26 on the LEFT)? Set `S3_IR_L_SIDE` to `S3_LN_L_ON_LEFT` in `s3_config.h`. Nothing else changes.
+- Calibrate with the wheels on the floor: sweep the car sideways so **each** sensor passes fully over white and black, then put both sensors on the line before START.
 ## 3. Rules the team must keep
 
 1. **ADC:** S3's sampler interrupt (timer alarm 1) is the only ADC user. Nobody else may open the kernel ADC driver.
@@ -99,7 +150,7 @@ Seen from above (car driving up the page):
 
 ## 5. Check it worked
 
-After you flash the main build, the console shows S3 status lines. Sweep both line sensors over white and black, and `UNCALIBRATED` disappears. Use `S3_CHECKLIST.md` for the full test plan.
+After you flash the main build, the console shows S3 status lines. Sweep both line sensors over white and black, and `UNCALIBRATED` disappears. Use `testing/subsystem3/S3_CHECKLIST.md` for the full test plan.
 
 ## 6. Drive test with Buddy 2's motors (before the Vehicle Controller exists)
 
@@ -133,11 +184,11 @@ The car stops by itself in any of these cases, and prints `S3 DRIVE STOP (reason
 - no odometry change for 2 s ("car not moving");
 - an **S2 E-STOP**: a wheel at ≥ 40 % duty with no tick for 300 ms latches it, and S2 then discards every command;
 - 3 m travelled;
-- 30 s elapsed.
+- No elapsed-time run limit (removed at Arif's request); the distance limit remains.
 
 A latched S2 E-STOP is reported and the run is **refused**: power-cycle the car. Buddy 2's reference says S3 must not clear an E-stop to make tests run.
 
-Status (28 Oct): v15b tracks the line and turns left on the car, but loses right and sharp turns at its fixed 150 mm/s. v17 spun at the start. v18 hunted from black to white and one wheel stalled. v19 with the outer sensor at 20 mm tracked 2.1 m but shook (steering changed sign in 27 % of prints). v20 passes the host tests and simulation, but has **not run on the car yet**. See `testing/subsystem3/S3_ATTEMPTS_LOG.md`.
+Status (28 Oct): v15b tracks the line and turns left on the car, but loses right and sharp turns at its fixed 150 mm/s. v17 spun at the start. v18 hunted from black to white and one wheel stalled. v19 with the outer sensor at 20 mm tracked 2.1 m but shook (steering changed sign in 27 % of prints). v20 and v21 pass the host tests and simulation, but have **not run on the car yet**. See `testing/subsystem3/S3_ATTEMPTS_LOG.md`.
 
 ## 7. Timing prints (`S3_TIMING 1`)
 

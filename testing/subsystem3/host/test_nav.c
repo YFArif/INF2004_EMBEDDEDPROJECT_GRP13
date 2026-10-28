@@ -1,14 +1,14 @@
 /*
  *	test_nav.c -- host test: every stored Code 39 character decodes (both
- *	directions) and the run-time letter -> command map works.
+ *	directions) and the run-time letter -> command map works. Normally
+ *	run by ../run_host_tests.sh, or:
  *
  *	  gcc -std=c99 -Wall -Wextra -I../../../app_program/subsystem3 test_nav.c \
- *	      ../../../app_program/subsystem3/s3_nav.c ../../../app_program/subsystem3/s3_code39.c \
+ *	      ../../../app_program/subsystem3/s3_code39.c \
  *	      -o tnav && ./tnav
  */
 #include <stdio.h>
 #include <string.h>
-#include "s3_nav.h"
 #include "s3_code39.h"
 
 static int g_fail = 0;

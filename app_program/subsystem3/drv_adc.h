@@ -1,19 +1,30 @@
 /** @file drv_adc.h
  *
- * @brief Subsystem 3 -- ADC owner and the 2 kHz sampler interrupt
- *        (timer alarm 1).
+ * @brief Subsystem 3 -- ADC owner, the 2 kHz sampler interrupt (timer
+ *        alarm 1) and the two analogue line IR sensors.
  *
  * @par
  * S3 drives the ADC registers itself and does not use the kernel ADC
- * driver ("adca"), so the ADC has exactly one owner. One sampler
+ * driver ("adca"), so the ADC has exactly one owner (NFR12). One sampler
  * interrupt runs every DRV_ADC_SAMPLE_US. Each time it hands the
- * barcode driver one analogue sample; every DRV_ADC_IR_EVERY samples
- * (10 ms) it also lets the two line-sensor drivers take one sample.
- * Each driver converts its own ADC channel with drv_adc_convert().
+ * barcode driver one analogue sample. Every DRV_ADC_IR_STRIDE samples it
+ * also samples both line IR sensors, and every DRV_ADC_IR_SAMPLES of
+ * those (10 ms, NFR1) it publishes their average: averaging cuts the
+ * sensor noise that made the steering flip left/right, at no extra
+ * delay for task_line, which reads once per 10 ms anyway.
+ *
+ * @par Line IR sensors
+ * - "Left IR" (FR1's name): GP26 / ADC0. On our car it is mounted on the
+ *   robot's RIGHT, just outside the line edge the Centre does not ride
+ *   (the OUTER sensor; s3_line.h). s3_line.c calls it "L".
+ * - Centre: GP27 / ADC1, rides one edge of the line.
+ * Each reading is kept as 8 bits (Change Requirement 1) in one byte with
+ * one writer; drv_adc_ir_read() returns both from the same 10 ms sample.
+ * Higher = darker.
  *
  * NOTE: Call drv_adc_init() from a task on core 1: RP2040 interrupt
- * enables are per core, and task_line reads the line sensors with
- * interrupts disabled on that same core.
+ * enables are per core, and drv_adc_ir_read() disables interrupts on
+ * that same core to read both sensors together.
  */
 
 #ifndef DRV_ADC_H
@@ -26,7 +37,24 @@
 #define DRV_ADC_SAMPLE_US   (500u)  /* 2 kHz: 0.15 mm per sample at      */
                                     /* 0.30 m/s.                         */
 #define DRV_ADC_IR_EVERY    (10000u / DRV_ADC_SAMPLE_US)  /* 10 ms.     */
+#define DRV_ADC_IR_SAMPLES  (4u)    /* ADC samples averaged per line IR  */
+                                    /* reading (one every 2.5 ms). v21:  */
+                                    /* host sim S3-S91, steering sign    */
+                                    /* flips 26 % -> 15 %. A power of 2, */
+                                    /* so the average is a shift.        */
+#define DRV_ADC_IR_SHIFT    (2u)    /* log2(DRV_ADC_IR_SAMPLES).         */
+#define DRV_ADC_IR_STRIDE   (DRV_ADC_IR_EVERY / DRV_ADC_IR_SAMPLES)
 #define DRV_ADC_FIRST_PIN   (26u)   /* ADC channel n is on GP(26 + n).  */
+
+#define DRV_IR_LEFT_PIN         (26u)   /* Rewired 28 Oct (was GP28).   */
+#define DRV_IR_LEFT_ADC_CH      (0u)
+#define DRV_IR_CENTRE_PIN       (27u)
+#define DRV_IR_CENTRE_ADC_CH    (1u)
+
+#if ((DRV_IR_LEFT_PIN != (DRV_ADC_FIRST_PIN + DRV_IR_LEFT_ADC_CH)) || \
+     (DRV_IR_CENTRE_PIN != (DRV_ADC_FIRST_PIN + DRV_IR_CENTRE_ADC_CH)))
+#error "drv_adc: a line IR pin and its ADC channel do not match"
+#endif
 
 /* ---------------------------------------------------------------------
  *  Interrupt code in RAM (Tribunal 1, Version C).
@@ -75,6 +103,8 @@ drv_adc_to8 (uint16_t adc)
 void     drv_adc_pin_analog(uint32_t pin);
 uint16_t drv_adc_convert(uint32_t channel);
 uint32_t drv_adc_sample_index(void);
+void     drv_adc_ir_init(void);
+void     drv_adc_ir_read(uint16_t * p_left, uint16_t * p_centre);
 ER       drv_adc_init(void);
 uint32_t drv_adc_isr_max_us_take(void);     /* Only with S3_TIMING 1.   */
 

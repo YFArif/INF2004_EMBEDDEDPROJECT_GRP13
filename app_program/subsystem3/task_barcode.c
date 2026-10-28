@@ -24,17 +24,11 @@
 
 #include "drv_adc.h"
 #include "drv_barcode.h"
-#include "drv_ir_centre.h"
-#include "drv_ir_left.h"
 #include "s3_analog.h"
 #include "s3_api.h"
 #include "s3_code39.h"
 #include "s3_config.h"
-#include "s3_nav.h"
 #include "s3_private.h"
-#include "task_barcode.h"
-#include "task_drive_test.h"
-#include "task_line.h"
 
 #define US_PER_MS       (1000u)
 #define NAV_SEQ_MASK    (0xFu)
@@ -124,17 +118,16 @@ barcode_task (INT stacd, void * p_exinf)
 static void
 hardware_start (void)
 {
-    drv_ir_left_init();
-    drv_ir_centre_init();
+    drv_adc_ir_init();
     CHECK(drv_barcode_init(), "drv_barcode_init");
     CHECK(drv_adc_init(), "drv_adc_init");
 
-    tm_printf((UB *) "S3 RUN: barcode DOUT=GP%d AOUT=ADC%d, outer IR=ADC%d "
-                     "(GP%d), Centre=ADC%d (GP%d), Centre rides the %s edge\n",
+    tm_printf((UB *) "S3 RUN: barcode DOUT=GP%d AOUT=ADC%d, Left IR=ADC%d "
+                     "(GP%d), Centre=ADC%d (GP%d), line sensors: %s\n",
               (INT) DRV_BARCODE_DOUT_PIN, (INT) DRV_BARCODE_ADC_CH,
               (INT) DRV_IR_LEFT_ADC_CH, (INT) DRV_IR_LEFT_PIN,
               (INT) DRV_IR_CENTRE_ADC_CH, (INT) DRV_IR_CENTRE_PIN,
-              S3_EDGE_TXT);
+              S3_LAYOUT_TXT);
 
     CHECK(task_line_start(), "task_line_start");
     CHECK(task_drive_test_start(), "task_drive_test_start");

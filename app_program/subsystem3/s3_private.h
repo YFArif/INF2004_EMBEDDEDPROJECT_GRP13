@@ -8,6 +8,11 @@
  * s3_api.c owns the kernel objects, the packed status, the steering word
  * and the tuning requests. The tasks change them only through the
  * functions below, which take mtx_s3 where the data is shared.
+ *
+ * @par Task start-up order
+ * s3_start() starts task_barcode, which sets up S3's hardware on core 1
+ * and then starts task_line and (only with S3_DRIVE_TEST 1) the drive
+ * test task.
  */
 
 #ifndef S3_PRIVATE_H
@@ -17,7 +22,7 @@
 #include <stdint.h>
 
 #include "s3_api.h"
-#include "s3_nav.h"
+#include "s3_code39.h"      /* s3_nav_cmd_t.                             */
 
 /** Calibration levels, raw ADC counts (drive test print / start check). */
 typedef struct
@@ -42,6 +47,12 @@ typedef struct
     uint8_t  junction_event;
     uint8_t  lost_event;
 } s3_line_report_t;
+
+/* Task start-up (task_barcode.c, task_line.c, task_drive_test.c). The
+ * drive test start does nothing unless S3_DRIVE_TEST is 1. */
+ER           task_barcode_start(void);
+ER           task_line_start(void);
+ER           task_drive_test_start(void);
 
 /* Time and distance. */
 uint32_t     s3_now_ms(void);

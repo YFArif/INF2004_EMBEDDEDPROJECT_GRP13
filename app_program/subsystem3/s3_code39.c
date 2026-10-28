@@ -1,6 +1,7 @@
 /** @file s3_code39.c
  *
- * @brief Subsystem 3 -- Code 39 frame decoder. See s3_code39.h.
+ * @brief Subsystem 3 -- Code 39 frame decoder and the letter to command
+ *        map. See s3_code39.h.
  *
  * @par
  * Speed-independent: in every 9-element symbol exactly 3 elements are
@@ -198,6 +199,143 @@ uint8_t s3_code39_index (char ch)
 char s3_code39_char (uint8_t idx)
 {
     return (idx < C39_TABLE_LEN) ? g_c39_table[idx].ch : '?';
+}
+
+/* ------------------------------------------------------------------ nav */
+
+/* g_nav_map[i] = letter for command (i + 1): LEFT, RIGHT, STRAIGHT,
+ * U-TURN. Not thread-safe on its own: s3_api.c calls the setter and the
+ * lookup under mtx_s3. */
+static char g_nav_map[S3_NAV_MAP_LEN] = {'A', 'B', 'C', 'D'};
+
+static char
+nav_to_upper (char ch)
+{
+    return ((ch >= 'a') && (ch <= 'z')) ? (char) ((ch - 'a') + 'A') : ch;
+}
+
+/*!
+ * @brief Back to the write-up example map "ABCD".
+ */
+void
+s3_nav_reset (void)
+{
+    g_nav_map[0] = 'A';
+    g_nav_map[1] = 'B';
+    g_nav_map[2] = 'C';
+    g_nav_map[3] = 'D';
+}
+
+/*!
+ * @brief Set the letters for LEFT, RIGHT, STRAIGHT, U-TURN, e.g. "DCBA".
+ *
+ * @return 0 if accepted; -1 if rejected (the old map is kept).
+ */
+int
+s3_nav_set_map (char const * p_map)
+{
+    char     tmp[S3_NAV_MAP_LEN];
+    uint16_t pat;
+    uint32_t i;
+    uint32_t j;
+
+    if (NULL == p_map)
+    {
+        return -1;
+    }
+    for (i = 0u; i < S3_NAV_MAP_LEN; i++)
+    {
+        tmp[i] = nav_to_upper(p_map[i]);
+        if (('\0' == tmp[i]) || ('*' == tmp[i]) ||
+            (0 == s3_code39_pattern(tmp[i], &pat)))
+        {
+            return -1;  /* Too short, start/stop char, or not Code 39.  */
+        }
+        for (j = 0u; j < i; j++)
+        {
+            if (tmp[j] == tmp[i])
+            {
+                return -1;  /* Same letter for two commands.            */
+            }
+        }
+    }
+    if ('\0' != p_map[S3_NAV_MAP_LEN])
+    {
+        return -1;      /* Too long.                                     */
+    }
+    for (i = 0u; i < S3_NAV_MAP_LEN; i++)
+    {
+        g_nav_map[i] = tmp[i];  /* Commit only a fully valid map.        */
+    }
+    return 0;
+}
+
+/*!
+ * @brief Copy the current map, e.g. "DCBA" plus '\0'.
+ */
+void
+s3_nav_get_map (char * p_out5)
+{
+    uint32_t i;
+
+    for (i = 0u; i < S3_NAV_MAP_LEN; i++)
+    {
+        p_out5[i] = g_nav_map[i];
+    }
+    p_out5[S3_NAV_MAP_LEN] = '\0';
+}
+
+/*!
+ * @brief The command for a decoded letter; S3_NAV_NONE if not in the map.
+ */
+s3_nav_cmd_t
+s3_nav_from_char (char ch)
+{
+    s3_nav_cmd_t cmd = S3_NAV_NONE;
+    uint32_t     i;
+
+    for (i = 0u; i < S3_NAV_MAP_LEN; i++)
+    {
+        if (g_nav_map[i] == ch)
+        {
+            cmd = (s3_nav_cmd_t) (i + 1u);
+            break;
+        }
+    }
+    return cmd;
+}
+
+/*!
+ * @brief Console text for a command.
+ */
+char const *
+s3_nav_name (s3_nav_cmd_t cmd)
+{
+    char const * p_name = "NONE";
+
+    switch (cmd)
+    {
+        case S3_NAV_LEFT:
+            p_name = "TURN LEFT";
+        break;
+
+        case S3_NAV_RIGHT:
+            p_name = "TURN RIGHT";
+        break;
+
+        case S3_NAV_STRAIGHT:
+            p_name = "GO STRAIGHT";
+        break;
+
+        case S3_NAV_UTURN:
+            p_name = "U-TURN";
+        break;
+
+        default:
+            // S3_NAV_NONE or an invalid value.
+        break;
+    }
+    return p_name;
 }
 
 /*** end of file ***/

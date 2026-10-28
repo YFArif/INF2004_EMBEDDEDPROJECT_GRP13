@@ -9,23 +9,25 @@
  * task_consumer.h is the course template example (see below).
  *
  * @par Files (app_program/subsystem3/)
+ * - subsystem3.c / .h          entry points called by app_main.c
  * - s3_api.h / s3_api.c        public interface, kernel objects, status
  * - s3_config.h                priorities, periods, test / debug switches
- * - drv_ir_left.c / .h         outer ("Left") IR sensor (GP26, ADC0)
- * - drv_ir_centre.c / .h       Centre sensor (GP27, ADC1)
+ * - s3_private.h               helpers and task start-up shared inside S3
+ * - drv_adc.c / .h             ADC owner, 2 kHz sampler interrupt, both
+ *                              line IR sensors (Left IR GP26 / ADC0,
+ *                              Centre GP27 / ADC1)
  * - drv_barcode.c / .h         barcode sensor (DOUT GP7, AOUT GP28)
- * - drv_adc.c / .h             ADC owner, 2 kHz sampler interrupt
- * - s3_ir_cal.c / .h           calibration of one line sensor (pure C)
- * - s3_line.c / .h             combiner: PD, junction, lost, search (pure C)
- * - s3_code39.c / .h           Code 39 decoder (pure C)
+ * - s3_line.c / .h             line following: calibration, PD, junction,
+ *                              lost, search (pure C)
+ * - s3_code39.c / .h           Code 39 decoder and letter -> command map
+ *                              (pure C)
  * - s3_analog.c / .h           analogue barcode widths (pure C)
- * - s3_nav.c / .h              letter -> command map (pure C)
- * - task_line.c / .h           10 ms line task
- * - task_barcode.c / .h        set-up, barcode decode and publish
- * - task_drive_test.c / .h     TEST ONLY (S3_DRIVE_TEST)
- * - s3_private.h               helpers shared inside S3 only
+ * - task_line.c                10 ms line task
+ * - task_barcode.c             set-up, barcode decode and publish
+ * - task_drive_test.c          TEST ONLY (S3_DRIVE_TEST)
  * "Pure C" files have no kernel calls and are unit-tested on a laptop
- * (testing/subsystem3/host/).
+ * (testing/subsystem3/run_host_tests.sh). Test plans and evidence live
+ * in testing/subsystem3/.
  *
  * @par Deviations from BARR-C:2018 (same kind as S2 and S5)
  * - micro T-Kernel types (ID, ER, INT, UW, H, UB, BOOL, T_xxx) appear only
