@@ -1,0 +1,1193 @@
+=== S2 test log ===
+test:     u03  (S2-U03 turn accuracy)
+date:     2026-10-28 16:23:12
+commit:   d0ecff7  (S2 CODE HAS UNCOMMITTED CHANGES)
+scope:    U03 runs 11-13 only (+180 LEFT); earlier runs are not repeated or imported
+tester:   Arif
+supply:   power bank on VIN + USB cable to the laptop; VIN = skipped V
+surface:  
+notes:    
+[build] rc=0
+[build] ---- last lines of the build:
+[build]    text	   data	    bss	    dec	    hex	filename
+[build]  306012	    380	  36472	 342864	  53b50	mtk3pico_smp1_usb_cdc_wifi_test.elf
+[build] tools/elf2uf2 mtk3pico_smp1_usb_cdc_wifi_test.elf mtk3pico_smp1_usb_cdc_wifi_test.uf2
+[build]  
+switch:   S2_FLOOR_TEST = 2 in subsystem2_floor.c, set for this build only; S2_U03_START_RUN = 11
+image:    mtk3pico_smp1_usb_cdc_wifi_test.uf2, built 16:24:10
+port:     COM5
+=== Pico output and [MEASURED] values ===
+
+
+microT-Kernel Version 3.00
+
+
+=== micro T-Kernel on Raspberry Pi Pico W (spec 0x6300, product 0x0003) ===
+dual-core (SMP) build, usermain on core 0
+encoder: GP16/GP17 edge interrupt on core 1
+all subsystems started
+
+motion_task: core 1, period 20 ms
+[TEST] === test run start ===
+[TEST] S1-U01 PASS  cyclic handler is running
+S3 RUN: barcode DOUT=GP6 AOUT=ADC0, Left=ADC2 (GP28), Centre=ADC1 (GP27)
+wifi: cyw43_utk_task starting (proc 1)
+monitor: I am task 9
+wifi: cyw43_init() ...
+wifi: cyw43_init() returned, bringing interface up ...
+S3 LINE  C=WHITE    0  outer=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 188-192  O 192-192
+S3 LINE  C=BLACK 1000  outer=EDGE   454  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 179-192  O 187-198
+S3 LINE  C=BLACK  812  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 179-195  O 187-202
+S3 LINE  C=WHITE    0  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 179-195  O 187-202
+S3 LINE  C=BLACK  812  outer=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 179-195  O 187-202
+[TEST] S1-U02 PASS  LED task sleeps between ticks
+[TEST] subsystem1 SUMMARY 2 passed, 0 failed
+S3 LINE  C=EDGE   619  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 179-200  O 187-202
+monitor: batch  n=5 last=40 from core 1
+monitor: t=3355771096 ms  samples=5  min=0 max=40 avg=20  free slots=4  free blocks=4
+S3 LINE  C=WHITE    0  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 179-200  O 187-204
+S3 LINE  C=EDGE   619  outer=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 179-200  O 187-204
+S3 LINE  C=BLACK 1000  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 179-200  O 187-204
+S3 LINE  C=WHITE    0  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 177-200  O 187-204
+
+[TEST] subsystem2 tests start
+[TEST] S2 INFO encoder interrupt on core 1 (A4 wants core 1)
+S3 LINE  C=EDGE   652  outer=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 177-200  O 187-204
+S3 LINE  C=EDGE   652  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 177-200  O 187-204
+S3 LINE  C=WHITE    0  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 177-200  O 187-204
+monitor: batch  n=10 last=90 from core 1
+monitor: t=3355772646 ms  samples=10  min=0 max=90 avg=45  free slots=4  free blocks=4
+S3 LINE  C=EDGE   652  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 177-200  O 187-204
+[TEST] S2-U08 INFO timer counted 1009428 in 1000 ms; WATCHDOG TICK at boot 0x260c (12 cycles = 0x..0c)
+[TEST] S2-U08 PASS  1 MHz timer runs at 1 MHz against the kernel clock
+S3 LINE  C=EDGE   652  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 177-200  O 187-204
+S3 LINE  C=EDGE   625  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 177-201  O 187-204
+S3 LINE  C=BLACK 1000  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 177-201  O 187-204
+S3 LINE  C=EDGE   689  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+S3 LINE  C=EDGE   689  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+[TEST] S2-U05 INFO 50 motion cycles in 1000 ms, longest cycle 271 us
+[TEST] S2-U05 PASS  motion_task runs every 20 ms (48-52 cycles per second)
+S3 LINE  C=EDGE   689  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+monitor: batch  n=15 last=60 from core 1
+monitor: t=3355774196 ms  samples=15  min=0 max=100 avg=56  free slots=4  free blocks=4
+S3 LINE  C=EDGE   689  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+S3 LINE  C=EDGE   689  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+S3 LINE  C=EDGE   689  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+[TEST] S2-U05 INFO 20 trials: worst 289 us, mean 132 us (limit 20000 us)
+[TEST] S2-U05 PASS  MF_ESTOP brakes within one cycle, 20 of 20 trials
+S3 LINE  C=EDGE   689  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+[TEST] S2-U13 INFO fresh value used 1, old value ignored 1
+[TEST] S2-U13 PASS  steering: a set value is used, then ignored after 100 ms
+S3 LINE  C=EDGE   689  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+[TEST] S2-U07 INFO 4 of 4 steps passed
+[TEST] S2-U07 PASS  E-stop latch and CLEAR protocol
+
+[S2-STEP] NEXT: S2-U03 TURN 180: pointer on arm F
+[S2-STEP] press BUTTON 1 (GP20) on the robot when ready
+S3 LINE  C=EDGE   689  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+S3 LINE  C=EDGE   689  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+monitor: batch  n=20 last=10 from core 1
+monitor: t=3355775746 ms  samples=20  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE  137  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+S3 LINE  C=WHITE  137  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+S3 LINE  C=EDGE   689  outer=EDGE   294  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 187-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=WHITE  137  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=WHITE    0  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+monitor: batch  n=25 last=40 from core 1
+monitor: t=3355777296 ms  samples=25  min=0 max=100 avg=44  free slots=4  free blocks=4
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=WHITE  137  outer=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=WHITE  137  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=WHITE  137  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+monitor: batch  n=30 last=90 from core 1
+monitor: t=3355778846 ms  samples=30  min=0 max=100 avg=48  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=WHITE  137  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=WHITE  137  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=BLACK 1000  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+monitor: batch  n=35 last=60 from core 1
+monitor: t=3355780396 ms  samples=35  min=0 max=100 avg=52  free slots=4  free blocks=4
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=BLACK 1000  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=WHITE  137  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=WHITE  137  outer=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+monitor: batch  n=40 last=10 from core 1
+monitor: t=3355781946 ms  samples=40  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=WHITE  137  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=EDGE   689  outer=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 186-204
+S3 LINE  C=WHITE  137  outer=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 172-201  O 172-204
+monitor: batch  n=45 last=40 from core 1
+monitor: t=3355783496 ms  samples=45  min=0 max=100 avg=46  free slots=4  free blocks=4
+S3 LINE  C=BLACK 1000  outer=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal C 166-946  O 162-648
+S3 LINE  C=BLACK  842  outer=BLACK  896  -> turn RIGHT     121 mm/s  FOLLOW   cal C 166-2609  O 162-3032
+S3 JDBG outer black: Centre black 0 mm before (max 15), both black 0 mm (need 8)
+S3 LINE  C=BLACK 1000  outer=BLACK 1000  -> turn RIGHT     200 mm/s  FOLLOW   cal C 166-2647  O 162-3142
+S3 LINE  C=BLACK  933  outer=BLACK  983  -> turn RIGHT     200 mm/s  FOLLOW   cal C 166-3417  O 162-3641
+S3 JDBG outer black: Centre black 0 mm before (max 15), both black 0 mm (need 8)
+S3 LINE  C=WHITE  111  outer=EDGE   551  -> turn LEFT      200 mm/s  FOLLOW   cal C 166-3417  O 162-3641
+S3 LINE  C=WHITE   17  outer=WHITE   27  -> turn LEFT      200 mm/s  FOLLOW   cal C 166-3417  O 162-3641
+S3 LINE  C=WHITE   22  outer=EDGE   307  -> turn LEFT      200 mm/s  FOLLOW   cal C 166-3417  O 162-3641
+monitor: batch  n=50 last=90 from core 1
+monitor: t=3355785046 ms  samples=50  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE   27  outer=EDGE   353  -> turn LEFT      200 mm/s  FOLLOW   cal C 166-3417  O 162-3641
+S3 LINE  C=WHITE   32  outer=EDGE   454  -> turn LEFT      200 mm/s  FOLLOW   cal C 166-3417  O 162-3641
+S3 LINE  C=WHITE    7  outer=WHITE   27  -> turn LEFT      200 mm/s  FOLLOW   cal C 166-3417  O 162-3641
+S3 LINE  C=WHITE    0  outer=WHITE    8  -> turn LEFT      200 mm/s  FOLLOW   cal C 165-3417  O 162-3641
+S3 LINE  C=WHITE    0  outer=WHITE    8  -> turn LEFT      200 mm/s  FOLLOW   cal C 165-3417  O 162-3641
+S3 LINE  C=WHITE    0  outer=WHITE    8  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3417  O 162-3641
+S3 LINE  C=WHITE    8  outer=WHITE   13  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3417  O 162-3641
+monitor: batch  n=55 last=60 from core 1
+monitor: t=3355786596 ms  samples=55  min=0 max=100 avg=51  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=WHITE    8  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3417  O 162-3641
+S3 LINE  C=WHITE   23  outer=EDGE   252  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3417  O 162-3641
+S3 LINE  C=BLACK  761  outer=BLACK  790  -> turn RIGHT     104 mm/s  FOLLOW   cal C 163-3417  O 162-3641
+S3 LINE  C=BLACK  751  outer=BLACK 1000  -> turn RIGHT      91 mm/s  FOLLOW   cal C 163-3417  O 162-3641
+S3 LINE  C=WHITE   23  outer=BLACK 1000  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3417  O 162-3910
+S3 LINE  C=WHITE   18  outer=BLACK  996  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3417  O 162-3919
+S3 LINE  C=WHITE   18  outer=BLACK  996  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3417  O 162-3919
+monitor: batch  n=60 last=10 from core 1
+monitor: t=3355788146 ms  samples=60  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: LED task resumed, state=RUN, pri=12
+S3 LINE  C=WHITE   13  outer=BLACK  996  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3417  O 162-3919
+S3 LINE  C=WHITE   18  outer=BLACK  996  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3417  O 162-3919
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3417  O 162-3958
+S3 LINE  C=WHITE   48  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3417  O 162-3958
+S3 LINE  C=BLACK 1000  outer=BLACK  973  -> turn RIGHT     200 mm/s  FOLLOW   cal C 163-3588  O 162-3958
+S3 LINE  C=WHITE   26  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3958
+S3 LINE  C=WHITE   21  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3958
+monitor: batch  n=65 last=40 from core 1
+monitor: t=3355789696 ms  samples=65  min=0 max=100 avg=47  free slots=4  free blocks=4
+S3 LINE  C=WHITE   17  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3958
+S3 LINE  C=WHITE   21  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3958
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3958
+S3 LINE  C=WHITE   12  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3958
+S3 LINE  C=WHITE    8  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3958
+S3 LINE  C=WHITE    8  outer=BLACK  997  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=70 last=90 from core 1
+monitor: t=3355791246 ms  samples=70  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    0  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    0  outer=BLACK  997  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  997  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    0  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=75 last=60 from core 1
+monitor: t=3355792796 ms  samples=75  min=0 max=100 avg=51  free slots=4  free blocks=4
+S3 LINE  C=WHITE   12  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  997  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  997  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=80 last=10 from core 1
+monitor: t=3355794346 ms  samples=80  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE   12  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  997  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=85 last=40 from core 1
+monitor: t=3355795896 ms  samples=85  min=0 max=100 avg=48  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  997  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=90 last=90 from core 1
+monitor: t=3355797446 ms  samples=90  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE   12  outer=BLACK  997  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=95 last=60 from core 1
+monitor: t=3355798996 ms  samples=95  min=0 max=100 avg=51  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE   12  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=100 last=10 from core 1
+monitor: t=3355800546 ms  samples=100  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  997  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    0  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=105 last=40 from core 1
+monitor: t=3355802096 ms  samples=105  min=0 max=100 avg=48  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE   12  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=110 last=90 from core 1
+monitor: t=3355803646 ms  samples=110  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=115 last=60 from core 1
+monitor: t=3355805196 ms  samples=115  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=120 last=10 from core 1
+monitor: t=3355806746 ms  samples=120  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: LED task resumed, state=RUN, pri=12
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=125 last=40 from core 1
+monitor: t=3355808296 ms  samples=125  min=0 max=100 avg=48  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=130 last=90 from core 1
+monitor: t=3355809846 ms  samples=130  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    0  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=135 last=60 from core 1
+monitor: t=3355811396 ms  samples=135  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    0  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=140 last=10 from core 1
+monitor: t=3355812946 ms  samples=140  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE   12  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=145 last=40 from core 1
+monitor: t=3355814496 ms  samples=145  min=0 max=100 avg=48  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=150 last=90 from core 1
+monitor: t=3355816046 ms  samples=150  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    0  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=155 last=60 from core 1
+monitor: t=3355817596 ms  samples=155  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    0  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=160 last=10 from core 1
+monitor: t=3355819146 ms  samples=160  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE   12  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=165 last=40 from core 1
+monitor: t=3355820696 ms  samples=165  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=170 last=90 from core 1
+monitor: t=3355822246 ms  samples=170  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    0  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE   12  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE   12  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=175 last=60 from core 1
+monitor: t=3355823796 ms  samples=175  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    0  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=180 last=10 from core 1
+monitor: t=3355825346 ms  samples=180  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: LED task resumed, state=RUN, pri=12
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE   12  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=185 last=40 from core 1
+monitor: t=3355826896 ms  samples=185  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=190 last=90 from core 1
+monitor: t=3355828446 ms  samples=190  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    0  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=195 last=60 from core 1
+monitor: t=3355829996 ms  samples=195  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+monitor: batch  n=200 last=10 from core 1
+monitor: t=3355831546 ms  samples=200  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE   12  outer=BLACK  989  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    0  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK  993  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    3  outer=BLACK  997  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3976
+S3 LINE  C=WHITE    8  outer=BLACK 1000  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-3992
+monitor: batch  n=205 last=40 from core 1
+monitor: t=3355833096 ms  samples=205  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  999  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4003
+S3 LINE  C=WHITE   12  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=210 last=90 from core 1
+monitor: t=3355834646 ms  samples=210  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+S3 LINE  C=WHITE    3  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=215 last=60 from core 1
+monitor: t=3355836196 ms  samples=215  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+[S2-STEP] 3
+S3 LINE  C=WHITE    0  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=220 last=10 from core 1
+monitor: t=3355837746 ms  samples=220  min=0 max=100 avg=50  free slots=4  free blocks=4
+[S2-STEP] 2
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+[S2-STEP] 1
+S3 LINE  C=WHITE   12  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=225 last=40 from core 1
+monitor: t=3355839296 ms  samples=225  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+[S2-STEP] GO
+S3 LINE  C=WHITE    8  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 JDBG outer black: Centre black 0 mm before (max 15), both black 0 mm (need 8)
+S3 LINE  C=WHITE    8  outer=WHITE   16  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    0  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=230 last=90 from core 1
+monitor: t=3355840846 ms  samples=230  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+[S2-FLOOR] TURN 180: odometry -2 mm (L -185 R 182), heading change +178.89 deg, 960 ms
+[MEASURED] TURN 180 run 11: measured 185 deg
+[TEST] S2-U03 PASS  TURN: odometry within 2 deg
+
+[S2-STEP] NEXT: S2-U03 TURN 180: pointer on arm F
+[S2-STEP] press BUTTON 1 (GP20) on the robot when ready
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=235 last=60 from core 1
+monitor: t=3355842396 ms  samples=235  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=240 last=10 from core 1
+monitor: t=3355843946 ms  samples=240  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: LED task resumed, state=RUN, pri=12
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=245 last=40 from core 1
+monitor: t=3355845496 ms  samples=245  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=250 last=90 from core 1
+monitor: t=3355847046 ms  samples=250  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=255 last=60 from core 1
+monitor: t=3355848596 ms  samples=255  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=260 last=10 from core 1
+monitor: t=3355850146 ms  samples=260  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    3  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=265 last=40 from core 1
+monitor: t=3355851696 ms  samples=265  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=270 last=90 from core 1
+monitor: t=3355853246 ms  samples=270  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=EDGE   474  outer=EDGE   573  -> turn RIGHT      53 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=BLACK  853  outer=BLACK  811  -> turn RIGHT     170 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 JDBG outer black: Centre black 0 mm before (max 15), both black 0 mm (need 8)
+S3 LINE  C=EDGE   643  outer=EDGE   707  -> turn RIGHT      10 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   44  outer=WHITE  245  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=275 last=60 from core 1
+monitor: t=3355854796 ms  samples=275  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=280 last=10 from core 1
+monitor: t=3355856346 ms  samples=280  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    3  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=285 last=40 from core 1
+monitor: t=3355857896 ms  samples=285  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=290 last=90 from core 1
+monitor: t=3355859446 ms  samples=290  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=295 last=60 from core 1
+monitor: t=3355860996 ms  samples=295  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=300 last=10 from core 1
+monitor: t=3355862546 ms  samples=300  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: LED task resumed, state=RUN, pri=12
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=305 last=40 from core 1
+monitor: t=3355864096 ms  samples=305  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE  227  outer=EDGE   357  -> turn LEFT       31 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=BLACK  867  outer=EDGE   744  -> turn RIGHT     183 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 JDBG outer black: Centre black 0 mm before (max 15), both black 0 mm (need 8)
+S3 LINE  C=BLACK  830  outer=EDGE   648  -> turn RIGHT     139 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=EDGE   716  outer=EDGE   644  -> turn RIGHT      47 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   26  outer=WHITE   20  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=310 last=90 from core 1
+monitor: t=3355865646 ms  samples=310  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=315 last=60 from core 1
+monitor: t=3355867196 ms  samples=315  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE   53  outer=EDGE   303  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=EDGE   451  outer=EDGE   665  -> turn LEFT       11 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=EDGE   410  outer=EDGE   507  -> turn LEFT       37 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    3  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=320 last=10 from core 1
+monitor: t=3355868746 ms  samples=320  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=WHITE    3  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE   20  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  919  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=325 last=40 from core 1
+monitor: t=3355870296 ms  samples=325  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=330 last=90 from core 1
+monitor: t=3355871846 ms  samples=330  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+S3 LINE  C=WHITE    3  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=335 last=60 from core 1
+monitor: t=3355873396 ms  samples=335  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=340 last=10 from core 1
+monitor: t=3355874946 ms  samples=340  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  969  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  919  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  973  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=345 last=40 from core 1
+monitor: t=3355876496 ms  samples=345  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=350 last=90 from core 1
+monitor: t=3355878046 ms  samples=350  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=355 last=60 from core 1
+monitor: t=3355879596 ms  samples=355  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=360 last=10 from core 1
+monitor: t=3355881146 ms  samples=360  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: LED task resumed, state=RUN, pri=12
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  998  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=365 last=40 from core 1
+monitor: t=3355882696 ms  samples=365  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  994  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=370 last=90 from core 1
+monitor: t=3355884246 ms  samples=370  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE   12  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+[S2-STEP] 3
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=375 last=60 from core 1
+monitor: t=3355885796 ms  samples=375  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+[S2-STEP] 2
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  985  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+[S2-STEP] 1
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+monitor: batch  n=380 last=10 from core 1
+monitor: t=3355887346 ms  samples=380  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=BLACK  990  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+[S2-STEP] GO
+S3 LINE  C=WHITE    0  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 163-3665  O 162-4006
+S3 JDBG outer black: Centre was WHITE -> overshoot, not a junction
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=385 last=40 from core 1
+monitor: t=3355888896 ms  samples=385  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    0  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+[S2-FLOOR] TURN 180: odometry 0 mm (L -187 R 183), heading change +179.66 deg, 960 ms
+[MEASURED] TURN 180 run 12: measured 185 deg
+[TEST] S2-U03 PASS  TURN: odometry within 2 deg
+
+[S2-STEP] NEXT: S2-U03 TURN 180: pointer on arm F
+[S2-STEP] press BUTTON 1 (GP20) on the robot when ready
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=390 last=90 from core 1
+monitor: t=3355890446 ms  samples=390  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=395 last=60 from core 1
+monitor: t=3355891996 ms  samples=395  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=400 last=10 from core 1
+monitor: t=3355893546 ms  samples=400  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    3  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=405 last=40 from core 1
+monitor: t=3355895096 ms  samples=405  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=410 last=90 from core 1
+monitor: t=3355896646 ms  samples=410  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=415 last=60 from core 1
+monitor: t=3355898196 ms  samples=415  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=420 last=10 from core 1
+monitor: t=3355899746 ms  samples=420  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: LED task resumed, state=RUN, pri=12
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=425 last=40 from core 1
+monitor: t=3355901296 ms  samples=425  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   12  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=430 last=90 from core 1
+monitor: t=3355902846 ms  samples=430  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE   12  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=435 last=60 from core 1
+monitor: t=3355904396 ms  samples=435  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=440 last=10 from core 1
+monitor: t=3355905946 ms  samples=440  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=445 last=40 from core 1
+monitor: t=3355907496 ms  samples=445  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=450 last=90 from core 1
+monitor: t=3355909046 ms  samples=450  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   17  outer=WHITE   20  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=EDGE   277  outer=EDGE   378  -> turn LEFT       73 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+monitor: batch  n=455 last=60 from core 1
+monitor: t=3355910596 ms  samples=455  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=BLACK  812  outer=EDGE   744  -> turn RIGHT     134 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 JDBG outer black: Centre black 0 mm before (max 15), both black 0 mm (need 8)
+S3 LINE  C=EDGE   748  outer=BLACK  757  -> turn RIGHT      84 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 JDBG outer black: Centre black 0 mm before (max 15), both black 0 mm (need 8)
+S3 LINE  C=EDGE   387  outer=EDGE   411  -> turn LEFT       37 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE   26  outer=WHITE   16  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 163-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=WHITE    0  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 162-4006
+S3 LINE  C=WHITE    0  outer=WHITE    3  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 162-4006
+monitor: batch  n=460 last=10 from core 1
+monitor: t=3355912146 ms  samples=460  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    0  outer=WHITE    3  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 162-4006
+S3 LINE  C=EDGE   501  outer=EDGE   603  -> turn RIGHT      32 mm/s  FOLLOW   cal C 162-3665  O 162-4006
+S3 LINE  C=EDGE   323  outer=EDGE   486  -> turn LEFT       67 mm/s  FOLLOW   cal C 162-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE   11  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 162-4006
+S3 LINE  C=WHITE    8  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 162-4006
+monitor: batch  n=465 last=40 from core 1
+monitor: t=3355913696 ms  samples=465  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=WHITE    7  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    0  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 162-4006
+S3 LINE  C=WHITE    3  outer=WHITE    2  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=WHITE    6  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=WHITE   10  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  936  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  965  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  969  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=470 last=90 from core 1
+monitor: t=3355915246 ms  samples=470  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=475 last=60 from core 1
+monitor: t=3355916796 ms  samples=475  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    0  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=480 last=10 from core 1
+monitor: t=3355918346 ms  samples=480  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: LED task resumed, state=RUN, pri=12
+S3 LINE  C=WHITE    3  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE   13  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    0  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    0  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=485 last=40 from core 1
+monitor: t=3355919896 ms  samples=485  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE   13  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  981  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  977  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=490 last=90 from core 1
+monitor: t=3355921446 ms  samples=490  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=495 last=60 from core 1
+monitor: t=3355922996 ms  samples=495  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE   13  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=500 last=10 from core 1
+monitor: t=3355924546 ms  samples=500  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE   13  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  952  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=505 last=40 from core 1
+monitor: t=3355926096 ms  samples=505  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE   13  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  952  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  952  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=510 last=90 from core 1
+monitor: t=3355927646 ms  samples=510  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+S3 LINE  C=WHITE    3  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=515 last=60 from core 1
+monitor: t=3355929196 ms  samples=515  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=520 last=10 from core 1
+monitor: t=3355930746 ms  samples=520  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  940  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  936  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE   13  outer=BLACK  940  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=525 last=40 from core 1
+monitor: t=3355932296 ms  samples=525  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  936  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  936  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  936  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  936  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  940  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE   13  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=530 last=90 from core 1
+monitor: t=3355933846 ms  samples=530  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    0  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=535 last=60 from core 1
+monitor: t=3355935396 ms  samples=535  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  952  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=540 last=10 from core 1
+monitor: t=3355936946 ms  samples=540  min=0 max=100 avg=50  free slots=4  free blocks=4
+monitor: LED task resumed, state=RUN, pri=12
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    0  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=545 last=40 from core 1
+monitor: t=3355938496 ms  samples=545  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    0  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE   13  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=550 last=90 from core 1
+monitor: t=3355940046 ms  samples=550  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE   13  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=555 last=60 from core 1
+monitor: t=3355941596 ms  samples=555  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  952  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  952  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=560 last=10 from core 1
+monitor: t=3355943146 ms  samples=560  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=565 last=40 from core 1
+monitor: t=3355944696 ms  samples=565  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    8  outer=BLACK  952  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE   13  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=570 last=90 from core 1
+monitor: t=3355946246 ms  samples=570  min=0 max=100 avg=49  free slots=4  free blocks=4
+monitor: LED task paused, state=WAIT+SUSPEND, pri=13
+S3 LINE  C=WHITE    8  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+[S2-STEP] 3
+S3 LINE  C=WHITE    8  outer=BLACK  961  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  956  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  952  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    0  outer=BLACK  944  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+[S2-STEP] 2
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=575 last=60 from core 1
+monitor: t=3355947796 ms  samples=575  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE   13  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+[S2-STEP] 1
+S3 LINE  C=WHITE    3  outer=BLACK  952  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE   13  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    8  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+monitor: batch  n=580 last=10 from core 1
+monitor: t=3355949346 ms  samples=580  min=0 max=100 avg=50  free slots=4  free blocks=4
+S3 LINE  C=WHITE    3  outer=BLACK  948  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+[S2-STEP] GO
+S3 LINE  C=WHITE    8  outer=BLACK  936  -> turn RIGHT     200 mm/s  OVERSHOOT   cal C 162-3665  O 150-4006
+S3 JDBG outer black: Centre was WHITE -> overshoot, not a junction
+S3 LINE  C=WHITE    8  outer=WHITE   10  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=WHITE   10  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    3  outer=WHITE   10  -> turn LEFT      200 mm/s  FOLLOW   cal C 162-3665  O 150-4006
+S3 LINE  C=WHITE    0  outer=WHITE   10  -> turn LEFT      200 mm/s  FOLLOW   cal C 149-3665  O 150-4006
+S3 LINE  C=WHITE   12  outer=WHITE   10  -> turn LEFT      200 mm/s  FOLLOW   cal C 149-3665  O 150-4006
+monitor: batch  n=585 last=40 from core 1
+monitor: t=3355950896 ms  samples=585  min=0 max=100 avg=49  free slots=4  free blocks=4
+S3 LINE  C=WHITE    7  outer=WHITE   10  -> turn LEFT      200 mm/s  FOLLOW   cal C 149-3665  O 150-4006
+S3 LINE  C=WHITE   12  outer=WHITE   10  -> turn LEFT      200 mm/s  FOLLOW   cal C 149-3665  O 150-4006
+S3 LINE  C=WHITE   12  outer=WHITE   10  -> turn LEFT      200 mm/s  FOLLOW   cal C 149-3665  O 150-4006
+[S2-FLOOR] TURN 180: odometry 0 mm (L -183 R 184), heading change +178.03 deg, 980 ms
+[MEASURED] TURN 180 run 13: measured 184 deg
+[TEST] S2-U03 PASS  TURN: odometry within 2 deg
+[TEST] subsystem2 floor SUMMARY 3 passed, 0 failed
+[TEST] S2-U10 INFO longest cycle 317 us (limit 4000), stack 424 of 2176 bytes = 19 % (limit 75 %), 9098 cycles
+[TEST] S2-U10 PASS  NFR11: longest motion cycle <= 4000 us, stack <= 75 %
+[TEST] subsystem2 SUMMARY 6 passed, 0 failed
+[CALIBRATION] LEFT  turns: 3, average 102.6 % of the command (as a 90: 92.3 deg), spread 0.5 deg; S2_TURN_TRACK_LEFT_MM is 118, suggested 115
+[RESULT] finished: 9 S2 checks passed, 0 failed

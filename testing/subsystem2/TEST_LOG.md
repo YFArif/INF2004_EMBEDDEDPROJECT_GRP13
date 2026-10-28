@@ -6,6 +6,34 @@ See `testing/README.md` for how to run tests and record results.
 
 ## Test cases
 
+### U03 recalibration, 2026-10-28 (hardware validation pending)
+
+Evidence: [90-degree run](logs/2026-10-28_s2_u03%28no180%29.txt) and
+[clean 180-degree rerun](logs/2026-10-28_s2_u03%28180%20test%29.txt).
+Only the first ten measurements from the former are used; its 180-degree
+measurements are superseded by the rerun.
+
+| Command | Physical measurements, degrees (magnitudes) | Result before adjustment |
+| --- | --- | --- |
+| LEFT 90 | 90, 90, 90, 90, 88 | All within 85-95 |
+| RIGHT 90 | 82, 87, 85, 84, 85 | 82 and 84 fail 85-95; mean 84.6 |
+| LEFT 180 | 185, 185, 184 | All within 172-188 |
+
+Keep the passing left turn scale at 118 mm. Change the right scale from
+110 to 117 mm: `110 * 90 / 84.6 = 117.02`. Under a proportional-response
+assumption, the previous right readings would become 87.2, 92.5, 90.4,
+89.3 and 90.4 degrees. These are predictions, not measured passes.
+Physical track, wheel circumference, encoder resolution and PID are unchanged.
+This changes finite TURN commands and spin heading estimation, not FOLLOW
+steering. Sean's sensor-based steering still uses `S2_S3_STEER_PERCENT = 50`;
+this adjustment does not establish a fix for right curves while following a line.
+
+NFR5 requires 90-degree turns within +/-5 degrees and 180-degree turns
+within +/-8 degrees over 10 trials each. The current five trials per
+90-degree direction and three U-turns are calibration evidence, not full
+acceptance evidence. Revalidate on the floor with the new firmware and
+a slack cable; do not infer physical accuracy from encoder-only PASS lines.
+
 Define a test here before running it. Test IDs never change.
 
 | ID     | What is tested                                                                                    | Requirement / interface | Method        | Steps / how                                                                                                                                                                                                               | Expected result                                                                                                                                                                                      |

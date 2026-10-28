@@ -29,10 +29,16 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('unit', 'u06', 'u02', 'u01', 'u11', 'u03', 'u12', 'u09')]
     [string]$Test,
-    [string]$Distro = 'Ubuntu-24.04'
+    [string]$Distro = 'Ubuntu-24.04',
+    [switch]$U03StartAt180
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($U03StartAt180 -and ($Test -ne 'u03'))
+{
+    throw '-U03StartAt180 is only valid with -Test u03.'
+}
 
 $root     = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $s2Dir    = Join-Path $root 'app_program\subsystem2'
@@ -126,6 +132,28 @@ function Ask-Number([string]$question)
     }
 }
 
+function Ask-Angle([string]$question)
+{
+    # A turn must not be skipped by accident: only 's' skips it.
+    while ($true)
+    {
+        $answer = (Read-Host "$question (type 's' to skip this turn)").Trim()
+        if ($answer -ieq 's')
+        {
+            return $null
+        }
+        $value = 0.0
+        if ([double]::TryParse($answer,
+                               [Globalization.NumberStyles]::Float,
+                               [Globalization.CultureInfo]::InvariantCulture,
+                               [ref]$value))
+        {
+            return $value
+        }
+        Write-Host '  Type the angle in degrees, for example 87 or 92.5' -ForegroundColor Yellow
+    }
+}
+
 function Ask-YesNo([string]$question)
 {
     while ($true)
@@ -201,6 +229,10 @@ $header.Add('=== S2 test log ===')
 $header.Add("test:     $Test  ($($t.Name))")
 $header.Add("date:     $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
 $header.Add("commit:   $commit  ($state)")
+if ($U03StartAt180)
+{
+    $header.Add('scope:    U03 runs 11-13 only (+180 LEFT); earlier runs are not repeated or imported')
+}
 
 if ($Test -ne 'u09')
 {
@@ -235,6 +267,11 @@ $header.Add("notes:    $notes")
 
 Write-Step 'Before you start'
 $t.Setup | ForEach-Object { Write-Host "  - $_" }
+if ($U03StartAt180)
+{
+    Write-Host '  - Only three LEFT 180-degree turns (runs 11-13). Keep the earlier log for the 90-degree results.' -ForegroundColor Yellow
+    Write-Host '  - Leave the USB cable loose and clear of the wheels and chassis throughout the full turn.' -ForegroundColor Yellow
+}
 if ($Test -ne 'u09')
 {
     Write-Host '  - Close the VS Code Serial Monitor and PuTTY.'
@@ -312,8 +349,23 @@ try
             throw "$($t.Switch) not found exactly once in $($t.File)"
         }
         $text = [regex]::Replace($text, $pattern, '${1}' + $t.Value + '${2}')
+        if ($Test -eq 'u03')
+        {
+            $startRun = 1
+            if ($U03StartAt180) { $startRun = 11 }
+            $startPattern = '(#define\s+S2_U03_START_RUN\s+\()\d+(\))'
+            if ([regex]::Matches($text, $startPattern).Count -ne 1)
+            {
+                throw 'S2_U03_START_RUN not found exactly once in subsystem2_floor.c'
+            }
+            $text = [regex]::Replace($text, $startPattern, '${1}' + $startRun + '${2}')
+        }
         [System.IO.File]::WriteAllBytes($file, (New-Object System.Text.UTF8Encoding($false)).GetBytes($text))
         $switchNote = "$($t.Switch) = $($t.Value) in $($t.File), set for this build only"
+        if ($Test -eq 'u03')
+        {
+            $switchNote += "; S2_U03_START_RUN = $startRun"
+        }
     }
 
     try
@@ -417,6 +469,7 @@ try
 
     $script:moveRun  = 0
     $script:turnRun  = 0
+    if ($U03StartAt180) { $script:turnRun = 10 }
     $script:u11Start = $null
     $script:u11Runs  = New-Object System.Collections.Generic.List[object]
     $script:u03Runs  = New-Object System.Collections.Generic.List[object]
@@ -508,15 +561,44 @@ try
                 {
                     $script:turnRun++
                     $target = [int]$Matches[1]
+                    $what   = "LEFT $target"
+                    if ($target -lt 0)
+                    {
+                        $what = "RIGHT $([math]::Abs($target))"
+                    }
+                    elseif ($target -eq 180)
+                    {
+                        $what = 'U-TURN 180'
+                    }
                     Look-AtRobot
-                    Write-Host "  Turn $($script:turnRun): measure with the protractor at the crossing." -ForegroundColor Yellow
-                    $angle = Ask-Number "  Angle actually turned, deg (commanded $target; + = left)"
+                    Write-Host ''
+                    Write-Host "  TURN $($script:turnRun) of 13 finished. It was told to turn $what degrees." -ForegroundColor Yellow
+                    Write-Host '  Do NOT press BUTTON 1 yet: the robot moves again as soon as you do.' -ForegroundColor Red
+                    Write-Host '  Read the angle the pointer turned through, in degrees (positive number; direction is known).' -ForegroundColor Yellow
+                    $angle = Ask-Angle "  How many degrees did it actually turn? (intended $what)"
                     Write-Log ("[MEASURED] TURN {0} run {1}: measured {2} deg" -f $target, $script:turnRun, (Format-Value $angle))
+                    if ($null -ne $angle)
+                    {
+                        $tolerance = 5
+                        if ([math]::Abs($target) -eq 180) { $tolerance = 8 }
+                        $errorDeg = [math]::Abs([math]::Abs($angle) - [math]::Abs($target))
+                        $physicalResult = 'FAIL'
+                        $physicalColor = 'Red'
+                        if ($errorDeg -le $tolerance)
+                        {
+                            $physicalResult = 'PASS'
+                            $physicalColor = 'Green'
+                        }
+                        $physicalLine = "[PHYSICAL] U03 run $($script:turnRun): $physicalResult; angle error $(Format-Value $errorDeg) deg, limit +/-$tolerance deg"
+                        Write-Log $physicalLine
+                        Write-Host "  $physicalLine" -ForegroundColor $physicalColor
+                    }
                     if (($null -ne $angle) -and ([math]::Abs($angle) -gt 20))
                     {
                         $script:u03Runs.Add(@{ Cmd = [double]$target; Meas = [double]$angle })
                     }
-                    Write-Host '  Saved. Line the pointer up on arm F again, then press BUTTON 1.' -ForegroundColor Yellow
+                    Write-Host "  Saved: $(Format-Value $angle) deg." -ForegroundColor Green
+                    Write-Host '  Now line the pointer up on arm F again, then press BUTTON 1 (GP20). A 3-2-1 countdown follows before it moves.' -ForegroundColor Yellow
                 }
             }
             'u12'
@@ -636,6 +718,10 @@ try
                 {
                     Write-Host '  Place the robot and answer the question below FIRST, then press BUTTON 1.' -ForegroundColor Yellow
                 }
+                elseif ($Test -eq 'u03')
+                {
+                    Write-Host '  Put the pointer on arm F with the axle over the crossing. Answer any angle question first, then press BUTTON 1 (GP20). Countdown 3-2-1, then it turns.' -ForegroundColor Yellow
+                }
                 else
                 {
                     Write-Host '  Get the robot ready, then press BUTTON 1 on the robot.' -ForegroundColor Yellow
@@ -740,7 +826,7 @@ try
     # -----------------------------------------------------------------
     #  u03: a turn of theta turns each wheel by theta x pi x track / 360,
     #  so the angle really turned = commanded x track_used / track_real.
-    #  Hence track_real = track_used x measured / commanded, per direction
+    #  Hence track_real = track_used x commanded / measured, per direction
     #  (left = positive, right = negative). Right turns typed without the
     #  minus sign are fine: magnitudes are used.
     # -----------------------------------------------------------------
@@ -760,14 +846,14 @@ try
             $ratios = @($sel | ForEach-Object { [math]::Abs($_.Meas) / [math]::Abs($_.Cmd) })
             $ratio  = ($ratios | Measure-Object -Average).Average
             $spread = (($ratios | Measure-Object -Maximum).Maximum - ($ratios | Measure-Object -Minimum).Minimum) * 90
-            $newTr  = [math]::Round($track * $ratio)
+            $newTr  = [math]::Round($track / $ratio)
             $line   = ('{0,-5} turns: {1}, average {2:N1} % of the command (as a 90: {3:N1} deg), spread {4:N1} deg; {5} is {6}, suggested {7}' -f
                        $dir[0], $sel.Count, ($ratio * 100), ($ratio * 90), $spread, $name, $track, $newTr)
             Write-Host "  $line"
             Write-Log "[CALIBRATION] $line"
             if ($spread -gt 6)
             {
-                Write-Host "    The $($dir[0]) turns vary by more than 6 deg: that is slip, not calibration. Check the ball caster and the floor first." -ForegroundColor Yellow
+                Write-Host "    The $($dir[0]) turns vary by more than 6 deg: check cable drag, alignment, measurement, caster and floor before changing calibration." -ForegroundColor Yellow
             }
             if ([math]::Abs($ratio - 1) -le 0.02)
             {

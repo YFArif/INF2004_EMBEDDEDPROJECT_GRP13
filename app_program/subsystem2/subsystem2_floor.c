@@ -37,6 +37,11 @@
 #if APP_TEST
 
 #define S2_FLOOR_TEST       (0)     /* 0 off; 1 U11; 2 U03; 3 U12.       */
+#define S2_U03_START_RUN    (1)     /* 11 reruns only the three U-turns. */
+
+#if (S2_U03_START_RUN != 1) && (S2_U03_START_RUN != 11)
+#error "S2_U03_START_RUN must be 1 or 11"
+#endif
 
 #define POLL_MS             (20u)
 #define SETTLE_MS           (600u)  /* Let it come to rest, then read.   */
@@ -129,7 +134,7 @@ subsystem2_floor_test (void)
 #elif (2 == S2_FLOOR_TEST)
     // S2-U03: NFR5 wants +/-5 deg at 90 and +/-8 deg at 180, measured by
     // hand; the odometry check here only proves the command completed.
-    for (run = 1u; run <= 13u; run++)
+    for (run = S2_U03_START_RUN; run <= 13u; run++)
     {
         int16_t angle = 90;
 

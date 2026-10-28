@@ -171,15 +171,14 @@ ER   subsystem2_gpio_isr_register(void (* p_hook)(UINT intno));        /* S3. */
  * Overflow: 50 ticks x 209010 and 639 x 209010 fit 32 bits easily. */
 #define S2_TRACK_MM             (112)   /* Centre of tyre to centre.      */
 
-/* Effective track for on-the-spot turns, per direction (S2-U03). The
- * tyres and the ball caster scrub when the robot spins, differently each
- * way. From 2026-10-23 (log 2026-10-23_s2_u03_4): with 112 mm, 5 left
- * turns of 90 averaged 85.6 deg (80-90) and 3 right turns 91.7 deg
- * (90-95). Provisional: few turns, and the tick-direction fix of the
- * same commit may change them. The u03 run of s2_test.ps1 prints new
- * values. Heading odometry still uses S2_TRACK_MM. */
+/* Effective track for on-the-spot turns, per direction (S2-U03).
+ * 2026-10-28: LEFT 90 measured 88-90 deg; LEFT 180 measured 184-185 deg,
+ * so keep 118 mm. RIGHT 90 averaged 84.6 deg with 110 mm:
+ * 110 x 90 / 84.6 = 117.02 mm. Use 117 mm, pending floor validation.
+ * The same directional scales are used for spin heading odometry.
+ * These are empirical turn scales, not changes to the physical track. */
 #define S2_TURN_TRACK_LEFT_MM   (118)   /* TURN with a positive angle.    */
-#define S2_TURN_TRACK_RIGHT_MM  (110)   /* TURN with a negative angle.    */
+#define S2_TURN_TRACK_RIGHT_MM  (117)   /* TURN with a negative angle.    */
 #define S2_TICKS_PER_REV_L      (639)   /* Debounced rising edges.        */
 #define S2_TICKS_PER_REV_R      (639)
 #define S2_WHEEL_CIRC_UM_L      (208620)    /* 66.41 mm rolling diameter. */
