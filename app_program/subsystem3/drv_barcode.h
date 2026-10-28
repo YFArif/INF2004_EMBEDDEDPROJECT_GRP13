@@ -1,7 +1,7 @@
 /** @file drv_barcode.h
  *
  * @brief Subsystem 3 -- barcode sensor driver: digital output (DOUT) on
- *        GP6 and analogue output (AOUT) on GP26 (ADC channel 0).
+ *        GP7 and analogue output (AOUT) on GP28 (ADC channel 2).
  *
  * @par Two independent paths
  * DIGITAL: the module's comparator output. A GPIO edge interrupt stores
@@ -34,8 +34,8 @@
 
 #include "../app.h"         /* ER for the kernel error code.            */
 
-#define DRV_BARCODE_DOUT_PIN    (6u)
-#define DRV_BARCODE_ADC_CH      (0u)    /* AOUT on GP26.                */
+#define DRV_BARCODE_DOUT_PIN    (7u)    /* Rewired 28 Oct (was GP6).    */
+#define DRV_BARCODE_ADC_CH      (2u)    /* AOUT on GP28 (was GP26).     */
 
 #define DRV_BARCODE_GLITCH_US   (2000u)     /* Measured chatter: 0.5 ... */
                                             /* 0.85 ms.                  */

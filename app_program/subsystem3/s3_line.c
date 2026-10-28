@@ -3,6 +3,7 @@
  * @brief Subsystem 3 -- line-following combiner. See s3_line.h.
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "s3_ir_cal.h"
@@ -12,6 +13,16 @@
 #define MM_TO_UM(mm)    ((uint32_t) (mm) * UM_PER_MM)
 #define SAT16           (0xFFFFu)
 #define X100            (100)
+
+/* Distances are saturating 16-bit micrometres (s3_line.h): every
+ * threshold must stay below 65.5 mm or it could never be reached. */
+typedef char s3_line_chk_mm_t[((S3_LN_JUNC_MM      * UM_PER_MM) < SAT16) &&
+                              ((S3_LN_JUNC_LEAD_MM * UM_PER_MM) < SAT16) &&
+                              ((S3_LN_REARM_MM     * UM_PER_MM) < SAT16) &&
+                              ((S3_LN_LOST_MM      * UM_PER_MM) < SAT16) &&
+                              ((S3_LN_SIDE_SETTLE_MM * UM_PER_MM) < SAT16) &&
+                              ((S3_LN_TIE_MM * UM_PER_MM) < SAT16)
+                              ? 1 : -1];
 
 static int32_t  clamp_i32(int32_t value, int32_t lo, int32_t hi);
 static uint16_t add_sat16(uint16_t acc, uint32_t add);
@@ -26,6 +37,11 @@ static void     track_distances(s3_line_t * p_ln, uint8_t b_l_black,
 static void     update_state(s3_line_t * p_ln, s3_ln_state_t prev_state,
                              uint8_t b_l_black, uint8_t b_c_black,
                              s3_line_out_t * p_out);
+static void     track_seen(s3_line_t * p_ln, uint8_t b_o_black,
+                           int32_t n_c, uint32_t moved_um);
+static int32_t  off_line_dir(s3_line_t const * p_ln);
+static uint8_t  edge_found(s3_line_t * p_ln, int32_t n_c, uint8_t b_from_left);
+static int      recover_step(s3_line_t * p_ln, s3_line_out_t * p_out);
 
 /*!
  * @brief Start uncalibrated, following, with the default gains.
@@ -40,6 +56,7 @@ s3_line_init (s3_line_t * p_ln, int32_t edge_side)
     p_ln->edge_right  = (edge_side < 0) ? 1u : 0u;
     p_ln->kp_x100     = S3_LN_KP_X100;
     p_ln->kd_x100     = S3_LN_KD_X100;
+    p_ln->boost_x100  = S3_LN_BOOST_X100;
     p_ln->e_prev      = 0;
     p_ln->state       = S3_LN_FOLLOW;
     p_ln->mode        = S3_LN_MODE_FOLLOW;
@@ -59,6 +76,36 @@ s3_line_set_gains (s3_line_t * p_ln, int32_t kp_x100, int32_t kd_x100)
     p_ln->kp_x100      = (int16_t) clamp_i32(kp_x100, 0, S3_LN_KP_MAX_X100);
     p_ln->kd_x100      = (int16_t) clamp_i32(kd_x100, 0, S3_LN_KD_MAX_X100);
     p_ln->e_prev_valid = 0u;
+}
+
+/*!
+ * @brief Set the curve boost (x100, clamped to 0 ... max; 0 = off).
+ */
+void
+s3_line_set_shape (s3_line_t * p_ln, int32_t boost_x100)
+{
+    p_ln->boost_x100 = (int16_t) clamp_i32(boost_x100, 0,
+                                           S3_LN_BOOST_MAX_X100);
+}
+
+/*!
+ * @brief Wheel-speed difference for S2 (IF-02), mm/s, from one step's
+ *        output. Tracking: steer x steer_max. OFF LINE or LOST: x 5/4
+ *        (S3_LN_SEARCH_NUM / DEN), so with steer_max = base speed and S2
+ *        applying 50 %, full lock is base -/+ 5/8 base (inner wheel still
+ *        forward at 3/8 base). Clamped to the 10-bit field. Shared by task_line and the host simulation.
+ */
+int32_t
+s3_line_dv (s3_line_out_t const * p_out, int32_t steer_max_mms)
+{
+    bool    b_search = (0u != p_out->off_line) ||
+                       (S3_LN_LOST == p_out->state);
+    int32_t num      = b_search ? S3_LN_SEARCH_NUM : 1;
+    int32_t den      = b_search ? (S3_LN_STEER_MAX * S3_LN_SEARCH_DEN) :
+                                  S3_LN_STEER_MAX;
+
+    return clamp_i32((p_out->steer * steer_max_mms * num) / den,
+                     -S3_LN_DV_LIMIT, S3_LN_DV_LIMIT);
 }
 
 /*!
@@ -142,6 +189,7 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
     p_out->lost_event       = 0u;
     p_out->overshoot        = 0u;
     p_out->line_found_event = 0u;
+    p_out->off_line         = 0u;
     p_out->calibrated       = ((0u != p_ln->cal_l.valid) &&
                                (0u != p_ln->cal_c.valid)) ? 1u : 0u;
     p_out->n_l              = s3_ir_cal_norm(&p_ln->cal_l, raw_l);
@@ -167,6 +215,10 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
     {
         return;                     /* Still searching.                  */
     }
+    if (0 == recover_step(p_ln, p_out))
+    {
+        return;                     /* LOST: still turning back.         */
+    }
 
     b_l_black = (p_out->n_l > S3_LN_BLACK) ? 1u : 0u;
     b_c_black = (p_out->n_c > S3_LN_BLACK) ? 1u : 0u;
@@ -176,20 +228,56 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
     /* 1. Line position and PD steering. */
     steer = pd_steer(p_ln, p_out->n_c, dt_us, prev_state, &p_out->pos);
 
-    /* 2. Overshoot: drifted past the line -> outer sensor on it, Centre
-     *    on the far white. Steer hard back (design 6.1). */
-    if ((0u != b_l_black) && (0u != b_c_white))
+    /* 2. Which sensor saw the line last (for OFF LINE and LOST). */
+    track_seen(p_ln, b_l_black, p_out->n_c, moved_um);
+
+    /* 3. OUTER: the outer sensor (just outside the far edge) is reaching
+     *    the line, so the car is drifting towards the outer side. Steer
+     *    that way, at least in proportion to how dark the outer sensor is
+     *    (0 at WHITE ... S3_LN_OUTER_STEER at fully black): the PD alone
+     *    is weak while the Centre is only part white, and a fixed step
+     *    (v19) made the car jerk. Not while the Centre is black: then
+     *    both are black, a junction. */
+    if ((0u == b_l_white) && (0u == b_c_black))
     {
+        int32_t dir   = edge_sign(p_ln);    /* Towards the outer side.   */
+        int32_t push  = (S3_LN_OUTER_STEER * (p_out->n_l - S3_LN_WHITE)) /
+                        (S3_LN_STEER_MAX - S3_LN_WHITE);
+
         p_out->overshoot = 1u;
-        steer            = -edge_sign(p_ln) * S3_LN_STEER_MAX;
+        if ((steer * dir) < push)
+        {
+            steer = dir * push;
+        }
     }
 
-    /* 3. and 4. Junction and lost distances, 5. state machine. */
+    /* 4. OFF LINE: both white. "Centre white" alone cannot say which side
+     *    the line is on, so steer full lock towards the sensor that saw
+     *    it last: the outer sensor -> it is on the outer side; the
+     *    Centre -> it is on the Centre's side. */
+    if ((0u != b_l_white) && (0u != b_c_white))
+    {
+        if (0u == p_ln->off_latched)        /* Decide once, then hold.   */
+        {
+            p_ln->off_right   = (off_line_dir(p_ln) > 0) ? 1u : 0u;
+            p_ln->off_latched = 1u;
+        }
+        p_out->off_line = 1u;
+        steer           = (0u != p_ln->off_right) ? S3_LN_STEER_MAX :
+                                                    -S3_LN_STEER_MAX;
+    }
+    else
+    {
+        p_ln->off_latched = 0u;
+    }
+
+    /* 5. Junction and lost distances, then the state machine. */
     track_distances(p_ln, b_l_black, b_c_black, b_l_white, b_c_white,
                     moved_um);
     update_state(p_ln, prev_state, b_l_black, b_c_black, p_out);
 
-    /* 6. What to steer in each state. */
+    /* 6. What to steer in each state. LOST keeps the OFF LINE direction
+     *    (computed fresh each step, so it follows the last-seen sensor). */
     if (S3_LN_FOLLOW == p_ln->state)
     {
         p_ln->last_steer = (int16_t) steer;
@@ -200,7 +288,8 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
     }
     else
     {
-        steer = p_ln->last_steer;   /* Lost: keep turning back.          */
+        steer = (0u != p_ln->off_right) ? S3_LN_STEER_MAX :   /* LOST:   */
+                                          -S3_LN_STEER_MAX;   /* held.   */
     }
     p_out->steer = steer;
     p_out->state = (s3_ln_state_t) p_ln->state;
@@ -218,7 +307,6 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
 static int
 search_step (s3_line_t * p_ln, s3_line_out_t * p_out)
 {
-    uint8_t b_direct;
     uint8_t b_found;
 
     if ((S3_LN_MODE_SEARCH_FROM_LEFT != p_ln->mode) &&
@@ -226,21 +314,8 @@ search_step (s3_line_t * p_ln, s3_line_out_t * p_out)
     {
         return 1;
     }
-    b_direct = ((S3_LN_MODE_SEARCH_FROM_LEFT == p_ln->mode) ^
-                (0u != p_ln->edge_right)) ? 1u : 0u;
-    if (p_out->n_c > S3_LN_BLACK)
-    {
-        p_ln->seen_black = 1u;
-    }
-    if (0u != b_direct)
-    {
-        b_found = (p_out->n_c > S3_LN_FOUND_DIRECT) ? 1u : 0u;
-    }
-    else
-    {
-        b_found = ((0u != p_ln->seen_black) &&
-                   (p_out->n_c < S3_LN_FOUND_CROSSED)) ? 1u : 0u;
-    }
+    b_found = edge_found(p_ln, p_out->n_c,
+                         (S3_LN_MODE_SEARCH_FROM_LEFT == p_ln->mode) ? 1u : 0u);
     if (0u == b_found)
     {
         p_ln->state  = S3_LN_SEARCH;
@@ -254,6 +329,70 @@ search_step (s3_line_t * p_ln, s3_line_out_t * p_out)
     p_ln->not_junc_um       = 0u;
     p_ln->state             = S3_LN_FOLLOW;
     return 1;
+}
+
+/*!
+ * @brief Has the Centre reached the CORRECT edge? Coming from the side of
+ *        the ridden edge, the first edge it meets is ours (Centre above
+ *        FOUND_DIRECT). From the other side it meets the wrong edge first,
+ *        so it must cross the black (seen_black) and come back to below
+ *        FOUND_CROSSED at the far edge, or it would lock onto the wrong
+ *        edge and steer backwards. Used by the VC search and by LOST
+ *        recovery.
+ *
+ * @param[in] b_from_left  1 = the car is LEFT of the line, moving right.
+ */
+static uint8_t
+edge_found (s3_line_t * p_ln, int32_t n_c, uint8_t b_from_left)
+{
+    uint8_t b_direct = ((0u != b_from_left) ^ (0u != p_ln->edge_right)) ?
+                       1u : 0u;
+
+    if (n_c > S3_LN_BLACK)
+    {
+        p_ln->seen_black = 1u;
+    }
+    if (0u != b_direct)
+    {
+        return (n_c > S3_LN_FOUND_DIRECT) ? 1u : 0u;
+    }
+    return ((0u != p_ln->seen_black) && (n_c < S3_LN_FOUND_CROSSED)) ?
+           1u : 0u;
+}
+
+/*!
+ * @brief LOST recovery. After LOST the car keeps turning (full lock, the
+ *        held OFF LINE direction) until the Centre reaches the CORRECT
+ *        edge: turning right means the line is to the right, so the car
+ *        comes from its left (edge_found). Without this, the first edge
+ *        it met after a sharp corner could be the wrong one, and the PD
+ *        steered away again (host simulation S3-S05, 28 Oct).
+ *
+ * @return 1 = recovered (or not recovering): carry on with this step;
+ *         0 = still recovering (p_out filled).
+ */
+static int
+recover_step (s3_line_t * p_ln, s3_line_out_t * p_out)
+{
+    if (0u == p_ln->recovering)
+    {
+        return 1;
+    }
+    if (0u != edge_found(p_ln, p_out->n_c, p_ln->off_right))
+    {
+        p_ln->recovering = 0u;
+        reset_tracking(p_ln);
+        p_ln->junc_armed  = 0u;         /* The re-entry is not a junction.*/
+        p_ln->not_junc_um = 0u;
+        p_ln->state       = S3_LN_FOLLOW;
+        return 1;
+    }
+    p_ln->state     = S3_LN_LOST;
+    p_out->state    = S3_LN_LOST;
+    p_out->off_line = 1u;               /* Search gain in s3_line_dv().  */
+    p_out->steer    = (0u != p_ln->off_right) ? S3_LN_STEER_MAX :
+                                                -S3_LN_STEER_MAX;
+    return 0;
 }
 
 /*!
@@ -284,11 +423,13 @@ pd_steer (s3_line_t * p_ln, int32_t n_c, uint32_t dt_us,
      * (straight line) keeps the gentle Kp. */
     if (err > (S3_LN_BLACK - S3_LN_EDGE_MID))
     {
-        p_term += S3_LN_BOOST_X100 * (err - (S3_LN_BLACK - S3_LN_EDGE_MID));
+        p_term += (int32_t) p_ln->boost_x100 *
+                  (err - (S3_LN_BLACK - S3_LN_EDGE_MID));
     }
     else if (err < (S3_LN_WHITE - S3_LN_EDGE_MID))
     {
-        p_term += S3_LN_BOOST_X100 * (err - (S3_LN_WHITE - S3_LN_EDGE_MID));
+        p_term += (int32_t) p_ln->boost_x100 *
+                  (err - (S3_LN_WHITE - S3_LN_EDGE_MID));
     }
     else
     {
@@ -297,8 +438,19 @@ pd_steer (s3_line_t * p_ln, int32_t n_c, uint32_t dt_us,
 
     if ((0u != p_ln->e_prev_valid) && (dt_us > 0u))
     {
-        d_err  = (int32_t) (((int64_t) (err - p_ln->e_prev) *
-                             (int64_t) S3_LN_REF_DT_US) / (int64_t) dt_us);
+        /* 32-bit only (the M0+ has no divide instruction; 64-bit maths
+         * called two library routines every step). |de| <= 1000 and
+         * REF_DT = 10 000, so de * REF_DT <= 1e7 fits. d_err is clamped
+         * BEFORE the multiply: after a late wake-up dt can be a few us,
+         * d_err up to 1e7, and Kd * d_err would overflow 32 bits. Once
+         * |d_err| >= D_LIMIT * 100, any Kd >= 1 saturates the D term
+         * anyway, so the result is unchanged. */
+        int32_t dt = (dt_us > (uint32_t) INT32_MAX) ? INT32_MAX :
+                                                      (int32_t) dt_us;
+
+        d_err  = ((err - p_ln->e_prev) * (int32_t) S3_LN_REF_DT_US) / dt;
+        d_err  = clamp_i32(d_err, -S3_LN_D_LIMIT * X100,
+                           S3_LN_D_LIMIT * X100);
         d_term = clamp_i32((int32_t) p_ln->kd_x100 * d_err,
                            -S3_LN_D_LIMIT * X100, S3_LN_D_LIMIT * X100);
     }
@@ -368,6 +520,8 @@ update_state (s3_line_t * p_ln, s3_ln_state_t prev_state, uint8_t b_l_black,
         if (S3_LN_LOST != prev_state)
         {
             p_out->lost_event = 1u;
+            p_ln->recovering  = 1u;     /* Turn back until the RIGHT edge */
+            p_ln->seen_black  = 0u;     /* is found (recover_step).       */
         }
         p_ln->state = S3_LN_LOST;
     }
@@ -382,6 +536,73 @@ update_state (s3_line_t * p_ln, s3_ln_state_t prev_state, uint8_t b_l_black,
     }
 }
 
+/*!
+ * @brief Distance since each sensor last saw the line (saturating), and
+ *        which side of the edge the Centre was on. The outer sensor
+ *        "sees" the line when black; the Centre when darker than
+ *        S3_LN_SEEN_C.
+ */
+static void
+track_seen (s3_line_t * p_ln, uint8_t b_o_black, int32_t n_c,
+            uint32_t moved_um)
+{
+    /* Only sightings made while MOVING count: the start-up calibration
+     * sweep (car pushed sideways, odometry 0) shows both sensors black
+     * and would otherwise look like "the outer sensor just saw the line"
+     * for the first 65 mm of the run. */
+    if (0u == moved_um)
+    {
+        return;
+    }
+    p_ln->since_o_um = (0u != b_o_black) ? 0u :
+                       add_sat16(p_ln->since_o_um, moved_um);
+    if (n_c >= S3_LN_SIDE_DARK)
+    {
+        p_ln->since_c_um  = 0u;
+        p_ln->c_band_um   = 0u;
+        p_ln->c_dark_side = 1u;
+    }
+    else if (n_c > S3_LN_SEEN_C)
+    {
+        p_ln->since_c_um = 0u;
+        p_ln->c_band_um  = add_sat16(p_ln->c_band_um, moved_um);
+        if ((uint32_t) p_ln->c_band_um >= MM_TO_UM(S3_LN_SIDE_SETTLE_MM))
+        {
+            p_ln->c_dark_side = 0u;     /* Settled on the edge again.    */
+        }
+    }
+    else
+    {
+        p_ln->since_c_um = add_sat16(p_ln->since_c_um, moved_um);
+    }
+}
+
+/*!
+ * @brief OFF LINE / LOST direction, rules 1 ... 3 in s3_line.h. Called
+ *        once, on the first both-white step.
+ *
+ * @return +1 = steer right, -1 = steer left.
+ */
+static int32_t
+off_line_dir (s3_line_t const * p_ln)
+{
+    int32_t to_outer = edge_sign(p_ln);
+
+    uint32_t so  = p_ln->since_o_um;
+    uint32_t sc  = p_ln->since_c_um;
+    uint32_t gap = (so > sc) ? (so - sc) : (sc - so);
+
+    if (so < SAT16)                     /* Outer saw it within 65 mm. */
+    {
+        if (gap <= MM_TO_UM(S3_LN_TIE_MM))
+        {
+            return to_outer;                    /* 2. Crossed together.  */
+        }
+        return (so < sc) ? to_outer : -to_outer;    /* 1. Last seen.     */
+    }
+    return (0u != p_ln->c_dark_side) ? -to_outer : to_outer;    /* 3.    */
+}
+
 static void
 reset_tracking (s3_line_t * p_ln)
 {
@@ -392,6 +613,13 @@ reset_tracking (s3_line_t * p_ln)
     p_ln->l_was_black   = 0u;
     p_ln->both_white_um = 0u;
     p_ln->seen_black    = 0u;
+    p_ln->since_o_um    = SAT16;
+    p_ln->since_c_um    = SAT16;
+    p_ln->c_dark_side   = 0u;
+    p_ln->c_band_um     = 0u;
+    p_ln->off_latched   = 0u;
+    p_ln->off_right     = 0u;
+    p_ln->recovering    = 0u;
 }
 
 static int32_t

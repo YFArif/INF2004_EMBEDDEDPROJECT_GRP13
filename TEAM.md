@@ -19,7 +19,7 @@ subsystem, ask its owner or open a pull request for them to review.
 | --- | ----------------------------------------------------- | ---------- | --------------- | ------------------------- | --------------------- |
 | 1   | _example:_ LED heartbeat on GP19                      |            |                 | `app_program/subsystem1/` | `testing/subsystem1/` |
 | 2   | Motion control: motors, encoders, PID, MOVE / TURN / FOLLOW, E-stop latch | 2501261    |                 | `app_program/subsystem2/` | `testing/subsystem2/` |
-| 3   | _example:_ Consumer: collects samples into statistics |            |                 | `app_program/subsystem3/` | `testing/subsystem3/` |
+| 3   | IR line following, junction / line-lost detection, Code 39 barcode navigation | 2500316    |                 | `app_program/subsystem3/` | `testing/subsystem3/` |
 | 4   | _example:_ Monitor: prints reports, pauses the LED    |            |                 | `app_program/subsystem4/` | `testing/subsystem4/` |
 | 5   |                                                       |            |                 | `app_program/subsystem5/` | `testing/subsystem5/` |
 
@@ -55,7 +55,7 @@ fixed.
 | GP4                    |               |                                                        |
 | GP5                    |               |                                                        |
 | GP6                    |               |                                                        |
-| GP7                    |               |                                                        |
+| GP7                    | S3            | barcode DOUT, edge interrupt (rewired 28 Oct, was GP6)  |
 | GP8                    | S2            | left motor M1A (PWM slice 4A, 20 kHz)                  |
 | GP9                    | S2            | left motor M1B (PWM slice 4B, 20 kHz)                  |
 | GP10                   | S2            | right motor M2A (PWM slice 5A, 20 kHz)                 |
@@ -71,9 +71,9 @@ fixed.
 | GP20                   | S5 (planned)  | start button (Button 1). S2 `make TEST=1` images only: read-only "next step" button (`subsystem2_step.c`) |
 | GP21                   |               |                                                        |
 | GP22                   |               |                                                        |
-| GP26                   |               | (ADC0 capable)                                         |
-| GP27                   |               | (ADC1 capable)                                         |
-| GP28                   |               | (ADC2 capable)                                         |
+| GP26                   | S3            | outer line IR AOUT, ADC0 (robot's right)               |
+| GP27                   | S3            | Centre line IR AOUT, ADC1                              |
+| GP28                   | S3            | barcode AOUT, ADC2 (rewired 28 Oct)                    |
 
 ## 3. Peripherals
 
@@ -148,7 +148,7 @@ change it only by team agreement. Write down every task you create.
 | --------- | ------------- | -------------------------------------- |
 | 1         | 12–13         | _example:_ led_task – 12 – any         |
 | 2         | 14–15         | motion_task – 9 – core 1 (Week 6 report §3); _example:_ producer_task – 14 – core 1 |
-| 3         | 16–17         | _example:_ consumer_task – 16 – core 0 |
+| 3         | 16–17         | task_line – 8 – core 1, task_barcode – 12 – core 1 (Week 6 report §3); _example:_ consumer_task – 16 – core 0 |
 | 4         | 18–19         | _example:_ monitor_task – 18 – any     |
 | 5         | 20–21         |                                        |
 

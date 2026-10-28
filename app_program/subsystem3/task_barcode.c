@@ -95,10 +95,25 @@ barcode_task (INT stacd, void * p_exinf)
         ch  = '?';
         rev = 0u;
         src = 0u;
+#if (1 == S3_TIMING)
+        {
+            uint32_t t0     = in_w(TIMER_TIMERAWL);
+            bool     b_ok   = pass_decode(&ch, &rev, &src);
+            uint32_t run_us = in_w(TIMER_TIMERAWL) - t0;
+
+            tm_printf((UB *) "S3 TIME barcode decode %d us (both paths)\n",
+                      (INT) run_us);
+            if (b_ok)
+            {
+                nav_publish(ch, rev, src);
+            }
+        }
+#else
         if (pass_decode(&ch, &rev, &src))
         {
             nav_publish(ch, rev, src);
         }
+#endif
     }
 }
 
@@ -114,8 +129,8 @@ hardware_start (void)
     CHECK(drv_barcode_init(), "drv_barcode_init");
     CHECK(drv_adc_init(), "drv_adc_init");
 
-    tm_printf((UB *) "S3 RUN: barcode DOUT=GP%d AOUT=ADC%d, Left=ADC%d (GP%d), "
-                     "Centre=ADC%d (GP%d), edge=%s\n",
+    tm_printf((UB *) "S3 RUN: barcode DOUT=GP%d AOUT=ADC%d, outer IR=ADC%d "
+                     "(GP%d), Centre=ADC%d (GP%d), Centre rides the %s edge\n",
               (INT) DRV_BARCODE_DOUT_PIN, (INT) DRV_BARCODE_ADC_CH,
               (INT) DRV_IR_LEFT_ADC_CH, (INT) DRV_IR_LEFT_PIN,
               (INT) DRV_IR_CENTRE_ADC_CH, (INT) DRV_IR_CENTRE_PIN,
@@ -235,19 +250,30 @@ nav_publish (char ch, uint8_t rev, uint8_t src)
     }
     b_have_last  = true;
     last_ms      = now_ms;
-    seq          = (seq + 1u) & NAV_SEQ_MASK;
-    msg.seq      = seq;
     msg.ch_idx   = s3_code39_index(ch);
     msg.reversed = (0u != rev) ? 1u : 0u;
     msg.source   = src & NAV_SRC_MASK;
     msg.odom_mm  = s3_odom_mm() & ODOM_16_MASK;
     msg.cmd      = (uint32_t) s3_nav_lookup(ch);   /* s3_nav_cmd_t values */
                                                    /* == s3_cmd_t values. */
+    s3_status_set_barcode((uint8_t) msg.ch_idx, (uint8_t) msg.cmd,
+                          (uint8_t) msg.reversed);
+
+    /* FR5: a letter that is not in today's map is decoded and shown in
+     * the status, but never becomes a command. It still starts the
+     * cooldown, so the same stripes are not read twice. seq counts sent
+     * messages only, so a gap at the receiver always means a drop. */
+    if (S3_NAV_NONE == (s3_nav_cmd_t) msg.cmd)
+    {
+        tm_printf((UB *) "S3 NAV '%c'%s not in today's map: ignored\n", ch,
+                  (0u != rev) ? " (read backwards)" : "");
+        return;
+    }
+    seq     = (seq + 1u) & NAV_SEQ_MASK;
+    msg.seq = seq;
 
     er = tk_snd_mbf(mbf_nav, &msg, (INT) sizeof(msg), TMO_POL);  /* Never */
                                                                  /* block. */
-    s3_status_set_barcode((uint8_t) msg.ch_idx, (uint8_t) msg.cmd,
-                          (uint8_t) msg.reversed);
     (void) tk_set_flg(flg_s3, FLG_S3_BARCODE);
 
     tm_printf((UB *) "S3 NAV #%d '%c' -> %s%s%s\n", (INT) msg.seq, ch,

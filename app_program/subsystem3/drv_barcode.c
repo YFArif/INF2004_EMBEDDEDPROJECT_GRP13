@@ -1,6 +1,6 @@
 /** @file drv_barcode.c
  *
- * @brief Subsystem 3 -- barcode sensor driver (DOUT GP6, AOUT GP26).
+ * @brief Subsystem 3 -- barcode sensor driver (DOUT GP7, AOUT GP28).
  *
  * @par
  * Register addresses are from the RP2040 datasheet: IO_BANK0 (2.19.6).
@@ -100,7 +100,7 @@ drv_barcode_init (void)
  *
  * @param[in] idx  Sample index from drv_adc (monotonic).
  */
-void
+S3_RAM_FUNC(drv_barcode_sample_isr) void
 drv_barcode_sample_isr (uint32_t idx)
 {
     uint8_t value = drv_adc_to8(drv_adc_convert(DRV_BARCODE_ADC_CH));
@@ -209,7 +209,7 @@ drv_barcode_take_pass (drv_barcode_pass_t * p_pass)
  * @brief DOUT edge, called from S2's IO_IRQ_BANK0 handler. Microseconds
  *        only, never waits.
  */
-static void
+S3_RAM_FUNC(gpio_isr) static void
 gpio_isr (UINT intno)
 {
     uint32_t now_us = in_w(TIMER_TIMERAWL);
@@ -252,7 +252,7 @@ gpio_isr (UINT intno)
  *        interrupts, which run on the same core at the same level and so
  *        never nest.
  */
-static void
+S3_RAM_FUNC(mark_active) static void
 mark_active (uint32_t idx, uint8_t src_bit)
 {
     if (0u == (g_act & ACT_OPEN_BIT))

@@ -22,6 +22,7 @@
 
 #include "../app.h"
 
+#include "drv_adc.h"
 #include "drv_ir_centre.h"
 #include "drv_ir_left.h"
 #include "s3_api.h"
@@ -52,6 +53,7 @@ static void         junction_debug(s3_line_t const * p_ln,
 static void         status_print(s3_line_t const * p_ln,
                                  s3_line_out_t const * p_out,
                                  int32_t dv, uint32_t state);
+static void         timing_report(uint32_t t_start_us, uint32_t dt_us);
 #if (1 == S3_LINE_VERBOSE)
 static char const * zone_txt(int32_t n_permille);
 #endif
@@ -128,6 +130,7 @@ line_task (INT stacd, void * p_exinf)
 
         raw_read(&raw_l, &raw_c);
         s3_line_step(&ln, raw_l, raw_c, moved_um_get(dt_us), dt_us, &out);
+        timing_report(t_now, dt_us);
 
         relax_ms += dt_us / US_PER_MS;
         if (relax_ms >= S3_CAL_RELAX_MS)
@@ -142,19 +145,7 @@ line_task (INT stacd, void * p_exinf)
 
         /* IF-02 steer_sp: permille -> mm/s, 10-bit signed, one store. */
         state = (0u == out.calibrated) ? S3_LINE_UNCAL : (uint32_t) out.state;
-        dv    = (out.steer * S3_STEER_MAX_MMS) / PERMILLE;
-        if (dv > S3_STEER_LIMIT_MMS)
-        {
-            dv = S3_STEER_LIMIT_MMS;
-        }
-        else if (dv < -S3_STEER_LIMIT_MMS)
-        {
-            dv = -S3_STEER_LIMIT_MMS;
-        }
-        else
-        {
-            ;   /* In range. */
-        }
+        dv    = s3_line_dv(&out, s3_steer_max_get());   /* 10-bit clamp. */
         seq = (seq + 1u) & SEQ_MASK;
         s3_steer_publish(dv, seq, (S3_LINE_FOLLOW == state) ||
                                   (S3_LINE_JUNCTION == state) ||
@@ -166,6 +157,10 @@ line_task (INT stacd, void * p_exinf)
         rep.seq            = seq;
         rep.n_left         = out.n_l;
         rep.n_centre       = out.n_c;
+        rep.cal.white_o    = (uint16_t) ln.cal_l.white;
+        rep.cal.black_o    = (uint16_t) ln.cal_l.black;
+        rep.cal.white_c    = (uint16_t) ln.cal_c.white;
+        rep.cal.black_c    = (uint16_t) ln.cal_c.black;
         rep.overshoot      = out.overshoot;
         rep.junction_event = out.junction_event;
         rep.lost_event     = out.lost_event;
@@ -211,14 +206,21 @@ moved_um_get (uint32_t dt_us)
 static void
 requests_apply (s3_line_t * p_ln)
 {
-    int32_t kp = 0;
-    int32_t kd = 0;
+    int32_t kp    = 0;
+    int32_t kd    = 0;
+    int32_t boost = 0;
 
     if (s3_gains_request_take(&kp, &kd))
     {
         s3_line_set_gains(p_ln, kp, kd);
         tm_printf((UB *) "S3 TUNE kp=%d kd=%d (x100)\n",
                   (INT) p_ln->kp_x100, (INT) p_ln->kd_x100);
+    }
+    if (s3_shape_request_take(&boost))
+    {
+        s3_line_set_shape(p_ln, boost);
+        tm_printf((UB *) "S3 TUNE curve boost=%d (x100)\n",
+                  (INT) p_ln->boost_x100);
     }
     if (s3_recal_request_take())
     {
@@ -330,7 +332,7 @@ junction_debug (s3_line_t const * p_ln, s3_line_out_t const * p_out)
         if (C_WHITE_AT_L == c_before_um)
         {
             tm_printf((UB *) "S3 JDBG outer black: Centre was WHITE -> "
-                             "overshoot, not a junction\n");
+                             "outer on the line (drift), not a junction\n");
         }
         else
         {
@@ -387,6 +389,9 @@ status_print (s3_line_t const * p_ln, s3_line_out_t const * p_out,
               zone_txt(p_out->n_c), (INT) p_out->n_c,
               zone_txt(p_out->n_l), (INT) p_out->n_l,
               p_turn, (INT) ((dv < 0) ? -dv : dv),
+              ((0u != p_out->off_line) && (S3_LINE_FOLLOW == state)) ?
+              ((p_out->steer > 0) ? "OFF LINE -> searching RIGHT" :
+                                    "OFF LINE -> searching LEFT") :
               s3_state_txt(state, p_out->overshoot),
               (INT) p_ln->cal_c.white, (INT) p_ln->cal_c.black,
               (INT) p_ln->cal_l.white, (INT) p_ln->cal_l.black);
@@ -395,6 +400,54 @@ status_print (s3_line_t const * p_ln, s3_line_out_t const * p_out,
     (void) p_out;
     (void) dv;
     (void) state;
+#endif
+}
+
+/*!
+ * @brief S3_TIMING: every S3_TIMING_PRINT_MS, print the longest line step
+ *        (wake-up to after s3_line_step), the longest and shortest period
+ *        seen, and the longest sampler interrupt. Evidence for the
+ *        Week 6 timing claims (line_task about 1 % of core 1). The 1 us
+ *        timer reads mean a value of N is N to N + 1 us.
+ *
+ * @param[in] t_start_us  Timer value taken at wake-up.
+ * @param[in] dt_us       Period since the previous wake-up.
+ */
+static void
+timing_report (uint32_t t_start_us, uint32_t dt_us)
+{
+#if (1 == S3_TIMING)
+    static uint32_t step_max_us;
+    static uint32_t dt_max_us;
+    static uint32_t dt_min_us = UINT32_MAX;
+    static uint32_t last_ms;
+    static uint32_t steps;
+    uint32_t        run_us = in_w(TIMER_TIMERAWL) - t_start_us;
+    uint32_t        now_ms;
+
+    steps++;
+    step_max_us = (run_us > step_max_us) ? run_us : step_max_us;
+    if (steps > 1u)                     /* The first dt is from start-up. */
+    {
+        dt_max_us = (dt_us > dt_max_us) ? dt_us : dt_max_us;
+        dt_min_us = (dt_us < dt_min_us) ? dt_us : dt_min_us;
+    }
+    now_ms = s3_now_ms();
+    if ((now_ms - last_ms) < S3_TIMING_PRINT_MS)
+    {
+        return;
+    }
+    last_ms = now_ms;
+    tm_printf((UB *) "S3 TIME line step max %d us, period %d-%d us, "
+                     "sampler isr max %d us\n",
+              (INT) step_max_us, (INT) dt_min_us, (INT) dt_max_us,
+              (INT) drv_adc_isr_max_us_take());
+    step_max_us = 0u;
+    dt_max_us   = 0u;
+    dt_min_us   = UINT32_MAX;
+#else
+    (void) t_start_us;
+    (void) dt_us;
 #endif
 }
 

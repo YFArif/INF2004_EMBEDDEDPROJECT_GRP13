@@ -22,7 +22,7 @@ drv_ir_centre_init (void)
 /*!
  * @brief Take one sample. Called only by the sampler interrupt.
  */
-void
+S3_RAM_FUNC(drv_ir_centre_sample_isr) void
 drv_ir_centre_sample_isr (void)
 {
     g_raw8 = drv_adc_to8(drv_adc_convert(DRV_IR_CENTRE_ADC_CH));

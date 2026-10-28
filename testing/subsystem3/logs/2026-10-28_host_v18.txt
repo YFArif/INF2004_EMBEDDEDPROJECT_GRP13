@@ -1,0 +1,78 @@
+# S3 host tests, 28 Oct 2026, v18 working tree (v17 + origin/main 4690bd9 + v18)
+# gcc 13, -std=c99 -O2 -Wall -Wextra -Wshadow: 0 warnings. test_line also clean under -fsanitize=address,undefined.
+
+===== line
+[TEST] S3-L01   PASS  uncalibrated -> steer 0
+[TEST] S3-L02   PASS  Centre on edge -> steer ~0, FOLLOW, no D kick
+[TEST] S3-L03   PASS  drifted onto line (C darker) -> steer LEFT (negative)
+[TEST] S3-L04   PASS  drifted off line (C whiter) -> steer RIGHT (positive)
+[TEST] S3-L05   PASS  right-edge follow: C darker -> steer RIGHT
+[TEST] S3-L06   PASS  30 mm of junction -> 1 event, JUNCTION, steer 0
+[TEST] S3-L07   PASS  6 mm of black -> no junction
+[TEST] S3-L08   PASS  stopped on black -> no junction
+[TEST] S3-L09   PASS  re-arm only after 30 mm off the junction
+[TEST] S3-L10   PASS  75 mm white -> LOST once, still steering back (right)
+[TEST] S3-L11   PASS  30 mm white gap -> not lost
+[TEST] S3-L12   PASS  calibration relax keeps >= 600 counts range
+[TEST] S3-L13   PASS  lifted-car extreme fades to real black in 30 s
+[TEST] S3-L14   PASS  2 min of white only -> black level unchanged
+[TEST] S3-L15   PASS  curve/drift (C black 30 mm before L) -> no junction, steer hard left
+[TEST] S3-L16   PASS  overshoot -> steer -1000
+[TEST] S3-L17   PASS  D per 10 ms: 20 ms step gives half the D of a 10 ms step
+[TEST] S3-L18   PASS  18 mm crossing line detected at 0.30 and 0.40 m/s
+[TEST] S3-L19   PASS  overshoot recovery (Left black first while Centre white) -> no junction
+[TEST] S3-L20   PASS  black stuck at 3999 recovers within 60 s; real black reads black again
+[TEST] S3-L21   PASS  LOST -> FOLLOW: steer from P only (no D kick)
+[TEST] S3-L22   PASS  right edge: junction 1 event; overshoot -> steer +1000
+[TEST] S3-L23   PASS  disabled: steer 0, no events
+[TEST] S3-L24   PASS  search from right (right edge): LINE FOUND at the first (correct) edge
+[TEST] S3-L25   PASS  search from left (right edge): ignores the wrong edge, LINE FOUND after crossing
+[TEST] S3-L27   PASS  found line stays FOLLOW while LF_SEARCH_x still set (5/5 steps, 0 extra FOUND); new request re-searches
+[TEST] S3-L28   PASS  curve boost: Centre all white -> >= 95 % lock; on the edge |steer| < 300
+[TEST] S3-L29   PASS  dt 1 us, Kd max: D term saturates to steer -600 (no 32-bit overflow)
+[TEST] S3-L30   PASS  corner: dark 12 mm then all white -> full RIGHT, LOST keeps it
+[TEST] S3-L31   PASS  slow drift to white -> no corner, steer LEFT
+[TEST] S3-L32   PASS  corner rule off (default) -> v15b behaviour, LEFT
+  sizeof(s3_ir_cal_t)=8 (was 14)  sizeof(s3_line_t)=44 (was 80)
+[TEST] S3-L26   PASS  calibration 14 -> 8 B, line state 80 -> <= 44 B
+[TEST] S3-N01   PASS  A/B/C/D -> L/R/S/U, others NONE
+ALL PASSED: 0 failure(s)
+
+===== code39
+[TEST] sample *A*                   PASS  (res=0 ch=A rev=0)
+[TEST] sample *Z*                   PASS  (res=0 ch=Z rev=0)
+[TEST] *A* read backwards           PASS  (res=0 ch=A rev=1)
+[TEST] *A* at quarter speed         PASS  (res=0 ch=A rev=0)
+[TEST] *A* gradual slow-down        PASS  (res=0 ch=A rev=0)
+[TEST] only 27 elements             PASS  (res=1 ch=? rev=9)
+[TEST] blurred bar -> reject        PASS  (res=2 ch=? rev=9)
+[TEST] all-equal noise -> reject    PASS  (res=2 ch=? rev=9)
+ALL PASSED: 0 failure(s)
+
+===== all
+[TEST] S3-C03   PASS  all 44 table entries match python-barcode
+[TEST] S3-C04   PASS  A-Z decode forwards (rev 0) and backwards (rev 1)
+  forwards 10320/10320, backwards 10320/10320, wrong letters 0
+[TEST] S3-C05   PASS  all 43 chars x 2 directions x 12 settings x 20 trials, 0 wrong
+ALL PASSED: 0 failure(s)
+
+===== nav
+[TEST] S3-C01   PASS  all 43 Code 39 characters decode forwards and backwards (ratio 3 and 2)
+[TEST] S3-C02   PASS  every character survives the 6-bit index round trip; unknown -> 63
+[TEST] S3-N01   PASS  default map ABCD
+[TEST] S3-N02   PASS  "DCBA" -> D=LEFT C=RIGHT B=STRAIGHT A=U-TURN
+[TEST] S3-N03   PASS  "zx1w" accepted (upper-cased); letters not in the map -> NONE
+[TEST] S3-N04   PASS  short/long/repeat/'*'/invalid/NULL rejected, old map kept
+ALL PASSED: 0 failure(s)
+
+===== analog
+[TEST] sharp *A* at 0.30 m/s              PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 27 ms)
+[TEST] blurred 1.5 mm *A* at 0.30 m/s     PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 16 ms)
+[TEST] blurred 1.8 mm *Z* at 0.15 m/s     PASS  (elements=29 extrema=31 res=0 ch=Z, trigger gap max 27 ms)
+[TEST] blurred 1.5 mm *A* reversed        PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 16 ms)
+[TEST] blurred 1.5 mm *A* at 0.40 m/s     PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 12 ms)
+[TEST] too blurred (3 mm) -> reject       PASS  (elements=13 extrema=15 res=1 ch=?, trigger gap max 22 ms)
+[TEST] hand 25 mm/s, swing 1500, blur 1.5 PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 194 ms)
+[TEST] hand 50 mm/s, swing 1500, blur 1.8 PASS  (elements=29 extrema=31 res=0 ch=Z, trigger gap max 121 ms)
+[TEST] plain white -> no edges            PASS  (elements=0)
+ALL PASSED: 0 failure(s)

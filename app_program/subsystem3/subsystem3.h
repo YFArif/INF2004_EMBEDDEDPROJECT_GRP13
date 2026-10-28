@@ -11,9 +11,9 @@
  * @par Files (app_program/subsystem3/)
  * - s3_api.h / s3_api.c        public interface, kernel objects, status
  * - s3_config.h                priorities, periods, test / debug switches
- * - drv_ir_left.c / .h         Left IR sensor (GP28, ADC2)
+ * - drv_ir_left.c / .h         outer ("Left") IR sensor (GP26, ADC0)
  * - drv_ir_centre.c / .h       Centre sensor (GP27, ADC1)
- * - drv_barcode.c / .h         barcode sensor (DOUT GP6, AOUT GP26)
+ * - drv_barcode.c / .h         barcode sensor (DOUT GP7, AOUT GP28)
  * - drv_adc.c / .h             ADC owner, 2 kHz sampler interrupt
  * - s3_ir_cal.c / .h           calibration of one line sensor (pure C)
  * - s3_line.c / .h             combiner: PD, junction, lost, search (pure C)

@@ -12,7 +12,7 @@ This covers firmware v14 (v14b after the review fixes). v16 renamed the types to
 | `mbf_nav` buffer (4 messages deep) | 64 B | 32 B | −50 % |
 | `s3_line_status_t` (telemetry) | 32 B (16-bit steer/pos/n, 32-bit counters, 4-char map) | 16 B | −50 % |
 | `steer_sp` (S3 → Motion) | part of the 32 B status, read under a mutex | one 32-bit word, lock-free | — |
-| `s3_line_t` (line-follow state) | 80 B | 36 B | −55 % |
+| `s3_line_t` (line-follow state) | 80 B | 36 B (v18: 44 B, + curve boost and the corner rule's three 16-bit distances) | −55 % (v18: −45 %) |
 | `s3_ir_cal_t` (one sensor's calibration) | 14 B | 8 B | −43 % |
 | Digital edge buffer | 64 × 32-bit timestamps = 256 B + 32-bit count | 64 × 16-bit gaps = 128 B + 3 index bytes | −50 % |
 | Analogue sample ring (RUN) | 16,384 × 16-bit = 32 KB (8 s) | 4,096 × 8-bit = 4 KB (2 s) | −87.5 % |
@@ -114,7 +114,7 @@ The 16 B MQTT figure is UNVERIFIED end to end. It depends on Buddy 1 publishing 
 | `test_line` L01–L27, N01 | line following, junction, lost, search, sizes | all pass |
 | `test_line` L27 | Regression for the v14 review defect: a found line stays in FOLLOW while `LF_SEARCH_x` is still set (5/5 steps, 0 extra LINE_FOUND), and a new request starts a new search | Passes with the fix. **Fails** with the old raw-pattern logic (checked). |
 | Firmware build | modes 0–4 | exit 0, 0 warnings |
-| Size asserts | NAV 4 B, STATUS 16 B, line 36 B, cal 8 B | hold on ARM |
+| Size asserts | NAV 4 B, STATUS 16 B, line ≤ 48 B (44 B in v18), cal 8 B | hold on ARM |
 
 All of this is host or compile evidence. **No hardware run of v14 yet**, so the on-robot behaviour is UNVERIFIED.
 

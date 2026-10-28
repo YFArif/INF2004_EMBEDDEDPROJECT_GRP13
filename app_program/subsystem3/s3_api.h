@@ -49,7 +49,9 @@
  *        struct directly. Tasks only.
  *
  * IF-S3d Motion (Buddy 2) -> S3: s3_set_odometry(fn), fn() = total mm.
- * IF-S3e any task -> S3: s3_set_line_gains(kp, kd);
+ * IF-S3e any task -> S3: s3_set_line_gains(kp, kd); s3_set_line_shape(boost)
+ *        for the curve boost (s3_line.h); s3_set_steer_max(mm/s) for the
+ *        steer_sp at full lock (set it near the base speed);
  *        s3_request_recalibrate();
  * IF-S3f Buddy 1 (MQTT) -> S3: s3_set_nav_map("DCBA") on the demo day:
  *        letters for LEFT, RIGHT, STRAIGHT, U-TURN. No recompilation.
@@ -130,7 +132,7 @@ typedef struct
     UW         state     : 3;   /* s3_line_state_t.                      */
     UW         last_cmd  : 3;   /* s3_cmd_t of the last barcode.         */
     UW         last_rev  : 1;   /* It was read backwards.                */
-    UW         overshoot : 1;   /* Left IR black + Centre white.         */
+    UW         overshoot : 1;   /* OUTER rule on (outer not white).      */
     UW         pad0      : 4;
     /* Word 1 */
     UW         n_outer   : 8;   /* Left IR, 0 = white .. 255 = black.    */
@@ -158,6 +160,8 @@ ER        s3_get_line_status(s3_line_status_t * p_status);  /* Tasks only. */
 typedef UW (* s3_odom_fn_t)(void);
 void s3_set_odometry(s3_odom_fn_t fn);
 void s3_set_line_gains(INT kp_x100, INT kd_x100);   /* e.g. 150, 400.     */
+void s3_set_line_shape(INT boost_x100);             /* 0 = off (default). */
+void s3_set_steer_max(INT dv_mms);                  /* 1 ... 511 mm/s.    */
 void s3_request_recalibrate(void);
 ER   s3_set_nav_map(char const * p_map);            /* Tasks only.        */
 

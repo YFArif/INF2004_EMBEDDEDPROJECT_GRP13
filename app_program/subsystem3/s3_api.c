@@ -40,7 +40,7 @@
 /* Change Requirement 1: the packed sizes are part of the interface. */
 typedef char s3_chk_nav_t[(sizeof(s3_nav_msg_t) == 4u) ? 1 : -1];
 typedef char s3_chk_status_t[(sizeof(s3_line_status_t) == 16u) ? 1 : -1];
-typedef char s3_chk_line_t[(sizeof(s3_line_t) <= 40u) ? 1 : -1];
+typedef char s3_chk_line_t[(sizeof(s3_line_t) <= 48u) ? 1 : -1];
 
 ID mbf_nav;
 ID mtx_s3;
@@ -48,14 +48,20 @@ ID flg_s3;
 ID flg_line;
 
 static s3_line_status_t      g_status;      /* Always under mtx_s3.     */
+static s3_cal_levels_t       g_cal;         /* Always under mtx_s3.     */
 static volatile s3_odom_fn_t g_odom_fn;     /* Set once by S2.          */
 static volatile uint32_t     g_steer_word;  /* IF-02, see above.        */
 
 /* Tuning requests: written by any task, taken by task_line. */
 static int32_t       g_req_kp;
 static int32_t       g_req_kd;
-static bool          g_b_req_gains;         /* Under mtx_s3.            */
+static volatile bool g_b_req_gains;         /* Set and cleared under    */
+                                            /* mtx_s3; peeked without.  */
 static volatile bool g_b_req_recal;         /* One flag, one byte.      */
+static int32_t       g_req_boost;
+static volatile bool g_b_req_shape;         /* Like g_b_req_gains.      */
+static volatile int32_t g_steer_max_mms = S3_STEER_MAX_MMS; /* One     */
+                                            /* aligned 32-bit store.    */
 
 static void status_map_update(void);
 
@@ -189,6 +195,41 @@ s3_set_line_gains (INT kp_x100, INT kd_x100)
 }
 
 /*!
+ * @brief IF-S3e: curve boost (x100, 0 = off). task_line applies it at
+ *        its next step. Negative values are ignored.
+ */
+void
+s3_set_line_shape (INT boost_x100)
+{
+    if (boost_x100 < 0)
+    {
+        return;
+    }
+    if (E_OK == tk_loc_mtx(mtx_s3, TMO_FEVR))
+    {
+        g_req_boost   = boost_x100;
+        g_b_req_shape = true;
+        (void) tk_unl_mtx(mtx_s3);
+    }
+}
+
+/*!
+ * @brief IF-S3e: steer_sp (wheel-speed difference) at full lock, mm/s,
+ *        clamped to 1 ... S3_STEER_LIMIT_MMS. Keep it close to the base
+ *        speed: S2 applies 50 %, so full lock gives base -/+ half of it
+ *        and the inner wheel never stops or reverses (a stopped inner
+ *        wheel at high duty trips S2's stall E-stop).
+ */
+void
+s3_set_steer_max (INT dv_mms)
+{
+    int32_t v = (int32_t) dv_mms;
+
+    v = (v < 1) ? 1 : ((v > S3_STEER_LIMIT_MMS) ? S3_STEER_LIMIT_MMS : v);
+    g_steer_max_mms = v;
+}
+
+/*!
  * @brief IF-S3f: today's letter map, e.g. "DCBA" (LEFT, RIGHT, STRAIGHT,
  *        U-TURN). An invalid map is rejected and the old one kept.
  *
@@ -306,6 +347,18 @@ s3_status_set_line (s3_line_report_t const * p_rep)
                           U8_MASK;
     g_status.losts      = (g_status.losts + p_rep->lost_event) & U8_MASK;
     g_status.updated_ms = s3_now_ms() & U16_MASK;
+    g_cal               = p_rep->cal;
+    (void) tk_unl_mtx(mtx_s3);
+}
+
+/*!
+ * @brief Test tasks: the calibration levels of the last line step.
+ */
+void
+s3_cal_levels_get (s3_cal_levels_t * p_cal)
+{
+    (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
+    *p_cal = g_cal;
     (void) tk_unl_mtx(mtx_s3);
 }
 
@@ -319,6 +372,13 @@ s3_gains_request_take (int32_t * p_kp_x100, int32_t * p_kd_x100)
 {
     bool b_take = false;
 
+    /* Called every 10 ms but a request comes perhaps once a run: peek at
+     * the flag first and take the mutex only when it is set. A request
+     * set just after the peek is taken at the next step. */
+    if (!g_b_req_gains)
+    {
+        return false;
+    }
     (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
     if (g_b_req_gains)
     {
@@ -329,6 +389,40 @@ s3_gains_request_take (int32_t * p_kp_x100, int32_t * p_kd_x100)
     }
     (void) tk_unl_mtx(mtx_s3);
     return b_take;
+}
+
+/*!
+ * @brief task_line only: take a pending shape request (peek, then lock).
+ *
+ * @return true if there was one (then *p_boost_x100 is set).
+ */
+bool
+s3_shape_request_take (int32_t * p_boost_x100)
+{
+    bool b_take = false;
+
+    if (!g_b_req_shape)
+    {
+        return false;
+    }
+    (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
+    if (g_b_req_shape)
+    {
+        b_take        = true;
+        *p_boost_x100 = g_req_boost;
+        g_b_req_shape = false;
+    }
+    (void) tk_unl_mtx(mtx_s3);
+    return b_take;
+}
+
+/*!
+ * @brief task_line: the current steer_sp at full lock, mm/s.
+ */
+int32_t
+s3_steer_max_get (void)
+{
+    return g_steer_max_mms;
 }
 
 /*!
@@ -385,7 +479,7 @@ s3_state_txt (uint32_t state, uint8_t overshoot)
     switch (state)
     {
         case S3_LINE_FOLLOW:
-            p_txt = (0u != overshoot) ? "OVERSHOOT" : "FOLLOW";
+            p_txt = (0u != overshoot) ? "FOLLOW (outer near line)" : "FOLLOW";
             break;
         case S3_LINE_JUNCTION:
             p_txt = "JUNCTION";

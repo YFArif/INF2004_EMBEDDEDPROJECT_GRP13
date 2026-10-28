@@ -23,6 +23,10 @@
 #define DRV_IR_CENTRE_PIN       (27u)
 #define DRV_IR_CENTRE_ADC_CH    (1u)
 
+#if (DRV_IR_CENTRE_PIN != (26u + DRV_IR_CENTRE_ADC_CH))
+#error "drv_ir_centre: pin and ADC channel do not match"
+#endif
+
 void     drv_ir_centre_init(void);
 void     drv_ir_centre_sample_isr(void);
 uint16_t drv_ir_centre_raw(void);
