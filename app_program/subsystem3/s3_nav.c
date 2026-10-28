@@ -1,8 +1,14 @@
-/*
- *	s3_nav.c -- see s3_nav.h
- *	Not thread-safe on its own: the kernel layer (s3_bringup.c) calls the
- *	setter and the lookup under mtx_s3.
+/** @file s3_nav.c
+ *
+ * @brief Subsystem 3 -- barcode letter to navigation command. See s3_nav.h.
+ *
+ * NOTE: Not thread-safe on its own: s3_api.c calls the setter and the
+ * lookup under mtx_s3.
  */
+
+#include <stddef.h>
+#include <stdint.h>
+
 #include "s3_nav.h"
 #include "s3_code39.h"
 
@@ -16,31 +22,36 @@ static char to_upper (char ch)
 
 void s3_nav_reset (void)
 {
-    g_map[0] = 'A'; g_map[1] = 'B'; g_map[2] = 'C'; g_map[3] = 'D';
+    g_map[0] = 'A';
+    g_map[1] = 'B';
+    g_map[2] = 'C';
+    g_map[3] = 'D';
 }
 
 int s3_nav_set_map (char const * p_map)
 {
     char     tmp[S3_NAV_MAP_LEN];
     uint16_t pat;
-    uint32_t i, j;
+    uint32_t i;
+    uint32_t j;
 
-    if (0 == p_map)
+    if (NULL == p_map)
     {
         return -1;
     }
-    for (i = 0U; i < S3_NAV_MAP_LEN; i++)
+    for (i = 0u; i < S3_NAV_MAP_LEN; i++)
     {
         tmp[i] = to_upper(p_map[i]);
-        if (('\0' == tmp[i]) || ('*' == tmp[i]) || (0 == s3_code39_pattern(tmp[i], &pat)))
+        if (('\0' == tmp[i]) || ('*' == tmp[i]) ||
+            (0 == s3_code39_pattern(tmp[i], &pat)))
         {
-            return -1;                           /* too short, start/stop char, or not Code 39 */
+            return -1;  /* Too short, start/stop char, or not Code 39. */
         }
-        for (j = 0U; j < i; j++)
+        for (j = 0u; j < i; j++)
         {
             if (tmp[j] == tmp[i])
             {
-                return -1;                       /* same letter for two commands */
+                return -1;              /* Same letter for two commands. */
             }
         }
     }
@@ -48,9 +59,9 @@ int s3_nav_set_map (char const * p_map)
     {
         return -1;                               /* too long */
     }
-    for (i = 0U; i < S3_NAV_MAP_LEN; i++)
+    for (i = 0u; i < S3_NAV_MAP_LEN; i++)
     {
-        g_map[i] = tmp[i];                       /* commit only a fully valid map */
+        g_map[i] = tmp[i];      /* Commit only a fully valid map. */
     }
     return 0;
 }
@@ -58,7 +69,8 @@ int s3_nav_set_map (char const * p_map)
 void s3_nav_get_map (char * p_out5)
 {
     uint32_t i;
-    for (i = 0U; i < S3_NAV_MAP_LEN; i++)
+
+    for (i = 0u; i < S3_NAV_MAP_LEN; i++)
     {
         p_out5[i] = g_map[i];
     }
@@ -68,11 +80,12 @@ void s3_nav_get_map (char * p_out5)
 s3_nav_cmd_t s3_nav_from_char (char ch)
 {
     uint32_t i;
-    for (i = 0U; i < S3_NAV_MAP_LEN; i++)
+
+    for (i = 0u; i < S3_NAV_MAP_LEN; i++)
     {
         if (g_map[i] == ch)
         {
-            return (s3_nav_cmd_t)(i + 1U);
+            return (s3_nav_cmd_t)(i + 1u);
         }
     }
     return S3_NAV_NONE;
@@ -89,3 +102,5 @@ char const * s3_nav_name (s3_nav_cmd_t cmd)
         default:              return "NONE";
     }
 }
+
+/*** end of file ***/
