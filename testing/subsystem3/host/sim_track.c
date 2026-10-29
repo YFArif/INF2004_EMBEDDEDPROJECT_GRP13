@@ -1,11 +1,12 @@
 /*
- *	sim_track.c -- host simulation: the REAL s3_line.c (v25, both sensors
- *	on the line) driving a simple model of our car around test tracks.
+ *	sim_track.c -- host simulation: the REAL s3_line.c (v29, one sensor
+ *	on each edge) driving a simple model of our car around test tracks.
  *
  *	Normally run by ../run_host_tests.sh, or on any PC/WSL with gcc:
  *	  gcc -std=c99 -O2 -Wall -Wextra -I../../../app_program/subsystem3 \
  *	      sim_track.c ../../../app_program/subsystem3/s3_line.c \
- *	      -lm -o sim && ./sim            (./sim sweep = gain sweep only)
+ *	      -lm -o sim && ./sim            (./sim sweep = gain sweep only,
+ *	                                      ./sim gap 16 = another spacing)
  *
  *	What is modelled (and what is NOT):
  *	- Differential drive, track 112 mm (S2). S2 FOLLOW: wheels = base -/+
@@ -16,7 +17,7 @@
  *	  S3 steps every 10 ms, S2 reads every 20 ms.
  *	- Sensors: two, SPACING mm apart centre to centre, the pair centred on
  *	  the car, LOOKAHEAD mm in front of the axle. Each reads the fraction
- *	  of a 5 mm spot over the 18 mm black line. Optional uniform noise
+ *	  of its spot (5 mm, or 8 mm in the realism runs) over the 18 mm line. Optional uniform noise
  *	  (fixed-seed LCG), 4-sample averaging and 8-bit readings, as
  *	  drv_adc.c.
  *	- UNVERIFIED on our car: lookahead (swept 40/60/80 mm), spot size,
@@ -32,7 +33,6 @@
 #define W_RAW       (200.0)
 #define B_RAW       (3000.0)
 #define LINE_HALF   (9.0)        /* mm */
-#define SPOT        (5.0)        /* mm, sensor spot width */
 #define TRACK       (112.0)      /* mm, wheel centre to centre */
 #define RAMP_MMS    (30.0)       /* S2 set-point ramp per 20 ms */
 #define CORNER_DEAD (10.0)       /* = S2_CORNER_DEADBAND_MMS */
@@ -40,13 +40,14 @@
 #define MAX_PTS     (4000)
 #define PI          (3.14159265358979)
 #define KICK_MS     (300.0)      /* Disturbance spread over this. */
-#define S3_IR_SPACING_TEST_MM (15.0)   /* Our car, centre to centre.   */
+#define S3_IR_SPACING_TEST_MM (18.0)   /* Our car, centre to centre.   */
 
 static int32_t  g_kp = S3_LN_KP_X100;   /* gains used by drive()        */
 static int32_t  g_kd = S3_LN_KD_X100;
 static int32_t  g_noise = 0;            /* +- raw counts on each read    */
 static uint32_t g_seed  = 12345u;
-static double   g_half  = 6.0;          /* half the sensor spacing, mm   */
+static double   g_half  = 9.0;          /* half the sensor spacing, mm   */
+static double   g_spot  = 5.0;          /* sensor spot width, mm         */
 static int32_t  g_l_side = S3_LN_L_ON_RIGHT;   /* GP26 mounting side     */
 static double   g_lag_ms     = 0.0;     /* 0 = wheels follow at once     */
 static int      g_quant8     = 0;       /* 1 = 8-bit readings            */
@@ -99,7 +100,7 @@ static double line_dist (double x, double y, int * p_idx)
 static uint16_t sensor (double x, double y)
 {
     double d   = line_dist(x, y, NULL);
-    double cov = (LINE_HALF + SPOT / 2.0 - d) / SPOT;
+    double cov = (LINE_HALF + g_spot / 2.0 - d) / g_spot;
     double v;
     cov = (cov < 0.0) ? 0.0 : ((cov > 1.0) ? 1.0 : cov);
     v   = W_RAW + (B_RAW - W_RAW) * cov;
@@ -307,7 +308,7 @@ static void realism (void)
     int    trk, l, n, s, ok = 1;
     char   line[160];
 
-    g_quant8 = 1; g_oversample = 4;
+    g_quant8 = 1; g_oversample = 4; g_spot = 8.0;
     for (trk = 0; trk < 2; trk++)
     {
         track_build((0 == trk) ? 0 : 5);
@@ -330,8 +331,8 @@ static void realism (void)
             }
         }
     }
-    g_quant8 = 0; g_oversample = 1; g_lag_ms = 0.0; g_noise = 0;
-    (void)snprintf(line, sizeof(line), "lag 40-120 ms, noise 40-80, 8-bit, 40 and 80 mm/s: "
+    g_quant8 = 0; g_oversample = 1; g_lag_ms = 0.0; g_noise = 0; g_spot = 5.0;
+    (void)snprintf(line, sizeof(line), "lag 40-120 ms, noise 40-80, 8 mm spot, 8-bit, 40 and 80 mm/s: "
                    "on track, axle within 30 mm");
     check("S3-S91", ok, line);
 }
@@ -351,7 +352,7 @@ static void disturb (void)
     int  trk, l, k, a, runs = 0, fails = 0;
     char line[160];
 
-    g_quant8 = 1; g_oversample = 4; g_noise = 60;
+    g_quant8 = 1; g_oversample = 4; g_noise = 60; g_spot = 8.0;
     for (trk = 0; trk < 3; trk++)
     {
         pen_start();
@@ -380,44 +381,54 @@ static void disturb (void)
             }
         }
     }
-    g_kick_at_mm = -1.0; g_quant8 = 0; g_oversample = 1; g_lag_ms = 0.0; g_noise = 0;
+    g_kick_at_mm = -1.0; g_quant8 = 0; g_oversample = 1; g_lag_ms = 0.0; g_noise = 0; g_spot = 5.0;
     printf("  disturbed runs finished: %d of %d\n", runs - fails, runs);
     (void)snprintf(line, sizeof(line), "after a bump or slip the car finishes the track "
                    "(%d of %d runs)", runs - fails, runs);
     check("S3-S92", 0 == fails, line);
 }
 
-/* "./sim sweep": gain sweep on all tracks with realism on (not a test). */
+/* "./sim sweep": gain sweep on all tracks with realism on (not a test):
+ * noise, 8-bit, averaging, wheel lag 80 and 120 ms, spot 5 and 8 mm, at
+ * 40 mm/s (the drive test). Worst case over all of them per gain pair. */
 static void sweep (void)
 {
-    static int32_t const kps[] = {50, 75, 100, 150, 200, 300};
-    static int32_t const kds[] = {0, 25, 50, 100, 200};
-    int a, b, t, s;
+    static int32_t const kps[]   = {20, 30, 40, 50, 60, 80, 100};
+    static int32_t const kds[]   = {0, 25, 50, 100, 200};
+    static double  const lags[]  = {80.0, 120.0};
+    static double  const spots[] = {5.0, 8.0};
+    int a, b, t, l, p;
 
-    g_quant8 = 1; g_oversample = 4; g_noise = 60; g_lag_ms = 80.0;
-    for (a = 0; a < 6; a++)
+    g_quant8 = 1; g_oversample = 4; g_noise = 60;
+    for (a = 0; a < (int)(sizeof(kps) / sizeof(kps[0])); a++)
     {
-        for (b = 0; b < 5; b++)
+        for (b = 0; b < (int)(sizeof(kds) / sizeof(kds[0])); b++)
         {
             double worst_p = 1.0, worst_e = 0.0, rms = 0.0, flips = 0.0;
+            int    runs = 0;
             g_kp = kps[a]; g_kd = kds[b];
-            for (t = 0; t < N_TRACKS; t++)
+            for (l = 0; l < 2; l++)
             {
-                track_build(t);
-                for (s = 0; s < 2; s++)
+                for (p = 0; p < 2; p++)
                 {
-                    double base = (0 == s) ? 40.0 : 80.0;
-                    run_t  r = drive(base, (int32_t)base, 60.0, 0.0);
-                    worst_p = (r.progress < worst_p) ? r.progress : worst_p;
-                    if (t < 3) { worst_e = (r.max_err > worst_e) ? r.max_err : worst_e; }
-                    if (0 == t) { rms += r.rms_err / 2.0; flips += r.flip_pct / 2.0; }
+                    g_lag_ms = lags[l]; g_spot = spots[p];
+                    for (t = 0; t < N_TRACKS; t++)
+                    {
+                        run_t r;
+                        track_build(t);
+                        r = drive(40.0, 40, 60.0, 0.0);
+                        worst_p = (r.progress < worst_p) ? r.progress : worst_p;
+                        if (t < 3) { worst_e = (r.max_err > worst_e) ? r.max_err : worst_e; }
+                        if (0 == t) { rms += r.rms_err; flips += r.flip_pct; runs++; }
+                    }
                 }
             }
             printf("Kp %3d Kd %3d: worst progress %3.0f %%, worst curve err %5.1f mm, "
                    "straight RMS %4.1f mm, flips %4.1f %%\n", (int)g_kp, (int)g_kd,
-                   100.0 * worst_p, worst_e, rms, flips);
+                   100.0 * worst_p, worst_e, rms / runs, flips / runs);
         }
     }
+    g_quant8 = 0; g_oversample = 1; g_noise = 0; g_lag_ms = 0.0; g_spot = 5.0;
 }
 
 int main (int argc, char ** argv)
@@ -441,19 +452,19 @@ int main (int argc, char ** argv)
         return g_fail;
     }
 
-    /* OUR CAR (v25): both sensors on the line, 12 mm apart, GP26 on the
+    /* OUR CAR (v29): one sensor on each edge, 18 mm apart, GP26 on the
      * robot's RIGHT (S3_IR_L_SIDE in s3_config.h). */
-    layout_set("OUR CAR: 15 mm (measured 28 Oct), GP26 RIGHT", S3_IR_SPACING_TEST_MM,
+    layout_set("OUR CAR: 18 mm edge pair, GP26 RIGHT", S3_IR_SPACING_TEST_MM,
                S3_LN_L_ON_RIGHT);
     all_tracks("S0");
     /* The same mounted the other way round, with S3_IR_L_SIDE set to
      * match: the result must be the same. */
     layout_set("mirror mount, GP26 LEFT", S3_IR_SPACING_TEST_MM, S3_LN_L_ON_LEFT);
     all_tracks("S1");
-    /* Mounting tolerance: 12 and 18 mm instead of 15. */
-    layout_set("12 mm", 12.0, S3_LN_L_ON_RIGHT);
+    /* Mounting tolerance: 16 and 20 mm instead of 18. */
+    layout_set("16 mm", 16.0, S3_LN_L_ON_RIGHT);
     all_tracks("S2");
-    layout_set("18 mm", 18.0, S3_LN_L_ON_RIGHT);
+    layout_set("20 mm", 20.0, S3_LN_L_ON_RIGHT);
     all_tracks("S3");
 
     layout_set("OUR CAR: start off the line", S3_IR_SPACING_TEST_MM, S3_LN_L_ON_RIGHT);

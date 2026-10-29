@@ -20,11 +20,12 @@
 #include "s3_line.h"        /* S3_LN_L_ON_LEFT / S3_LN_L_ON_RIGHT.      */
 
 /* ---------------------------------------------------------------------
- *  Line sensor layout (v25 CENTRED PAIR, s3_line.h). Both sensors sit ON
- *  the line, 12 mm apart centre to centre, the pair centred on the car:
+ *  Line sensor layout (v29 EDGE PAIR, s3_line.h). One sensor on EACH
+ *  edge of the 18 mm line, 18 mm apart centre to centre, the pair
+ *  centred on the car. Centred, both read GREY (about 500):
  *
- *        white |####  L  ####  R  ####| white     (looking down, car
- *                     <-12 mm->                    pointing up the page)
+ *        white  L|##################|R  white     (looking down, car
+ *                <------ 18 mm ----->              pointing up the page)
  *
  *  On our car the GP26 ("Left IR") sensor is on the robot's RIGHT and
  *  GP27 ("Centre IR") on its LEFT. If they are mounted the other way
@@ -34,10 +35,10 @@
 #ifndef S3_IR_L_SIDE
 #define S3_IR_L_SIDE            (S3_LN_L_ON_RIGHT)
 #endif
-#define S3_IR_SPACING_MM        (12)    /* Mounting: centre to centre.   */
+#define S3_IR_SPACING_MM        (18)    /* Mounting: centre to centre.   */
 #define S3_LAYOUT_TXT           ((S3_LN_L_ON_LEFT == S3_IR_L_SIDE) ? \
-                                 "both on line, GP26 LEFT" :           \
-                                 "both on line, GP26 RIGHT")
+                                 "edge pair 18 mm, GP26 LEFT" :        \
+                                 "edge pair 18 mm, GP26 RIGHT")
 
 /* ---------------------------------------------------------------------
  *  Tasks (Week 6 report section 3, TEAM.md section 4). Both run on core 1
@@ -88,8 +89,10 @@
 #define S3_DRIVE_TEST           (0)
 #endif
 #define S3_LINE_VERBOSE         (!S3_DRIVE_TEST) /* Drive task owns logs. */
+#ifndef S3_BC_VERBOSE
 #define S3_BC_VERBOSE           (0)     /* 1 = every barcode attempt;    */
                                         /* 0 = only "S3 NAV" lines.      */
+#endif
 #ifndef S3_TIMING
 #define S3_TIMING               (!S3_DRIVE_TEST) /* Quiet drive prompts. */
                                         /* sampler interrupt and line    */

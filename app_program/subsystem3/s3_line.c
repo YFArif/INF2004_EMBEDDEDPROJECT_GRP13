@@ -1,7 +1,7 @@
 /** @file s3_line.c
  *
- * @brief Subsystem 3 -- line following with both sensors on the line
- *        (centred pair, v25) and per-sensor calibration. See s3_line.h.
+ * @brief Subsystem 3 -- line following with one sensor on each edge
+ *        (edge pair, v29) and per-sensor calibration. See s3_line.h.
  */
 
 #include <stdbool.h>
@@ -230,9 +230,34 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
     err        = n_right - n_left;
     p_out->pos = err / 2;
 
-    if ((n_left >= S3_LN_WHITE) || (n_right >= S3_LN_WHITE))
+    if ((n_left > S3_LN_BLACK) && (n_right > S3_LN_BLACK))
+    {
+        /* 2a. Both black: a junction or crossing line (a plain line is
+         *     never under both). Straight across; one event after
+         *     S3_LN_JUNC_MM, then JUNCTION until a sensor leaves black. */
+        uint16_t prev_um = p_ln->both_black_um;
+
+        p_ln->both_black_um = add_sat16(p_ln->both_black_um, moved_um);
+        p_ln->both_white_um = 0u;
+        p_ln->e_prev_valid  = 0u;   /* No D kick on the way out.         */
+        steer               = 0;
+        if ((uint32_t) p_ln->both_black_um >= MM_TO_UM(S3_LN_JUNC_MM))
+        {
+            if ((uint32_t) prev_um < MM_TO_UM(S3_LN_JUNC_MM))
+            {
+                p_out->junction_event = 1u;
+            }
+            p_ln->state = S3_LN_JUNCTION;
+        }
+        else
+        {
+            p_ln->state = S3_LN_FOLLOW;
+        }
+    }
+    else if ((n_left >= S3_LN_WHITE) || (n_right >= S3_LN_WHITE))
     {
         /* 2. A sensor sees the line: PD, and remember the side. */
+        p_ln->both_black_um = 0u;
         steer = pd_steer(p_ln, err, dt_us, prev_state);
         if ((err > S3_LN_SIDE_MIN) || (err < -S3_LN_SIDE_MIN))
         {
@@ -249,6 +274,7 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
          *    for S3_LN_HOLD_MM, then ramp from S3_LN_SOFT_PERMILLE to
          *    full lock at S3_LN_LOST_MM (state LOST from there). */
         p_ln->e_prev_valid  = 0u;   /* No D kick when the line returns.  */
+        p_ln->both_black_um = 0u;
         p_out->off_line     = 1u;
         if (err > S3_LN_SIDE_MIN)
         {
@@ -342,7 +368,7 @@ pd_steer (s3_line_t * p_ln, int32_t err, uint32_t dt_us,
     }
     else
     {
-        ;   /* Both sensors on the line: Kp only. */
+        ;   /* Near the centre: Kp only. */
     }
 
     if ((0u != p_ln->e_prev_valid) && (dt_us > 0u))
@@ -370,6 +396,7 @@ reset_tracking (s3_line_t * p_ln)
 {
     p_ln->e_prev_valid  = 0u;
     p_ln->both_white_um = 0u;
+    p_ln->both_black_um = 0u;
 }
 
 /*!

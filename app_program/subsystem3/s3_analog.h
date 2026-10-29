@@ -20,9 +20,12 @@
 /* Samples are 8-bit (ADC 12-bit >> 4, Change Requirement 1: the barcode
  * only needs ~230 grey levels between white ~240 and black ~3960; noise is
  * ~5 counts of 4096, below one 8-bit step). Thresholds are 8-bit units. */
-#define S3_AN_MIN_RANGE     (19u)   /* Below this max - min: just noise.  */
-#define S3_AN_MIN_PROM      (9u)    /* Smallest peak / valley prominence. */
-#define S3_AN_PROM_PCT      (12u)   /* Prominence = 12 % of max - min.    */
+#define S3_AN_MIN_RANGE     (12u)   /* 192 ADC counts: minimum useful     */
+                                    /* white/black range after 8-bit      */
+                                    /* quantisation.                      */
+#define S3_AN_MIN_PROM      (4u)    /* Smallest peak / valley prominence. */
+#define S3_AN_PROM_PCT      (6u)    /* Prominence = 6 % of the observed    */
+                                    /* range, with S3_AN_MIN_PROM floor.   */
 #define S3_AN_MAX_EXTREMA   (80u)
 
 typedef struct

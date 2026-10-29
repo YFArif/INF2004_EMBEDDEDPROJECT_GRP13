@@ -1,38 +1,39 @@
 /** @file s3_line.h
  *
  * @brief Subsystem 3 -- line following: per-sensor calibration and the
- *        PD controller that keeps BOTH line sensors on the black line
- *        (pure C, no kernel calls, unit-tested on a laptop:
+ *        PD controller that keeps one line sensor on EACH edge of the
+ *        black line (pure C, no kernel calls, unit-tested on a laptop:
  *        testing/subsystem3/host/test_line.c, sim_track.c).
  *
- * @par Geometry: CENTRED PAIR (v25, 28 Oct; replaces the v19 straddle)
+ * @par Geometry: EDGE PAIR (v29, 29 Oct; replaces the v25 centred pair)
  *
- *              <-- 12 mm -->
- *             L            R        both sensor centres ON the line
- *       white |####################| white      line 18 mm wide
+ *         <------ 18 mm ------>
+ *         L                    R    each sensor centre ON an edge
+ *   white |####################| white          line 18 mm wide
  *
- * - Both sensors sit over the line, 12 mm apart centre to centre, the
- *   pair centred on the car and on the line. On the line both read
- *   black (about 1000 permille).
- * - When the car drifts, the sensor on the drifting side reaches the
- *   edge first and turns grey, then white; the other stays black. The
- *   difference e = n_RIGHT - n_LEFT says where the line is: e > 0, the
- *   right sensor is darker, the line is to the right -> steer right.
- * - The rule is the same for left and right, so left and right corners
- *   behave the same, and there is no "which edge am I on" to get wrong
- *   (the v19 ... v22 straddle could, and then spun).
+ * - The sensors are 18 mm apart centre to centre, the line width, the
+ *   pair centred on the car. Centred on the line, each spot is half on
+ *   black: both read GREY (about 500 permille), e = 0.
+ * - When the car drifts, one sensor moves onto the line (darker) and
+ *   the other off it (lighter), so BOTH change and e = n_RIGHT - n_LEFT
+ *   moves at once, with no dead band in the middle (the v25 pair had
+ *   +-3 mm where both read black and e stayed 0). e > 0: the right
+ *   sensor is darker, the line is to the right -> steer right.
+ * - e reaches +-1000 after only half a spot width (2-4 mm), so Kp is
+ *   much lower than v25's 100, or the car weaves.
+ * - Past that, one sensor is black and the other white (e saturated)
+ *   until the black one crosses the far edge: the car is pulled back
+ *   from up to about 18 mm either side. Both white = really off the
+ *   line, so OFF LINE turns towards the last side at once.
+ * - Both BLACK cannot happen on a plain 18 mm line: it is a junction or
+ *   a crossing line (FR3), see S3_LN_JUNC_MM.
  * - Which ADC channel is on which side: s3_line_init() l_side (the "Left
  *   IR" channel GP26 on the robot's LEFT or RIGHT; S3_IR_L_SIDE in
  *   s3_config.h). The other channel (GP27, "Centre IR") is on the other
  *   side.
- * - Spacing: closer than about 6 mm and both stay black until the car is
- *   well off the line (late, hard corrections); wider than about 16 mm
- *   and a sensor sits near the edge all the time (noisy). 12 mm leaves
- *   about 3 mm of black between each sensor and its edge.
- * - LIMIT: both sensors are black on every part of the line, so a
- *   junction looks like plain line. This layout does NOT detect
- *   junctions (junction_event is always 0; FR3 junctions need another
- *   method, e.g. the barcode before each junction).
+ * - Spacing: narrower than about 14 mm and both read black near the
+ *   centre (dead band, and false junctions); wider than about 22 mm and
+ *   both read white near the centre (false OFF LINE).
  *
  * @par Units
  * Normalised readings are permille, 0 = white, 1000 = black. Steering
@@ -41,12 +42,16 @@
  *
  * @par Rules (each one has a host test in test_line.c)
  * - PD on e = n_RIGHT - n_LEFT (-1000 ... +1000), optional curve boost
- *   once |e| > S3_LN_BOOST_FROM (one sensor off the line). D is "change
- *   per 10 ms", so Kd holds if the period varies.
+ *   once |e| > S3_LN_BOOST_FROM. D is "change per 10 ms", so Kd holds if
+ *   the period varies.
  * - Last side: while |e| > S3_LN_SIDE_MIN, remember which side the line
  *   is on (the darker sensor).
- * - OFF LINE: both white -> full lock towards the last side, until
- *   either sensor is darker than WHITE again (then PD).
+ * - Junction: both black -> steer 0 (straight across); after
+ *   S3_LN_JUNC_MM one junction_event and state JUNCTION, until either
+ *   sensor is not black.
+ * - OFF LINE: both white -> S3_LN_SOFT_PERMILLE towards the last side,
+ *   rising to full lock at S3_LN_LOST_MM, until either sensor is darker
+ *   than WHITE again (then PD).
  * - Lost: both white for S3_LN_LOST_MM -> one lost_event, state LOST,
  *   still full lock towards the last side until a sensor sees the line.
  * - Search (Vehicle Controller): steer 0 until either sensor is above
@@ -105,15 +110,18 @@ int32_t  s3_ir_cal_norm(s3_ir_cal_t const * p_cal, uint16_t value);
 #define S3_LN_WHITE         (250)   /* n < 250 = white.                   */
 #define S3_LN_MIN_RANGE     (S3_IR_CAL_MIN_RANGE)
 #define S3_LN_LOST_MM       (40u)   /* Both white this far = LOST.        */
-#define S3_LN_KP_X100       (100)   /* Default gains: steer =             */
+#define S3_LN_KP_X100       (60)    /* Default gains: steer =             */
 #define S3_LN_KD_X100       (0)     /*   (Kp * e + Kd * de) / 100.        */
-                                    /* v25 host sweep (sim_track.c sweep, */
-                                    /* lag 80 ms, noise, 8-bit): every Kp */
-                                    /* 50-300 / Kd 0-200 finishes every   */
-                                    /* track; Kp 100 / Kd 0: worst curve  */
-                                    /* error 5.7 mm, 2 % sign flips. D    */
-                                    /* only added flips. UNVERIFIED on    */
-                                    /* the car.                           */
+                                    /* v29 host sweep (sim_track.c sweep, */
+                                    /* 40 mm/s, steer_max 40, lag 80/120  */
+                                    /* ms, spot 5/8 mm, noise, 8-bit):    */
+                                    /* every Kp 20-100 / Kd 0-200         */
+                                    /* finishes every track. Kp <= 50:    */
+                                    /* r200 curves need more steer than   */
+                                    /* e can give, worst error 18 mm (at  */
+                                    /* the edge). Kp 60: 6.3 mm. Kd >= 50 */
+                                    /* only added sign flips (1-27 %).    */
+                                    /* UNVERIFIED on the car.             */
 #define S3_LN_KP_MAX_X100   (2000)
 #define S3_LN_KD_MAX_X100   (4000)
 #define S3_LN_BOOST_X100    (0)     /* Curve boost: extra steer per       */
@@ -127,14 +135,16 @@ int32_t  s3_ir_cal_norm(s3_ir_cal_t const * p_cal, uint16_t value);
                                     /* while both read "white" (a reading */
                                     /* of 200 / 1000 is the line, not     */
                                     /* noise: white floor was 3-66).      */
-#define S3_LN_HOLD_MM       (8u)    /* Both white: steer 0 this far, so a */
-                                    /* sensor pair straddling the line,   */
-                                    /* or a one-sample dropout, does not  */
-                                    /* throw the car into full lock (log  */
-                                    /* 28 Oct: every WW sample was +-50). */
-#define S3_LN_SOFT_PERMILLE (350)   /* ... then this much steer towards   */
+#define S3_LN_HOLD_MM       (0u)    /* Both white: steer 0 this far. 0 in */
+                                    /* the edge pair: both white means    */
+                                    /* the car is already about 15 mm     */
+                                    /* off, so turn back at once.         */
+#define S3_LN_SOFT_PERMILLE (700)   /* ... then this much steer towards   */
                                     /* the remembered side, rising        */
                                     /* linearly to full lock at LOST_MM.  */
+#define S3_LN_JUNC_MM       (5u)    /* Both black this far = junction     */
+                                    /* (one sample of noise is 0.4 mm at  */
+                                    /* 40 mm/s; a crossing line is 18).   */
 #define S3_LN_FOUND         (500)   /* Search: a sensor above this =      */
                                     /* line found.                        */
 #define S3_LN_SEARCH_NUM    (5)     /* OFF LINE / LOST: full lock is      */
@@ -154,8 +164,7 @@ int32_t  s3_ir_cal_norm(s3_ir_cal_t const * p_cal, uint16_t value);
 typedef enum
 {
     S3_LN_FOLLOW = 0,   /* On the line, PD steering valid.               */
-    S3_LN_JUNCTION,     /* Not used by the centred pair (kept for the    */
-                        /* IF-07 state field).                           */
+    S3_LN_JUNCTION,     /* Both black for S3_LN_JUNC_MM: steer 0.        */
     S3_LN_LOST,         /* Both white for S3_LN_LOST_MM.                 */
     S3_LN_DISABLED,     /* LF_ENABLE clear (turn / bypass): steer 0.     */
     S3_LN_SEARCH        /* Reacquiring after a bypass: steer 0.          */
@@ -181,6 +190,7 @@ typedef struct
     int16_t      e_prev;        /* -1000 ... +1000 permille.             */
     int16_t      boost_x100;    /* Curve boost, 0 ... 600 (0 = off).     */
     uint16_t     both_white_um; /* Distance with both sensors white.     */
+    uint16_t     both_black_um; /* Distance with both sensors black.     */
     unsigned int state        : 3;  /* s3_ln_state_t.                    */
     unsigned int mode         : 2;  /* s3_ln_mode_t.                     */
     unsigned int req_mode     : 2;  /* Last mode REQUESTED by the VC.    */
@@ -198,7 +208,7 @@ typedef struct
                                     /* +500, + = line to the right.      */
     int32_t       steer;            /* -1000 ... +1000.                  */
     s3_ln_state_t state;
-    uint8_t       junction_event;   /* Always 0 (see LIMIT above).       */
+    uint8_t       junction_event;   /* 1 on the step a junction starts.  */
     uint8_t       lost_event;       /* 1 on the step the line is lost.   */
     uint8_t       overshoot;        /* 1 while one sensor is white.      */
     uint8_t       calibrated;       /* Both sensors have a trusted range. */

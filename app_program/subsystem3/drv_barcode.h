@@ -41,11 +41,14 @@
                                             /* 0.85 ms.                  */
 #define DRV_BARCODE_QUIET_US    (300000u)   /* Whole code at 0.30 m/s =  */
                                             /* 470 ms.                   */
-#define DRV_BARCODE_ACT_STEP    (12)        /* 8-bit units (= 192 of     */
-                                            /* 4096): well above noise.  */
+#define DRV_BARCODE_ACT_STEP    (6)         /* 8-bit units (= 96 of      */
+                                            /* 4096): captures shallow    */
+                                            /* narrow stripes while the   */
+                                            /* analogue range gate rejects */
+                                            /* low-level noise.            */
 #define DRV_BARCODE_DIG_RING    (64u)       /* Power of 2; a code needs  */
                                             /* 30 edges.                 */
-#define DRV_BARCODE_RING        (4096u)     /* 4096 x 0.5 ms = 2 s.      */
+#define DRV_BARCODE_RING        (8192u)     /* 8192 x 0.5 ms = 4.096 s.  */
 
 /** Opened by: bit 0 = AOUT moved, bit 1 = DOUT edge. */
 #define DRV_BARCODE_SRC_AOUT    (1u)

@@ -91,6 +91,16 @@ ifeq ($(TEST),1)
 TEST_SUFFIX := _test
 endif
 
+# S3_BC_VERBOSE=1 prints each barcode's digital and analogue decode result,
+# fusion decision, and rejection reason for bench testing.
+S3_BC_VERBOSE ?= 0
+ifneq ($(filter $(S3_BC_VERBOSE),0 1),$(S3_BC_VERBOSE))
+$(error Unknown S3_BC_VERBOSE '$(S3_BC_VERBOSE)'; use 0 or 1)
+endif
+ifeq ($(S3_BC_VERBOSE),1)
+S3_BC_SUFFIX := _bcverbose
+endif
+
 # CRASH_REPORT=1 also copies every console line to UART0 on GP0 (TX) /
 # GP1 (RX), 115200 8N1.  UART output is sent immediately, so it still shows
 # the last messages and the kernel's crash report after a crash, when the
@@ -116,7 +126,7 @@ endif
 # a live hazard: an SMP=1 build was once flashed in place of an SMP=0 one and
 # only the banner in the log revealed it.
 #
-EXE_FILE := mtk3pico_smp$(SMP)_$(CONSOLE)$(WIFI_SUFFIX)$(NET_SUFFIX)$(MQTT_SUFFIX)$(CRASH_SUFFIX)$(TEST_SUFFIX)
+EXE_FILE := mtk3pico_smp$(SMP)_$(CONSOLE)$(WIFI_SUFFIX)$(NET_SUFFIX)$(MQTT_SUFFIX)$(CRASH_SUFFIX)$(TEST_SUFFIX)$(S3_BC_SUFFIX)
 
 GCC := arm-none-eabi-gcc
 AS := arm-none-eabi-gcc
@@ -176,7 +186,7 @@ ifeq ($(SMP),1)
 CFLAGS  += -DCNF_SMP=1
 ASFLAGS += -DCNF_SMP=1
 endif
-CFLAGS  += -DAPP_TEST=$(TEST)
+CFLAGS  += -DAPP_TEST=$(TEST) -DS3_BC_VERBOSE=$(S3_BC_VERBOSE)
 CFLAGS  += -DTM_CONSOLE_UART=$(CRASH_REPORT)
 ifeq ($(CRASH_REPORT),0)
 CFLAGS  += -DBOARD_UART0_FREE=1

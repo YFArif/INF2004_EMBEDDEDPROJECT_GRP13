@@ -69,7 +69,7 @@ static void run (char const * p_id, char const * p_bits, double sigma, double sp
         uint32_t i, last = 0U, first = 0U, gap = 0U, seen = 0U; uint8_t ref = x[0];
         for (i = 1U; i < n; i++) {
             int d = (int)x[i] - (int)ref;
-            if ((d > 12) || (d < -12))   /* S3_ACT_STEP, 8-bit units */ { ref = x[i]; if (seen && ((i - last) > gap)) { gap = i - last; } if (!seen) { first = i; } seen = 1U; last = i; }
+            if ((d > 6) || (d < -6))     /* DRV_BARCODE_ACT_STEP */ { ref = x[i]; if (seen && ((i - last) > gap)) { gap = i - last; } if (!seen) { first = i; } seen = 1U; last = i; }
         }
         (void)first;
         g_max_gap_ms = seen ? (gap * 0.5) : -1.0;

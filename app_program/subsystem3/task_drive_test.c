@@ -6,7 +6,8 @@
  * @par How to use
  * Wait for the calibration countdown and SWEEP NOW banner. Sweep both
  * sensors across white and black, then wait for CALIBRATION READY.
- * Put both sensors on black, tap and release GP20, then wait for the
+ * Centre the car on the line (each sensor on an edge, both GREY), tap
+ * and release GP20, then wait for the
  * 3 s drive countdown. Any GP20 press while driving stops the car.
  * GP21: short press changes preset; hold 2 s restarts calibration.
  * Waiting prompts print only when readiness changes; wheel and sensor
@@ -62,25 +63,26 @@ typedef struct
     uint16_t steer_max_mms;
 } drive_preset_t;
 
-/* v25 (28 Oct): gains for the CENTRED pair (both sensors on the line,
- * 12 mm apart). e = n_right - n_left runs -1000 ... +1000, so Kp 100
- * gives full lock when one sensor is white and the other black. Host
- * sweep: every set below finishes every track in the model (UNVERIFIED
+/* v29 (29 Oct): gains for the EDGE pair (one sensor on each edge, 18 mm
+ * apart). e = n_right - n_left reaches +-1000 within a few mm, so Kp
+ * 100 = full lock at about 3 mm off centre. Host sweep (s3_line.h): Kp
+ * below about 55 cannot hold an r200 curve at steer_max 40 (UNVERIFIED
  * on the car). Speed 40 mm/s and steer_max = speed throughout, so presets
  * differ ONLY in gains and can be compared directly. */
 static drive_preset_t const g_presets[] =
 {
-    {100,   0,  40,  40},   /* 0: default.                              */
-    { 75,   0,  40,  40},   /* 1: softer (if it weaves on straights).   */
-    {150,   0,  40,  40},   /* 2: stronger (if it is late on corners).  */
-    {100,  25,  40,  40},   /* 3: a little D (if it overshoots).        */
-    {200,   0,  40,  40}    /* 4: much stronger (if it still runs wide).*/
+    { 80,   0,  40,  40},   /* 0: default (car 29 Oct: Kp 60 ran wide   */
+                            /*    on curves; GP20 runs this one).       */
+    { 45,   0,  40,  40},   /* 1: softer (if it weaves on straights).   */
+    { 80,   0,  40,  40},   /* 2: stronger (if it is late on corners).  */
+    { 60,  25,  40,  40},   /* 3: a little D (if it overshoots).        */
+    {100,   0,  40,  40}    /* 4: much stronger (if it still runs wide).*/
 };
 
 #define N_PRESETS   (sizeof(g_presets) / sizeof(g_presets[0]))
 
 /* End-of-run diagnosis limits (run_summary). */
-#define DIAG_BOTH_BLACK_MIN_PCT (30u)   /* Both sensors on the line.    */
+#define DIAG_BOTH_GREY_MIN_PCT  (30u)   /* Both on their edges.         */
 #define DIAG_BOTH_WHITE_MAX_PCT (10u)   /* Both off the line.           */
 #define DIAG_FLIPS_PER_M_MAX    (20u)   /* Steering side changes per m. */
 #define DIAG_WHEEL_ERR_MAX_MMS  (15u)   /* Mean |target - measured|.    */
@@ -89,7 +91,7 @@ static drive_preset_t const g_presets[] =
 typedef struct
 {
     uint32_t polls;
-    uint32_t both_black;
+    uint32_t both_grey;         /* Centred: each sensor on its edge.    */
     uint32_t one_white;
     uint32_t both_white;
     uint32_t white_from;        /* moved_mm + 1 when both went white.   */
@@ -214,15 +216,15 @@ start_allowed (void)
     {
         tm_printf((UB *) "S3 DRIVE NOT STARTED: line state is %s. Sweep the "
                          "car sideways across the line until it is "
-                         "calibrated, then put both sensors on the line.\n",
+                         "calibrated, then centre it on the line.\n",
                   s3_state_txt((uint32_t) st.state, 0u));
         return false;
     }
     if ((st.n_centre < U8_WHITE_BELOW) && (st.n_outer < U8_WHITE_BELOW))
     {
         tm_printf((UB *) "S3 DRIVE NOT STARTED: neither sensor is on the line "
-                         "(GP27=%d, GP26=%d of 1000). Put the car so both "
-                         "sensors are over the black line.\n",
+                         "(GP27=%d, GP26=%d of 1000). Centre the car on "
+                         "the line, one sensor on each edge.\n",
                   (INT) ((st.n_centre * PERMILLE) / U8_FULL),
                   (INT) ((st.n_outer * PERMILLE) / U8_FULL));
         return false;
@@ -294,7 +296,8 @@ cal_watch (bool * p_ready, bool * p_reported)
             tm_printf((UB *) "\n================================================\n"
                              "  STEP 3: CALIBRATION READY - WAITING FOR YOU\n"
                              "================================================\n"
-                             "Stop sweeping. Put BOTH sensors on BLACK.\n"
+                             "Stop sweeping. Centre the car on the line:\n"
+                             "one sensor on each edge, both GREY.\n"
                              "Tap and RELEASE GP20 to start (3 s countdown).\n"
                              "GP21: tap = preset; hold 2 s = recalibrate.\n"
                              "No driving until you press GP20.\n");
@@ -508,9 +511,10 @@ stats_add (drive_stats_t * p_s, s3_line_status_t const * p_st,
     int32_t             err_r;
 
     p_s->polls++;
-    if ((n_l > S3_LN_BLACK) && (n_r > S3_LN_BLACK))
+    if ((n_l >= S3_LN_WHITE) && (n_l <= S3_LN_BLACK) &&
+        (n_r >= S3_LN_WHITE) && (n_r <= S3_LN_BLACK))
     {
-        p_s->both_black++;
+        p_s->both_grey++;
     }
     if (b_lw && b_rw)
     {
@@ -556,38 +560,41 @@ static void
 run_summary (drive_stats_t const * p_s, uint32_t moved_mm)
 {
     uint32_t n         = (0u == p_s->polls) ? 1u : p_s->polls;
-    uint32_t pct_bb    = (100u * p_s->both_black) / n;
+    uint32_t pct_gg    = (100u * p_s->both_grey) / n;
     uint32_t pct_one   = (100u * p_s->one_white) / n;
     uint32_t pct_ww    = (100u * p_s->both_white) / n;
     uint32_t flips_m   = (moved_mm < 100u) ? 0u :
                          (p_s->flips * 1000u) / moved_mm;
     uint32_t wheel_err = p_s->wheel_err_sum / (2u * n);
 
-    tm_printf((UB *) "S3 SUMMARY: both sensors black %d %%, one sensor white "
-                     "%d %%, both white %d %% (longest %d mm). Steering "
-                     "flips %d (%d per m). Wheel speed error mean %d mm/s.\n",
-              (INT) pct_bb, (INT) pct_one, (INT) pct_ww,
+    tm_printf((UB *) "S3 SUMMARY: both sensors grey (centred) %d %%, one "
+                     "sensor white %d %%, both white %d %% (longest %d mm). "
+                     "Steering flips %d (%d per m). Wheel speed error mean "
+                     "%d mm/s.\n",
+              (INT) pct_gg, (INT) pct_one, (INT) pct_ww,
               (INT) p_s->white_max_mm, (INT) p_s->flips, (INT) flips_m,
               (INT) wheel_err);
-    if (pct_bb < DIAG_BOTH_BLACK_MIN_PCT)
+    if (pct_gg < DIAG_BOTH_GREY_MIN_PCT)
     {
-        tm_printf((UB *) "S3 DIAG: SENSORS: both were black together only "
-                         "%d %% of the time. They are too far apart or not "
-                         "centred on the line: park on the line, both must "
-                         "read BLACK in \"S3 LINE\".\n", (INT) pct_bb);
+        tm_printf((UB *) "S3 DIAG: SENSORS: both were grey together only "
+                         "%d %% of the time. The car weaves, or the sensors "
+                         "are not on the edges: park centred on the line, "
+                         "both must read EDGE in \"S3 LINE\".\n",
+                  (INT) pct_gg);
     }
     if (pct_ww > DIAG_BOTH_WHITE_MAX_PCT)
     {
-        tm_printf((UB *) "S3 DIAG: LINE BETWEEN SENSORS: both white %d %% of "
-                         "the time while driving: the line passes between "
-                         "the sensors (gap too wide) or the car leaves it.\n",
+        tm_printf((UB *) "S3 DIAG: OFF LINE: both white %d %% of the time "
+                         "while driving: the car leaves the line (too late "
+                         "on curves: try a stronger preset), or the sensors "
+                         "are wider apart than the line.\n",
                   (INT) pct_ww);
     }
     if (flips_m > DIAG_FLIPS_PER_M_MAX)
     {
         tm_printf((UB *) "S3 DIAG: OVERSTEER / WEAVE: steering changed side "
-                         "%d times per metre. Try preset 1 (softer), or move "
-                         "the sensors closer.\n", (INT) flips_m);
+                         "%d times per metre. Try a softer preset (lower "
+                         "Kp) or one with D.\n", (INT) flips_m);
     }
     if (wheel_err > DIAG_WHEEL_ERR_MAX_MMS)
     {
@@ -596,7 +603,7 @@ run_summary (drive_stats_t const * p_s, uint32_t moved_mm)
                          "encoders (enc L/R in S3 LOG must both rise) and "
                          "S2 tuning.\n", (INT) wheel_err);
     }
-    if ((pct_bb >= DIAG_BOTH_BLACK_MIN_PCT) &&
+    if ((pct_gg >= DIAG_BOTH_GREY_MIN_PCT) &&
         (pct_ww <= DIAG_BOTH_WHITE_MAX_PCT) &&
         (flips_m <= DIAG_FLIPS_PER_M_MAX) &&
         (wheel_err <= DIAG_WHEEL_ERR_MAX_MMS))
