@@ -4,6 +4,28 @@
 
 See `testing/README.md` for how to run tests and record results.
 
+## Sean edge-pair speed isolation, 2026-10-29 (host/build only)
+
+Baseline: Sean's `22fda8a`, with local diagnostic experiments preserved.
+S3 drive-test images now exclude S5 tasks so GP20 cannot also start S5's
+300 mm/s mission. The integrated normal image retains both S5 tasks.
+Build-time `DRIVE_SPEED` controls every drive preset's speed and steering
+limit; running GP21 toggles 1.5x, with command failures latching E-stop.
+
+- [S3 regressions](logs/2026-10-29_host_sean_speed.txt): **7/7 programs pass**.
+- [10 mm/s build](logs/2026-10-29_build_sean_speed10.txt),
+  [40 mm/s build](logs/2026-10-29_build_sean_speed40.txt), and
+  [normal build](logs/2026-10-29_build_sean_normal.txt): pass.
+- Named outputs: `S3_v33_SEAN_EDGE_10MMS.uf2` and
+  `S3_v33_SEAN_EDGE_40MMS.uf2`, 612352 bytes each, with distinct SHA-256 hashes.
+  Both test ELFs contain the S5-disabled diagnostic; normal ELF retains
+  `obstacle_task` and `vehicle_ctrl_task`.
+- S2 model verifies distinct 10/15/40/60 speeds and the encoder interval fix;
+  see the S2 test log. This is **not hardware evidence**.
+- Pending floor checks: sweep calibration; GP20 start/stop; base speed timed
+  over a measured straight distance; GP21 10/15 and 40/60 transitions;
+  steering reacquisition; LOST stop. **No ultrasonic protection in tests.**
+
 ## Test cases
 
 Define a test here before running it. Test IDs never change.
@@ -23,6 +45,9 @@ Define a test here before running it. Test IDs never change.
 | S3-U05 | Junction and line-lost events on the car | FR3, IF-S3c | manual | `S3_JUNC_DEBUG 1`. 10 cross-junction passes; 3 m straight with no junction; lift the car off the line 5 times. | 10 of 10 `JUNCTION`, 0 false on the straight, 5 of 5 `LINE LOST` |
 | S3-U06 | Wiring A2 / A3: GP26 driven by one output only; GP28 VBAT jumper open | A2, A3 | manual | Continuity meter; read GP28 with the sensor unplugged. | One source on GP26; GP28 reads ~0 unplugged |
 | S3-U07 | S3 timing on the car | Week 6 §3 (line_task ≈ 1 % of core 1), INT-05 | manual | `S3_TIMING 1`, any drive test; copy 3 `S3 TIME` lines. | line step max < 100 µs (1 % of 10 ms); period 9 000 – 11 000 µs; sampler isr max < 20 µs (4 % of core 1 at 2 kHz). Targets UNVERIFIED until measured |
+| S3-H07 | GP27 experimental state machine | experimental follow/recovery/crossing | auto (host) | `run_host_tests.sh`, program probe, ASan/UBSan | Unarmed black never turns; arm requires white then black; 139 mm alignment; brake before +90; verified reacquisition; bounded searches; timeout/stop/E-stop priority; no overall run timer |
+| S3-U08 | GP27 recovery on the car | experimental, not FR3 acceptance | manual | Image v29 GP27_RECOVERY; clear floor, 40 mm/s; move off a straight line in both directions, then test absent line | First sampled loss requests brake; gentle search recovers from each side; absent line stops after bounded attempts; GP20 stops. NOT RUN |
+| S3-U09 | Button-armed crossing turn | experimental, not integrated navigation | manual | Image v29 ARMED_LEFT90; one isolated 18 mm cross; compare unarmed crossing, armed crossing, then next unarmed crossing | Only armed confirmed crossing turns; measured left turn near 90 degrees; GP27 reacquired; resumes; no repeated turn without new instruction. NOT RUN |
 
 *Method:* **auto** = `TEST_CHECK` in code, result printed on the console;
 **auto (host)** = laptop test with `gcc`, no Pico needed;
@@ -34,6 +59,8 @@ Add a new row for every run. Never edit or delete old rows.
 
 | Date | Test ID | Commit | Tester | Result | Log / evidence | Notes |
 |---|---|---|---|---|---|---|
+| 2026-10-29 | S3-H01 ... H07 | `1e547e1` + uncommitted v29 experiment | Copilot for Arif | PASS (host only) | `logs/2026-10-29_host_v29.txt` | Seven programs; original centred-pair regressions and 216/216 disturbances pass. New deterministic probe checks cover arming, alignment, recovery and stop bounds under ASan/UBSan. Does not validate the experimental sensor geometry on hardware. |
+| 2026-10-29 | S3-U08, U09 | `1e547e1` + uncommitted v29 experiment | pending Arif | NOT RUN | pending serial logs/video | Both experiment images and restored normal image compile without compiler diagnostics. No hardware success claimed. |
 | 2026-10-28 | S3-H01 | `4a8c395` + v17 (uncommitted) | Claude, reviewed by Sean | PASS (30/30) | `logs/2026-10-28_host_v17.txt` | L01 … L28 output byte-identical to `4a8c395`. New L29 fails on `4a8c395` (UBSan: signed overflow in `pd_steer`) and passes on v17 |
 | 2026-10-28 | S3-H02 | `4a8c395` + v17 (uncommitted) | Claude, reviewed by Sean | PASS (8/8) | `logs/2026-10-28_host_v17.txt` | |
 | 2026-10-28 | S3-H03 | `4a8c395` + v17 (uncommitted) | Claude, reviewed by Sean | PASS (3/3) | `logs/2026-10-28_host_v17.txt` | 10 320 / 10 320 forwards and backwards, 0 wrong. Mutation: 1 bit changed in 'A' → C03 FAIL |

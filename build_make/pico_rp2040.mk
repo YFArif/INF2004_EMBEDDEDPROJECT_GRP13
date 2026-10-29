@@ -91,6 +91,20 @@ ifeq ($(TEST),1)
 TEST_SUFFIX := _test
 endif
 
+# Isolated S3 drive test: only this task owns buttons and motion.
+# Separate profile tracking prevents stale images when changing speed.
+DRIVE ?= 0
+DRIVE_SPEED ?= 40
+ifneq ($(filter $(DRIVE),0 1),$(DRIVE))
+$(error Unknown DRIVE '$(DRIVE)'; use 0 or 1)
+endif
+ifeq ($(DRIVE),1)
+DRIVE_SUFFIX := _drive$(DRIVE_SPEED)
+ifeq ($(TEST),1)
+$(error DRIVE=1 cannot be combined with TEST=1)
+endif
+endif
+
 # S3_BC_VERBOSE=1 prints each barcode's digital and analogue decode result,
 # fusion decision, and rejection reason for bench testing.
 S3_BC_VERBOSE ?= 0
@@ -126,7 +140,7 @@ endif
 # a live hazard: an SMP=1 build was once flashed in place of an SMP=0 one and
 # only the banner in the log revealed it.
 #
-EXE_FILE := mtk3pico_smp$(SMP)_$(CONSOLE)$(WIFI_SUFFIX)$(NET_SUFFIX)$(MQTT_SUFFIX)$(CRASH_SUFFIX)$(TEST_SUFFIX)$(S3_BC_SUFFIX)
+EXE_FILE := mtk3pico_smp$(SMP)_$(CONSOLE)$(WIFI_SUFFIX)$(NET_SUFFIX)$(MQTT_SUFFIX)$(CRASH_SUFFIX)$(TEST_SUFFIX)$(S3_BC_SUFFIX)$(DRIVE_SUFFIX)
 
 GCC := arm-none-eabi-gcc
 AS := arm-none-eabi-gcc
@@ -187,6 +201,10 @@ CFLAGS  += -DCNF_SMP=1
 ASFLAGS += -DCNF_SMP=1
 endif
 CFLAGS  += -DAPP_TEST=$(TEST) -DS3_BC_VERBOSE=$(S3_BC_VERBOSE)
+ifeq ($(DRIVE),1)
+CFLAGS  += -DS3_DRIVE_TEST=1
+endif
+CFLAGS  += -DS3_DRIVE_SPEED_MMS=$(DRIVE_SPEED)
 CFLAGS  += -DTM_CONSOLE_UART=$(CRASH_REPORT)
 ifeq ($(CRASH_REPORT),0)
 CFLAGS  += -DBOARD_UART0_FREE=1
@@ -219,7 +237,7 @@ endif
 # before any recipe executes.
 ################################################################################
 
-PROFILE_ID := smp$(SMP)-$(CONSOLE)-wifi$(WIFI)-net$(NET)-mqtt$(MQTT)-crash$(CRASH_REPORT)-test$(TEST)
+PROFILE_ID := smp$(SMP)-$(CONSOLE)-wifi$(WIFI)-net$(NET)-mqtt$(MQTT)-crash$(CRASH_REPORT)-test$(TEST)-drive$(DRIVE)-speed$(DRIVE_SPEED)-bc$(S3_BC_VERBOSE)
 PROFILE_FILE := .build_profile
 
 ifneq ($(strip $(shell cat $(PROFILE_FILE) 2>/dev/null)),$(PROFILE_ID))

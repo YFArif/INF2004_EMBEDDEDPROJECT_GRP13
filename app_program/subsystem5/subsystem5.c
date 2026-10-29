@@ -25,6 +25,7 @@
 #include "s5_profile.h"
 #include "subsystem5.h"
 #include "vehicle_ctrl_task.h"
+#include "../subsystem3/s3_config.h"
 
 /* Message buffer sizing: each message takes a 4-byte header plus its
  * size rounded up to 4 bytes (kernel messagebuf.h).
@@ -114,6 +115,11 @@ subsystem5_init (void)
 ER
 subsystem5_start (void)
 {
+#if ((S3_EXPERIMENT_MODE != 0) || (S3_DRIVE_TEST != 0))
+    tm_printf((UB *) "S5 tasks DISABLED: isolated S3 test owns motors/buttons; "
+                     "no ultrasonic protection.\n");
+    return E_OK;
+#else
     ER result  = E_OK;
     ID tid_obs = app_start_task(obstacle_task, S5_PRI_OBSTACLE, TP_PRC1,
                                 "obstacle_task");
@@ -134,6 +140,7 @@ subsystem5_start (void)
     }
 
     return (result);
+#endif
 }
 
 /*!

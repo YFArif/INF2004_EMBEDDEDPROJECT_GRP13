@@ -427,6 +427,67 @@ check (char const * p_id, bool b_ok, char const * p_format, ...)
  *  Tests.
  * --------------------------------------------------------------------- */
 
+static void
+test_slow_tick_intervals (void)
+{
+    uint32_t const intervals[] = {40000u, 50000u, 90000u, 100000u};
+    uint32_t idx;
+    uint32_t pass;
+
+    for (pass = 0u; pass < 2u; pass++)
+    {
+        for (idx = 0u; idx < (sizeof(intervals) / sizeof(intervals[0])); idx++)
+        {
+            uint32_t start = (0u == pass) ? 100000u : UINT32_MAX - 10000u;
+            uint32_t dt = intervals[idx];
+            uint32_t used = (dt >= SPEED_STOPPED_US) ? CYCLE_US : dt;
+            int32_t expected;
+            wheel_t * p_wheel;
+
+            sim_reset(SIM_LOAD_FLOOR, start);
+            p_wheel = &g_motion.wheel[WHEEL_LEFT];
+            p_wheel->tick_time_us = start;
+            p_wheel->direction = 1;
+            g_sim[WHEEL_LEFT].ticks = 1u;
+            g_sim[WHEEL_LEFT].tick_time_us = start + dt;
+            expected = (int32_t) ((((uint32_t) p_wheel->circ_um /
+                                    (uint32_t) p_wheel->ticks_per_rev) *
+                                   US_PER_MS) / used);
+            wheel_measure(p_wheel, start + dt);
+            check("H21-tick-interval", p_wheel->speed_mms == expected,
+                  "interval %u us, wrap=%u: measured %d expected %d mm/s",
+                  (unsigned) dt, (unsigned) pass,
+                  (int) p_wheel->speed_mms, (int) expected);
+        }
+    }
+}
+
+static void
+test_low_speed (uint16_t speed_mms)
+{
+    double start_left;
+    double start_right;
+    double speed_left;
+    double speed_right;
+
+    send(S2_CMD_FOLLOW, 0, speed_mms);
+    sim_run(100u);
+    start_left = g_sim[WHEEL_LEFT].pos_um;
+    start_right = g_sim[WHEEL_RIGHT].pos_um;
+    sim_run(250u);
+    speed_left = (g_sim[WHEEL_LEFT].pos_um - start_left) / 5000.0;
+    speed_right = (g_sim[WHEEL_RIGHT].pos_um - start_right) / 5000.0;
+    check("H20-low-speed",
+          (fabs(speed_left - speed_mms) <= (speed_mms * 0.15)) &&
+          (fabs(speed_right - speed_mms) <= (speed_mms * 0.15)) &&
+          (g_status.target_l_mms == speed_mms) &&
+          (g_status.target_r_mms == speed_mms),
+          "FOLLOW %u: five-second physical mean L %.2f R %.2f mm/s; "
+          "targets %d/%d (15%% tolerance, no steering)",
+          (unsigned) speed_mms, speed_left, speed_right,
+          (int) g_status.target_l_mms, (int) g_status.target_r_mms);
+}
+
 /* NFR4: FOLLOW 0 -> 250 mm/s; both wheels within +/-10 % from 0.5 s. */
 static void
 test_step (char const * p_id, double load, uint32_t start_us)
@@ -504,7 +565,7 @@ test_move (char const * p_id, int16_t mm, uint16_t speed, double tol_mm)
 
 /* FR6, NFR5: TURN on the spot by encoder arc. */
 static void
-test_turn (char const * p_id, int16_t deg)
+test_turn (char const * p_id, int16_t deg, uint16_t speed_mms)
 {
     uint32_t used = 0u;
     double   head = 0.0;
@@ -513,7 +574,7 @@ test_turn (char const * p_id, int16_t deg)
     double   diff = 0.0;
 
     sim_reset(SIM_LOAD_FLOOR, 0u);
-    send(S2_CMD_TURN, deg, 0u);
+    send(S2_CMD_TURN, deg, speed_mms);
     used = sim_run_until_idle(1000u);
     sim_run(SETTLE_CYCLES);
     head = true_heading_deg();
@@ -826,6 +887,14 @@ main (void)
     test_step("H02", SIM_LOAD_FLOOR, 0u);
     test_step("H03", 0.6, 0u);
     test_step("H11", SIM_LOAD_FLOOR, 0xFFFFFFFFu - 300000u);
+    test_slow_tick_intervals();
+    sim_reset(SIM_LOAD_FLOOR, 0u);
+    test_low_speed(10u);
+    test_low_speed(15u);
+    test_low_speed(10u);
+    test_low_speed(40u);
+    test_low_speed(60u);
+    test_low_speed(40u);
 
     // The real motors' time constant is not measured yet: the gains must
     // also work if it is half or about twice the model's 80 ms.
@@ -840,12 +909,18 @@ main (void)
     test_move("H04", 1000, 0u, 10.0);
     test_move("H04", 300, 150u, 5.0);
     test_move("H05", -100, 0u, 5.0);
-    test_turn("H06", 90);
-    test_turn("H06", -90);
-    test_turn("H06", 180);
-    test_turn("H06", 45);
-    test_turn("H06", 360);
-    test_turn("H06", -540);
+    test_turn("H06", 90, 0u);
+    test_turn("H06", -90, 0u);
+    test_turn("H06", 180, 0u);
+    test_turn("H06", 45, 0u);
+    test_turn("H06", 360, 0u);
+    test_turn("H06", -540, 0u);
+    test_turn("H19-probe", 4, 60u);
+    test_turn("H19-probe", -8, 60u);
+    test_turn("H19-probe", 16, 60u);
+    test_turn("H19-probe", -24, 60u);
+    test_turn("H19-probe", 12, 60u);
+    test_turn("H19-probe", 90, 60u);
 
     (void) printf("-- commands, E-stop and faults (IF-04, IF-05, FR15)\n");
     test_stop_interrupts_move();

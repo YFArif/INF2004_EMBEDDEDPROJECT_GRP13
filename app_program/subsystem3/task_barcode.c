@@ -129,8 +129,12 @@ hardware_start (void)
               (INT) DRV_IR_CENTRE_ADC_CH, (INT) DRV_IR_CENTRE_PIN,
               S3_LAYOUT_TXT);
 
+#if (S3_EXPERIMENT_MODE != 0)
+    CHECK(task_probe_start(), "task_probe_start");
+#else
     CHECK(task_line_start(), "task_line_start");
     CHECK(task_drive_test_start(), "task_drive_test_start");
+#endif
 }
 
 /*!

@@ -91,7 +91,6 @@
 /* Speed measurement. */
 #define US_PER_MS               (1000u)
 #define CYCLE_US                (S2_MOTION_PERIOD_MS * US_PER_MS)
-#define STALE_TICK_US           (2u * CYCLE_US)
 #define SPEED_STOPPED_US        (100000u)   /* No tick for 100 ms = 0.    */
 
 /* Geometry, in micrometres. */
@@ -544,9 +543,10 @@ wheel_measure (wheel_t * p_wheel, uint32_t now_us)
     {
         // Edge-timed: the new ticks span the time from the previous last
         // tick to this last tick. After a stop that span is meaningless,
-        // so use one cycle instead.
+        // so use one cycle instead. Keep real intervals until the same
+        // 100 ms stopped threshold used below, including slow wheel ticks.
         dt_us = count.tick_time_us - p_wheel->tick_time_us;
-        if ((0u == dt_us) || (dt_us > STALE_TICK_US))
+        if ((0u == dt_us) || (dt_us >= SPEED_STOPPED_US))
         {
             dt_us = CYCLE_US;
         }

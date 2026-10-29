@@ -18,6 +18,7 @@
 #define S3_CONFIG_H
 
 #include "s3_line.h"        /* S3_LN_L_ON_LEFT / S3_LN_L_ON_RIGHT.      */
+#include "s3_experiment.h"
 
 /* ---------------------------------------------------------------------
  *  Line sensor layout (v29 EDGE PAIR, s3_line.h). One sensor on EACH
@@ -87,6 +88,18 @@
  * --------------------------------------------------------------------- */
 #ifndef S3_DRIVE_TEST
 #define S3_DRIVE_TEST           (0)
+#endif
+#if ((S3_EXPERIMENT_MODE != 0) && (S3_DRIVE_TEST != 0))
+#error "Choose either the preserved drive test or the GP27 experiment"
+#endif
+#if (S3_DRIVE_TEST != 0) && APP_TEST
+#error "S3 drive test must not compete with subsystem self-tests"
+#endif
+#ifndef S3_DRIVE_SPEED_MMS
+#define S3_DRIVE_SPEED_MMS      (40u)
+#endif
+#if ((S3_DRIVE_SPEED_MMS < 1) || (S3_DRIVE_SPEED_MMS > 300))
+#error "S3_DRIVE_SPEED_MMS must be 1..300 (including headroom for 1.5x boost)"
 #endif
 #define S3_LINE_VERBOSE         (!S3_DRIVE_TEST) /* Drive task owns logs. */
 #ifndef S3_BC_VERBOSE

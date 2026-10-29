@@ -6,6 +6,22 @@ See `testing/README.md` for how to run tests and record results.
 
 ## Test cases
 
+### Low-speed estimator regression, 2026-10-29 (host only)
+
+Evidence: [speed isolation run](logs/2026-10-29_host_speed_isolation.txt).
+The unchanged plant model reproduced 10 mm/s underspeed (5.40 / 4.39 mm/s)
+with the old 40 ms tick-interval cutoff. Reusing the existing 100 ms stopped
+threshold fixes that estimator inconsistency without changing PID gains.
+
+- H20: live FOLLOW sequence 10 / 15 / 10 / 40 / 60 / 40 mm/s; five-second
+  displacement-derived wheel means within 15% and exact requested targets.
+  At 10 mm/s: left 10.20, right 10.46 mm/s; at 40: approximately 40-41 mm/s.
+- H21: 40/50/90/100 ms tick intervals, with and without timer wrap; genuine
+  intervals retained below 100 ms and existing stopped fallback at 100 ms.
+- Full S2 motion host suite: **53 passed, 0 failed**.
+- Physical speed, battery/load sensitivity and edge tracking at 10 mm/s
+  still require hardware testing. This is not a new floor calibration.
+
 ### U03 recalibration, 2026-10-28 (hardware validation pending)
 
 Evidence: [90-degree run](logs/2026-10-28_s2_u03%28no180%29.txt) and
@@ -61,6 +77,7 @@ Add a new row for every run. Never edit or delete old rows.
 | Date       | Test ID | Commit    | Tester | Result      | Log / evidence          | Notes |
 | ---------- | ------- | --------- | ------ | ----------- | ----------------------- | ----- |
 | YYYY-MM-DD | S2-U01  | `abc1234` |        | PASS / FAIL | `logs/YYYY-MM-DD_….txt` |       |
+| 2026-10-29 | S2-U09 | `1e547e1` + uncommitted v29 tests | Copilot for Arif | PASS (39 checks) | `logs/2026-10-29_host_probe_turns.txt` | Existing motor model plus +4/-8/+16/-24/+12 and +90 degree TURN at 60 mm/s wheel speed, for the GP27 experiment. Host model only; physical low-speed turn accuracy and search recovery still unverified. |
 | 2026-10-22 | S2-U09  | `0d5f601` | Arif (run by Copilot in WSL) | PASS | `logs/2026-10-22_host_test_motion.txt` | 32 of 32 checks; simulated robot, gcc 13.3 with ASan/UBSan. Earlier runs during development found the weak PI, the ramp wind-up and the 3 deg TURN overshoot, fixed in `081d9d7` |
 | 2026-10-22 | S2-U08  | `de44e54` | Arif | PASS | `logs/2026-10-22_s2_unit.txt` | 1009672 counts in 1000 ms. Power bank on VIN + USB; VIN not measured |
 | 2026-10-22 | S2-U05  | `de44e54` | Arif | PASS | `logs/2026-10-22_s2_unit.txt` | 50 cycles/s; E-stop latency worst 176 us, mean 135 us (limit 20000) |

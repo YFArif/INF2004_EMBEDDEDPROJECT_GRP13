@@ -9,7 +9,8 @@
  * Centre the car on the line (each sensor on an edge, both GREY), tap
  * and release GP20, then wait for the
  * 3 s drive countdown. Any GP20 press while driving stops the car.
- * GP21: short press changes preset; hold 2 s restarts calibration.
+ * GP21: while driving, tap toggles 1.5x speed; while waiting, short press
+ * changes preset and holding 2 s restarts calibration.
  * Waiting prompts print only when readiness changes; wheel and sensor
  * diagnostics print during driving. Both
  * buttons are only read, with the pad pull-up, as in subsystem2_step.c.
@@ -67,16 +68,15 @@ typedef struct
  * apart). e = n_right - n_left reaches +-1000 within a few mm, so Kp
  * 100 = full lock at about 3 mm off centre. Host sweep (s3_line.h): Kp
  * below about 55 cannot hold an r200 curve at steer_max 40 (UNVERIFIED
- * on the car). Speed 40 mm/s and steer_max = speed throughout, so presets
+ * on the car). Build-time speed and steer_max match throughout, so presets
  * differ ONLY in gains and can be compared directly. */
 static drive_preset_t const g_presets[] =
 {
-    { 80,   0,  40,  40},   /* 0: default (car 29 Oct: Kp 60 ran wide   */
-                            /*    on curves; GP20 runs this one).       */
-    { 45,   0,  40,  40},   /* 1: softer (if it weaves on straights).   */
-    { 80,   0,  40,  40},   /* 2: stronger (if it is late on corners).  */
-    { 60,  25,  40,  40},   /* 3: a little D (if it overshoots).        */
-    {100,   0,  40,  40}    /* 4: much stronger (if it still runs wide).*/
+    { 80,   0, S3_DRIVE_SPEED_MMS, S3_DRIVE_SPEED_MMS}, /* default */
+    { 45,   0, S3_DRIVE_SPEED_MMS, S3_DRIVE_SPEED_MMS},
+    { 80,   0, S3_DRIVE_SPEED_MMS, S3_DRIVE_SPEED_MMS},
+    { 60,  25, S3_DRIVE_SPEED_MMS, S3_DRIVE_SPEED_MMS},
+    {100,   0, S3_DRIVE_SPEED_MMS, S3_DRIVE_SPEED_MMS}
 };
 
 #define N_PRESETS   (sizeof(g_presets) / sizeof(g_presets[0]))
@@ -353,6 +353,8 @@ drive_run (void)
     uint32_t               lost_ms   = 0u;  /* Time spent LOST.          */
     uint32_t               still_ms  = 0u;  /* Time without odometry.    */
     uint32_t               last_mm   = 0u;
+    uint32_t               held2     = 0u;
+    bool                   b_boost   = false;
     char const *           p_why     = "?";
     ER                     er;
 
@@ -360,11 +362,20 @@ drive_run (void)
                      "  STEP 4: RUNNING - PRESS GP20 TO STOP\n"
                      "================================================\n");
     er = subsystem2_follow(p_set->speed_mms);
+    if (E_OK != er)
+    {
+        subsystem2_estop_set();
+        tm_printf((UB *) "S3 DRIVE command failed (%d); E-stop set.\n", (INT) er);
+        return;
+    }
     tm_printf((UB *) "S3 DRIVE GO preset %d: %d mm/s, kp=%d kd=%d, steer max "
                      "%d mm/s, %s (er=%d). Press BUTTON 1 to stop.\n",
               (INT) g_preset, (INT) p_set->speed_mms, (INT) p_set->kp_x100,
               (INT) p_set->kd_x100, (INT) p_set->steer_max_mms, S3_LAYOUT_TXT,
               (INT) er);
+    tm_printf((UB *) "S3 DRIVE ISOLATED: S5 disabled, no ultrasonic guard. "
+                     "GP21 tap toggles %d / %d mm/s; GP20 stops.\n",
+              (INT) p_set->speed_mms, (INT) ((p_set->speed_mms * 3u) / 2u));
     tm_printf((UB *) "S3 LOG legend: t ms | mm | sensors L R (0 white .. "
                      "1000 black) zone (B black, G grey, W white) | dv "
                      "(+ = right) | S2 wheel target, measured, duty L/R | "
@@ -386,6 +397,35 @@ drive_run (void)
         {
             p_why = "button";
             break;
+        }
+        if (button2_down())
+        {
+            if (held2 < PRESS_MS)
+            {
+                held2 += POLL_MS;
+            }
+        }
+        else
+        {
+            if (held2 >= PRESS_MS)
+            {
+                uint16_t speed;
+
+                b_boost = !b_boost;
+                speed = b_boost ? (uint16_t) ((p_set->speed_mms * 3u) / 2u) :
+                                  p_set->speed_mms;
+                s3_set_steer_max(speed);
+                er = subsystem2_follow(speed);
+                tm_printf((UB *) "S3 DRIVE SPEED %d mm/s boost=%d er=%d\n",
+                          (INT) speed, (INT) b_boost, (INT) er);
+                if (E_OK != er)
+                {
+                    subsystem2_estop_set();
+                    p_why = "speed command failed";
+                    break;
+                }
+            }
+            held2 = 0u;
         }
         still_ms = (moved_mm == last_mm) ? (still_ms + POLL_MS) : 0u;
         last_mm  = moved_mm;
@@ -427,7 +467,13 @@ drive_run (void)
             break;
         }
     }
-    (void) subsystem2_stop();
+    er = subsystem2_stop();
+    if (E_OK != er)
+    {
+        subsystem2_estop_set();
+        tm_printf((UB *) "S3 DRIVE STOP failed (%d); E-stop set.\n", (INT) er);
+    }
+    s3_set_steer_max(p_set->steer_max_mms);
     subsystem2_status_get(&s2);
     tm_printf((UB *) "\n================ RUN STOPPED ================\n"
                      "S3 DRIVE STOP (%s) after %d mm, %d ms. S2: stalls=%d "

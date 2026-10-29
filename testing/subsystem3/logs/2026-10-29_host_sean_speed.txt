@@ -1,0 +1,295 @@
+commit: 22fda8a (+ uncommitted changes in S3)
+compiler: gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+===== code39
+[TEST] sample *A*                   PASS  (res=0 ch=A rev=0)
+[TEST] sample *Z*                   PASS  (res=0 ch=Z rev=0)
+[TEST] *A* read backwards           PASS  (res=0 ch=A rev=1)
+[TEST] *A* at quarter speed         PASS  (res=0 ch=A rev=0)
+[TEST] *A* gradual slow-down        PASS  (res=0 ch=A rev=0)
+[TEST] only 27 elements             PASS  (res=1 ch=? rev=9)
+[TEST] blurred bar -> reject        PASS  (res=2 ch=? rev=9)
+[TEST] all-equal noise -> reject    PASS  (res=2 ch=? rev=9)
+ALL PASSED: 0 failure(s)
+===== code39_all
+[TEST] S3-C03   PASS  all 44 table entries match python-barcode
+[TEST] S3-C04   PASS  A-Z decode forwards (rev 0) and backwards (rev 1)
+  forwards 10320/10320, backwards 10320/10320, wrong letters 0
+[TEST] S3-C05   PASS  all 43 chars x 2 directions x 12 settings x 20 trials, 0 wrong
+ALL PASSED: 0 failure(s)
+===== nav
+[TEST] S3-C01   PASS  all 43 Code 39 characters decode forwards and backwards (ratio 3 and 2)
+[TEST] S3-C02   PASS  every character survives the 6-bit index round trip; unknown -> 63
+[TEST] S3-N01   PASS  default map ABCD
+[TEST] S3-N02   PASS  "DCBA" -> D=LEFT C=RIGHT B=STRAIGHT A=U-TURN
+[TEST] S3-N03   PASS  "zx1w" accepted (upper-cased); letters not in the map -> NONE
+[TEST] S3-N04   PASS  short/long/repeat/'*'/invalid/NULL rejected, old map kept
+ALL PASSED: 0 failure(s)
+===== analog
+[TEST] sharp *A* at 0.30 m/s              PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 27 ms)
+[TEST] blurred 1.5 mm *A* at 0.30 m/s     PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 12 ms)
+[TEST] blurred 1.8 mm *Z* at 0.15 m/s     PASS  (elements=29 extrema=31 res=0 ch=Z, trigger gap max 20 ms)
+[TEST] blurred 1.5 mm *A* reversed        PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 12 ms)
+[TEST] blurred 1.5 mm *A* at 0.40 m/s     PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 9 ms)
+[TEST] too blurred (3 mm) -> reject       PASS  (elements=13 extrema=15 res=1 ch=?, trigger gap max 18 ms)
+[TEST] hand 25 mm/s, swing 1500, blur 1.5 PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 176 ms)
+[TEST] hand 50 mm/s, swing 1500, blur 1.8 PASS  (elements=29 extrema=31 res=0 ch=Z, trigger gap max 92 ms)
+[TEST] plain white -> no edges            PASS  (elements=0)
+ALL PASSED: 0 failure(s)
+===== line
+[TEST] S3-L01   PASS  uncalibrated -> steer 0
+[TEST] S3-L02   PASS  both grey (centred) -> steer ~0, FOLLOW
+[TEST] S3-L03   PASS  car drifted right (left darker, right lighter) -> steer LEFT, Kp x e
+[TEST] S3-L04   PASS  car drifted left (right darker) -> steer RIGHT, same size
+[TEST] S3-L05   PASS  mirror mount: left sensor lighter -> steer RIGHT
+  half drift -> steer -301, black/white -> steer -600 (Kp 60)
+[TEST] S3-L06   PASS  steer proportional to the difference; one sensor white -> flagged
+[TEST] S3-L07   PASS  both white: soft LEFT at once, not yet full lock
+[TEST] S3-L07b  PASS  both white 15 mm -> LEFT rising, not yet LOST
+[TEST] S3-L08   PASS  40 mm both white -> 1 LOST event, keeps LEFT; line back -> FOLLOW
+[TEST] S3-L09   PASS  30 mm white gap -> not lost
+[TEST] S3-L10   PASS  stopped on white for 2 s -> no LOST
+[TEST] S3-L11   PASS  both black 100 mm -> 1 junction event, steer 0; 3 mm -> none; next one re-arms
+[TEST] S3-L12   PASS  calibration relax keeps >= 600 counts range
+[TEST] S3-L13   PASS  one-off extreme fades to real black in 30 s
+[TEST] S3-L14   PASS  2 min of white only -> black level unchanged
+[TEST] S3-L15   PASS  disabled: steer 0, no events
+[TEST] S3-L16   PASS  search from LEFT: steer 0, found -> FOLLOW (not restarted), off line -> RIGHT
+[TEST] S3-L17   PASS  search from RIGHT: found, off line -> LEFT
+[TEST] S3-L18   PASS  D adds on a sudden change; first step after LOST is P only
+[TEST] S3-L19   PASS  dt 1 us, Kd max: D clamped to its limit
+[TEST] S3-L20   PASS  black stuck at 3600 recovers within 60 s; real black reads black again
+[TEST] S3-L21   PASS  dv: follow 40, OFF LINE / LOST x 5/4 = 50, clamp 511
+[TEST] S3-L22   PASS  boost 300: none at |e| 500, -700 + 300 x -200 / 100 -> full lock
+[TEST] S3-L23   PASS  noise (|e| < 60) keeps the side -> RIGHT
+[TEST] S3-L42   PASS  weak reading names the side
+[TEST] S3-L41   PASS  car lifted (4050) not learned: tape 2700 reads black
+  sizeof(s3_ir_cal_t)=8 (was 14)  sizeof(s3_line_t)=32 (was 80)
+[TEST] S3-L26   PASS  calibration 14 -> 8 B, line state 80 -> <= 48 B
+[TEST] S3-N01   PASS  A/B/C/D -> L/R/S/U, others NONE
+ALL PASSED: 0 failure(s)
+===== sim
+== layout: OUR CAR: 18 mm edge pair, GP26 RIGHT
+  straight 2 m      40 mm/s lookahead 40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      40 mm/s lookahead 60: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      40 mm/s lookahead 80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      80 mm/s lookahead 40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      80 mm/s lookahead 60: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      80 mm/s lookahead 80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+[TEST] S3-S01   PASS  straight 2 m: >= 98 % of the track, axle within 10 mm
+  left curve r200   40 mm/s lookahead 40: 100 % of track, max err   1.7 mm, RMS  0.9 mm, LOST 0
+  left curve r200   40 mm/s lookahead 60: 100 % of track, max err   6.4 mm, RMS  3.4 mm, LOST 0
+  left curve r200   40 mm/s lookahead 80: 100 % of track, max err  13.0 mm, RMS  6.8 mm, LOST 0
+  left curve r200   80 mm/s lookahead 40: 100 % of track, max err   1.9 mm, RMS  1.1 mm, LOST 0
+  left curve r200   80 mm/s lookahead 60: 100 % of track, max err   6.9 mm, RMS  3.8 mm, LOST 0
+  left curve r200   80 mm/s lookahead 80: 100 % of track, max err  13.6 mm, RMS  7.2 mm, LOST 0
+[TEST] S3-S02   PASS  left curve r200: >= 98 % of the track, axle within 25 mm
+  right curve r200  40 mm/s lookahead 40: 100 % of track, max err   1.7 mm, RMS  0.9 mm, LOST 0
+  right curve r200  40 mm/s lookahead 60: 100 % of track, max err   6.4 mm, RMS  3.4 mm, LOST 0
+  right curve r200  40 mm/s lookahead 80: 100 % of track, max err  13.0 mm, RMS  6.8 mm, LOST 0
+  right curve r200  80 mm/s lookahead 40: 100 % of track, max err   1.9 mm, RMS  1.1 mm, LOST 0
+  right curve r200  80 mm/s lookahead 60: 100 % of track, max err   6.9 mm, RMS  3.8 mm, LOST 0
+  right curve r200  80 mm/s lookahead 80: 100 % of track, max err  13.6 mm, RMS  7.2 mm, LOST 0
+[TEST] S3-S03   PASS  right curve r200: >= 98 % of the track, axle within 25 mm
+  sharp RIGHT 90    40 mm/s lookahead 40: 100 % of track, max err  39.2 mm, RMS 14.4 mm, LOST 1
+  sharp RIGHT 90    40 mm/s lookahead 60: 100 % of track, max err  19.4 mm, RMS  7.1 mm, LOST 1
+  sharp RIGHT 90    40 mm/s lookahead 80: 100 % of track, max err  19.3 mm, RMS  6.5 mm, LOST 1
+  sharp RIGHT 90    80 mm/s lookahead 40: 100 % of track, max err  37.8 mm, RMS 13.7 mm, LOST 1
+  sharp RIGHT 90    80 mm/s lookahead 60: 100 % of track, max err  17.7 mm, RMS  6.6 mm, LOST 1
+  sharp RIGHT 90    80 mm/s lookahead 80: 100 % of track, max err  19.2 mm, RMS  6.2 mm, LOST 1
+[TEST] S3-S04   PASS  sharp RIGHT 90: >= 98 % of the track, axle within 60 mm
+  sharp LEFT 90     40 mm/s lookahead 40: 100 % of track, max err  39.2 mm, RMS 14.4 mm, LOST 1
+  sharp LEFT 90     40 mm/s lookahead 60: 100 % of track, max err  19.4 mm, RMS  7.1 mm, LOST 1
+  sharp LEFT 90     40 mm/s lookahead 80: 100 % of track, max err  19.3 mm, RMS  6.5 mm, LOST 1
+  sharp LEFT 90     80 mm/s lookahead 40: 100 % of track, max err  37.8 mm, RMS 13.7 mm, LOST 1
+  sharp LEFT 90     80 mm/s lookahead 60: 100 % of track, max err  17.7 mm, RMS  6.6 mm, LOST 1
+  sharp LEFT 90     80 mm/s lookahead 80: 100 % of track, max err  19.2 mm, RMS  6.2 mm, LOST 1
+[TEST] S3-S05   PASS  sharp LEFT 90: >= 98 % of the track, axle within 60 mm
+  S-bend r150       40 mm/s lookahead 40: 100 % of track, max err  18.1 mm, RMS  8.5 mm, LOST 0
+  S-bend r150       40 mm/s lookahead 60: 100 % of track, max err  15.9 mm, RMS  6.8 mm, LOST 0
+  S-bend r150       40 mm/s lookahead 80: 100 % of track, max err  14.0 mm, RMS  8.4 mm, LOST 0
+  S-bend r150       80 mm/s lookahead 40: 100 % of track, max err   2.5 mm, RMS  1.3 mm, LOST 0
+  S-bend r150       80 mm/s lookahead 60: 100 % of track, max err   8.2 mm, RMS  4.7 mm, LOST 0
+  S-bend r150       80 mm/s lookahead 80: 100 % of track, max err  16.1 mm, RMS  8.9 mm, LOST 0
+[TEST] S3-S06   PASS  S-bend r150: >= 98 % of the track, axle within 30 mm
+== layout: mirror mount, GP26 LEFT
+  straight 2 m      40 mm/s lookahead 40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      40 mm/s lookahead 60: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      40 mm/s lookahead 80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      80 mm/s lookahead 40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      80 mm/s lookahead 60: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      80 mm/s lookahead 80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+[TEST] S3-S11   PASS  straight 2 m: >= 98 % of the track, axle within 10 mm
+  left curve r200   40 mm/s lookahead 40: 100 % of track, max err   1.7 mm, RMS  0.9 mm, LOST 0
+  left curve r200   40 mm/s lookahead 60: 100 % of track, max err   6.4 mm, RMS  3.4 mm, LOST 0
+  left curve r200   40 mm/s lookahead 80: 100 % of track, max err  13.0 mm, RMS  6.8 mm, LOST 0
+  left curve r200   80 mm/s lookahead 40: 100 % of track, max err   1.9 mm, RMS  1.1 mm, LOST 0
+  left curve r200   80 mm/s lookahead 60: 100 % of track, max err   6.9 mm, RMS  3.8 mm, LOST 0
+  left curve r200   80 mm/s lookahead 80: 100 % of track, max err  13.6 mm, RMS  7.2 mm, LOST 0
+[TEST] S3-S12   PASS  left curve r200: >= 98 % of the track, axle within 25 mm
+  right curve r200  40 mm/s lookahead 40: 100 % of track, max err   1.7 mm, RMS  0.9 mm, LOST 0
+  right curve r200  40 mm/s lookahead 60: 100 % of track, max err   6.4 mm, RMS  3.4 mm, LOST 0
+  right curve r200  40 mm/s lookahead 80: 100 % of track, max err  13.0 mm, RMS  6.8 mm, LOST 0
+  right curve r200  80 mm/s lookahead 40: 100 % of track, max err   1.9 mm, RMS  1.1 mm, LOST 0
+  right curve r200  80 mm/s lookahead 60: 100 % of track, max err   6.9 mm, RMS  3.8 mm, LOST 0
+  right curve r200  80 mm/s lookahead 80: 100 % of track, max err  13.6 mm, RMS  7.2 mm, LOST 0
+[TEST] S3-S13   PASS  right curve r200: >= 98 % of the track, axle within 25 mm
+  sharp RIGHT 90    40 mm/s lookahead 40: 100 % of track, max err  39.2 mm, RMS 14.4 mm, LOST 1
+  sharp RIGHT 90    40 mm/s lookahead 60: 100 % of track, max err  19.4 mm, RMS  7.1 mm, LOST 1
+  sharp RIGHT 90    40 mm/s lookahead 80: 100 % of track, max err  19.3 mm, RMS  6.5 mm, LOST 1
+  sharp RIGHT 90    80 mm/s lookahead 40: 100 % of track, max err  37.8 mm, RMS 13.7 mm, LOST 1
+  sharp RIGHT 90    80 mm/s lookahead 60: 100 % of track, max err  17.7 mm, RMS  6.6 mm, LOST 1
+  sharp RIGHT 90    80 mm/s lookahead 80: 100 % of track, max err  19.2 mm, RMS  6.2 mm, LOST 1
+[TEST] S3-S14   PASS  sharp RIGHT 90: >= 98 % of the track, axle within 60 mm
+  sharp LEFT 90     40 mm/s lookahead 40: 100 % of track, max err  39.2 mm, RMS 14.4 mm, LOST 1
+  sharp LEFT 90     40 mm/s lookahead 60: 100 % of track, max err  19.4 mm, RMS  7.1 mm, LOST 1
+  sharp LEFT 90     40 mm/s lookahead 80: 100 % of track, max err  19.3 mm, RMS  6.5 mm, LOST 1
+  sharp LEFT 90     80 mm/s lookahead 40: 100 % of track, max err  37.8 mm, RMS 13.7 mm, LOST 1
+  sharp LEFT 90     80 mm/s lookahead 60: 100 % of track, max err  17.7 mm, RMS  6.6 mm, LOST 1
+  sharp LEFT 90     80 mm/s lookahead 80: 100 % of track, max err  19.2 mm, RMS  6.2 mm, LOST 1
+[TEST] S3-S15   PASS  sharp LEFT 90: >= 98 % of the track, axle within 60 mm
+  S-bend r150       40 mm/s lookahead 40: 100 % of track, max err  18.1 mm, RMS  8.5 mm, LOST 0
+  S-bend r150       40 mm/s lookahead 60: 100 % of track, max err  15.9 mm, RMS  6.8 mm, LOST 0
+  S-bend r150       40 mm/s lookahead 80: 100 % of track, max err  14.0 mm, RMS  8.4 mm, LOST 0
+  S-bend r150       80 mm/s lookahead 40: 100 % of track, max err   2.5 mm, RMS  1.3 mm, LOST 0
+  S-bend r150       80 mm/s lookahead 60: 100 % of track, max err   8.2 mm, RMS  4.7 mm, LOST 0
+  S-bend r150       80 mm/s lookahead 80: 100 % of track, max err  16.1 mm, RMS  8.9 mm, LOST 0
+[TEST] S3-S16   PASS  S-bend r150: >= 98 % of the track, axle within 30 mm
+== layout: 16 mm
+  straight 2 m      40 mm/s lookahead 40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      40 mm/s lookahead 60: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      40 mm/s lookahead 80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      80 mm/s lookahead 40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      80 mm/s lookahead 60: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      80 mm/s lookahead 80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+[TEST] S3-S21   PASS  straight 2 m: >= 98 % of the track, axle within 10 mm
+  left curve r200   40 mm/s lookahead 40: 100 % of track, max err   1.2 mm, RMS  0.4 mm, LOST 0
+  left curve r200   40 mm/s lookahead 60: 100 % of track, max err   5.4 mm, RMS  3.0 mm, LOST 0
+  left curve r200   40 mm/s lookahead 80: 100 % of track, max err  12.0 mm, RMS  6.4 mm, LOST 0
+  left curve r200   80 mm/s lookahead 40: 100 % of track, max err   1.4 mm, RMS  0.7 mm, LOST 0
+  left curve r200   80 mm/s lookahead 60: 100 % of track, max err   6.0 mm, RMS  3.3 mm, LOST 0
+  left curve r200   80 mm/s lookahead 80: 100 % of track, max err  12.6 mm, RMS  6.8 mm, LOST 0
+[TEST] S3-S22   PASS  left curve r200: >= 98 % of the track, axle within 25 mm
+  right curve r200  40 mm/s lookahead 40: 100 % of track, max err   1.2 mm, RMS  0.4 mm, LOST 0
+  right curve r200  40 mm/s lookahead 60: 100 % of track, max err   5.4 mm, RMS  3.0 mm, LOST 0
+  right curve r200  40 mm/s lookahead 80: 100 % of track, max err  12.0 mm, RMS  6.4 mm, LOST 0
+  right curve r200  80 mm/s lookahead 40: 100 % of track, max err   1.4 mm, RMS  0.7 mm, LOST 0
+  right curve r200  80 mm/s lookahead 60: 100 % of track, max err   6.0 mm, RMS  3.3 mm, LOST 0
+  right curve r200  80 mm/s lookahead 80: 100 % of track, max err  12.6 mm, RMS  6.8 mm, LOST 0
+[TEST] S3-S23   PASS  right curve r200: >= 98 % of the track, axle within 25 mm
+  sharp RIGHT 90    40 mm/s lookahead 40: 100 % of track, max err  39.9 mm, RMS 14.8 mm, LOST 1
+  sharp RIGHT 90    40 mm/s lookahead 60: 100 % of track, max err  20.1 mm, RMS  7.3 mm, LOST 1
+  sharp RIGHT 90    40 mm/s lookahead 80: 100 % of track, max err  18.8 mm, RMS  6.1 mm, LOST 1
+  sharp RIGHT 90    80 mm/s lookahead 40: 100 % of track, max err  39.1 mm, RMS 14.2 mm, LOST 1
+  sharp RIGHT 90    80 mm/s lookahead 60: 100 % of track, max err  18.7 mm, RMS  6.8 mm, LOST 1
+  sharp RIGHT 90    80 mm/s lookahead 80: 100 % of track, max err  19.0 mm, RMS  5.6 mm, LOST 1
+[TEST] S3-S24   PASS  sharp RIGHT 90: >= 98 % of the track, axle within 60 mm
+  sharp LEFT 90     40 mm/s lookahead 40: 100 % of track, max err  39.9 mm, RMS 14.8 mm, LOST 1
+  sharp LEFT 90     40 mm/s lookahead 60: 100 % of track, max err  20.1 mm, RMS  7.3 mm, LOST 1
+  sharp LEFT 90     40 mm/s lookahead 80: 100 % of track, max err  18.8 mm, RMS  6.1 mm, LOST 1
+  sharp LEFT 90     80 mm/s lookahead 40: 100 % of track, max err  39.1 mm, RMS 14.2 mm, LOST 1
+  sharp LEFT 90     80 mm/s lookahead 60: 100 % of track, max err  18.7 mm, RMS  6.8 mm, LOST 1
+  sharp LEFT 90     80 mm/s lookahead 80: 100 % of track, max err  19.0 mm, RMS  5.6 mm, LOST 1
+[TEST] S3-S25   PASS  sharp LEFT 90: >= 98 % of the track, axle within 60 mm
+  S-bend r150       40 mm/s lookahead 40: 100 % of track, max err  17.1 mm, RMS  8.1 mm, LOST 0
+  S-bend r150       40 mm/s lookahead 60: 100 % of track, max err  15.4 mm, RMS  6.4 mm, LOST 0
+  S-bend r150       40 mm/s lookahead 80: 100 % of track, max err  13.2 mm, RMS  7.8 mm, LOST 0
+  S-bend r150       80 mm/s lookahead 40: 100 % of track, max err   8.9 mm, RMS  2.8 mm, LOST 0
+  S-bend r150       80 mm/s lookahead 60: 100 % of track, max err   7.3 mm, RMS  4.2 mm, LOST 0
+  S-bend r150       80 mm/s lookahead 80: 100 % of track, max err  15.2 mm, RMS  8.5 mm, LOST 0
+[TEST] S3-S26   PASS  S-bend r150: >= 98 % of the track, axle within 30 mm
+== layout: 20 mm
+  straight 2 m      40 mm/s lookahead 40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      40 mm/s lookahead 60: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      40 mm/s lookahead 80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      80 mm/s lookahead 40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      80 mm/s lookahead 60: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+  straight 2 m      80 mm/s lookahead 80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, LOST 0
+[TEST] S3-S31   PASS  straight 2 m: >= 98 % of the track, axle within 10 mm
+  left curve r200   40 mm/s lookahead 40: 100 % of track, max err   1.4 mm, RMS  0.6 mm, LOST 0
+  left curve r200   40 mm/s lookahead 60: 100 % of track, max err   6.2 mm, RMS  3.3 mm, LOST 0
+  left curve r200   40 mm/s lookahead 80: 100 % of track, max err  13.4 mm, RMS  7.0 mm, LOST 0
+  left curve r200   80 mm/s lookahead 40: 100 % of track, max err   1.6 mm, RMS  0.9 mm, LOST 0
+  left curve r200   80 mm/s lookahead 60: 100 % of track, max err   6.8 mm, RMS  3.7 mm, LOST 0
+  left curve r200   80 mm/s lookahead 80: 100 % of track, max err  13.8 mm, RMS  7.3 mm, LOST 0
+[TEST] S3-S32   PASS  left curve r200: >= 98 % of the track, axle within 25 mm
+  right curve r200  40 mm/s lookahead 40: 100 % of track, max err   1.4 mm, RMS  0.6 mm, LOST 0
+  right curve r200  40 mm/s lookahead 60: 100 % of track, max err   6.2 mm, RMS  3.3 mm, LOST 0
+  right curve r200  40 mm/s lookahead 80: 100 % of track, max err  13.4 mm, RMS  7.0 mm, LOST 0
+  right curve r200  80 mm/s lookahead 40: 100 % of track, max err   1.6 mm, RMS  0.9 mm, LOST 0
+  right curve r200  80 mm/s lookahead 60: 100 % of track, max err   6.8 mm, RMS  3.7 mm, LOST 0
+  right curve r200  80 mm/s lookahead 80: 100 % of track, max err  13.8 mm, RMS  7.3 mm, LOST 0
+[TEST] S3-S33   PASS  right curve r200: >= 98 % of the track, axle within 25 mm
+  sharp RIGHT 90    40 mm/s lookahead 40: 100 % of track, max err  38.3 mm, RMS 14.0 mm, LOST 1
+  sharp RIGHT 90    40 mm/s lookahead 60: 100 % of track, max err  18.8 mm, RMS  7.1 mm, LOST 1
+  sharp RIGHT 90    40 mm/s lookahead 80: 100 % of track, max err  19.6 mm, RMS  6.8 mm, LOST 1
+  sharp RIGHT 90    80 mm/s lookahead 40: 100 % of track, max err  36.5 mm, RMS 13.2 mm, LOST 1
+  sharp RIGHT 90    80 mm/s lookahead 60: 100 % of track, max err  18.0 mm, RMS  6.7 mm, LOST 1
+  sharp RIGHT 90    80 mm/s lookahead 80: 100 % of track, max err  19.9 mm, RMS  6.4 mm, LOST 1
+[TEST] S3-S34   PASS  sharp RIGHT 90: >= 98 % of the track, axle within 60 mm
+  sharp LEFT 90     40 mm/s lookahead 40: 100 % of track, max err  38.3 mm, RMS 14.0 mm, LOST 1
+  sharp LEFT 90     40 mm/s lookahead 60: 100 % of track, max err  18.8 mm, RMS  7.1 mm, LOST 1
+  sharp LEFT 90     40 mm/s lookahead 80: 100 % of track, max err  19.6 mm, RMS  6.8 mm, LOST 1
+  sharp LEFT 90     80 mm/s lookahead 40: 100 % of track, max err  36.5 mm, RMS 13.2 mm, LOST 1
+  sharp LEFT 90     80 mm/s lookahead 60: 100 % of track, max err  18.0 mm, RMS  6.7 mm, LOST 1
+  sharp LEFT 90     80 mm/s lookahead 80: 100 % of track, max err  19.9 mm, RMS  6.4 mm, LOST 1
+[TEST] S3-S35   PASS  sharp LEFT 90: >= 98 % of the track, axle within 60 mm
+  S-bend r150       40 mm/s lookahead 40: 100 % of track, max err  18.9 mm, RMS  8.9 mm, LOST 0
+  S-bend r150       40 mm/s lookahead 60: 100 % of track, max err  17.2 mm, RMS  7.3 mm, LOST 0
+  S-bend r150       40 mm/s lookahead 80: 100 % of track, max err  14.6 mm, RMS  7.8 mm, LOST 0
+  S-bend r150       80 mm/s lookahead 40: 100 % of track, max err   4.2 mm, RMS  1.4 mm, LOST 0
+  S-bend r150       80 mm/s lookahead 60: 100 % of track, max err   8.5 mm, RMS  4.9 mm, LOST 0
+  S-bend r150       80 mm/s lookahead 80: 100 % of track, max err  17.0 mm, RMS  9.2 mm, LOST 0
+[TEST] S3-S36   PASS  S-bend r150: >= 98 % of the track, axle within 30 mm
+== layout: OUR CAR: start off the line
+  start -15 mm from the line: 100 % of track, max err  12.2 mm
+  start  -8 mm from the line: 100 % of track, max err   5.6 mm
+  start  +8 mm from the line: 100 % of track, max err   5.6 mm
+  start +15 mm from the line: 100 % of track, max err  12.2 mm
+[TEST] S3-S80   PASS  start 8-15 mm off the line (one sensor on it) -> pulls on, finishes
+== layout: OUR CAR: wheel lag + noise + 8-bit + averaging
+  -- straight 2 m
+  40 mm/s lag  40 ms noise +-40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, dv flips  0 %
+  40 mm/s lag  40 ms noise +-80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, dv flips  0 %
+  40 mm/s lag  80 ms noise +-40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, dv flips  0 %
+  40 mm/s lag  80 ms noise +-80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, dv flips  0 %
+  40 mm/s lag 120 ms noise +-40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, dv flips  0 %
+  40 mm/s lag 120 ms noise +-80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, dv flips  0 %
+  80 mm/s lag  40 ms noise +-40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, dv flips  0 %
+  80 mm/s lag  40 ms noise +-80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, dv flips  4 %
+  80 mm/s lag  80 ms noise +-40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, dv flips  0 %
+  80 mm/s lag  80 ms noise +-80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, dv flips  4 %
+  80 mm/s lag 120 ms noise +-40: 100 % of track, max err   0.0 mm, RMS  0.0 mm, dv flips  0 %
+  80 mm/s lag 120 ms noise +-80: 100 % of track, max err   0.0 mm, RMS  0.0 mm, dv flips  4 %
+  -- S-bend r150
+  40 mm/s lag  40 ms noise +-40: 100 % of track, max err  17.2 mm, RMS  7.4 mm, dv flips  0 %
+  40 mm/s lag  40 ms noise +-80: 100 % of track, max err  17.0 mm, RMS  7.3 mm, dv flips  0 %
+  40 mm/s lag  80 ms noise +-40: 100 % of track, max err  16.6 mm, RMS  7.1 mm, dv flips  0 %
+  40 mm/s lag  80 ms noise +-80: 100 % of track, max err  17.3 mm, RMS  7.5 mm, dv flips  0 %
+  40 mm/s lag 120 ms noise +-40: 100 % of track, max err  17.1 mm, RMS  7.3 mm, dv flips  0 %
+  40 mm/s lag 120 ms noise +-80: 100 % of track, max err  17.3 mm, RMS  7.4 mm, dv flips  0 %
+  80 mm/s lag  40 ms noise +-40: 100 % of track, max err   6.5 mm, RMS  3.4 mm, dv flips  0 %
+  80 mm/s lag  40 ms noise +-80: 100 % of track, max err   6.5 mm, RMS  3.4 mm, dv flips  1 %
+  80 mm/s lag  80 ms noise +-40: 100 % of track, max err   6.4 mm, RMS  3.3 mm, dv flips  0 %
+  80 mm/s lag  80 ms noise +-80: 100 % of track, max err   6.4 mm, RMS  3.3 mm, dv flips  1 %
+  80 mm/s lag 120 ms noise +-40: 100 % of track, max err   6.3 mm, RMS  3.1 mm, dv flips  0 %
+  80 mm/s lag 120 ms noise +-80: 100 % of track, max err   6.3 mm, RMS  3.1 mm, dv flips  1 %
+[TEST] S3-S91   PASS  lag 40-120 ms, noise 40-80, 8 mm spot, 8-bit, 40 and 80 mm/s: on track, axle within 30 mm
+== layout: OUR CAR: disturbed once
+  disturbed runs finished: 216 of 216
+[TEST] S3-S92   PASS  after a bump or slip the car finishes the track (216 of 216 runs)
+ALL PASSED: 0 failure(s)
+===== probe
+PASS diagnostic WHITE/GREY/BLACK exact boundaries and invalid inputs
+PASS unarmed both-black never turns
+PASS recovery-only image ignores arm
+PASS arming while already black requires white then black
+PASS 139mm alignment, brake, 90deg, reacquire, one-shot disarm
+PASS GP27 loss brakes, small search, stable black resumes
+PASS absent line exhausts five search legs and stops
+PASS loss during alignment refuses blind turn
+PASS maneuver timeout
+PASS search angle bound
+PASS E-stop and manual stop override arm
+PASS no overall run timer
+ALL PROBE TESTS PASSED
+S3 HOST: PASS (7 of 7 programs, all checks passed)
