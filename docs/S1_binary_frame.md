@@ -343,9 +343,10 @@ These match the computed figures in `mqtt_queue.c` at `pre-minbit`:
 publish record 214 B, cost 220 B, 8 x 220 = 1760 B; command record
 116 B, cost 120 B, 8 x 120 = 960 B; 2720 B for the two buffers.
 
-**In the linked image these objects take 0 B today.** Nothing calls the
-driver until Stage 3, so `--gc-sections` drops every section of both
-objects (they are listed under "Discarded input sections" in the map).
+**In the linked image at that commit these objects take 0 B.** Nothing
+called the driver before Stage 3, so `--gc-sections` dropped every
+section of both objects (they are listed under "Discarded input sections"
+in the map).
 Image totals for reference: `..._lwip_mqtt.elf` text 339368, data 96,
 bss 82356; `..._lwip.elf` text 329880, data 96, bss 82144. The object
 sizes above are therefore the primary "before". Section 8.3 gives the
@@ -462,8 +463,9 @@ Not in these figures:
 - **The codec.** Nothing calls it yet, so it is neither in the image
   nor a root. Its flash cost is measured separately (9.2, "Codec
   flash").
-- **`mbf_event`.** Stage 3 builds it; until then its 2048 -> 240 B stays
-  computed (9.2).
+- **`mbf_event`.** No code creates it yet: it is to be created by
+  `telemetry_task` (planned, Stage 4), not by the Stage 3 adapter. Until
+  then its 2048 -> 240 B stays computed (9.2).
 
 **Tag.** The local annotated tag `pre-minbit` on `a25b9f4` (the last
 commit before any minimum-bit change) lets the "before" be rebuilt at
@@ -556,7 +558,8 @@ option A worked.
 9.1 is computed from the layout. In 9.2 the driver objects and the two
 message buffers are measured (20 Oct 2026, `d604644` and, with the topic
 ID, `df58a14`), and so is the codec's flash (S1-U08 build, `3814f93`);
-`mbf_event` stays computed until Stage 3 builds it.
+`mbf_event` stays computed: it is to be created by `telemetry_task`
+(planned, Stage 4).
 
 ### 9.1 Message sizes
 
@@ -610,7 +613,7 @@ so the totals below do not change.
 | `mbf_cmd` (8 records) | 960 B | 480 B | 64 B | 8 x (4 + 4) | measured (rooted map, 0x40) |
 | `mqtt_link.o` bss | 648 B | 452 B | 354 B | `g_pending` 214 -> 80 -> 32, `g_command` 116 -> 54 -> 4 | measured (`arm-none-eabi-size`) |
 | `mqtt_queue.o` bss | 2733 B | 1165 B | 365 B | the two buffers + 13 B of IDs and counters | measured (`arm-none-eabi-size`) |
-| `mbf_event` (30 events) | 2048 B | 240 B | 240 B | 30 x (4 + 4), record 3 B rounded to 4 | computed (Stage 3 not built) |
+| `mbf_event` (30 events) | 2048 B | 240 B | 240 B | 30 x (4 + 4), record 3 B rounded to 4 | computed (to be created by `telemetry_task`, planned, Stage 4) |
 | **S1 static RAM, object level plus computed `mbf_event`** | **5430 B** | **about 1858 B** | **about 960 B** | Not linked-image figures; see 8.3 for those | mixed: see below |
 
 **Measured saving: 2664 B** of static RAM in the linked image for the
@@ -620,8 +623,9 @@ At object level it is 2662 B (3382 -> 1618 -> 720 B: `mqtt_link.o`
 648 + 1 data -> 452 + 1 -> 354 + 1, `mqtt_queue.o` 2733 -> 1165 -> 365);
 the 2 B difference is alignment padding in the linked image. The 4470 B
 difference of the total row also contains the computed `mbf_event`
-saving of 1808 B (2048 -> 240 B), which is only confirmed once Stage 3
-builds `mbf_event`.
+saving of 1808 B (2048 -> 240 B), which is only confirmed once
+`mbf_event` exists; it is to be created by `telemetry_task` (planned,
+Stage 4).
 
 **Codec flash (measured, separate):** the `NET=lwip MQTT=1` image with
 the codec in it (the 11 public codec functions linked as roots) is

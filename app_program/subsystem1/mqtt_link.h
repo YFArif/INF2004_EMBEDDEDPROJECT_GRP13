@@ -45,9 +45,6 @@
  * latest MQTT_LINK_STALE_MSEC after init. app_main.c never calls
  * mqtt_link_init().
  *
- * NOTE: Until Stage 3 replaces the body of mqtt_utk.c (today the
- * template's demo client), nothing calls mqtt_link_poll().
- *
  * @par Commands
  * Exactly one task, the application dispatcher, calls
  * mqtt_link_receive_command() and routes each command to the subsystem

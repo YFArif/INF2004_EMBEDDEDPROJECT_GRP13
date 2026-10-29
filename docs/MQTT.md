@@ -11,27 +11,28 @@ Source column by symbol (so the reference survives line changes) or by
 TEST_LOG row. A rule that comes from the MQTT 3.1.1 standard or from the
 mosquitto tools is marked *standard* or *tool*. Anything not built yet
 is marked **planned**. Checked on 27 Oct 2026 against commit `5d23dbf`
-on branch `buddy1-mqtt-port`; lwIP is the Pico SDK's copy,
-`STABLE-2_2_1_RELEASE`.
+on branch `buddy1-mqtt-port`, and the Stage 3 statements on 30 Oct 2026
+against the adapter commit on `buddy1-mqtt-stage3`; lwIP is the Pico
+SDK's copy, `STABLE-2_2_1_RELEASE`.
 
 ## 1. Status
 
 | Part | State | Source |
 |---|---|---|
-| MQTT driver (`mqtt_link`, `mqtt_queue`) | Built and host-tested; not yet called on the robot | `app_program/subsystem1/`; TEST_LOG S1-U09 |
+| MQTT driver (`mqtt_link`, `mqtt_queue`) | Built and host-tested. In `MQTT=1` builds it is polled through the Stage 3 adapter; not run on the robot yet (S1-U13) | `app_program/subsystem1/`; TEST_LOG S1-U09 |
 | Message codec (`msg_codec`) | Built, host-tested and timed on the Pico | `app_program/subsystem1/`; TEST_LOG S1-U05, S1-U08 |
 | Dashboard decoder (`s1_decode.py`) | Built and host-tested | `app_program/subsystem1/dashboard/`; TEST_LOG S1-U11, S1-U12 |
-| Stage 3: the radio service task calls `mqtt_link_poll()` | **Planned**. It changes `lib/`: instructor approval given 27 Oct 2026; team agreement under TEAM.md section 3 pending | `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c`; TEAM.md section 3 ("WiFi and MQTT are special") |
+| Stage 3: the radio service task calls `mqtt_link_poll()` | Adapter written: `mqtt_utk_start()` calls `mqtt_link_poll(netif_default)`. Instructor approval 27 Oct 2026; team agreement in person 29 Oct 2026. On-robot test S1-U13 not run | `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c`; TEAM.md section 3 ("WiFi and MQTT are special") |
 | `telemetry_task`: builds the frames, handles commands | **Planned** | - |
 
-Today a `NET=lwip MQTT=1` build runs the template's demo client,
-`mqtt_utk.c`, instead: one topic (`MQTT_TOPIC` in
-`config/wifi_secrets.h`), a text heartbeat every 5 s
-(`MQTT_UTK_HEARTBEAT_MS`) and a 60 s keep-alive (`MQTT_UTK_KEEPALIVE_S`).
-Nothing else in this document applies to that demo. In `MQTT=1` builds
-`subsystem1_init()` calls `mqtt_link_init()`, which creates the driver's
-two message buffers, but nothing polls the driver until Stage 3 replaces
-the demo client (the "Start-up" note in `mqtt_link.h`).
+Stage 3 replaced the template's demo client in `mqtt_utk.c` (a text
+heartbeat on `MQTT_TOPIC`, 60 s keep-alive) with the adapter, and the
+`MQTT_*` settings in `config/wifi_secrets.h` are no longer read. In
+`MQTT=1` builds `subsystem1_init()` calls `mqtt_link_init()`, which
+creates the driver's two message buffers, and `mqtt_utk_start()` calls
+`mqtt_link_poll(netif_default)` on every pass of `cyw43_utk_task` while
+the link is up (the "Start-up" note in `mqtt_link.h`). It has not been
+run on the robot; S1-U13 decides whether it works there.
 
 ## 2. Configuration
 
@@ -58,7 +59,7 @@ copied from `mqtt_config.example.h` and never committed (the folder's
 | Connect time limit | 5 s; lwIP's own limit is 100 s | `CONNECT_TIMEOUT_MSEC`, `step_connecting()`; lwIP `MQTT_CONNECT_TIMOUT`; pinned at compile time in S1-U09 |
 | Retry delay | 1, 2, 4, 8, 8, ... s | `BACKOFF_MIN_MSEC`, `BACKOFF_MAX_MSEC`, `next_backoff()`; S1-U09 (`test_backoff`) |
 | Retry delay reset | Back to 1 s after a session that lasted at least 10 s | `STABLE_SESSION_MSEC`, `enter_backoff()`. No test covers this yet. |
-| While the link is down | The driver waits for the link without further tries, so it does not build up a long retry delay during an outage | `step_idle()`, `link_ready()` |
+| While the link is down | The driver is not polled (the adapter runs only while `CYW43_LINK_UP`), so it makes no tries and does not build up a long retry delay during an outage; if a poll finds the netif without link or address, it waits for the link without further tries | `cyw43_utk.c`, `mqtt_utk_start()`; `step_idle()`, `link_ready()` |
 | Session | Clean: the broker keeps nothing for the robot while it is away | lwIP `mqtt_client_connect()` always sets `MQTT_CONNECT_FLAG_CLEAN_SESSION` |
 | Order after connecting | Subscribe to the commands, publish "online", then send queued messages one at a time | `step_connected()`, `step_publish()` |
 | Publish retries | 3 tries in all, then the message is dropped and counted; a lost connection does not count as a try | `PUBLISH_MAX_ATTEMPTS`, `finish_message()` |
@@ -126,7 +127,8 @@ arrive twice under QoS 1, so the command handler must accept a repeat
   shall resume within 15 s. The broker shall show the robot as offline
   within 10 s of link loss (keep-alive 5 s plus last-will)." The budget
   for the first sentence is in section 9. Neither sentence is measured
-  end to end yet; both need Stage 3.
+  end to end yet: the second needs the on-robot test S1-U13 (not run),
+  and the first also needs `telemetry_task`.
 
 ## 7. Message formats
 
@@ -179,12 +181,18 @@ was off the link status read 1 (JOIN), never 0; it went negative once,
 
 **MQTT.** From the code:
 
-- When the network interface loses its link or address, the driver closes
+- `cyw43_utk.c` calls the adapter only while the link is
+  `CYW43_LINK_UP`, so during a WiFi outage the driver is not polled at
+  all. lwIP's own timers still run and end a session the broker no longer
+  answers, 5 to 10 s after its last byte (section 3); the driver's
+  `connection_cb()` then starts a retry delay (`enter_backoff()`).
+- If a poll finds the netif without link or address, the driver closes
   the session, waits out one retry delay and then waits for the link
   without further tries (`link_ready()`, `abort_session()`,
   `step_idle()`).
-- When the link is back, it looks the broker up, connects (5 s limit),
-  subscribes and publishes `online` straight away (section 3).
+- When the link is back, the driver first waits out any retry delay still
+  running (`step_backoff()`), then looks the broker up, connects (5 s
+  limit), subscribes and publishes `online` (section 3).
 - Queued publishes and commands survive a reconnect, and a lost
   connection does not use up a publish try (the `PUBLISH_MAX_ATTEMPTS`
   and `submit_pending()` notes in `mqtt_link.c`; not covered by a test).
@@ -201,7 +209,8 @@ about 6 s left for the MQTT reconnect (broker lookup, connect, subscribe,
 period (**planned**, `telemetry_task`), is therefore established only for
 the 8 s case; a re-measurement with Mac-clock markers for every drop is
 needed (**planned**). The reconnect itself is not measured, and the whole
-chain is unmeasured end to end until Stage 3.
+chain is unmeasured end to end. S1-U13 (not run) will measure the time to
+`online` after each drop; telemetry still needs `telemetry_task`.
 
 If only the broker was down, the WiFi needs no rejoin. The driver waits
 up to 8 s between tries (`BACKOFF_MAX_MSEC`), and that wait starts only
@@ -234,6 +243,14 @@ it, before the kernel's `tk_snd_mbf()`: 64 B for `mqtt_link_publish()`
 and 8 B for `mqtt_queue_put_publish()`. Source: `-fstack-usage` and the
 `mqtt_link_publish` prologue in the disassembly, with the build's own
 flags, at `5d23dbf`, for both `SMP=1` and `SMP=0`.
+
+The driver itself runs on the radio service task. The deepest static
+chain from `cyw43_utk_task` through `mqtt_utk_start()` and
+`mqtt_link_poll()` is 1768 B of that task's 8 KB stack. It is an
+estimate: `-fstack-usage` and `-fcallgraph-info=su` on the Stage 3
+`NET=lwip MQTT=1` build (29 Oct 2026, `SMP=1`), with eight indirect
+calls resolved by hand; it leaves out the other indirect calls, interrupt
+frames and library leaves such as `memcpy`.
 
 ## 11. Reading messages: `s1_decode.py`
 
@@ -304,11 +321,13 @@ topics received on `robocar/car1/cmd/#` at QoS 1. TEST_LOG S1-U12.
 
 **Not run:**
 
-- Anything on the robot: it needs Stage 3 and `telemetry_task`.
-- The template demo, which shows only that a broker is reachable, not
-  S1's messages.
+- Anything on the robot. S1-U13 (Stage 3 on the robot: status topic,
+  broker restart, hotspot drops, power cut) is defined but not run, and
+  steps 4 and 5 below also need `telemetry_task`.
 
-**After Stage 3 and `telemetry_task` (planned):**
+**On the robot (planned).** Steps 1 to 3 and 6 need only Stage 3, which
+is written but not run on the robot (S1-U13); steps 4 and 5 also need
+`telemetry_task`:
 
 1. Run a broker the robot can reach, for example mosquitto on port 1883.
 2. Fill in `app_program/subsystem1/mqtt_config.h`; build with
@@ -346,13 +365,11 @@ STOP round trip under 300 ms) and of the NFR14 test.
 | Heartbeat RSSI is not available yet (it must be read inside the radio service task), and the S4 terrain fields will read 0 until S4's data exists | **planned** (`telemetry_task`) |
 | Every layout field is still marked "guess" or "from Version B" until its owner confirms it | S1_binary_frame.md section 1 |
 
-## 14. What changes at Stage 3
+## 14. What changes next
 
-- Section 1 is rewritten: the driver replaces the demo client.
-- Section 9: who calls the driver while the link is down, and the
-  measured reconnect and NFR14 times.
-- Section 12: the steps after Stage 3 become runnable, and their results
-  are added.
+- After S1-U13 (Stage 3 on the robot): section 1 says whether the driver
+  works there, section 9 gets the measured reconnect and NFR14 times, and
+  section 12 gets the results of steps 1 to 3 and 6.
 - With `telemetry_task`: the planned values in sections 5, 8 and 10 become
   code, and the measured rates are added.
 - Sections 2, 3, 4, 7, 11 and 13 stay as they are, unless the layout
