@@ -117,12 +117,10 @@
  *  TEST ONLY: line following on Buddy 2's motors before the Vehicle
  *  Controller exists (task_drive_test.c). Keep 0 in main.
  * --------------------------------------------------------------------- */
-#define S3_DRIVE_LOST_MM        (300u)  /* Stop after LOST this far.     */
-#define S3_DRIVE_LOST_MS        (2000u) /* ... or LOST this long (a car  */
-                                        /* that stopped never got far).  */
 #define S3_DRIVE_STILL_MS       (2000u) /* Stop if the odometry has not  */
                                         /* changed this long.            */
-#define S3_DRIVE_MAX_MM         (3000u) /* Stop after this distance.     */
+#define S3_DRIVE_MAX_MM         (30000u)/* Stop after this distance (was */
+                                        /* 3 m: stopped mid-course).     */
 #define S3_DRIVE_BTN1_PIN       (20u)   /* Button 1 (GP20): PRESS = start */
                                         /* (no hold); any press while    */
                                         /* driving = stop. Read only.    */

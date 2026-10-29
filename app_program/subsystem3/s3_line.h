@@ -135,11 +135,12 @@ int32_t  s3_ir_cal_norm(s3_ir_cal_t const * p_cal, uint16_t value);
                                     /* while both read "white" (a reading */
                                     /* of 200 / 1000 is the line, not     */
                                     /* noise: white floor was 3-66).      */
-#define S3_LN_HOLD_MM       (0u)    /* Both white: steer 0 this far. 0 in */
-                                    /* the edge pair: both white means    */
-                                    /* the car is already about 15 mm     */
-                                    /* off, so turn back at once.         */
-#define S3_LN_SOFT_PERMILLE (700)   /* ... then this much steer towards   */
+#define S3_LN_HOLD_MM       (15u)   /* Both white: keep the last PD steer */
+                                    /* this far. Car log 29 Oct: centred, */
+                                    /* the line passed BETWEEN the spots  */
+                                    /* (hard steer there = weave), and on */
+                                    /* curves steer 0 there lost the turn.*/
+#define S3_LN_SOFT_PERMILLE (350)   /* ... then this much steer towards   */
                                     /* the remembered side, rising        */
                                     /* linearly to full lock at LOST_MM.  */
 #define S3_LN_JUNC_MM       (5u)    /* Both black this far = junction     */
@@ -189,6 +190,7 @@ typedef struct
     int16_t      kd_x100;       /* 0 ... 4000.                           */
     int16_t      e_prev;        /* -1000 ... +1000 permille.             */
     int16_t      boost_x100;    /* Curve boost, 0 ... 600 (0 = off).     */
+    int16_t      steer_prev;    /* Last PD steering, permille.           */
     uint16_t     both_white_um; /* Distance with both sensors white.     */
     uint16_t     both_black_um; /* Distance with both sensors black.     */
     unsigned int state        : 3;  /* s3_ln_state_t.                    */

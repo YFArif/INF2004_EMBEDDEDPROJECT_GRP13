@@ -16,7 +16,8 @@
  * buttons are only read, with the pad pull-up, as in subsystem2_step.c.
  *
  * @par Stops by itself
- * Button 1, LINE LOST for S3_DRIVE_LOST_MM or S3_DRIVE_LOST_MS, no
+ * Button 1, LINE LOST and not found by the 3 recovery sweeps
+ * (line_recover()), no
  * odometry change for S3_DRIVE_STILL_MS (LOST is measured in distance, so
  * a car that stopped moving stayed in FOLLOW for ever: log 28 Oct), an S2
  * emergency stop (for example a wheel stall: duty >= 40 % and no encoder
@@ -54,6 +55,19 @@
 #define U8_BLACK_ABOVE      (191u)
 #define PERMILLE            (1000u)
 #define U8_FULL             (255u)
+#define U8_FOUND            ((S3_LN_FOUND * U8_FULL) / PERMILLE)
+
+/* LINE_RECOVERY sweeps, + = towards the side the line was last seen.
+ * Same pattern as S5 (s5_mission.c, FR15); if all miss, turn back,
+ * reverse RECOVERY_BACK_MM and sweep once more. */
+#define RECOVERY_STEPS      (3u)
+#define RECOVERY_ROUNDS     (2u)
+#define RECOVERY_SPEED_MMS  (40u)   /* Car 29 Oct: S2's 150 too abrupt. */
+#define RECOVERY_BACK_MM    (60)    /* About the distance driven LOST.  */
+#define RECOVERY_MOVE_MS    (10000u)/* One step longer = S2 problem.    */
+#define STOPPED_WAIT_MS     (1000u)
+#define DRIVE_BOOST_X100    (150)   /* Car 29 Oct: Kp 60 alone lost the  */
+                                    /* left curve (one sensor black).   */
 
 /** Preset: Kp x100, Kd x100, speed mm/s, steer_sp at full lock mm/s. */
 typedef struct
@@ -72,10 +86,11 @@ typedef struct
  * differ ONLY in gains and can be compared directly. */
 static drive_preset_t const g_presets[] =
 {
-    { 80,   0, S3_DRIVE_SPEED_MMS, S3_DRIVE_SPEED_MMS}, /* default */
+    { 60,  25, S3_DRIVE_SPEED_MMS, S3_DRIVE_SPEED_MMS}, /* default: Kp 80 */
+                                                        /* was jerky.     */
     { 45,   0, S3_DRIVE_SPEED_MMS, S3_DRIVE_SPEED_MMS},
     { 80,   0, S3_DRIVE_SPEED_MMS, S3_DRIVE_SPEED_MMS},
-    { 60,  25, S3_DRIVE_SPEED_MMS, S3_DRIVE_SPEED_MMS},
+    { 60,   0, S3_DRIVE_SPEED_MMS, S3_DRIVE_SPEED_MMS},
     {100,   0, S3_DRIVE_SPEED_MMS, S3_DRIVE_SPEED_MMS}
 };
 
@@ -107,6 +122,9 @@ static void drive_task(INT stacd, void * p_exinf);
 static bool button1_down(void);
 static bool button2_down(void);
 static void button_input(uint32_t pin);
+static bool line_recover(int32_t last_dv, uint16_t speed_mms);
+static int  recovery_move(bool b_turn, int16_t value);
+static void wheels_stop(void);
 static void preset_next(void);
 static void preset_apply(void);
 static void wait_start(void);
@@ -349,8 +367,6 @@ drive_run (void)
     uint32_t               moved_mm  = 0u;
     uint32_t               ms        = 0u;
     uint32_t               log_ms    = 0u;
-    uint32_t               lost_from = 0u;  /* moved_mm + 1 at LOST.     */
-    uint32_t               lost_ms   = 0u;  /* Time spent LOST.          */
     uint32_t               still_ms  = 0u;  /* Time without odometry.    */
     uint32_t               last_mm   = 0u;
     uint32_t               held2     = 0u;
@@ -439,27 +455,20 @@ drive_run (void)
             p_why = "S2 E-STOP (wheel stall?), see S2 counters below";
             break;
         }
-        /* LOST keeps the last (full) correction, so the car usually turns
-         * back onto the line by itself; stop only if it stays lost, by
-         * distance or, if it is not moving, by time. */
+        /* LINE_RECOVERY (design 6.1 SEARCHING, FR15): stop and sweep;
+         * not found after 3 sweeps = LINE_NOT_FOUND fault. */
         if (S3_LINE_LOST == st.state)
         {
-            lost_ms += POLL_MS;
-            if (0u == lost_from)
+            if (!line_recover(st.steer_dv,
+                              b_boost ? (uint16_t) ((p_set->speed_mms * 3u) /
+                                                    2u) :
+                                        p_set->speed_mms))
             {
-                lost_from = moved_mm + 1u;
-            }
-            if (((moved_mm + 1u - lost_from) >= S3_DRIVE_LOST_MM) ||
-                (lost_ms >= S3_DRIVE_LOST_MS))
-            {
-                p_why = "LINE LOST, not found again";
+                p_why = "LINE NOT FOUND after 3 sweeps (FAULT)";
                 break;
             }
-        }
-        else
-        {
-            lost_from = 0u;
-            lost_ms   = 0u;
+            last_mm  = s3_odom_mm() - start_mm;
+            still_ms = 0u;
         }
         if (moved_mm >= S3_DRIVE_MAX_MM)
         {
@@ -715,6 +724,126 @@ wait_start (void)
         }
     }
 }
+/*!
+ * @brief LINE_RECOVERY (design 6.1 SEARCHING): stop, then turn slowly on
+ *        the spot 30 deg towards the side the line was last seen, 60 back
+ *        and 90 again. If all miss: turn back to the heading at the loss,
+ *        reverse RECOVERY_BACK_MM, and sweep once more. Every step stops
+ *        as soon as either sensor sees the line.
+ *
+ * @param[in] last_dv   Steering when LOST (+ = right): the line's side.
+ * @param[in] speed_mms Follow speed to resume at.
+ *
+ * @return true = found, following again; false = not found, GP20
+ *         pressed or an S2 fault.
+ */
+static bool
+line_recover (int32_t last_dv, uint16_t speed_mms)
+{
+    static int16_t const sweep_deg[RECOVERY_STEPS] = {30, -60, 90};
+    int16_t              side = (last_dv > 0) ? -1 : 1;   /* + = left. */
+    uint32_t             round;
+    uint32_t             step;
+    int                  res = 0;
+
+    for (round = 0u; (round < RECOVERY_ROUNDS) && (0 == res); round++)
+    {
+        for (step = 0u; (step < RECOVERY_STEPS) && (0 == res); step++)
+        {
+            tm_printf((UB *) "S3 DRIVE LINE LOST: round %d sweep %d, turn "
+                             "%d deg\n", (INT) (round + 1u), (INT) (step + 1u),
+                      (INT) (sweep_deg[step] * side));
+            res = recovery_move(true, (int16_t) (sweep_deg[step] * side));
+        }
+        if ((0 == res) && ((round + 1u) < RECOVERY_ROUNDS))
+        {
+            /* The sweeps end 60 deg towards side: face the old heading,
+             * then back up to where the line was. */
+            tm_printf((UB *) "S3 DRIVE LINE LOST: turn back, reverse %d mm\n",
+                      (INT) RECOVERY_BACK_MM);
+            res = recovery_move(true, (int16_t) (-60 * side));
+            if (0 == res)
+            {
+                res = recovery_move(false, (int16_t) -RECOVERY_BACK_MM);
+            }
+        }
+    }
+    if (res > 0)
+    {
+        tm_printf((UB *) "S3 DRIVE LINE FOUND\n");
+        return (E_OK == subsystem2_follow(speed_mms));
+    }
+    return false;
+}
+
+/*!
+ * @brief One recovery step at RECOVERY_SPEED_MMS, from standstill.
+ *
+ * @param[in] b_turn true = TURN value deg (+ = left); false = MOVE value mm.
+ *
+ * @return 1 = a sensor saw the line (stopped); 0 = step done, no line;
+ *         -1 = GP20, an S2 fault or a command error.
+ */
+static int
+recovery_move (bool b_turn, int16_t value)
+{
+    s3_line_status_t    st       = {0};
+    subsystem2_status_t s2       = {0};
+    uint32_t            waited   = 0u;
+    subsystem2_state_t  busy     = b_turn ? S2_STATE_TURNING :
+                                            S2_STATE_MOVING;
+    ER                  er;
+
+    wheels_stop();
+    er = b_turn ? subsystem2_turn(value, RECOVERY_SPEED_MMS) :
+                  subsystem2_move(value, RECOVERY_SPEED_MMS);
+    if (E_OK != er)
+    {
+        return -1;
+    }
+    do
+    {
+        tk_dly_tsk(POLL_MS);
+        waited += POLL_MS;
+        (void) s3_get_line_status(&st);
+        if ((st.n_centre > U8_FOUND) || (st.n_outer > U8_FOUND))
+        {
+            wheels_stop();
+            return 1;
+        }
+        if (button1_down() || subsystem2_estop_is_set())
+        {
+            return -1;
+        }
+        subsystem2_status_get(&s2);
+        /* The first SETTLE_MS: S2 may not have taken the command yet. */
+    } while (((waited < (uint32_t) SETTLE_MS) || (busy == s2.state)) &&
+             (waited < RECOVERY_MOVE_MS));
+    return (waited < RECOVERY_MOVE_MS) ? 0 : -1;
+}
+
+/*!
+ * @brief Stop and wait until both wheels read 0 mm/s. S2 learns a wheel's
+ *        direction only at standstill, so a new command on a wheel still
+ *        rolling backwards made it count forward as -550 mm/s and drive
+ *        it flat out (car 29 Oct: a 360 deg spin after a sweep).
+ */
+static void
+wheels_stop (void)
+{
+    subsystem2_odom_t odom   = {0};
+    uint32_t          waited = 0u;
+
+    (void) subsystem2_stop();
+    do
+    {
+        tk_dly_tsk(POLL_MS);
+        waited += POLL_MS;
+        subsystem2_odom_get(&odom);
+    } while (((0 != odom.speed_l_mms) || (0 != odom.speed_r_mms)) &&
+             (waited < STOPPED_WAIT_MS));
+}
+
 static void
 preset_next (void)
 {
@@ -728,7 +857,7 @@ preset_apply (void)
     drive_preset_t const * p_set = &g_presets[g_preset];
 
     s3_set_line_gains(p_set->kp_x100, p_set->kd_x100);
-    s3_set_line_shape(0);
+    s3_set_line_shape(DRIVE_BOOST_X100);
     s3_set_steer_max(p_set->steer_max_mms);
     tm_printf((UB *) "S3 DRIVE PRESET %d of %d: %d mm/s, kp=%d kd=%d, steer "
                      "max %d mm/s\n",

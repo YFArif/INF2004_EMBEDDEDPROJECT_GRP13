@@ -120,20 +120,24 @@ int main (void)
           (1U == o.overshoot),
           "steer proportional to the difference; one sensor white -> flagged");
 
-    /* L07: drift right until both white: the line was last seen on the
-            LEFT -> turn LEFT at once (no hold in the edge pair) */
+    /* L07: drift right until both white: the first 15 mm keep the last
+            PD steer (the line may be between the spots, or the car is in
+            a curve), then soft LEFT, rising */
     fresh(&ln, &o);
     (void)lr(&ln, DARK, LIGHT, STEP, 2, &o);
     (void)lr(&ln, B, W, STEP, 2, &o);
     (void)lr(&ln, MID, W, STEP, 1, &o);
-    (void)lr(&ln, W, W, STEP, 1, &o);
-    check("S3-L07", (1U == o.off_line) && (o.steer <= -S3_LN_SOFT_PERMILLE) &&
-          (o.steer > -1000) && (S3_LN_FOLLOW == o.state),
-          "both white: soft LEFT at once, not yet full lock");
     s_p = o.steer;
-    (void)lr(&ln, W, W, STEP, 4, &o);
-    check("S3-L07b", (o.steer < s_p) && (o.steer > -1000) && (S3_LN_FOLLOW == o.state),
-          "both white 15 mm -> LEFT rising, not yet LOST");
+    (void)lr(&ln, W, W, STEP, 1, &o);
+    check("S3-L07", (1U == o.off_line) && (s_p < 0) && (o.steer == s_p) &&
+          (S3_LN_FOLLOW == o.state),
+          "both white: keep the last PD steer (LEFT) for the first 15 mm");
+    (void)lr(&ln, W, W, STEP, 5, &o);
+    s_p = o.steer;
+    (void)lr(&ln, W, W, STEP, 2, &o);
+    check("S3-L07b", (s_p <= -S3_LN_SOFT_PERMILLE) && (o.steer < s_p) && (o.steer > -1000) &&
+          (S3_LN_FOLLOW == o.state),
+          "both white 18-24 mm -> soft LEFT, rising, not yet LOST");
 
     /* L08: both white for 40 mm -> one LOST event, still full LEFT; a
             sensor on the line again -> FOLLOW with PD */
@@ -203,7 +207,7 @@ int main (void)
     ok = ok && (1U == o.line_found_event) && (S3_LN_FOLLOW == o.state);
     s3_line_request_mode(&ln, S3_LN_MODE_SEARCH_FROM_LEFT);   /* flag still set */
     (void)lr(&ln, W, W, STEP, 1, &o);
-    ok = ok && (o.steer >= S3_LN_SOFT_PERMILLE);
+    ok = ok && (0 == o.steer);
     (void)lr(&ln, W, W, STEP, 14, &o);
     check("S3-L16", ok && (1000 == o.steer),
           "search from LEFT: steer 0, found -> FOLLOW (not restarted), off line -> RIGHT");

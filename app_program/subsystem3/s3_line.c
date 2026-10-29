@@ -241,6 +241,7 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
         p_ln->both_white_um = 0u;
         p_ln->e_prev_valid  = 0u;   /* No D kick on the way out.         */
         steer               = 0;
+        p_ln->steer_prev    = 0;
         if ((uint32_t) p_ln->both_black_um >= MM_TO_UM(S3_LN_JUNC_MM))
         {
             if ((uint32_t) prev_um < MM_TO_UM(S3_LN_JUNC_MM))
@@ -259,6 +260,7 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
         /* 2. A sensor sees the line: PD, and remember the side. */
         p_ln->both_black_um = 0u;
         steer = pd_steer(p_ln, err, dt_us, prev_state);
+        p_ln->steer_prev = (int16_t) steer;
         if ((err > S3_LN_SIDE_MIN) || (err < -S3_LN_SIDE_MIN))
         {
             p_ln->last_right = (err > 0) ? 1u : 0u;
@@ -290,6 +292,13 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
         }
         p_ln->both_white_um = add_sat16(p_ln->both_white_um, moved_um);
         steer               = off_line_steer(p_ln->both_white_um);
+        if (steer < ((p_ln->steer_prev < 0) ? -p_ln->steer_prev :
+                                              p_ln->steer_prev))
+        {
+            /* Never weaker than the turn in progress (curves). */
+            steer = (p_ln->steer_prev < 0) ? -p_ln->steer_prev :
+                                             p_ln->steer_prev;
+        }
         if (0u == p_ln->last_right)
         {
             steer = -steer;
@@ -397,6 +406,7 @@ reset_tracking (s3_line_t * p_ln)
     p_ln->e_prev_valid  = 0u;
     p_ln->both_white_um = 0u;
     p_ln->both_black_um = 0u;
+    p_ln->steer_prev    = 0;
 }
 
 /*!
