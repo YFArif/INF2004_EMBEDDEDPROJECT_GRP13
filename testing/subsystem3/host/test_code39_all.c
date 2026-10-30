@@ -175,6 +175,55 @@ int main (void)
                    (unsigned)TRIALS);
     check("S3-C05", (fwd == total) && (bwd == total) && (0U == wrong), line);
 
+    /* C06: sensor-spot blur (3 mm stripes): every bar longer and every
+     * space shorter by 2/3 of a narrow element, ratio 2.5. Mixing bars
+     * and spaces in one wide/narrow split failed here. */
+    {
+        uint32_t ok_blur = 0U;
+        uint32_t blur    = (2U * UNIT) / 3U;
+
+        for (i = 0U; i < N_DATA; i++)
+        {
+            build(g_ref_ch[i], 25U, 0U, 0, dur);
+            for (k = 0U; k < S3_C39_ELEMENTS; k++)
+            {
+                dur[k] = (0U == (k & 1U)) ? (dur[k] + blur) : (dur[k] - blur);
+            }
+            if ((S3_C39_OK == s3_code39_decode(dur, S3_C39_ELEMENTS, &ch, &rev)) &&
+                (g_ref_ch[i] == ch))
+            {
+                ok_blur++;
+            }
+        }
+        check("S3-C06", N_DATA == ok_blur, "all chars decode with bars +2/3, spaces -2/3 narrow (blur)");
+    }
+
+    /* C07: a stray stripe before and one after the code (31 + 2 elements)
+     * still decodes: the 29-element window slides over the pass. */
+    {
+        uint32_t pass[S3_C39_ELEMENTS + 4U];
+        uint32_t ok_stray = 0U;
+
+        for (letter = 'A'; letter <= 'Z'; letter++)
+        {
+            build(letter, 30U, 0U, 0, dur);
+            pass[0] = 5U * UNIT;                     /* stray bar   */
+            pass[1] = 4U * UNIT;                     /* white       */
+            for (k = 0U; k < S3_C39_ELEMENTS; k++)
+            {
+                pass[k + 2U] = dur[k];
+            }
+            pass[S3_C39_ELEMENTS + 2U] = 4U * UNIT;  /* white       */
+            pass[S3_C39_ELEMENTS + 3U] = UNIT;       /* stray bar   */
+            if ((S3_C39_OK == s3_code39_decode(pass, S3_C39_ELEMENTS + 4U, &ch, &rev)) &&
+                (letter == ch))
+            {
+                ok_stray++;
+            }
+        }
+        check("S3-C07", 26U == ok_stray, "A-Z decode with a stray stripe before and after the code");
+    }
+
     printf("%s: %d failure(s)\n", g_fail ? "FAILED" : "ALL PASSED", g_fail);
     return g_fail;
 }

@@ -49,7 +49,12 @@
  * - Junction: both black -> steer 0 (straight across); after
  *   S3_LN_JUNC_MM one junction_event and state JUNCTION, until either
  *   sensor is not black.
- * - OFF LINE: both white -> S3_LN_SOFT_PERMILLE towards the last side,
+ * - CENTRED: both white, but no sensor went black since the line was
+ *   last on the other sensor -> the line faded INWARDS between the
+ *   spots: keep the last PD steer, never ramp; LOST only after
+ *   S3_LN_LOST_MM x S3_LN_CENTRE_DIV.
+ * - OFF LINE: both white after a sensor saw black (the line passed under
+ *   it, out to that side) -> S3_LN_SOFT_PERMILLE towards the last side,
  *   rising to full lock at S3_LN_LOST_MM, until either sensor is darker
  *   than WHITE again (then PD).
  * - Lost: both white for S3_LN_LOST_MM -> one lost_event, state LOST,
@@ -143,7 +148,16 @@ int32_t  s3_ir_cal_norm(s3_ir_cal_t const * p_cal, uint16_t value);
 #define S3_LN_SOFT_PERMILLE (350)   /* ... then this much steer towards   */
                                     /* the remembered side, rising        */
                                     /* linearly to full lock at LOST_MM.  */
-#define S3_LN_JUNC_MM       (5u)    /* Both black this far = junction     */
+#define S3_LN_CENTRE_DIV    (4u)    /* CENTRED both white counts 1/4 of   */
+                                    /* the distance: LOST after 160 mm.   */
+                                    /* Car log 30 Oct 15:42: centred, one */
+                                    /* sensor grey and the other 0, then  */
+                                    /* both white; the ramp there swung   */
+                                    /* full lock to full lock (weave).    */
+#define S3_LN_JUNC_SUM      (1300)  /* n_L + n_R above this = junction  */
+                                    /* (plain line: both grey, ~1000;   */
+                                    /* car junction 807 + 674 = 1481).  */
+#define S3_LN_JUNC_MM       (5u)   /* Both black this far = junction     */
                                     /* (one sample of noise is 0.4 mm at  */
                                     /* 40 mm/s; a crossing line is 18).   */
 #define S3_LN_FOUND         (500)   /* Search: a sensor above this =      */
@@ -199,6 +213,7 @@ typedef struct
     unsigned int l_right      : 1;  /* 1 = GP26 on the robot's RIGHT.    */
     unsigned int e_prev_valid : 1;
     unsigned int last_right   : 1;  /* Line last seen: 1 = to the right. */
+    unsigned int seen_black   : 1;  /* Black since the line changed side.*/
 } s3_line_t;
 
 /** Result of one step. */

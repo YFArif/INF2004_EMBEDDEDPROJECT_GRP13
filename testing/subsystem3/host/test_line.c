@@ -147,6 +147,19 @@ int main (void)
     check("S3-L08", ok && (S3_LN_FOLLOW == o.state) && (0U == o.off_line) && (o.steer < 0),
           "40 mm both white -> 1 LOST event, keeps LEFT; line back -> FOLLOW");
 
+    /* L08b: CENTRED: the left sensor fades grey -> white, never black (the
+             line went in between the spots, car log 30 Oct 15:42): keep
+             the last PD steer, no ramp, not OFF LINE, LOST after 160 mm */
+    fresh(&ln, &o);
+    (void)lr(&ln, MID, W, STEP, 3, &o);
+    s_p = o.steer;
+    ev = lr(&ln, W, W, STEP, 30, &o);
+    ok = (0 == ev) && (s_p < 0) && (o.steer == s_p) && (0U == o.off_line) &&
+         (S3_LN_FOLLOW == o.state);
+    ev = lr(&ln, W, W, STEP, 25, &o);
+    check("S3-L08b", ok && (100 == ev) && (S3_LN_LOST == o.state) && (o.steer == s_p),
+          "grey fades to white (centred): last PD steer, no ramp, LOST after 160 mm");
+
     /* L09: a 30 mm white gap is not LOST */
     fresh(&ln, &o);
     (void)lr(&ln, LIGHT, DARK, STEP, 2, &o);

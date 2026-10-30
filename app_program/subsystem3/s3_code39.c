@@ -11,6 +11,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "s3_code39.h"
 
@@ -40,49 +41,91 @@ static s3_c39_entry_t const g_c39_table[] =
 #define WIDE_PER_SYMBOL (3u)
 #define SYMBOLS         (3u)    /* start, character, stop */
 
-static s3_c39_result_t
-decode_symbol (uint32_t const * p_el, char * p_char, uint32_t * p_min_wide)
+/*!
+ * @brief Mark the n_wide longest of the n elements at p_el[first],
+ *        p_el[first + 2], ... (every other one: bars or spaces) as wide.
+ *
+ * @return 1 if the split is clean (shortest wide >= ratio x longest
+ *         narrow, or with no wide element: no element >= ratio x
+ *         another). *p_min_wide = shortest wide (UINT32_MAX if none).
+ */
+static int
+split_wide (uint32_t const * p_el, uint32_t first, uint32_t n,
+            uint32_t n_wide, uint8_t * p_is_wide, uint32_t * p_min_wide)
 {
-    uint8_t  is_wide[SYMBOL_LEN] = {0u};
     uint32_t min_wide   = UINT32_MAX;
     uint32_t max_narrow = 0u;
-    uint16_t pattern    = 0u;
+    uint32_t min_narrow = UINT32_MAX;
     uint32_t k;
     uint32_t i;
 
-    /* Mark the 3 longest elements as wide. */
-    for (k = 0u; k < WIDE_PER_SYMBOL; k++)
+    for (k = 0u; k < n_wide; k++)
     {
         uint32_t best = SYMBOL_LEN;
 
-        for (i = 0u; i < SYMBOL_LEN; i++)
+        for (i = first; i < (first + (2u * n)); i += 2u)
         {
-            if ((0u == is_wide[i]) &&
+            if ((0u == p_is_wide[i]) &&
                 ((SYMBOL_LEN == best) || (p_el[i] > p_el[best])))
             {
                 best = i;
             }
         }
-        is_wide[best] = 1u;
+        p_is_wide[best] = 1u;
+        min_wide = (p_el[best] < min_wide) ? p_el[best] : min_wide;
+    }
+    for (i = first; i < (first + (2u * n)); i += 2u)
+    {
+        if (0u == p_is_wide[i])
+        {
+            max_narrow = (p_el[i] > max_narrow) ? p_el[i] : max_narrow;
+            min_narrow = (p_el[i] < min_narrow) ? p_el[i] : min_narrow;
+        }
+    }
+    *p_min_wide = min_wide;
+    if (0u == n_wide)
+    {
+        /* All narrow: only reject a clearly wide one (jitter is fine). */
+        return ((max_narrow * 10u) < (min_narrow * 2u * S3_C39_RATIO_X10))
+               ? 1 : 0;
+    }
+    return ((min_wide * 10u) >= (max_narrow * S3_C39_RATIO_X10)) ? 1 : 0;
+}
+
+/*!
+ * @brief Bars and spaces are split into wide / narrow SEPARATELY: the
+ *        sensor spot makes every bar look longer and every space shorter
+ *        by the same amount, so mixing them (a blurred narrow bar vs a
+ *        wide space) is what failed on 3 mm stripes. Every Code 39 symbol
+ *        is 2 wide bars + 1 wide space, or ('$', '/', '+', '%') 0 wide
+ *        bars + 3 wide spaces.
+ *
+ * @param[out] p_min_wide  Shortest wide SPACE (for the inter-character
+ *                         gap check, which is a space too).
+ */
+static s3_c39_result_t
+decode_symbol (uint32_t const * p_el, char * p_char, uint32_t * p_min_wide)
+{
+    uint8_t  is_wide[SYMBOL_LEN] = {0u};
+    uint32_t min_wide_bar;
+    uint32_t min_wide   = UINT32_MAX;
+    uint16_t pattern    = 0u;
+    uint32_t i;
+
+    if ((0 == split_wide(p_el, 0u, 5u, 2u, is_wide, &min_wide_bar)) ||
+        (0 == split_wide(p_el, 1u, 4u, 1u, is_wide, &min_wide)))
+    {
+        (void) memset(is_wide, 0, sizeof(is_wide));
+        if ((0 == split_wide(p_el, 0u, 5u, 0u, is_wide, &min_wide_bar)) ||
+            (0 == split_wide(p_el, 1u, 4u, 3u, is_wide, &min_wide)))
+        {
+            return S3_C39_BAD_RATIO;
+        }
     }
 
     for (i = 0u; i < SYMBOL_LEN; i++)
     {
         pattern = (uint16_t)((pattern << 1) | is_wide[i]);
-
-        if (1u == is_wide[i])
-        {
-            min_wide = (p_el[i] < min_wide) ? p_el[i] : min_wide;
-        }
-        else
-        {
-            max_narrow = (p_el[i] > max_narrow) ? p_el[i] : max_narrow;
-        }
-    }
-
-    if ((min_wide * 10u) < (max_narrow * S3_C39_RATIO_X10))
-    {
-        return S3_C39_BAD_RATIO;
     }
 
     for (i = 0u; i < C39_TABLE_LEN; i++)
@@ -138,33 +181,44 @@ s3_code39_decode (uint32_t const * p_dur, uint32_t count,
 {
     uint32_t        rev[S3_C39_ELEMENTS];
     uint32_t        i;
+    uint32_t        ofs;
     s3_c39_result_t res;
+    s3_c39_result_t first_res = S3_C39_BAD_COUNT;
 
     if ((NULL == p_dur) || (NULL == p_char) || (NULL == p_reversed) ||
-        (S3_C39_ELEMENTS != count))
+        (count < S3_C39_ELEMENTS))
     {
         return S3_C39_BAD_COUNT;
     }
 
-    res = decode_frame(p_dur, p_char);
-    if (S3_C39_OK == res)
+    /* Slide a 29-element window over the pass: a stray edge before or
+     * after the code (line edge, paper crease) only shifts the frame. */
+    for (ofs = 0u; (ofs + S3_C39_ELEMENTS) <= count; ofs++)
     {
-        *p_reversed = 0u;
-        return res;
+        res = decode_frame(&p_dur[ofs], p_char);
+        if (S3_C39_OK == res)
+        {
+            *p_reversed = 0u;
+            return res;
+        }
+
+        for (i = 0u; i < S3_C39_ELEMENTS; i++)
+        {
+            rev[i] = p_dur[ofs + S3_C39_ELEMENTS - 1u - i];
+        }
+
+        if (S3_C39_OK == decode_frame(rev, p_char))
+        {
+            *p_reversed = 1u;
+            return S3_C39_OK;
+        }
+        if (0u == ofs)
+        {
+            first_res = res;
+        }
     }
 
-    for (i = 0u; i < S3_C39_ELEMENTS; i++)
-    {
-        rev[i] = p_dur[S3_C39_ELEMENTS - 1u - i];
-    }
-
-    if (S3_C39_OK == decode_frame(rev, p_char))
-    {
-        *p_reversed = 1u;
-        return S3_C39_OK;
-    }
-
-    return res;   /* report the forward-read failure reason */
+    return first_res;   /* report the first forward-read failure reason */
 }
 
 int s3_code39_pattern (char ch, uint16_t * p_pattern)

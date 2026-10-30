@@ -72,6 +72,9 @@
 #define S3_ODOM_MAX_STEP_MM     (1000)  /* A bigger jump is a reset.     */
 #define S3_CAL_RELAX_MS         (1000u) /* Calibration relax period.     */
 #define S3_STATUS_PRINT_MS      (200u)  /* "S3 LINE" console period.     */
+#define S3_BC_HOLD_MS           (3500u) /* Max soft steer over a code    */
+                                        /* (130 mm code at 40 mm/s).     */
+#define S3_BC_HOLD_DIV          (2)     /* Steering / 2 over a barcode.  */
 
 /* ---------------------------------------------------------------------
  *  Barcode
@@ -95,6 +98,10 @@
 #if (S3_DRIVE_TEST != 0) && APP_TEST
 #error "S3 drive test must not compete with subsystem self-tests"
 #endif
+#ifndef S3_DRIVE_STRAIGHT
+#define S3_DRIVE_STRAIGHT       (0)     /* 1 = barcode sensor test: drive */
+#endif                                  /* straight, no line following.   */
+#define S3_DRIVE_STRAIGHT_MM    (600)   /* Straight test distance.       */
 #ifndef S3_DRIVE_SPEED_MMS
 #define S3_DRIVE_SPEED_MMS      (40u)
 #endif
@@ -134,13 +141,15 @@
                                         /* START while not READY).       */
 #define S3_DRIVE_GO_COUNT_S     (3u)    /* Countdown after START.        */
 #define S3_DRIVE_LOG_MS         (100u)  /* "S3 LOG" line while driving.  */
-#define S3_DRIVE_CAL_BLACK_MIN  (2500u) /* Refuse to start until BOTH    */
+#define S3_DRIVE_CAL_BLACK_MIN  (1800u) /* Refuse to start until BOTH    */
                                         /* sensors' black level is at    */
                                         /* least this (raw). Car 28 Oct: */
                                         /* full sweep 2955 ... 3939; a   */
                                         /* half sweep was "valid" at     */
                                         /* 2099 and kept rising while    */
-                                        /* driving.                      */
+                                        /* driving. 30 Oct remount: GP26 */
+                                        /* sweep peaked 2331, so 2500    */
+                                        /* never passed.                 */
 
 #endif /* S3_CONFIG_H */
 

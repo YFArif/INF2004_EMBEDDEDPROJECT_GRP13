@@ -31,14 +31,16 @@
 
 #define S3_C39_ELEMENTS     (29u)   /* *X* = 3 symbols x 9 + 2 gaps          */
 #ifndef S3_C39_RATIO_X10
-#define S3_C39_RATIO_X10    (13u)   /* Shortest wide >= 1.3 x longest    */
-                                    /* narrow (sim: 0 wrong decodes).    */
+#define S3_C39_RATIO_X10    (12u)   /* Shortest wide >= 1.2 x longest    */
+                                    /* narrow (C05: 0 wrong; 1.1 gave 24 */
+                                    /* wrong, 1.3 lost blurred 3 mm).    */
 #endif
 
 typedef enum
 {
     S3_C39_OK = 0,
-    S3_C39_BAD_COUNT,        /* not 29 elements                           */
+    S3_C39_BAD_COUNT,        /* fewer than 29 elements (a longer pass is  */
+                             /* searched with a sliding 29 window)        */
     S3_C39_BAD_RATIO,        /* wide/narrow not separable in some symbol  */
     S3_C39_BAD_SYMBOL,       /* pattern is not a Code 39 character        */
     S3_C39_NO_START_STOP     /* decoded, but not framed by '*'            */

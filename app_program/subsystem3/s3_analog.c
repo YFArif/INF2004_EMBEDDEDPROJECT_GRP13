@@ -24,6 +24,7 @@ static extremum_t g_ext[S3_AN_MAX_EXTREMA];
 static uint32_t   g_cross_us[S3_AN_MAX_EXTREMA];
 
 static uint32_t find_extrema(uint8_t const * p_x, uint32_t n, uint32_t prom);
+static uint32_t merge_fragments(uint32_t * p_dur, uint32_t n);
 static uint32_t find_crossings(uint8_t const * p_x, uint32_t n_ext,
                                uint32_t dt_us);
 
@@ -59,6 +60,24 @@ s3_analog_widths (uint8_t const * p_x, uint32_t n, uint32_t dt_us,
         hi = (p_x[i] > hi) ? p_x[i] : hi;
     }
     prom = ((uint32_t) (hi - lo) * S3_AN_PROM_PCT) / PCT;
+
+    /* Thick bars set hi - lo, so a % of it hides blurred 3 mm bars (car
+     * 30 Oct: only the 6 thick bars were found). Use the noise on the
+     * white lead-in instead, never stricter than the % rule. */
+    {
+        uint8_t  lead_lo = 0xFFu;
+        uint8_t  lead_hi = 0u;
+        uint32_t noise_prom;
+        uint32_t n_lead = (n < S3_AN_LEAD_SAMPLES) ? n : S3_AN_LEAD_SAMPLES;
+
+        for (i = 0u; i < n_lead; i++)
+        {
+            lead_lo = (p_x[i] < lead_lo) ? p_x[i] : lead_lo;
+            lead_hi = (p_x[i] > lead_hi) ? p_x[i] : lead_hi;
+        }
+        noise_prom = (uint32_t) (lead_hi - lead_lo) * S3_AN_NOISE_X;
+        prom       = (noise_prom < prom) ? noise_prom : prom;
+    }
     prom = (prom < S3_AN_MIN_PROM) ? S3_AN_MIN_PROM : prom;
 
     if (NULL != p_stats)
@@ -89,7 +108,71 @@ s3_analog_widths (uint8_t const * p_x, uint32_t n, uint32_t dt_us,
         p_dur[n_out] = g_cross_us[i + 1u] - g_cross_us[i];
         n_out++;
     }
-    return n_out;
+    return merge_fragments(p_dur, n_out);
+}
+
+/*!
+ * @brief Remove noise stripes: one much shorter than the median stripe
+ *        (< median / S3_AN_FRAG_DIV) is joined with the stripes on both
+ *        sides (same colour as each other), or dropped at either end.
+ *        Relative, so it works at any speed and any narrow width (3 to
+ *        6 mm codes). Car 30 Oct: 55-65 stripes, many 8-30 ms, for 29.
+ *
+ * @return New number of durations.
+ */
+static uint32_t
+merge_fragments (uint32_t * p_dur, uint32_t n)
+{
+    uint32_t sorted[S3_AN_MAX_EXTREMA];
+    uint32_t thr;
+    uint32_t i;
+    uint32_t j;
+    uint32_t k;
+
+    if (n < 3u)
+    {
+        return n;
+    }
+    for (i = 0u; i < n; i++)            /* Insertion sort for the median. */
+    {
+        uint32_t v = p_dur[i];
+
+        for (j = i; (j > 0u) && (sorted[j - 1u] > v); j--)
+        {
+            sorted[j] = sorted[j - 1u];
+        }
+        sorted[j] = v;
+    }
+    thr = sorted[n / 2u] / S3_AN_FRAG_DIV;
+
+    i = 0u;
+    while (i < n)
+    {
+        if (p_dur[i] >= thr)
+        {
+            i++;
+        }
+        else if ((0u == i) || ((i + 1u) == n))
+        {
+            for (k = i; (k + 1u) < n; k++)  /* At an end: drop it.        */
+            {
+                p_dur[k] = p_dur[k + 1u];
+            }
+            n--;
+            i = (0u == i) ? 0u : n;
+        }
+        else
+        {
+            p_dur[i - 1u] += p_dur[i] + p_dur[i + 1u];  /* prev+frag+next */
+            for (k = i; (k + 2u) < n; k++)
+            {
+                p_dur[k] = p_dur[k + 2u];
+            }
+            n -= 2u;
+            i = i - 1u;                 /* The joined stripe may still be */
+        }                               /* next to another fragment.      */
+    }
+    return n;
 }
 
 /*!
@@ -240,6 +323,61 @@ find_crossings (uint8_t const * p_x, uint32_t n_ext, uint32_t dt_us)
         }
     }
     return n_cross;
+}
+
+/*!
+ * @brief Digital path (car 30 Oct): DOUT flicks white for a few ms inside
+ *        a black bar (tb 46, nw 9, tb 54), adding 2 stripes. Join any
+ *        WHITE stripe shorter than the median white / S3_AN_FRAG_DIV with
+ *        the bars around it. Black stripes are never joined: narrow bars
+ *        really do read as short DOUT pulses (6-25 ms). Stripe 0 = black.
+ *
+ * @return New number of durations.
+ */
+uint32_t
+s3_merge_gaps (uint32_t * p_dur, uint32_t n)
+{
+    uint32_t sorted[S3_AN_MAX_EXTREMA];
+    uint32_t n_w = 0u;
+    uint32_t thr;
+    uint32_t i;
+    uint32_t j;
+    uint32_t k;
+
+    if ((n < 3u) || (n > S3_AN_MAX_EXTREMA))
+    {
+        return n;
+    }
+    for (i = 1u; i < n; i += 2u)        /* Insertion sort of the whites.  */
+    {
+        uint32_t v = p_dur[i];
+
+        for (j = n_w; (j > 0u) && (sorted[j - 1u] > v); j--)
+        {
+            sorted[j] = sorted[j - 1u];
+        }
+        sorted[j] = v;
+        n_w++;
+    }
+    thr = sorted[n_w / 2u] / S3_AN_FRAG_DIV;
+
+    for (i = 1u; (i + 1u) < n; )
+    {
+        if (p_dur[i] < thr)
+        {
+            p_dur[i - 1u] += p_dur[i] + p_dur[i + 1u];  /* bar+gap+bar   */
+            for (k = i; (k + 2u) < n; k++)
+            {
+                p_dur[k] = p_dur[k + 2u];
+            }
+            n -= 2u;
+        }
+        else
+        {
+            i += 2u;
+        }
+    }
+    return n;
 }
 
 /*** end of file ***/

@@ -95,11 +95,19 @@ endif
 # Separate profile tracking prevents stale images when changing speed.
 DRIVE ?= 0
 DRIVE_SPEED ?= 40
+# STRAIGHT=1 (with DRIVE=1): barcode sensor test, straight MOVE, no line.
+STRAIGHT ?= 0
+ifneq ($(filter $(STRAIGHT),0 1),$(STRAIGHT))
+$(error Unknown STRAIGHT '$(STRAIGHT)'; use 0 or 1)
+endif
 ifneq ($(filter $(DRIVE),0 1),$(DRIVE))
 $(error Unknown DRIVE '$(DRIVE)'; use 0 or 1)
 endif
 ifeq ($(DRIVE),1)
 DRIVE_SUFFIX := _drive$(DRIVE_SPEED)
+ifeq ($(STRAIGHT),1)
+DRIVE_SUFFIX := _straight$(DRIVE_SPEED)
+endif
 ifeq ($(TEST),1)
 $(error DRIVE=1 cannot be combined with TEST=1)
 endif
@@ -205,6 +213,7 @@ ifeq ($(DRIVE),1)
 CFLAGS  += -DS3_DRIVE_TEST=1
 endif
 CFLAGS  += -DS3_DRIVE_SPEED_MMS=$(DRIVE_SPEED)
+CFLAGS  += -DS3_DRIVE_STRAIGHT=$(STRAIGHT)
 CFLAGS  += -DTM_CONSOLE_UART=$(CRASH_REPORT)
 ifeq ($(CRASH_REPORT),0)
 CFLAGS  += -DBOARD_UART0_FREE=1
@@ -237,7 +246,7 @@ endif
 # before any recipe executes.
 ################################################################################
 
-PROFILE_ID := smp$(SMP)-$(CONSOLE)-wifi$(WIFI)-net$(NET)-mqtt$(MQTT)-crash$(CRASH_REPORT)-test$(TEST)-drive$(DRIVE)-speed$(DRIVE_SPEED)-bc$(S3_BC_VERBOSE)
+PROFILE_ID := smp$(SMP)-$(CONSOLE)-wifi$(WIFI)-net$(NET)-mqtt$(MQTT)-crash$(CRASH_REPORT)-test$(TEST)-drive$(DRIVE)-speed$(DRIVE_SPEED)-straight$(STRAIGHT)-bc$(S3_BC_VERBOSE)
 PROFILE_FILE := .build_profile
 
 ifneq ($(strip $(shell cat $(PROFILE_FILE) 2>/dev/null)),$(PROFILE_ID))

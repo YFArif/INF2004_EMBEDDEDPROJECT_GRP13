@@ -23,6 +23,7 @@
 #include "../app.h"
 
 #include "drv_adc.h"
+#include "drv_barcode.h"
 #include "s3_api.h"
 #include "s3_config.h"
 #include "s3_line.h"
@@ -92,6 +93,7 @@ line_task (INT stacd, void * p_exinf)
     T_RFLG           rflg;
     uint32_t         t_prev   = in_w(TIMER_TIMERAWL);
     uint32_t         relax_ms = 0u;
+    uint32_t         hold_ms  = 0u;     /* Time a barcode has been read. */
     uint32_t         seq      = 0u;
     uint32_t         t_now;
     uint32_t         dt_us;
@@ -139,6 +141,17 @@ line_task (INT stacd, void * p_exinf)
         /* IF-02 steer_sp: permille -> mm/s, 10-bit signed, one store. */
         state = (0u == out.calibrated) ? S3_LINE_UNCAL : (uint32_t) out.state;
         dv    = s3_line_dv(&out, s3_steer_max_get());   /* 10-bit clamp. */
+
+        /* Barcode passing: half steering so its speed and path stay
+         * steadier (car 30 Oct: weave lost 2 of 29 stripes). Not while
+         * off the line (it must steer back), at most S3_BC_HOLD_MS. */
+        hold_ms = drv_barcode_reading() ? (hold_ms + (dt_us / US_PER_MS)) : 0u;
+        if ((0u != hold_ms) && (hold_ms <= S3_BC_HOLD_MS) &&
+            (0u == out.off_line))
+        {
+            dv = dv / S3_BC_HOLD_DIV;   /* Softer, not off: 0 drifted   */
+                                        /* along the left edge (15:56). */
+        }
         seq = (seq + 1u) & SEQ_MASK;
         s3_steer_publish(dv, seq, (S3_LINE_FOLLOW == state) ||
                                   (S3_LINE_JUNCTION == state) ||
