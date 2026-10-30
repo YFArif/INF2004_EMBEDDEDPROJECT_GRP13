@@ -187,6 +187,17 @@ int main (void)
     check("S3-L11", ok && (1 == ev),
           "both black 100 mm -> 1 junction event, steer 0; 3 mm -> none; next one re-arms");
 
+    /* L11b: junction by the L+R sum (car 30 Oct: n 807 + 674, neither both
+             > 750); a sharp turn (n 1000 + 250) is not a junction.
+             raw = 200 + n x 2.8 with this calibration. */
+    fresh(&ln, &o);
+    ev = lr(&ln, 2460U, 2087U, STEP, 5, &o);
+    ok = (1 == ev) && (S3_LN_JUNCTION == o.state);
+    fresh(&ln, &o);
+    ev = lr(&ln, B, 900U, STEP, 30, &o);
+    check("S3-L11b", ok && (0 == ev) && (S3_LN_JUNCTION != o.state),
+          "807 + 674 -> junction; turn 1000 + 250 -> no junction");
+
     /* L12: relax never drops below the trusted range */
     s3_ir_cal_init(&c); s3_ir_cal_learn(&c, 300U); s3_ir_cal_learn(&c, 1000U);
     for (i = 0; i < 200; i++) { s3_ir_cal_learn(&c, 300U); s3_ir_cal_learn(&c, 700U); s3_ir_cal_relax(&c); }

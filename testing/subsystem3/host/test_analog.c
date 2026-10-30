@@ -151,6 +151,15 @@ int main (void)
         ok2 = (29U == m) && (S3_C39_OK == s3_code39_decode(d, m, &c, &r)) && ('A' == c);
         printf("[TEST] %-34s %s  (stripes 29 -> %u, ch=%c)\n", "car: 6 ms narrow bar kept", ok2 ? "PASS" : "FAIL", (unsigned)m, c);
         g_fail += !ok1; g_fail += !ok2;
+
+        /* Pass began on black: a 40 ms white first, so the bars sit on odd
+         * stripes. Merging from stripe 1 (task_barcode retry) keeps the 6 ms bar. */
+        d[0] = 40000U;
+        for (k = 0U; k < 29U; k++) { d[k + 1U] = k_good[k] * 1000U; }
+        m   = s3_merge_gaps(&d[1], 29U) + 1U; c = '?';
+        ok1 = (30U == m) && (S3_C39_OK == s3_code39_decode(d, m, &c, &r)) && ('A' == c);
+        printf("[TEST] %-34s %s  (stripes 30 -> %u, ch=%c)\n", "car: pass starts on black", ok1 ? "PASS" : "FAIL", (unsigned)m, c);
+        g_fail += !ok1;
     }
 
     printf("%s: %d failure(s)\n", g_fail ? "FAILED" : "ALL PASSED", g_fail);

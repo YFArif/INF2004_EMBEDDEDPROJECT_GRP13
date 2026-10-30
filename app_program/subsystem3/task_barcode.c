@@ -149,6 +149,8 @@ pass_decode (char * p_ch, uint8_t * p_rev, uint8_t * p_src)
 {
     static uint32_t    an_dur[S3_AN_MAX_EXTREMA];  /* Static: stack.     */
     static uint32_t    dig_dur[S3_AN_MAX_EXTREMA];
+    static uint32_t    dig_alt[S3_AN_MAX_EXTREMA];  /* Shifted retry.    */
+    uint32_t           n_raw = 0u;
     uint32_t           n_dig = 0u;
     uint32_t           i;
     drv_barcode_pass_t pass;
@@ -167,14 +169,26 @@ pass_decode (char * p_ch, uint8_t * p_rev, uint8_t * p_src)
     /* Digital path: not trusted if edges were dropped. */
     if ((pass.n_edges >= 2u) && (0u == pass.lost))
     {
-        n_dig = pass.n_edges - 1u;
-        n_dig = (n_dig > S3_AN_MAX_EXTREMA) ? S3_AN_MAX_EXTREMA : n_dig;
-        for (i = 0u; i < n_dig; i++)
+        n_raw = pass.n_edges - 1u;
+        n_raw = (n_raw > S3_AN_MAX_EXTREMA) ? S3_AN_MAX_EXTREMA : n_raw;
+        for (i = 0u; i < n_raw; i++)
         {
             dig_dur[i] = pass.p_dur[i];
+            dig_alt[i] = pass.p_dur[i];
         }
-        n_dig = s3_merge_gaps(dig_dur, n_dig);  /* DOUT flicker in a bar. */
+        n_dig = s3_merge_gaps(dig_dur, n_raw);  /* DOUT flicker in a bar. */
         res_d = s3_code39_decode(dig_dur, n_dig, &ch_d, &rev_d);
+
+        /* Pass began on black: stripe 0 is white and the odd stripes are
+         * bars, so the merge above can join away a narrow bar. Retry with
+         * the whites counted from stripe 1. */
+        if ((S3_C39_OK != res_d) && (n_raw > 1u) &&
+            (S3_C39_OK == s3_code39_decode(dig_alt,
+                              s3_merge_gaps(&dig_alt[1], n_raw - 1u) + 1u,
+                              &ch_d, &rev_d)))
+        {
+            res_d = S3_C39_OK;
+        }
     }
 
     /* Analogue path. */
