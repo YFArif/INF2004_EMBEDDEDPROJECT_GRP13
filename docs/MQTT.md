@@ -19,10 +19,10 @@ SDK's copy, `STABLE-2_2_1_RELEASE`.
 
 | Part | State | Source |
 |---|---|---|
-| MQTT driver (`mqtt_link`, `mqtt_queue`) | Built and host-tested. In `MQTT=1` builds it is polled through the Stage 3 adapter; not run on the robot yet (S1-U13) | `app_program/subsystem1/`; TEST_LOG S1-U09 |
+| MQTT driver (`mqtt_link`, `mqtt_queue`) | Built and host-tested. In `MQTT=1` builds it is polled through the Stage 3 adapter; run on the robot in S1-U13: PASS at `9a01717`, 31 Oct 2026 | `app_program/subsystem1/`; TEST_LOG S1-U09, S1-U13 |
 | Message codec (`msg_codec`) | Built, host-tested and timed on the Pico | `app_program/subsystem1/`; TEST_LOG S1-U05, S1-U08 |
 | Dashboard decoder (`s1_decode.py`) | Built and host-tested | `app_program/subsystem1/dashboard/`; TEST_LOG S1-U11, S1-U12 |
-| Stage 3: the radio service task calls `mqtt_link_poll()` | Adapter written: `mqtt_utk_start()` calls `mqtt_link_poll(netif_default)`. Instructor approval 27 Oct 2026; team agreement in person 29 Oct 2026. On-robot test S1-U13 not run | `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c`; TEAM.md section 3 ("WiFi and MQTT are special") |
+| Stage 3: the radio service task calls `mqtt_link_poll()` | Adapter written: `mqtt_utk_start()` calls `mqtt_link_poll(netif_default)`. Instructor approval 27 Oct 2026; team agreement in person 29 Oct 2026. On the robot: S1-U13 PASS at `9a01717`, 31 Oct 2026 | `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c`; TEAM.md section 3 ("WiFi and MQTT are special"); TEST_LOG S1-U13 |
 | `telemetry_task`: builds the frames, handles commands | **Planned** | - |
 
 Stage 3 replaced the template's demo client in `mqtt_utk.c` (a text
@@ -31,8 +31,12 @@ heartbeat on `MQTT_TOPIC`, 60 s keep-alive) with the adapter, and the
 `MQTT=1` builds `subsystem1_init()` calls `mqtt_link_init()`, which
 creates the driver's two message buffers, and `mqtt_utk_start()` calls
 `mqtt_link_poll(netif_default)` on every pass of `cyw43_utk_task` while
-the link is up (the "Start-up" note in `mqtt_link.h`). It has not been
-run on the robot; S1-U13 decides whether it works there.
+the link is up (the "Start-up" note in `mqtt_link.h`). S1-U13 ran it on
+the robot on 31 Oct 2026 and passed: the status topic, a broker restart,
+hotspot drops and a power cut (section 9). It also logged five
+unexpected disconnects, not explained yet: four after the second boot,
+each followed by `online` with no reboot, and one in the first boot,
+followed by a power cycle (TEST_LOG S1-U13).
 
 ## 2. Configuration
 
@@ -126,9 +130,9 @@ arrive twice under QoS 1, so the command handler must accept a repeat
   Requirements): "After the access point or broker comes back, telemetry
   shall resume within 15 s. The broker shall show the robot as offline
   within 10 s of link loss (keep-alive 5 s plus last-will)." The budget
-  for the first sentence is in section 9. Neither sentence is measured
-  end to end yet: the second needs the on-robot test S1-U13 (not run),
-  and the first also needs `telemetry_task`.
+  for the first sentence is in section 9. S1-U13 measured the second on
+  the robot: `offline` 5.3 to 7.8 s after the hotspot-off or power-cut
+  marker (section 9). The first needs `telemetry_task`.
 
 ## 7. Message formats
 
@@ -197,27 +201,44 @@ was off the link status read 1 (JOIN), never 0; it went negative once,
   connection does not use up a publish try (the `PUBLISH_MAX_ATTEMPTS`
   and `submit_pending()` notes in `mqtt_link.c`; not covered by a test).
 
+**MQTT, measured on the robot.** S1-U13 (TEST_LOG row of 31 Oct 2026, at
+`9a01717`; logs `2026-10-31_s1u13_*`). The robot and the Mac share the
+hotspot, so every drop also drops the Mac. Drop 1 is left out: the Mac
+did not rejoin within 60 s, so it is invalid.
+
+| Drop | Hotspot off | `offline` after the off marker | Robot link up after hotspot-on | `online` after hotspot-on | Link up to `online` |
+|---|---|---|---|---|---|
+| 2 | 12.6 s | 5.4 s | 5.4 s | 10.0 s | 4.6 s |
+| 3 | 63.0 s | 6.3 s | 15.7 s (status -3 on the way) | 18.6 s | 2.9 s |
+| 4 | 62.1 s | 5.3 s | 6.8 s | 9.4 s | 2.6 s |
+
+The `online` times come from the broker log (1 s resolution) and include
+the Mac's own rejoin: in drop 2 the Mac's address came back in the same
+second as `online`, 4.6 s after the robot's link. Broker restart, after
+38.7 s down: `online` 2.3 s after the broker started. Power cut:
+`offline` 7.8 s after the marker. After the second boot, four unexpected
+disconnects between the planned actions (two closed by the robot, two
+keep-alive timeouts at the broker) were each followed by `online` within
+0.9 to 8.2 s, with no reboot; their cause is not known yet.
+
 **NFR14 budget.** After the access point or broker comes back,
-telemetry shall resume within 15 s (section 6). The WiFi rejoin time
-from the hotspot's return is measured for drop 3 of S1-U10 only: 8 s, at
-most 9 s given the 1 s timestamps. Drop 1 came back 9 s after its -3
-(20:03:03 to 20:03:12, through the template's retry), but its hotspot-on
-time was recorded only to the minute, so its rejoin time from the
-hotspot's return is unknown; drop 2 has no hotspot-on time at all. The
-about 6 s left for the MQTT reconnect (broker lookup, connect, subscribe,
-`online`) and the first telemetry frame, which can wait up to one 500 ms
-period (**planned**, `telemetry_task`), is therefore established only for
-the 8 s case; a re-measurement with Mac-clock markers for every drop is
-needed (**planned**). The reconnect itself is not measured, and the whole
-chain is unmeasured end to end. S1-U13 (not run) will measure the time to
-`online` after each drop; telemetry still needs `telemetry_task`.
+telemetry shall resume within 15 s (section 6). S1-U13 measured
+`online`, standing in for telemetry, with Mac-clock markers for every
+drop: 10.0, 18.6 and 9.4 s after the hotspot came back, so one of the
+three valid drops is over 15 s. In that drop the robot's own link took
+15.7 s (status -3, then link up with no joining line) and the MQTT part,
+link up to `online`, took 2.9 s. Over the three drops the MQTT part took
+2.6 to 4.6 s, including the wait for the Mac. The first telemetry
+frame can wait up to one more 500 ms period (**planned**,
+`telemetry_task`), so telemetry itself is still unmeasured end to end.
 
 If only the broker was down, the WiFi needs no rejoin. The driver waits
 up to 8 s between tries (`BACKOFF_MAX_MSEC`), and that wait starts only
 when a try ends: a try in flight to a silent host when the broker comes
 back can fail on its 5 s timeout first (`CONNECT_TIMEOUT_MSEC`;
 `step_connecting()`, `enter_backoff()`). So about 7 s left of the 15 s
-is the best case, not the budget. Not measured.
+is the best case, not the budget. S1-U13 measured one case: `online`
+2.3 s after the broker started, after 38.7 s down.
 
 ## 10. Full queues and drop counters
 
@@ -319,15 +340,16 @@ Result: PASS on 27 Oct 2026 at `f2e2f54`: the 18 golden vectors decoded
 through the broker as directly, 0 error lines; STOP id 5 from both
 topics received on `robocar/car1/cmd/#` at QoS 1. TEST_LOG S1-U12.
 
-**Not run:**
+**On the robot: S1-U13, PASS on 31 Oct 2026 at `9a01717`** (TEST_LOG
+S1-U13; section 9 for the times). Steps 1 to 3 and 6 below ran, with
+mosquitto on the Mac as the broker: `online` appeared on `robot/status`,
+a subscriber started later received it with the retain flag set, and
+switching the hotspot off or cutting the robot's power brought `offline`
+5.3 to 7.8 s later. Steps 4 and 5 need `telemetry_task` and have not
+run.
 
-- Anything on the robot. S1-U13 (Stage 3 on the robot: status topic,
-  broker restart, hotspot drops, power cut) is defined but not run, and
-  steps 4 and 5 below also need `telemetry_task`.
-
-**On the robot (planned).** Steps 1 to 3 and 6 need only Stage 3, which
-is written but not run on the robot (S1-U13); steps 4 and 5 also need
-`telemetry_task`:
+**On the robot, step by step.** Steps 1 to 3 and 6 need only Stage 3;
+steps 4 and 5 also need `telemetry_task`:
 
 1. Run a broker the robot can reach, for example mosquitto on port 1883.
 2. Fill in `app_program/subsystem1/mqtt_config.h`; build with
@@ -367,9 +389,7 @@ STOP round trip under 300 ms) and of the NFR14 test.
 
 ## 14. What changes next
 
-- After S1-U13 (Stage 3 on the robot): section 1 says whether the driver
-  works there, section 9 gets the measured reconnect and NFR14 times, and
-  section 12 gets the results of steps 1 to 3 and 6.
+- S1-U13 done (31 Oct 2026): sections 1, 9 and 12 carry its results.
 - With `telemetry_task`: the planned values in sections 5, 8 and 10 become
   code, and the measured rates are added.
 - Sections 2, 3, 4, 7, 11 and 13 stay as they are, unless the layout

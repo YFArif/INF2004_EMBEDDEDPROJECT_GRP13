@@ -1,0 +1,952 @@
+2026-10-31T21:56:58: Info: running mosquitto as user: <user>.
+2026-10-31T21:56:58: mosquitto version 2.1.2 starting
+2026-10-31T21:56:58: Config loaded from broker.conf.
+2026-10-31T21:56:58: Bridge support available.
+2026-10-31T21:56:58: Persistence support available.
+2026-10-31T21:56:58: TLS support available.
+2026-10-31T21:56:58: TLS-PSK support available.
+2026-10-31T21:56:58: Websockets support available.
+2026-10-31T21:56:58: Opening ipv4 listen socket on port 1883.
+2026-10-31T21:56:58: Opening ipv4 listen socket on port 1883.
+2026-10-31T21:56:58: mosquitto version 2.1.2 running
+2026-10-31T21:57:09: New connection from 127.0.0.1:58236 on port 1883.
+2026-10-31T21:57:09: New client connected from 127.0.0.1:58236 as auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E (p4, c1, k60).
+2026-10-31T21:57:09: No will message specified.
+2026-10-31T21:57:09: Sending CONNACK to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E (0, 0)
+2026-10-31T21:57:09: Received SUBSCRIBE from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T21:57:09: 	robot/status (QoS 1)
+2026-10-31T21:57:09: auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E 1 robot/status
+2026-10-31T21:57:09: Sending SUBACK to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T21:57:23: New connection from <BROKER_HOST>:58243 on port 1883.
+2026-10-31T21:57:23: New client connected from <BROKER_HOST>:58243 as s1u13-lanprobe (p4, c1, k60).
+2026-10-31T21:57:23: No will message specified.
+2026-10-31T21:57:23: Sending CONNACK to s1u13-lanprobe (0, 0)
+2026-10-31T21:57:23: Received SUBSCRIBE from s1u13-lanprobe
+2026-10-31T21:57:23: 	s1u13/probe (QoS 0)
+2026-10-31T21:57:23: s1u13-lanprobe 0 s1u13/probe
+2026-10-31T21:57:23: Sending SUBACK to s1u13-lanprobe
+2026-10-31T21:57:23: Received DISCONNECT from s1u13-lanprobe
+2026-10-31T21:57:23: Client s1u13-lanprobe [<BROKER_HOST>:58243] disconnected.
+2026-10-31T21:58:09: Received PINGREQ from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T21:58:09: Sending PINGRESP to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T21:59:09: Received PINGREQ from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T21:59:09: Sending PINGRESP to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:00:09: Received PINGREQ from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:00:09: Sending PINGRESP to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:01:09: Received PINGREQ from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:01:09: Sending PINGRESP to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:02:10: Received PINGREQ from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:02:10: Sending PINGRESP to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:02:15: New connection from 172.20.10.3:54591 on port 1883.
+2026-10-31T22:02:15: New client connected from 172.20.10.3:54591 as robocar-buddy1 (p4, c1, k5).
+2026-10-31T22:02:15: Will message specified (7 bytes) (r1, q1).
+2026-10-31T22:02:15: 	robot/status
+2026-10-31T22:02:15: Sending CONNACK to robocar-buddy1 (0, 0)
+2026-10-31T22:02:15: Received SUBSCRIBE from robocar-buddy1
+2026-10-31T22:02:15: 	robot/cmd/# (QoS 1)
+2026-10-31T22:02:15: robocar-buddy1 1 robot/cmd/#
+2026-10-31T22:02:15: Sending SUBACK to robocar-buddy1
+2026-10-31T22:02:15: Received PUBLISH from robocar-buddy1 (d0, q1, r1, m2, 'robot/status', ... (6 bytes))
+2026-10-31T22:02:15: Sending PUBLISH to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E (d0, q1, r0, m1, 'robot/status', ... (6 bytes))
+2026-10-31T22:02:15: Sending PUBACK to robocar-buddy1 (m2, rc0)
+2026-10-31T22:02:15: Received PUBACK from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E (Mid: 1, RC:0)
+2026-10-31T22:02:21: Received PINGREQ from robocar-buddy1
+2026-10-31T22:02:21: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:02:28: Client robocar-buddy1 [172.20.10.3:54591] disconnected: exceeded timeout.
+2026-10-31T22:02:28: Sending PUBLISH to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E (d0, q1, r0, m2, 'robot/status', ... (7 bytes))
+2026-10-31T22:02:28: Received PUBACK from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E (Mid: 2, RC:0)
+2026-10-31T22:03:29: Received PINGREQ from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:03:29: Sending PINGRESP to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:04:29: Received PINGREQ from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:04:29: Sending PINGRESP to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:05:29: Received PINGREQ from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:05:29: Sending PINGRESP to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:06:29: Received PINGREQ from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:06:29: Sending PINGRESP to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:07:18: New connection from 172.20.10.3:54591 on port 1883.
+2026-10-31T22:07:18: New client connected from 172.20.10.3:54591 as robocar-buddy1 (p4, c1, k5).
+2026-10-31T22:07:18: Will message specified (7 bytes) (r1, q1).
+2026-10-31T22:07:18: 	robot/status
+2026-10-31T22:07:18: Sending CONNACK to robocar-buddy1 (0, 0)
+2026-10-31T22:07:18: Received SUBSCRIBE from robocar-buddy1
+2026-10-31T22:07:18: 	robot/cmd/# (QoS 1)
+2026-10-31T22:07:18: robocar-buddy1 1 robot/cmd/#
+2026-10-31T22:07:18: Sending SUBACK to robocar-buddy1
+2026-10-31T22:07:18: Received PUBLISH from robocar-buddy1 (d0, q1, r1, m2, 'robot/status', ... (6 bytes))
+2026-10-31T22:07:18: Sending PUBLISH to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E (d0, q1, r0, m3, 'robot/status', ... (6 bytes))
+2026-10-31T22:07:18: Sending PUBACK to robocar-buddy1 (m2, rc0)
+2026-10-31T22:07:18: Received PUBACK from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E (Mid: 3, RC:0)
+2026-10-31T22:07:23: Received PINGREQ from robocar-buddy1
+2026-10-31T22:07:23: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:07:28: Received PINGREQ from robocar-buddy1
+2026-10-31T22:07:28: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:07:34: Received PINGREQ from robocar-buddy1
+2026-10-31T22:07:34: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:07:39: Received PINGREQ from robocar-buddy1
+2026-10-31T22:07:39: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:07:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:07:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:07:48: Received PINGREQ from robocar-buddy1
+2026-10-31T22:07:48: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:07:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:07:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:07:59: Received PINGREQ from robocar-buddy1
+2026-10-31T22:07:59: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:08:04: Received PINGREQ from robocar-buddy1
+2026-10-31T22:08:04: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:08:09: Received PINGREQ from robocar-buddy1
+2026-10-31T22:08:09: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:08:13: Received PINGREQ from robocar-buddy1
+2026-10-31T22:08:13: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:08:18: Received PINGREQ from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:08:18: Sending PINGRESP to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:08:18: Received PINGREQ from robocar-buddy1
+2026-10-31T22:08:18: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:08:24: Received PINGREQ from robocar-buddy1
+2026-10-31T22:08:24: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:08:29: Received PINGREQ from robocar-buddy1
+2026-10-31T22:08:29: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:08:34: Received PINGREQ from robocar-buddy1
+2026-10-31T22:08:34: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:08:38: Received PINGREQ from robocar-buddy1
+2026-10-31T22:08:38: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:08:41: New connection from 127.0.0.1:58485 on port 1883.
+2026-10-31T22:08:41: New client connected from 127.0.0.1:58485 as auto-6F54F223-BC5A-6DA7-0E47-627294F77DE8 (p4, c1, k60).
+2026-10-31T22:08:41: No will message specified.
+2026-10-31T22:08:41: Sending CONNACK to auto-6F54F223-BC5A-6DA7-0E47-627294F77DE8 (0, 0)
+2026-10-31T22:08:41: Received SUBSCRIBE from auto-6F54F223-BC5A-6DA7-0E47-627294F77DE8
+2026-10-31T22:08:41: 	robot/status (QoS 0)
+2026-10-31T22:08:41: auto-6F54F223-BC5A-6DA7-0E47-627294F77DE8 0 robot/status
+2026-10-31T22:08:41: Sending SUBACK to auto-6F54F223-BC5A-6DA7-0E47-627294F77DE8
+2026-10-31T22:08:41: Sending PUBLISH to auto-6F54F223-BC5A-6DA7-0E47-627294F77DE8 (d0, q0, r1, m0, 'robot/status', ... (6 bytes))
+2026-10-31T22:08:41: Received DISCONNECT from auto-6F54F223-BC5A-6DA7-0E47-627294F77DE8
+2026-10-31T22:08:41: Client auto-6F54F223-BC5A-6DA7-0E47-627294F77DE8 [127.0.0.1:58485] disconnected.
+2026-10-31T22:08:41: Client auto-6F54F223-BC5A-6DA7-0E47-627294F77DE8 [127.0.0.1:58485] disconnected: connection closed by client.
+2026-10-31T22:08:43: Received PINGREQ from robocar-buddy1
+2026-10-31T22:08:43: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:08:48: Received PINGREQ from robocar-buddy1
+2026-10-31T22:08:48: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:08:54: Received PINGREQ from robocar-buddy1
+2026-10-31T22:08:54: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:08:59: Received PINGREQ from robocar-buddy1
+2026-10-31T22:08:59: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:09:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:09:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:09:08: Received PINGREQ from robocar-buddy1
+2026-10-31T22:09:08: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:09:13: Received PINGREQ from robocar-buddy1
+2026-10-31T22:09:13: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:09:17: Received PINGREQ from auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:09:17: Sending PINGRESP to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E
+2026-10-31T22:09:19: Received PINGREQ from robocar-buddy1
+2026-10-31T22:09:19: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:09:24: Received PINGREQ from robocar-buddy1
+2026-10-31T22:09:24: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:09:25: Sending PUBLISH to auto-BD2AFF0C-9B01-E75D-4204-AEBAE5BEFF5E (d0, q1, r0, m4, 'robot/status', ... (7 bytes))
+2026-10-31T22:09:25: mosquitto version 2.1.2 terminating
+2026-10-31T22:10:04: Info: running mosquitto as user: <user>.
+2026-10-31T22:10:04: mosquitto version 2.1.2 starting
+2026-10-31T22:10:04: Config loaded from broker.conf.
+2026-10-31T22:10:04: Bridge support available.
+2026-10-31T22:10:04: Persistence support available.
+2026-10-31T22:10:04: TLS support available.
+2026-10-31T22:10:04: TLS-PSK support available.
+2026-10-31T22:10:04: Websockets support available.
+2026-10-31T22:10:04: Opening ipv4 listen socket on port 1883.
+2026-10-31T22:10:04: Opening ipv4 listen socket on port 1883.
+2026-10-31T22:10:04: mosquitto version 2.1.2 running
+2026-10-31T22:10:05: New connection from 127.0.0.1:58551 on port 1883.
+2026-10-31T22:10:05: New client connected from 127.0.0.1:58551 as auto-426705A2-F351-DDED-D700-210BD8F19BF0 (p4, c1, k60).
+2026-10-31T22:10:05: No will message specified.
+2026-10-31T22:10:05: Sending CONNACK to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (0, 0)
+2026-10-31T22:10:05: Received SUBSCRIBE from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:10:05: 	robot/status (QoS 1)
+2026-10-31T22:10:05: auto-426705A2-F351-DDED-D700-210BD8F19BF0 1 robot/status
+2026-10-31T22:10:05: Sending SUBACK to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:10:07: New connection from 172.20.10.3:54598 on port 1883.
+2026-10-31T22:10:07: New client connected from 172.20.10.3:54598 as robocar-buddy1 (p4, c1, k5).
+2026-10-31T22:10:07: Will message specified (7 bytes) (r1, q1).
+2026-10-31T22:10:07: 	robot/status
+2026-10-31T22:10:07: Sending CONNACK to robocar-buddy1 (0, 0)
+2026-10-31T22:10:07: Received SUBSCRIBE from robocar-buddy1
+2026-10-31T22:10:07: 	robot/cmd/# (QoS 1)
+2026-10-31T22:10:07: robocar-buddy1 1 robot/cmd/#
+2026-10-31T22:10:07: Sending SUBACK to robocar-buddy1
+2026-10-31T22:10:07: Received PUBLISH from robocar-buddy1 (d0, q1, r1, m2, 'robot/status', ... (6 bytes))
+2026-10-31T22:10:07: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m1, 'robot/status', ... (6 bytes))
+2026-10-31T22:10:07: Sending PUBACK to robocar-buddy1 (m2, rc0)
+2026-10-31T22:10:07: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 1, RC:0)
+2026-10-31T22:10:12: Received PINGREQ from robocar-buddy1
+2026-10-31T22:10:12: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:10:17: Received PINGREQ from robocar-buddy1
+2026-10-31T22:10:17: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:10:22: Received PINGREQ from robocar-buddy1
+2026-10-31T22:10:22: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:10:27: Received PINGREQ from robocar-buddy1
+2026-10-31T22:10:27: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:10:32: Received PINGREQ from robocar-buddy1
+2026-10-31T22:10:32: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:10:37: Received PINGREQ from robocar-buddy1
+2026-10-31T22:10:37: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:10:42: Received PINGREQ from robocar-buddy1
+2026-10-31T22:10:42: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:10:47: Received PINGREQ from robocar-buddy1
+2026-10-31T22:10:47: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:10:52: Received PINGREQ from robocar-buddy1
+2026-10-31T22:10:52: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:10:58: Received PINGREQ from robocar-buddy1
+2026-10-31T22:10:58: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:11:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:11:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:11:07: Received PINGREQ from robocar-buddy1
+2026-10-31T22:11:07: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:11:07: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:11:07: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:11:12: Received PINGREQ from robocar-buddy1
+2026-10-31T22:11:12: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:11:17: Received PINGREQ from robocar-buddy1
+2026-10-31T22:11:17: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:11:23: Received PINGREQ from robocar-buddy1
+2026-10-31T22:11:23: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:11:28: Received PINGREQ from robocar-buddy1
+2026-10-31T22:11:28: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:11:32: Client robocar-buddy1 [172.20.10.3:54598] disconnected: connection closed by client.
+2026-10-31T22:11:32: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m2, 'robot/status', ... (7 bytes))
+2026-10-31T22:11:32: Client robocar-buddy1 [172.20.10.3:54598] disconnected: connection closed by client.
+2026-10-31T22:11:32: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 2, RC:0)
+2026-10-31T22:11:40: New connection from 172.20.10.3:54600 on port 1883.
+2026-10-31T22:11:40: New client connected from 172.20.10.3:54600 as robocar-buddy1 (p4, c1, k5).
+2026-10-31T22:11:40: Will message specified (7 bytes) (r1, q1).
+2026-10-31T22:11:40: 	robot/status
+2026-10-31T22:11:40: Sending CONNACK to robocar-buddy1 (0, 0)
+2026-10-31T22:11:40: Received SUBSCRIBE from robocar-buddy1
+2026-10-31T22:11:40: 	robot/cmd/# (QoS 1)
+2026-10-31T22:11:40: robocar-buddy1 1 robot/cmd/#
+2026-10-31T22:11:40: Sending SUBACK to robocar-buddy1
+2026-10-31T22:11:40: Received PUBLISH from robocar-buddy1 (d0, q1, r1, m2, 'robot/status', ... (6 bytes))
+2026-10-31T22:11:40: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m3, 'robot/status', ... (6 bytes))
+2026-10-31T22:11:40: Sending PUBACK to robocar-buddy1 (m2, rc0)
+2026-10-31T22:11:40: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 3, RC:0)
+2026-10-31T22:11:46: Received PINGREQ from robocar-buddy1
+2026-10-31T22:11:46: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:11:50: Received PINGREQ from robocar-buddy1
+2026-10-31T22:11:50: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:11:56: Received PINGREQ from robocar-buddy1
+2026-10-31T22:11:56: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:12:01: Received PINGREQ from robocar-buddy1
+2026-10-31T22:12:01: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:12:05: Received PINGREQ from robocar-buddy1
+2026-10-31T22:12:05: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:12:10: Received PINGREQ from robocar-buddy1
+2026-10-31T22:12:10: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:12:15: Received PINGREQ from robocar-buddy1
+2026-10-31T22:12:15: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:12:22: Client robocar-buddy1 [172.20.10.3:54600] disconnected: exceeded timeout.
+2026-10-31T22:12:22: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m4, 'robot/status', ... (7 bytes))
+2026-10-31T22:12:22: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 4, RC:0)
+2026-10-31T22:13:23: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:13:23: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:14:23: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:14:23: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:14:46: New connection from <BROKER_HOST>:58641 on port 1883.
+2026-10-31T22:14:46: New client connected from <BROKER_HOST>:58641 as s1u13-lanprobe (p4, c1, k60).
+2026-10-31T22:14:46: No will message specified.
+2026-10-31T22:14:46: Sending CONNACK to s1u13-lanprobe (0, 0)
+2026-10-31T22:14:46: Received SUBSCRIBE from s1u13-lanprobe
+2026-10-31T22:14:46: 	s1u13/probe (QoS 0)
+2026-10-31T22:14:46: s1u13-lanprobe 0 s1u13/probe
+2026-10-31T22:14:46: Sending SUBACK to s1u13-lanprobe
+2026-10-31T22:14:46: Received DISCONNECT from s1u13-lanprobe
+2026-10-31T22:14:46: Client s1u13-lanprobe [<BROKER_HOST>:58641] disconnected.
+2026-10-31T22:14:49: New connection from 172.20.10.3:54612 on port 1883.
+2026-10-31T22:14:49: New client connected from 172.20.10.3:54612 as robocar-buddy1 (p4, c1, k5).
+2026-10-31T22:14:49: Will message specified (7 bytes) (r1, q1).
+2026-10-31T22:14:49: 	robot/status
+2026-10-31T22:14:49: Sending CONNACK to robocar-buddy1 (0, 0)
+2026-10-31T22:14:49: Received SUBSCRIBE from robocar-buddy1
+2026-10-31T22:14:49: 	robot/cmd/# (QoS 1)
+2026-10-31T22:14:49: robocar-buddy1 1 robot/cmd/#
+2026-10-31T22:14:49: Sending SUBACK to robocar-buddy1
+2026-10-31T22:14:49: Received PUBLISH from robocar-buddy1 (d0, q1, r1, m2, 'robot/status', ... (6 bytes))
+2026-10-31T22:14:49: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m5, 'robot/status', ... (6 bytes))
+2026-10-31T22:14:49: Sending PUBACK to robocar-buddy1 (m2, rc0)
+2026-10-31T22:14:49: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 5, RC:0)
+2026-10-31T22:14:54: Received PINGREQ from robocar-buddy1
+2026-10-31T22:14:54: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:15:00: Received PINGREQ from robocar-buddy1
+2026-10-31T22:15:00: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:15:05: Received PINGREQ from robocar-buddy1
+2026-10-31T22:15:05: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:15:10: Received PINGREQ from robocar-buddy1
+2026-10-31T22:15:10: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:15:15: Received PINGREQ from robocar-buddy1
+2026-10-31T22:15:15: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:15:19: Received PINGREQ from robocar-buddy1
+2026-10-31T22:15:19: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:15:25: Received PINGREQ from robocar-buddy1
+2026-10-31T22:15:25: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:15:30: Received PINGREQ from robocar-buddy1
+2026-10-31T22:15:30: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:15:35: Received PINGREQ from robocar-buddy1
+2026-10-31T22:15:35: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:15:40: Received PINGREQ from robocar-buddy1
+2026-10-31T22:15:40: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:15:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:15:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:15:48: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:15:48: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:15:52: Client robocar-buddy1 [172.20.10.3:54612] disconnected: exceeded timeout.
+2026-10-31T22:15:52: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m6, 'robot/status', ... (7 bytes))
+2026-10-31T22:15:52: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 6, RC:0)
+2026-10-31T22:15:53: New connection from 172.20.10.3:54613 on port 1883.
+2026-10-31T22:15:53: New client connected from 172.20.10.3:54613 as robocar-buddy1 (p4, c1, k5).
+2026-10-31T22:15:53: Will message specified (7 bytes) (r1, q1).
+2026-10-31T22:15:53: 	robot/status
+2026-10-31T22:15:53: Sending CONNACK to robocar-buddy1 (0, 0)
+2026-10-31T22:15:53: Received SUBSCRIBE from robocar-buddy1
+2026-10-31T22:15:53: 	robot/cmd/# (QoS 1)
+2026-10-31T22:15:53: robocar-buddy1 1 robot/cmd/#
+2026-10-31T22:15:53: Sending SUBACK to robocar-buddy1
+2026-10-31T22:15:53: Received PUBLISH from robocar-buddy1 (d0, q1, r1, m2, 'robot/status', ... (6 bytes))
+2026-10-31T22:15:53: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m7, 'robot/status', ... (6 bytes))
+2026-10-31T22:15:53: Sending PUBACK to robocar-buddy1 (m2, rc0)
+2026-10-31T22:15:53: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 7, RC:0)
+2026-10-31T22:15:58: Received PINGREQ from robocar-buddy1
+2026-10-31T22:15:58: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:16:04: Received PINGREQ from robocar-buddy1
+2026-10-31T22:16:04: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:16:09: Received PINGREQ from robocar-buddy1
+2026-10-31T22:16:09: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:16:14: Received PINGREQ from robocar-buddy1
+2026-10-31T22:16:14: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:16:19: Received PINGREQ from robocar-buddy1
+2026-10-31T22:16:19: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:16:23: Received PINGREQ from robocar-buddy1
+2026-10-31T22:16:23: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:16:29: Received PINGREQ from robocar-buddy1
+2026-10-31T22:16:29: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:16:34: Received PINGREQ from robocar-buddy1
+2026-10-31T22:16:34: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:16:39: Received PINGREQ from robocar-buddy1
+2026-10-31T22:16:39: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:16:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:16:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:16:48: Received PINGREQ from robocar-buddy1
+2026-10-31T22:16:48: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:16:52: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:16:52: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:16:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:16:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:16:59: Received PINGREQ from robocar-buddy1
+2026-10-31T22:16:59: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:17:04: Received PINGREQ from robocar-buddy1
+2026-10-31T22:17:04: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:17:09: Received PINGREQ from robocar-buddy1
+2026-10-31T22:17:09: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:17:13: Received PINGREQ from robocar-buddy1
+2026-10-31T22:17:13: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:17:18: Received PINGREQ from robocar-buddy1
+2026-10-31T22:17:18: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:17:24: Received PINGREQ from robocar-buddy1
+2026-10-31T22:17:24: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:17:31: Client robocar-buddy1 [172.20.10.3:54613] disconnected: exceeded timeout.
+2026-10-31T22:17:31: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m8, 'robot/status', ... (7 bytes))
+2026-10-31T22:17:31: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 8, RC:0)
+2026-10-31T22:17:37: New connection from 172.20.10.3:54614 on port 1883.
+2026-10-31T22:17:37: New client connected from 172.20.10.3:54614 as robocar-buddy1 (p4, c1, k5).
+2026-10-31T22:17:37: Will message specified (7 bytes) (r1, q1).
+2026-10-31T22:17:37: 	robot/status
+2026-10-31T22:17:37: Sending CONNACK to robocar-buddy1 (0, 0)
+2026-10-31T22:17:37: Received SUBSCRIBE from robocar-buddy1
+2026-10-31T22:17:37: 	robot/cmd/# (QoS 1)
+2026-10-31T22:17:37: robocar-buddy1 1 robot/cmd/#
+2026-10-31T22:17:37: Sending SUBACK to robocar-buddy1
+2026-10-31T22:17:37: Received PUBLISH from robocar-buddy1 (d0, q1, r1, m2, 'robot/status', ... (6 bytes))
+2026-10-31T22:17:37: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m9, 'robot/status', ... (6 bytes))
+2026-10-31T22:17:37: Sending PUBACK to robocar-buddy1 (m2, rc0)
+2026-10-31T22:17:37: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 9, RC:0)
+2026-10-31T22:17:43: Received PINGREQ from robocar-buddy1
+2026-10-31T22:17:43: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:17:48: Received PINGREQ from robocar-buddy1
+2026-10-31T22:17:48: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:17:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:17:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:17:58: Received PINGREQ from robocar-buddy1
+2026-10-31T22:17:58: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:18:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:18:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:18:07: Received PINGREQ from robocar-buddy1
+2026-10-31T22:18:07: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:18:13: Received PINGREQ from robocar-buddy1
+2026-10-31T22:18:13: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:18:18: Received PINGREQ from robocar-buddy1
+2026-10-31T22:18:18: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:18:23: Received PINGREQ from robocar-buddy1
+2026-10-31T22:18:23: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:18:28: Received PINGREQ from robocar-buddy1
+2026-10-31T22:18:28: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:18:32: Received PINGREQ from robocar-buddy1
+2026-10-31T22:18:32: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:18:38: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:18:38: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:18:38: Received PINGREQ from robocar-buddy1
+2026-10-31T22:18:38: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:18:43: Received PINGREQ from robocar-buddy1
+2026-10-31T22:18:43: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:18:48: Received PINGREQ from robocar-buddy1
+2026-10-31T22:18:48: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:18:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:18:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:18:57: Received PINGREQ from robocar-buddy1
+2026-10-31T22:18:57: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:19:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:19:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:19:08: Received PINGREQ from robocar-buddy1
+2026-10-31T22:19:08: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:19:13: Received PINGREQ from robocar-buddy1
+2026-10-31T22:19:13: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:19:18: Received PINGREQ from robocar-buddy1
+2026-10-31T22:19:18: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:19:22: Received PINGREQ from robocar-buddy1
+2026-10-31T22:19:22: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:19:28: Received PINGREQ from robocar-buddy1
+2026-10-31T22:19:28: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:19:33: Received PINGREQ from robocar-buddy1
+2026-10-31T22:19:33: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:19:38: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:19:38: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:19:38: Received PINGREQ from robocar-buddy1
+2026-10-31T22:19:38: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:19:43: Received PINGREQ from robocar-buddy1
+2026-10-31T22:19:43: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:19:48: Received PINGREQ from robocar-buddy1
+2026-10-31T22:19:48: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:19:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:19:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:19:58: Received PINGREQ from robocar-buddy1
+2026-10-31T22:19:58: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:20:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:20:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:20:08: Received PINGREQ from robocar-buddy1
+2026-10-31T22:20:08: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:20:13: Received PINGREQ from robocar-buddy1
+2026-10-31T22:20:13: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:20:18: Received PINGREQ from robocar-buddy1
+2026-10-31T22:20:18: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:20:23: Received PINGREQ from robocar-buddy1
+2026-10-31T22:20:23: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:20:27: Received PINGREQ from robocar-buddy1
+2026-10-31T22:20:27: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:20:33: Received PINGREQ from robocar-buddy1
+2026-10-31T22:20:33: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:20:38: Received PINGREQ from robocar-buddy1
+2026-10-31T22:20:38: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:20:38: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:20:38: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:20:43: Received PINGREQ from robocar-buddy1
+2026-10-31T22:20:43: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:20:48: Received PINGREQ from robocar-buddy1
+2026-10-31T22:20:48: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:20:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:20:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:20:58: Received PINGREQ from robocar-buddy1
+2026-10-31T22:20:58: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:21:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:21:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:21:08: Received PINGREQ from robocar-buddy1
+2026-10-31T22:21:08: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:21:13: Received PINGREQ from robocar-buddy1
+2026-10-31T22:21:13: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:21:18: Received PINGREQ from robocar-buddy1
+2026-10-31T22:21:18: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:21:22: Received PINGREQ from robocar-buddy1
+2026-10-31T22:21:22: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:21:30: Client robocar-buddy1 [172.20.10.3:54614] disconnected: exceeded timeout.
+2026-10-31T22:21:30: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m10, 'robot/status', ... (7 bytes))
+2026-10-31T22:21:30: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 10, RC:0)
+2026-10-31T22:21:48: New connection from <BROKER_HOST>:58826 on port 1883.
+2026-10-31T22:21:48: New client connected from <BROKER_HOST>:58826 as s1u13-lanprobe (p4, c1, k60).
+2026-10-31T22:21:48: No will message specified.
+2026-10-31T22:21:48: Sending CONNACK to s1u13-lanprobe (0, 0)
+2026-10-31T22:21:48: Received SUBSCRIBE from s1u13-lanprobe
+2026-10-31T22:21:48: 	s1u13/probe (QoS 0)
+2026-10-31T22:21:48: s1u13-lanprobe 0 s1u13/probe
+2026-10-31T22:21:48: Sending SUBACK to s1u13-lanprobe
+2026-10-31T22:21:48: Received DISCONNECT from s1u13-lanprobe
+2026-10-31T22:21:48: Client s1u13-lanprobe [<BROKER_HOST>:58826] disconnected.
+2026-10-31T22:21:48: New connection from 172.20.10.3:54616 on port 1883.
+2026-10-31T22:21:48: New client connected from 172.20.10.3:54616 as robocar-buddy1 (p4, c1, k5).
+2026-10-31T22:21:48: Will message specified (7 bytes) (r1, q1).
+2026-10-31T22:21:48: 	robot/status
+2026-10-31T22:21:48: Sending CONNACK to robocar-buddy1 (0, 0)
+2026-10-31T22:21:48: Received SUBSCRIBE from robocar-buddy1
+2026-10-31T22:21:48: 	robot/cmd/# (QoS 1)
+2026-10-31T22:21:48: robocar-buddy1 1 robot/cmd/#
+2026-10-31T22:21:48: Sending SUBACK to robocar-buddy1
+2026-10-31T22:21:48: Received PUBLISH from robocar-buddy1 (d0, q1, r1, m2, 'robot/status', ... (6 bytes))
+2026-10-31T22:21:48: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m11, 'robot/status', ... (6 bytes))
+2026-10-31T22:21:48: Sending PUBACK to robocar-buddy1 (m2, rc0)
+2026-10-31T22:21:48: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 11, RC:0)
+2026-10-31T22:21:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:21:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:21:58: Received PINGREQ from robocar-buddy1
+2026-10-31T22:21:58: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:22:04: Received PINGREQ from robocar-buddy1
+2026-10-31T22:22:04: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:22:09: Received PINGREQ from robocar-buddy1
+2026-10-31T22:22:09: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:22:14: Received PINGREQ from robocar-buddy1
+2026-10-31T22:22:14: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:22:18: Received PINGREQ from robocar-buddy1
+2026-10-31T22:22:18: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:22:23: Received PINGREQ from robocar-buddy1
+2026-10-31T22:22:23: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:22:29: Received PINGREQ from robocar-buddy1
+2026-10-31T22:22:29: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:22:34: Received PINGREQ from robocar-buddy1
+2026-10-31T22:22:34: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:22:39: Received PINGREQ from robocar-buddy1
+2026-10-31T22:22:39: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:22:43: Received PINGREQ from robocar-buddy1
+2026-10-31T22:22:43: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:22:47: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:22:47: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:22:48: Received PINGREQ from robocar-buddy1
+2026-10-31T22:22:48: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:22:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:22:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:22:59: Received PINGREQ from robocar-buddy1
+2026-10-31T22:22:59: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:23:04: Received PINGREQ from robocar-buddy1
+2026-10-31T22:23:04: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:23:09: Received PINGREQ from robocar-buddy1
+2026-10-31T22:23:09: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:23:13: Received PINGREQ from robocar-buddy1
+2026-10-31T22:23:13: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:23:19: Received PINGREQ from robocar-buddy1
+2026-10-31T22:23:19: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:23:23: Received PINGREQ from robocar-buddy1
+2026-10-31T22:23:23: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:23:28: Received PINGREQ from robocar-buddy1
+2026-10-31T22:23:28: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:23:34: Received PINGREQ from robocar-buddy1
+2026-10-31T22:23:34: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:23:39: Received PINGREQ from robocar-buddy1
+2026-10-31T22:23:39: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:23:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:23:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:23:48: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:23:48: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:23:48: Received PINGREQ from robocar-buddy1
+2026-10-31T22:23:48: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:23:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:23:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:23:59: Received PINGREQ from robocar-buddy1
+2026-10-31T22:23:59: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:24:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:24:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:24:08: Received PINGREQ from robocar-buddy1
+2026-10-31T22:24:08: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:24:14: Received PINGREQ from robocar-buddy1
+2026-10-31T22:24:14: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:24:19: Received PINGREQ from robocar-buddy1
+2026-10-31T22:24:19: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:24:24: Received PINGREQ from robocar-buddy1
+2026-10-31T22:24:24: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:24:28: Received PINGREQ from robocar-buddy1
+2026-10-31T22:24:28: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:24:33: Received PINGREQ from robocar-buddy1
+2026-10-31T22:24:33: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:24:38: Received PINGREQ from robocar-buddy1
+2026-10-31T22:24:38: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:24:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:24:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:24:48: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:24:48: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:24:49: Received PINGREQ from robocar-buddy1
+2026-10-31T22:24:49: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:24:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:24:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:24:58: Received PINGREQ from robocar-buddy1
+2026-10-31T22:24:58: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:25:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:25:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:25:09: Received PINGREQ from robocar-buddy1
+2026-10-31T22:25:09: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:25:14: Received PINGREQ from robocar-buddy1
+2026-10-31T22:25:14: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:25:19: Received PINGREQ from robocar-buddy1
+2026-10-31T22:25:19: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:25:23: Received PINGREQ from robocar-buddy1
+2026-10-31T22:25:23: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:25:29: Received PINGREQ from robocar-buddy1
+2026-10-31T22:25:29: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:25:34: Received PINGREQ from robocar-buddy1
+2026-10-31T22:25:34: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:25:39: Received PINGREQ from robocar-buddy1
+2026-10-31T22:25:39: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:25:45: Received PINGREQ from robocar-buddy1
+2026-10-31T22:25:45: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:25:48: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:25:48: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:25:49: Received PINGREQ from robocar-buddy1
+2026-10-31T22:25:49: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:25:54: Received PINGREQ from robocar-buddy1
+2026-10-31T22:25:54: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:25:58: Received PINGREQ from robocar-buddy1
+2026-10-31T22:25:58: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:26:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:26:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:26:09: Received PINGREQ from robocar-buddy1
+2026-10-31T22:26:09: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:26:14: Received PINGREQ from robocar-buddy1
+2026-10-31T22:26:14: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:26:19: Received PINGREQ from robocar-buddy1
+2026-10-31T22:26:19: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:26:24: Received PINGREQ from robocar-buddy1
+2026-10-31T22:26:24: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:26:28: Received PINGREQ from robocar-buddy1
+2026-10-31T22:26:28: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:26:33: Received PINGREQ from robocar-buddy1
+2026-10-31T22:26:33: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:26:39: Received PINGREQ from robocar-buddy1
+2026-10-31T22:26:39: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:26:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:26:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:26:48: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:26:48: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:26:49: Received PINGREQ from robocar-buddy1
+2026-10-31T22:26:49: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:26:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:26:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:26:59: Received PINGREQ from robocar-buddy1
+2026-10-31T22:26:59: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:27:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:27:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:27:08: Received PINGREQ from robocar-buddy1
+2026-10-31T22:27:08: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:27:13: Received PINGREQ from robocar-buddy1
+2026-10-31T22:27:13: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:27:19: Received PINGREQ from robocar-buddy1
+2026-10-31T22:27:19: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:27:24: Received PINGREQ from robocar-buddy1
+2026-10-31T22:27:24: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:27:29: Received PINGREQ from robocar-buddy1
+2026-10-31T22:27:29: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:27:33: Received PINGREQ from robocar-buddy1
+2026-10-31T22:27:33: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:27:39: Received PINGREQ from robocar-buddy1
+2026-10-31T22:27:39: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:27:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:27:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:27:47: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:27:47: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:27:49: Received PINGREQ from robocar-buddy1
+2026-10-31T22:27:49: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:27:54: Received PINGREQ from robocar-buddy1
+2026-10-31T22:27:54: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:27:58: Received PINGREQ from robocar-buddy1
+2026-10-31T22:27:58: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:28:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:28:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:28:09: Received PINGREQ from robocar-buddy1
+2026-10-31T22:28:09: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:28:14: Received PINGREQ from robocar-buddy1
+2026-10-31T22:28:14: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:28:19: Received PINGREQ from robocar-buddy1
+2026-10-31T22:28:19: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:28:23: Received PINGREQ from robocar-buddy1
+2026-10-31T22:28:23: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:28:28: Received PINGREQ from robocar-buddy1
+2026-10-31T22:28:28: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:28:34: Received PINGREQ from robocar-buddy1
+2026-10-31T22:28:34: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:28:39: Received PINGREQ from robocar-buddy1
+2026-10-31T22:28:39: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:28:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:28:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:28:48: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:28:48: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:28:48: Received PINGREQ from robocar-buddy1
+2026-10-31T22:28:48: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:28:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:28:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:28:59: Received PINGREQ from robocar-buddy1
+2026-10-31T22:28:59: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:29:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:29:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:29:08: Received PINGREQ from robocar-buddy1
+2026-10-31T22:29:08: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:29:14: Received PINGREQ from robocar-buddy1
+2026-10-31T22:29:14: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:29:19: Received PINGREQ from robocar-buddy1
+2026-10-31T22:29:19: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:29:24: Received PINGREQ from robocar-buddy1
+2026-10-31T22:29:24: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:29:28: Received PINGREQ from robocar-buddy1
+2026-10-31T22:29:28: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:29:33: Received PINGREQ from robocar-buddy1
+2026-10-31T22:29:33: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:29:39: Received PINGREQ from robocar-buddy1
+2026-10-31T22:29:39: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:29:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:29:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:29:48: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:29:48: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:29:49: Received PINGREQ from robocar-buddy1
+2026-10-31T22:29:49: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:29:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:29:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:29:58: Received PINGREQ from robocar-buddy1
+2026-10-31T22:29:58: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:30:04: Received PINGREQ from robocar-buddy1
+2026-10-31T22:30:04: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:30:09: Received PINGREQ from robocar-buddy1
+2026-10-31T22:30:09: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:30:14: Received PINGREQ from robocar-buddy1
+2026-10-31T22:30:14: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:30:18: Received PINGREQ from robocar-buddy1
+2026-10-31T22:30:18: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:30:23: Received PINGREQ from robocar-buddy1
+2026-10-31T22:30:23: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:30:29: Received PINGREQ from robocar-buddy1
+2026-10-31T22:30:29: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:30:36: Client robocar-buddy1 [172.20.10.3:54616] disconnected: exceeded timeout.
+2026-10-31T22:30:36: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m12, 'robot/status', ... (7 bytes))
+2026-10-31T22:30:36: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 12, RC:0)
+2026-10-31T22:31:36: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:31:36: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:31:42: New connection from <BROKER_HOST>:59030 on port 1883.
+2026-10-31T22:31:42: New client connected from <BROKER_HOST>:59030 as s1u13-lanprobe (p4, c1, k60).
+2026-10-31T22:31:42: No will message specified.
+2026-10-31T22:31:42: Sending CONNACK to s1u13-lanprobe (0, 0)
+2026-10-31T22:31:42: Received SUBSCRIBE from s1u13-lanprobe
+2026-10-31T22:31:42: 	s1u13/probe (QoS 0)
+2026-10-31T22:31:42: s1u13-lanprobe 0 s1u13/probe
+2026-10-31T22:31:42: Sending SUBACK to s1u13-lanprobe
+2026-10-31T22:31:42: Received DISCONNECT from s1u13-lanprobe
+2026-10-31T22:31:42: Client s1u13-lanprobe [<BROKER_HOST>:59030] disconnected.
+2026-10-31T22:31:52: New connection from 172.20.10.3:54618 on port 1883.
+2026-10-31T22:31:52: New client connected from 172.20.10.3:54618 as robocar-buddy1 (p4, c1, k5).
+2026-10-31T22:31:52: Will message specified (7 bytes) (r1, q1).
+2026-10-31T22:31:52: 	robot/status
+2026-10-31T22:31:52: Sending CONNACK to robocar-buddy1 (0, 0)
+2026-10-31T22:31:52: Received SUBSCRIBE from robocar-buddy1
+2026-10-31T22:31:52: 	robot/cmd/# (QoS 1)
+2026-10-31T22:31:52: robocar-buddy1 1 robot/cmd/#
+2026-10-31T22:31:52: Sending SUBACK to robocar-buddy1
+2026-10-31T22:31:52: Received PUBLISH from robocar-buddy1 (d0, q1, r1, m2, 'robot/status', ... (6 bytes))
+2026-10-31T22:31:52: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m13, 'robot/status', ... (6 bytes))
+2026-10-31T22:31:52: Sending PUBACK to robocar-buddy1 (m2, rc0)
+2026-10-31T22:31:52: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 13, RC:0)
+2026-10-31T22:31:57: Received PINGREQ from robocar-buddy1
+2026-10-31T22:31:57: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:32:02: Received PINGREQ from robocar-buddy1
+2026-10-31T22:32:02: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:32:07: Received PINGREQ from robocar-buddy1
+2026-10-31T22:32:07: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:32:12: Received PINGREQ from robocar-buddy1
+2026-10-31T22:32:12: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:32:18: Received PINGREQ from robocar-buddy1
+2026-10-31T22:32:18: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:32:22: Received PINGREQ from robocar-buddy1
+2026-10-31T22:32:22: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:32:27: Received PINGREQ from robocar-buddy1
+2026-10-31T22:32:27: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:32:32: Received PINGREQ from robocar-buddy1
+2026-10-31T22:32:32: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:32:37: Received PINGREQ from robocar-buddy1
+2026-10-31T22:32:37: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:32:43: Received PINGREQ from robocar-buddy1
+2026-10-31T22:32:43: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:32:47: Received PINGREQ from robocar-buddy1
+2026-10-31T22:32:47: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:32:52: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:32:52: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:32:52: Received PINGREQ from robocar-buddy1
+2026-10-31T22:32:52: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:32:57: Received PINGREQ from robocar-buddy1
+2026-10-31T22:32:57: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:33:02: Received PINGREQ from robocar-buddy1
+2026-10-31T22:33:02: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:33:08: Received PINGREQ from robocar-buddy1
+2026-10-31T22:33:08: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:33:13: Received PINGREQ from robocar-buddy1
+2026-10-31T22:33:13: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:33:17: Received PINGREQ from robocar-buddy1
+2026-10-31T22:33:17: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:33:22: Received PINGREQ from robocar-buddy1
+2026-10-31T22:33:22: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:33:27: Received PINGREQ from robocar-buddy1
+2026-10-31T22:33:27: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:33:33: Received PINGREQ from robocar-buddy1
+2026-10-31T22:33:33: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:33:38: Received PINGREQ from robocar-buddy1
+2026-10-31T22:33:38: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:33:42: Received PINGREQ from robocar-buddy1
+2026-10-31T22:33:42: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:33:47: Received PINGREQ from robocar-buddy1
+2026-10-31T22:33:47: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:33:52: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:33:52: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:33:52: Received PINGREQ from robocar-buddy1
+2026-10-31T22:33:52: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:33:58: Received PINGREQ from robocar-buddy1
+2026-10-31T22:33:58: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:34:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:34:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:34:07: Received PINGREQ from robocar-buddy1
+2026-10-31T22:34:07: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:34:12: Received PINGREQ from robocar-buddy1
+2026-10-31T22:34:12: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:34:17: Received PINGREQ from robocar-buddy1
+2026-10-31T22:34:17: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:34:22: Received PINGREQ from robocar-buddy1
+2026-10-31T22:34:22: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:34:28: Received PINGREQ from robocar-buddy1
+2026-10-31T22:34:28: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:34:32: Received PINGREQ from robocar-buddy1
+2026-10-31T22:34:32: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:34:37: Received PINGREQ from robocar-buddy1
+2026-10-31T22:34:37: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:34:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:34:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:34:47: Received PINGREQ from robocar-buddy1
+2026-10-31T22:34:47: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:34:51: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:34:51: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:34:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:34:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:34:57: Client robocar-buddy1 [172.20.10.3:54618] disconnected: connection closed by client.
+2026-10-31T22:34:57: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m14, 'robot/status', ... (7 bytes))
+2026-10-31T22:34:57: Client robocar-buddy1 [172.20.10.3:54618] disconnected: connection closed by client.
+2026-10-31T22:34:57: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 14, RC:0)
+2026-10-31T22:34:59: New connection from 172.20.10.3:54619 on port 1883.
+2026-10-31T22:34:59: New client connected from 172.20.10.3:54619 as robocar-buddy1 (p4, c1, k5).
+2026-10-31T22:34:59: Will message specified (7 bytes) (r1, q1).
+2026-10-31T22:34:59: 	robot/status
+2026-10-31T22:34:59: Sending CONNACK to robocar-buddy1 (0, 0)
+2026-10-31T22:34:59: Received SUBSCRIBE from robocar-buddy1
+2026-10-31T22:34:59: 	robot/cmd/# (QoS 1)
+2026-10-31T22:34:59: robocar-buddy1 1 robot/cmd/#
+2026-10-31T22:34:59: Sending SUBACK to robocar-buddy1
+2026-10-31T22:34:59: Received PUBLISH from robocar-buddy1 (d0, q1, r1, m2, 'robot/status', ... (6 bytes))
+2026-10-31T22:34:59: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m15, 'robot/status', ... (6 bytes))
+2026-10-31T22:34:59: Sending PUBACK to robocar-buddy1 (m2, rc0)
+2026-10-31T22:34:59: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 15, RC:0)
+2026-10-31T22:35:05: Received PINGREQ from robocar-buddy1
+2026-10-31T22:35:05: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:35:09: Received PINGREQ from robocar-buddy1
+2026-10-31T22:35:09: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:35:14: Received PINGREQ from robocar-buddy1
+2026-10-31T22:35:14: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:35:19: Received PINGREQ from robocar-buddy1
+2026-10-31T22:35:19: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:35:24: Received PINGREQ from robocar-buddy1
+2026-10-31T22:35:24: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:35:29: Received PINGREQ from robocar-buddy1
+2026-10-31T22:35:29: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:35:34: Received PINGREQ from robocar-buddy1
+2026-10-31T22:35:34: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:35:39: Received PINGREQ from robocar-buddy1
+2026-10-31T22:35:39: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:35:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:35:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:35:51: Client robocar-buddy1 [172.20.10.3:54619] disconnected: exceeded timeout.
+2026-10-31T22:35:51: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m16, 'robot/status', ... (7 bytes))
+2026-10-31T22:35:51: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 16, RC:0)
+2026-10-31T22:36:51: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:36:51: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:36:56: New connection from <BROKER_HOST>:59150 on port 1883.
+2026-10-31T22:36:56: New client connected from <BROKER_HOST>:59150 as s1u13-lanprobe (p4, c1, k60).
+2026-10-31T22:36:56: No will message specified.
+2026-10-31T22:36:56: Sending CONNACK to s1u13-lanprobe (0, 0)
+2026-10-31T22:36:56: Received SUBSCRIBE from s1u13-lanprobe
+2026-10-31T22:36:56: 	s1u13/probe (QoS 0)
+2026-10-31T22:36:56: s1u13-lanprobe 0 s1u13/probe
+2026-10-31T22:36:56: Sending SUBACK to s1u13-lanprobe
+2026-10-31T22:36:56: Received DISCONNECT from s1u13-lanprobe
+2026-10-31T22:36:56: Client s1u13-lanprobe [<BROKER_HOST>:59150] disconnected.
+2026-10-31T22:36:58: New connection from 172.20.10.3:54621 on port 1883.
+2026-10-31T22:36:58: New client connected from 172.20.10.3:54621 as robocar-buddy1 (p4, c1, k5).
+2026-10-31T22:36:58: Will message specified (7 bytes) (r1, q1).
+2026-10-31T22:36:58: 	robot/status
+2026-10-31T22:36:58: Sending CONNACK to robocar-buddy1 (0, 0)
+2026-10-31T22:36:58: Received SUBSCRIBE from robocar-buddy1
+2026-10-31T22:36:58: 	robot/cmd/# (QoS 1)
+2026-10-31T22:36:58: robocar-buddy1 1 robot/cmd/#
+2026-10-31T22:36:58: Sending SUBACK to robocar-buddy1
+2026-10-31T22:36:58: Received PUBLISH from robocar-buddy1 (d0, q1, r1, m2, 'robot/status', ... (6 bytes))
+2026-10-31T22:36:58: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m17, 'robot/status', ... (6 bytes))
+2026-10-31T22:36:58: Sending PUBACK to robocar-buddy1 (m2, rc0)
+2026-10-31T22:36:58: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 17, RC:0)
+2026-10-31T22:37:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:37:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:37:08: Received PINGREQ from robocar-buddy1
+2026-10-31T22:37:08: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:37:13: Received PINGREQ from robocar-buddy1
+2026-10-31T22:37:13: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:37:19: Received PINGREQ from robocar-buddy1
+2026-10-31T22:37:19: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:37:24: Received PINGREQ from robocar-buddy1
+2026-10-31T22:37:24: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:37:28: Received PINGREQ from robocar-buddy1
+2026-10-31T22:37:28: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:37:33: Received PINGREQ from robocar-buddy1
+2026-10-31T22:37:33: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:37:39: Received PINGREQ from robocar-buddy1
+2026-10-31T22:37:39: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:37:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:37:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:37:49: Received PINGREQ from robocar-buddy1
+2026-10-31T22:37:49: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:37:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:37:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:37:58: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:37:58: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:37:58: Received PINGREQ from robocar-buddy1
+2026-10-31T22:37:58: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:38:03: Received PINGREQ from robocar-buddy1
+2026-10-31T22:38:03: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:38:09: Received PINGREQ from robocar-buddy1
+2026-10-31T22:38:09: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:38:14: Received PINGREQ from robocar-buddy1
+2026-10-31T22:38:14: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:38:18: Received PINGREQ from robocar-buddy1
+2026-10-31T22:38:18: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:38:23: Received PINGREQ from robocar-buddy1
+2026-10-31T22:38:23: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:38:28: Received PINGREQ from robocar-buddy1
+2026-10-31T22:38:28: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:38:34: Received PINGREQ from robocar-buddy1
+2026-10-31T22:38:34: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:38:39: Received PINGREQ from robocar-buddy1
+2026-10-31T22:38:39: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:38:44: Received PINGREQ from robocar-buddy1
+2026-10-31T22:38:44: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:38:48: Received PINGREQ from robocar-buddy1
+2026-10-31T22:38:48: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:38:53: Received PINGREQ from robocar-buddy1
+2026-10-31T22:38:53: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:38:57: Received PINGREQ from auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:38:57: Sending PINGRESP to auto-426705A2-F351-DDED-D700-210BD8F19BF0
+2026-10-31T22:38:59: Received PINGREQ from robocar-buddy1
+2026-10-31T22:38:59: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:39:04: Received PINGREQ from robocar-buddy1
+2026-10-31T22:39:04: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:39:09: Received PINGREQ from robocar-buddy1
+2026-10-31T22:39:09: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:39:13: Received PINGREQ from robocar-buddy1
+2026-10-31T22:39:13: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:39:18: Received PINGREQ from robocar-buddy1
+2026-10-31T22:39:18: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:39:23: Received PINGREQ from robocar-buddy1
+2026-10-31T22:39:23: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:39:29: Received PINGREQ from robocar-buddy1
+2026-10-31T22:39:29: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:39:34: Received PINGREQ from robocar-buddy1
+2026-10-31T22:39:34: Sending PINGRESP to robocar-buddy1
+2026-10-31T22:39:41: Client robocar-buddy1 [172.20.10.3:54621] disconnected: exceeded timeout.
+2026-10-31T22:39:41: Sending PUBLISH to auto-426705A2-F351-DDED-D700-210BD8F19BF0 (d0, q1, r0, m18, 'robot/status', ... (7 bytes))
+2026-10-31T22:39:41: Received PUBACK from auto-426705A2-F351-DDED-D700-210BD8F19BF0 (Mid: 18, RC:0)
+2026-10-31T22:39:56: mosquitto version 2.1.2 terminating
