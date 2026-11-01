@@ -31,15 +31,15 @@ typedef uint8_t s1_telem_check_pub_t[((MSG_ACK_BYTES <= S1_TELEM_PUB_MAX)
 /*!
  * @brief Add two counts without wrapping.
  *
- * @param[in] a First count.
- * @param[in] b Second count.
+ * @param[in] total  The count so far.
+ * @param[in] amount The count to add.
  *
- * @return a + b, or UINT32_MAX if the sum does not fit.
+ * @return total + amount, or UINT32_MAX if the sum does not fit.
  */
 uint32_t
-s1_telem_sat_add (uint32_t a, uint32_t b)
+s1_telem_sat_add (uint32_t total, uint32_t amount)
 {
-    return ((b > (UINT32_MAX - a)) ? UINT32_MAX : (a + b));
+    return ((amount > (UINT32_MAX - total)) ? UINT32_MAX : (total + amount));
 }
 
 /*!
@@ -54,7 +54,7 @@ s1_telem_sat_add (uint32_t a, uint32_t b)
  * them (msg_codec_get_command()), otherwise both are 0.
  *
  * @param[in]     p_cmd   The command from mqtt_link_receive_command().
- * @param[in]     post    Posts a command to S5 (see s1_telem_post_fn_t).
+ * @param[in]     p_post  Posts a command to S5 (see s1_telem_post_fn_t).
  * @param[in,out] p_stats Counters to update.
  * @param[out]    p_ack   Receives the ack and how to publish it: topic
  *                        MQTT_LINK_TOPIC_ACK, QoS 1, not retained.
@@ -64,7 +64,7 @@ s1_telem_sat_add (uint32_t a, uint32_t b)
  */
 bool
 s1_telem_on_command (const mqtt_link_command_t * p_cmd,
-                     s1_telem_post_fn_t post, s1_telem_stats_t * p_stats,
+                     s1_telem_post_fn_t p_post, s1_telem_stats_t * p_stats,
                      s1_telem_pub_t * p_ack)
 {
     msg_codec_command_t cmd = {MSG_OP_INVALID, 0U};
@@ -72,7 +72,7 @@ s1_telem_on_command (const mqtt_link_command_t * p_cmd,
     bool                b_valid = false;
     bool                b_ok = false;
 
-    if ((NULL != p_cmd) && (NULL != post) && (NULL != p_stats)
+    if ((NULL != p_cmd) && (NULL != p_post) && (NULL != p_stats)
         && (NULL != p_ack))
     {
         if (p_cmd->payload_len <= sizeof(p_cmd->payload))
@@ -86,7 +86,7 @@ s1_telem_on_command (const mqtt_link_command_t * p_cmd,
             p_stats->codec_reject = s1_telem_sat_add(p_stats->codec_reject,
                                                      1U);
         }
-        else if (0 == post(cmd.opcode, cmd.cmd_id))
+        else if (0 == p_post(cmd.opcode, cmd.cmd_id))
         {
             ack.result = MSG_ACK_ACCEPTED;
         }
@@ -135,18 +135,18 @@ bool
 s1_telem_heartbeat (uint8_t seq, const s1_telem_hb_in_t * p_in,
                     const s1_telem_stats_t * p_stats, s1_telem_pub_t * p_hb)
 {
-    msg_codec_heartbeat_t hb = {0U, 0U, 0, 0U, 0U, 0U, 0U};
+    msg_codec_heartbeat_t hb_fields = {0U, 0U, 0, 0U, 0U, 0U, 0U};
     bool                  b_ok = false;
 
     if ((NULL != p_in) && (NULL != p_stats) && (NULL != p_hb))
     {
-        hb.seq = seq;
-        hb.uptime_s = p_in->uptime_s;
-        hb.rssi_dbm = 0;
-        hb.connect_count = p_in->connect_count;
-        hb.tel_drop = 0U;
-        hb.evt_drop = 0U;
-        hb.cmd_reject = s1_telem_sat_add(
+        hb_fields.seq = seq;
+        hb_fields.uptime_s = p_in->uptime_s;
+        hb_fields.rssi_dbm = 0;
+        hb_fields.connect_count = p_in->connect_count;
+        hb_fields.tel_drop = 0U;
+        hb_fields.evt_drop = 0U;
+        hb_fields.cmd_reject = s1_telem_sat_add(
             s1_telem_sat_add(p_stats->codec_reject, p_stats->post_failure),
             p_in->command_dropped);
 
@@ -156,8 +156,8 @@ s1_telem_heartbeat (uint8_t seq, const s1_telem_hb_in_t * p_in,
         /* The heartbeat is MSG_HB_BYTES long, which the compile-time
          * check above keeps within uint16_t.
          */
-        p_hb->len = (uint16_t)msg_codec_put_heartbeat(&hb, p_hb->payload,
-                                                      sizeof(p_hb->payload));
+        p_hb->len = (uint16_t)msg_codec_put_heartbeat(
+            &hb_fields, p_hb->payload, sizeof(p_hb->payload));
         b_ok = (MSG_HB_BYTES == p_hb->len);
     }
 

@@ -1,0 +1,31 @@
+S1-U14 run_telemetry_test.sh, 2026-11-01 15:03:04 +08
+commit: 06e11e1 (tested files have uncommitted changes)
+cc: Apple clang version 17.0.0 (clang-1700.6.4.2)
+== stage 1: build (strict warnings as errors, UBSan/ASan)
+stage 1: ok, no warnings
+== stage 2: run
+S1-U14 s1_telem host test (layout version 1)
+commands
+  ok
+heartbeat
+  ok
+schedule
+  ok
+RESULT: all passed (176 checks)
+stage 2: ok
+== stage 3: mutations
+C1 payload room cut to the ack's size: caught by a compile-time check
+M1 a queued command acked as rejected: caught by the test (RESULT: 9 FAILED)
+M2 codec rejects posted to S5: caught by the test (RESULT: 19 FAILED)
+M3 command_dropped left out of cmd_reject: caught by the test (RESULT: 2 FAILED)
+M4 relative heartbeat deadline instead of absolute: caught by the test (RESULT: 3 FAILED)
+M5 ack published on the event topic: caught by the test (RESULT: 9 FAILED)
+M6 heartbeat published while the snapshot is stale: caught by the test (RESULT: 1 FAILED)
+M7 heartbeat sent at QoS 1: caught by the test (RESULT: 1 FAILED)
+stage 3: 8/8 mutations caught
+== stage 4: target compile
+arm-none-eabi-gcc (Arm GNU Toolchain 15.3.Rel1 (Build arm-15.149)) 15.3.1 20260627
+   text	   data	    bss	    dec	    hex	filename
+    364	      0	      0	    364	    16c	s1_telem.o
+stage 4: ok, no warnings
+S1-U14: PASS (176 checks, 8/8 mutations caught, target compile ok)

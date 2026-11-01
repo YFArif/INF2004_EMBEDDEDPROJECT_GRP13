@@ -167,7 +167,7 @@ telemetry_task (INT stacd, void * p_exinf)
 #if S1_TELEM_STACK_REPORT
     uint32_t            next_report_msec = next_hb_msec;
 #endif
-    int32_t             rc = MQTT_LINK_OK;
+    int32_t             rx_result = MQTT_LINK_OK;
 
     /* The casts mark the kernel's start-up arguments as unused. */
     (void)stacd;
@@ -175,17 +175,18 @@ telemetry_task (INT stacd, void * p_exinf)
 
     for (;;)
     {
-        rc = mqtt_link_receive_command(&cmd, TELEMETRY_TASK_RX_WAIT_MSEC);
+        rx_result = mqtt_link_receive_command(&cmd,
+                                              TELEMETRY_TASK_RX_WAIT_MSEC);
 
-        if (MQTT_LINK_OK == rc)
+        if (MQTT_LINK_OK == rx_result)
         {
             handle_command(&cmd);
         }
-        else if (MQTT_LINK_ERR_TIMEOUT == rc)
+        else if (MQTT_LINK_ERR_TIMEOUT == rx_result)
         {
             /* No command this pass. */
         }
-        else if (MQTT_LINK_ERR_NOT_READY == rc)
+        else if (MQTT_LINK_ERR_NOT_READY == rx_result)
         {
             /* Not expected: subsystem1_start() starts this task only after
              * mqtt_link_init() succeeded. The driver's rule is never to
@@ -277,18 +278,18 @@ static void
 send_heartbeat (void)
 {
     mqtt_link_status_t status;
-    s1_telem_hb_in_t   in = {0U, 0U, 0U};
-    s1_telem_pub_t     hb = {MQTT_LINK_TOPIC_TELEMETRY, MQTT_LINK_QOS_0,
-                             false, 0U, {0U}};
+    s1_telem_hb_in_t   hb_in = {0U, 0U, 0U};
+    s1_telem_pub_t     hb_msg = {MQTT_LINK_TOPIC_TELEMETRY, MQTT_LINK_QOS_0,
+                                 false, 0U, {0U}};
     bool               b_fresh = mqtt_link_get_status(&status);
     bool               b_send = false;
 
     if (b_fresh && s1_telem_hb_should_publish(status.state, status.b_stale))
     {
-        in.uptime_s = uptime_s();
-        in.connect_count = status.connect_count;
-        in.command_dropped = status.command_dropped;
-        b_send = s1_telem_heartbeat(g_hb_seq, &in, &g_stats, &hb);
+        hb_in.uptime_s = uptime_s();
+        hb_in.connect_count = status.connect_count;
+        hb_in.command_dropped = status.command_dropped;
+        b_send = s1_telem_heartbeat(g_hb_seq, &hb_in, &g_stats, &hb_msg);
     }
 
     if (!b_send)
@@ -302,8 +303,9 @@ send_heartbeat (void)
          */
         g_hb_seq = (uint8_t)(g_hb_seq + 1U);
 
-        if (MQTT_LINK_OK == mqtt_link_publish(hb.topic, hb.payload, hb.len,
-                                              hb.qos, hb.b_retain))
+        if (MQTT_LINK_OK == mqtt_link_publish(hb_msg.topic, hb_msg.payload,
+                                              hb_msg.len, hb_msg.qos,
+                                              hb_msg.b_retain))
         {
             g_stats.hb_published = s1_telem_sat_add(g_stats.hb_published, 1U);
         }

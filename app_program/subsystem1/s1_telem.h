@@ -93,9 +93,9 @@ typedef struct
     uint32_t    command_dropped;    /* mqtt_link status command_dropped.  */
 } s1_telem_hb_in_t;
 
-uint32_t s1_telem_sat_add(uint32_t a, uint32_t b);
+uint32_t s1_telem_sat_add(uint32_t total, uint32_t amount);
 bool     s1_telem_on_command(const mqtt_link_command_t * p_cmd,
-                             s1_telem_post_fn_t post,
+                             s1_telem_post_fn_t p_post,
                              s1_telem_stats_t * p_stats,
                              s1_telem_pub_t * p_ack);
 bool     s1_telem_heartbeat(uint8_t seq, const s1_telem_hb_in_t * p_in,

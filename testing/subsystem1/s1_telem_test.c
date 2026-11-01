@@ -179,41 +179,44 @@ test_valid_commands (void)
     static const uint8_t opcodes[3] = {MSG_OP_START, MSG_OP_STOP,
                                        MSG_OP_RESET};
     static const uint8_t ids[3] = {0U, 1U, 63U};
-    uint32_t i = 0U;
-    uint32_t j = 0U;
+    uint32_t op_idx = 0U;
+    uint32_t id_idx = 0U;
 
-    for (i = 0U; i < 3U; i++)
+    for (op_idx = 0U; op_idx < 3U; op_idx++)
     {
-        for (j = 0U; j < 3U; j++)
+        for (id_idx = 0U; id_idx < 3U; id_idx++)
         {
             /* Opcode in the top 2 bits of byte 1, id in the low 6; the
              * result is at most 0xFF, so the cast keeps it.
              */
-            uint8_t             b1 = (uint8_t)(((uint32_t)opcodes[i] << 6U)
-                                               | ids[j]);
-            mqtt_link_command_t cmd = make_cmd(HDR_COMMAND, b1, 2U);
-            s1_telem_stats_t    st;
+            uint8_t             cmd_byte1 =
+                (uint8_t)(((uint32_t)opcodes[op_idx] << 6U) | ids[id_idx]);
+            mqtt_link_command_t cmd = make_cmd(HDR_COMMAND, cmd_byte1, 2U);
+            s1_telem_stats_t    stats;
             s1_telem_pub_t      ack;
-            const uint8_t       want[3] = {HDR_ACK, b1, ACK_BYTE2_QUEUED};
+            const uint8_t       want[3] = {HDR_ACK, cmd_byte1,
+                                           ACK_BYTE2_QUEUED};
             bool                b_ok = false;
 
-            (void)memset(&st, 0, sizeof(st));
+            (void)memset(&stats, 0, sizeof(stats));
             (void)memset(&ack, 0xA5, sizeof(ack));
             stub_reset(E_OK_VALUE);
-            b_ok = s1_telem_on_command(&cmd, stub_post, &st, &ack);
+            b_ok = s1_telem_on_command(&cmd, stub_post, &stats, &ack);
 
-            check(b_ok, "valid: returns true", b1);
-            check(1U == g_post_calls, "valid: posted once", b1);
-            check(opcodes[i] == g_post_opcode, "valid: opcode posted", b1);
-            check(ids[j] == g_post_cmd_id, "valid: id posted", b1);
+            check(b_ok, "valid: returns true", cmd_byte1);
+            check(1U == g_post_calls, "valid: posted once", cmd_byte1);
+            check(opcodes[op_idx] == g_post_opcode, "valid: opcode posted",
+                  cmd_byte1);
+            check(ids[id_idx] == g_post_cmd_id, "valid: id posted", cmd_byte1);
             check(MSG_ACK_BYTES == ack.len, "valid: ack length", ack.len);
             check(bytes_equal(ack.payload, want, 3U), "valid: ack bytes",
-                  b1);
-            check(MQTT_LINK_TOPIC_ACK == ack.topic, "valid: ack topic", b1);
-            check(MQTT_LINK_QOS_1 == ack.qos, "valid: ack QoS 1", b1);
-            check(!ack.b_retain, "valid: ack not retained", b1);
-            check((0U == st.codec_reject) && (0U == st.post_failure),
-                  "valid: nothing counted", b1);
+                  cmd_byte1);
+            check(MQTT_LINK_TOPIC_ACK == ack.topic, "valid: ack topic",
+                  cmd_byte1);
+            check(MQTT_LINK_QOS_1 == ack.qos, "valid: ack QoS 1", cmd_byte1);
+            check(!ack.b_retain, "valid: ack not retained", cmd_byte1);
+            check((0U == stats.codec_reject) && (0U == stats.post_failure),
+                  "valid: nothing counted", cmd_byte1);
         }
     }
 }
@@ -226,28 +229,28 @@ test_post_failures (void)
 {
     static const int32_t errors[3] = {E_TMOUT_VALUE, E_ID_VALUE,
                                       E_NOEXS_VALUE};
-    s1_telem_stats_t st;
-    uint32_t         i = 0U;
+    s1_telem_stats_t stats;
+    uint32_t         err_idx = 0U;
 
-    (void)memset(&st, 0, sizeof(st));
+    (void)memset(&stats, 0, sizeof(stats));
 
-    for (i = 0U; i < 3U; i++)
+    for (err_idx = 0U; err_idx < 3U; err_idx++)
     {
         /* STOP, id 5: golden vector CMD-1 (14 85). */
         mqtt_link_command_t cmd = make_cmd(HDR_COMMAND, 0x85U, 2U);
         s1_telem_pub_t      ack;
         const uint8_t       want[3] = {HDR_ACK, 0x85U, ACK_BYTE2_REJECTED};
 
-        stub_reset(errors[i]);
-        check(s1_telem_on_command(&cmd, stub_post, &st, &ack),
-              "post failure: returns true", i);
-        check(1U == g_post_calls, "post failure: posted once", i);
+        stub_reset(errors[err_idx]);
+        check(s1_telem_on_command(&cmd, stub_post, &stats, &ack),
+              "post failure: returns true", err_idx);
+        check(1U == g_post_calls, "post failure: posted once", err_idx);
         check(bytes_equal(ack.payload, want, 3U),
-              "post failure: ack rejected, opcode and id echoed", i);
-        check((i + 1U) == st.post_failure, "post failure: counted",
-              st.post_failure);
-        check(0U == st.codec_reject, "post failure: not a codec reject",
-              st.codec_reject);
+              "post failure: ack rejected, opcode and id echoed", err_idx);
+        check((err_idx + 1U) == stats.post_failure, "post failure: counted",
+              stats.post_failure);
+        check(0U == stats.codec_reject, "post failure: not a codec reject",
+              stats.codec_reject);
     }
 }
 
@@ -266,29 +269,30 @@ test_codec_rejects (void)
         {HDR_COMMAND, 0x85U, 1U, 0x00U},  /* One byte.                   */
         {HDR_COMMAND, 0x85U, 0U, 0x00U},  /* Empty (a cleared retain).   */
     };
-    s1_telem_stats_t st;
-    uint32_t         i = 0U;
+    s1_telem_stats_t stats;
+    uint32_t         case_idx = 0U;
 
-    (void)memset(&st, 0, sizeof(st));
+    (void)memset(&stats, 0, sizeof(stats));
 
-    for (i = 0U; i < 6U; i++)
+    for (case_idx = 0U; case_idx < 6U; case_idx++)
     {
-        mqtt_link_command_t cmd = make_cmd(cases[i][0], cases[i][1],
-                                           cases[i][2]);
+        mqtt_link_command_t cmd = make_cmd(cases[case_idx][0],
+                                           cases[case_idx][1],
+                                           cases[case_idx][2]);
         s1_telem_pub_t      ack;
-        const uint8_t       want[3] = {HDR_ACK, cases[i][3],
+        const uint8_t       want[3] = {HDR_ACK, cases[case_idx][3],
                                        ACK_BYTE2_REJECTED};
 
         stub_reset(E_OK_VALUE);
-        check(s1_telem_on_command(&cmd, stub_post, &st, &ack),
-              "codec reject: returns true", i);
-        check(0U == g_post_calls, "codec reject: not posted", i);
+        check(s1_telem_on_command(&cmd, stub_post, &stats, &ack),
+              "codec reject: returns true", case_idx);
+        check(0U == g_post_calls, "codec reject: not posted", case_idx);
         check(bytes_equal(ack.payload, want, 3U),
-              "codec reject: ack bytes", i);
-        check((i + 1U) == st.codec_reject, "codec reject: counted",
-              st.codec_reject);
-        check(0U == st.post_failure, "codec reject: no post failure",
-              st.post_failure);
+              "codec reject: ack bytes", case_idx);
+        check((case_idx + 1U) == stats.codec_reject, "codec reject: counted",
+              stats.codec_reject);
+        check(0U == stats.post_failure, "codec reject: no post failure",
+              stats.post_failure);
     }
 
     {
@@ -298,7 +302,7 @@ test_codec_rejects (void)
         const uint8_t       want[3] = {HDR_ACK, 0x00U, ACK_BYTE2_REJECTED};
 
         stub_reset(E_OK_VALUE);
-        check(s1_telem_on_command(&cmd, stub_post, &st, &ack)
+        check(s1_telem_on_command(&cmd, stub_post, &stats, &ack)
               && (0U == g_post_calls)
               && bytes_equal(ack.payload, want, 3U),
               "codec reject: over-long length refused, not posted", 3U);
@@ -312,21 +316,21 @@ static void
 test_null_arguments (void)
 {
     mqtt_link_command_t cmd = make_cmd(HDR_COMMAND, 0x85U, 2U);
-    s1_telem_stats_t    st;
+    s1_telem_stats_t    stats;
     s1_telem_pub_t      pub;
-    s1_telem_hb_in_t    in = {0U, 0U, 0U};
+    s1_telem_hb_in_t    hb_in = {0U, 0U, 0U};
 
-    (void)memset(&st, 0, sizeof(st));
+    (void)memset(&stats, 0, sizeof(stats));
     stub_reset(E_OK_VALUE);
-    check(!s1_telem_on_command(NULL, stub_post, &st, &pub), "null cmd", 0U);
-    check(!s1_telem_on_command(&cmd, NULL, &st, &pub), "null post", 0U);
+    check(!s1_telem_on_command(NULL, stub_post, &stats, &pub), "null cmd", 0U);
+    check(!s1_telem_on_command(&cmd, NULL, &stats, &pub), "null post", 0U);
     check(!s1_telem_on_command(&cmd, stub_post, NULL, &pub), "null stats",
           0U);
-    check(!s1_telem_on_command(&cmd, stub_post, &st, NULL), "null ack", 0U);
+    check(!s1_telem_on_command(&cmd, stub_post, &stats, NULL), "null ack", 0U);
     check(0U == g_post_calls, "null: never posted", g_post_calls);
-    check(!s1_telem_heartbeat(0U, NULL, &st, &pub), "null hb in", 0U);
-    check(!s1_telem_heartbeat(0U, &in, NULL, &pub), "null hb stats", 0U);
-    check(!s1_telem_heartbeat(0U, &in, &st, NULL), "null hb out", 0U);
+    check(!s1_telem_heartbeat(0U, NULL, &stats, &pub), "null hb in", 0U);
+    check(!s1_telem_heartbeat(0U, &hb_in, NULL, &pub), "null hb stats", 0U);
+    check(!s1_telem_heartbeat(0U, &hb_in, &stats, NULL), "null hb out", 0U);
     check(!s1_telem_hb_due(0U, NULL), "null deadline", 0U);
 }
 
@@ -342,29 +346,31 @@ test_heartbeat_bytes (void)
      */
     static const uint8_t want[9] = {HDR_HEARTBEAT, 0x01U, 0x00U, 0x02U,
                                     0x00U, 0x06U, 0x00U, 0x00U, 0x08U};
-    s1_telem_hb_in_t     in = {2U, 3U, 1U};
-    s1_telem_stats_t     st;
-    s1_telem_pub_t       hb;
+    s1_telem_hb_in_t     hb_in = {2U, 3U, 1U};
+    s1_telem_stats_t     stats;
+    s1_telem_pub_t       hb_msg;
 
-    (void)memset(&st, 0, sizeof(st));
-    st.codec_reject = 1U;
-    st.post_failure = 2U;
+    (void)memset(&stats, 0, sizeof(stats));
+    stats.codec_reject = 1U;
+    stats.post_failure = 2U;
 
-    check(s1_telem_heartbeat(1U, &in, &st, &hb), "hb: returns true", 0U);
-    check(MSG_HB_BYTES == hb.len, "hb: length", hb.len);
-    check(bytes_equal(hb.payload, want, 9U),
+    check(s1_telem_heartbeat(1U, &hb_in, &stats, &hb_msg), "hb: returns true",
+          0U);
+    check(MSG_HB_BYTES == hb_msg.len, "hb: length", hb_msg.len);
+    check(bytes_equal(hb_msg.payload, want, 9U),
           "hb: bytes (cmd_reject = codec + post failures + dropped)", 0U);
-    check(MQTT_LINK_TOPIC_TELEMETRY == hb.topic, "hb: telemetry topic", 0U);
-    check(MQTT_LINK_QOS_0 == hb.qos, "hb: QoS 0", 0U);
-    check(!hb.b_retain, "hb: not retained", 0U);
+    check(MQTT_LINK_TOPIC_TELEMETRY == hb_msg.topic, "hb: telemetry topic", 0U);
+    check(MQTT_LINK_QOS_0 == hb_msg.qos, "hb: QoS 0", 0U);
+    check(!hb_msg.b_retain, "hb: not retained", 0U);
 
-    in.uptime_s = 0U;
-    in.connect_count = 0U;
-    in.command_dropped = 0U;
-    (void)memset(&st, 0, sizeof(st));
-    check(s1_telem_heartbeat(255U, &in, &st, &hb)
-          && (HDR_HEARTBEAT == hb.payload[0]) && (0xFFU == hb.payload[1])
-          && (0x00U == hb.payload[8]), "hb: seq 255, all else 0", 0U);
+    hb_in.uptime_s = 0U;
+    hb_in.connect_count = 0U;
+    hb_in.command_dropped = 0U;
+    (void)memset(&stats, 0, sizeof(stats));
+    check(s1_telem_heartbeat(255U, &hb_in, &stats, &hb_msg)
+          && (HDR_HEARTBEAT == hb_msg.payload[0])
+          && (0xFFU == hb_msg.payload[1])
+          && (0x00U == hb_msg.payload[8]), "hb: seq 255, all else 0", 0U);
 }
 
 /*!
@@ -373,24 +379,25 @@ test_heartbeat_bytes (void)
 static void
 test_heartbeat_saturation (void)
 {
-    s1_telem_hb_in_t in = {70000U, 300U, 10U};
-    s1_telem_stats_t st;
-    s1_telem_pub_t   hb;
+    s1_telem_hb_in_t hb_in = {70000U, 300U, 10U};
+    s1_telem_stats_t stats;
+    s1_telem_pub_t   hb_msg;
 
-    (void)memset(&st, 0, sizeof(st));
-    st.codec_reject = 200U;
-    st.post_failure = 50U;
+    (void)memset(&stats, 0, sizeof(stats));
+    stats.codec_reject = 200U;
+    stats.post_failure = 50U;
 
-    check(s1_telem_heartbeat(0U, &in, &st, &hb), "sat: returns true", 0U);
+    check(s1_telem_heartbeat(0U, &hb_in, &stats, &hb_msg), "sat: returns true",
+          0U);
     /* uptime 65535 in bytes 2-3; connect 255 across bits 39-46; cmd_reject
      * 255 across bits 63-70: byte 7 bit 0 and byte 8 bits 7-1.
      */
-    check((0xFFU == hb.payload[2]) && (0xFFU == hb.payload[3]),
+    check((0xFFU == hb_msg.payload[2]) && (0xFFU == hb_msg.payload[3]),
           "sat: uptime 70000 -> 65535", 0U);
-    check((0x01U == (hb.payload[4] & 0x01U)) && (0xFEU == hb.payload[5]),
-          "sat: connect 300 -> 255", 0U);
-    check((0x01U == (hb.payload[7] & 0x01U)) && (0xFEU == hb.payload[8]),
-          "sat: cmd_reject 260 -> 255", 0U);
+    check((0x01U == (hb_msg.payload[4] & 0x01U))
+          && (0xFEU == hb_msg.payload[5]), "sat: connect 300 -> 255", 0U);
+    check((0x01U == (hb_msg.payload[7] & 0x01U))
+          && (0xFEU == hb_msg.payload[8]), "sat: cmd_reject 260 -> 255", 0U);
 
     check(UINT32_MAX == s1_telem_sat_add(UINT32_MAX, 1U), "sat_add max+1",
           0U);
@@ -407,16 +414,16 @@ test_heartbeat_saturation (void)
 static void
 test_schedule_steady (void)
 {
-    const uint32_t t0 = 0xFFFFF000U;    /* Wraps 4096 ms in. */
-    uint32_t       next = t0;
+    const uint32_t start_msec = 0xFFFFF000U;    /* Wraps 4096 ms in. */
+    uint32_t       next = start_msec;
     uint32_t       dues = 0U;
     uint32_t       last = 0U;
-    uint32_t       i = 0U;
+    uint32_t       step = 0U;
     bool           b_spaced = true;
 
-    for (i = 0U; i < 200U; i++)
+    for (step = 0U; step < 200U; step++)
     {
-        uint32_t now = t0 + (50U * i);
+        uint32_t now = start_msec + (50U * step);
 
         if (s1_telem_hb_due(now, &next))
         {
@@ -442,12 +449,12 @@ test_schedule_jitter (void)
 {
     uint32_t next = 0U;
     uint32_t dues = 0U;
-    uint32_t i = 0U;
+    uint32_t step = 0U;
     bool     b_on_grid = true;
 
-    for (i = 0U; i < 286U; i++)
+    for (step = 0U; step < 286U; step++)
     {
-        uint32_t now = 70U * i;
+        uint32_t now = 70U * step;
 
         if (s1_telem_hb_due(now, &next))
         {
