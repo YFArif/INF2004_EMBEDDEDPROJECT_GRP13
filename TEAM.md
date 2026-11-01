@@ -147,7 +147,7 @@ change it only by team agreement. Write down every task you create.
 
 | Subsystem | Priority band | Tasks (name – priority – core)         |
 | --------- | ------------- | -------------------------------------- |
-| 1         | 12–13         | _example:_ led_task – 12 – any         |
+| 1         | 12–13         | telemetry_task – 14 – core 0, `MQTT=1` builds only (Week 6 report §3; outside the 12–13 band, pending team agreement); _example:_ led_task – 12 – any |
 | 2         | 14–15         | motion_task – 9 – core 1 (Week 6 report §3); _example:_ producer_task – 14 – core 1 |
 | 3         | 16–17         | task_line – 8 – core 1, task_barcode – 12 – core 1 (Week 6 report §3); _example:_ consumer_task – 16 – core 0 |
 | 4         | 18–19         | _example:_ monitor_task – 18 – any     |
@@ -181,12 +181,12 @@ limit there. The numbers below are the example's usage.
 
 | Object               | Limit | S1  | S2  | S3  | S4  | S5  |
 | -------------------- | ----- | --- | --- | --- | --- | --- |
-| Task                 | 32    | 1   | 1   | 1   | 1   | 2   |
+| Task                 | 32    | 2   | 1   | 1   | 1   | 2   |
 | Semaphore            | 16    |     | 1   |     |     |     |
 | Event flag           | 16    |     |     |     | 1   | 3   |
 | Mailbox              | 12    |     |     | 1   |     |     |
 | Mutex                | 12    |     |     | 1   |     | 1   |
-| Message buffer       | 12    |     |     |     | 1   | 2   |
+| Message buffer       | 12    | 2   |     |     | 1   | 2   |
 | Fixed memory pool    | 12    |     | 1   |     |     |     |
 | Variable memory pool | 12    |     |     |     |     |     |
 | Cyclic handler       | 12    | 1   |     |     |     |     |
