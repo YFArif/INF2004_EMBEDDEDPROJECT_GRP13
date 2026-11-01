@@ -1,0 +1,468 @@
+
+
+microT-Kernel Version 3.00
+
+
+=== S1-U08 msg_codec timing (layout version 1) ===
+wifi: cyw43_utk_task starting (proc 1)
+wifi: cyw43_init() ...
+wifi: cyw43_init() returned, bringing interface up ...
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+[S1-U08] all 11 codec functions called once: ok
+[S1-U08] round 1, core 1, priority 14
+[S1-U08] core 1 timer overhead: n=1000 min 0 mean 0.041 max 1 us (not subtracted)
+[S1-U08] core 1 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 26.868 us
+[S1-U08] core 1 put_telemetry: n=1000 min 26 mean 27.418 max 185 us; round trips 1000/1000
+[S1-U08] core 1 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005373 percent
+[S1-U08] core 1 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 get_telemetry: first call (cold, deployed) 111 us; batch mean (warm) 21.184 us
+[S1-U08] core 1 get_telemetry: n=1000 min 21 mean 21.441 max 197 us; round trips 1000/1000
+[S1-U08] core 1 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022200, warm 0.004236 percent
+[S1-U08] core 1 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 put_command: first call (cold, deployed) 11 us; batch mean (warm) 0.954 us
+[S1-U08] core 1 put_command: n=1000 min 0 mean 1.183 max 3 us; round trips 1000/1000
+[S1-U08] core 1 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003666, warm 0.000318 percent
+[S1-U08] core 1 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 1 get_command: n=1000 min 1 mean 1.642 max 32 us; round trips 1000/1000
+[S1-U08] core 1 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[TEST] S1-U08 PASS  put_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  put_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_command: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_command: max <= 1000 us (core 1)
+[TEST] s1u08 SUMMARY 8 passed, 0 failed
+[S1-U08] round 1, core 0, priority 14 (below the WiFi service; report only)
+[S1-U08] core 0 timer overhead: n=1000 min 0 mean 0.040 max 1 us (not subtracted)
+[S1-U08] core 0 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 26.840 us
+[S1-U08] core 0 put_telemetry: n=1000 min 26 mean 27.408 max 192 us; round trips 1000/1000
+[S1-U08] core 0 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005368 percent
+[S1-U08] core 0 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 get_telemetry: first call (cold, deployed) 110 us; batch mean (warm) 21.235 us
+[S1-U08] core 0 get_telemetry: n=1000 min 21 mean 21.715 max 496 us; round trips 1000/1000
+[S1-U08] core 0 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022000, warm 0.004247 percent
+[S1-U08] core 0 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 put_command: first call (cold, deployed) 10 us; batch mean (warm) 0.954 us
+[S1-U08] core 0 put_command: n=1000 min 0 mean 1.158 max 3 us; round trips 1000/1000
+[S1-U08] core 0 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003333, warm 0.000318 percent
+[S1-U08] core 0 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 0 get_command: n=1000 min 1 mean 1.411 max 4 us; round trips 1000/1000
+[S1-U08] core 0 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[S1-U08] round 1 done; next round in 30 s
+
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wif[S1-U08] round 3, core 1, priority 14
+[S1-U08] core 1 timer overhead: n=1000 min 0 mean 0.043 max 1 us (not subtracted)
+[S1-U08] core 1 put_telemetry: first call (cold, deployed) 165 us; batch mean (warm) 26.783 us
+[S1-U08] core 1 put_telemetry: n=1000 min 26 mean 27.509 max 257 us; round trips 1000/1000
+[S1-U08] core 1 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033000, warm 0.005356 percent
+[S1-U08] core 1 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 get_telemetry: first call (cold, deployed) 110 us; batch mean (warm) 21.173 us
+[S1-U08] core 1 get_telemetry: n=1000 min 21 mean 21.446 max 187 us; round trips 1000/1000
+[S1-U08] core 1 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022000, warm 0.004234 percent
+[S1-U08] core 1 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 put_command: first call (cold, deployed) 11 us; batch mean (warm) 0.954 us
+[S1-U08] core 1 put_command: n=1000 min 0 mean 1.180 max 3 us; round trips 1000/1000
+[S1-U08] core 1 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003666, warm 0.000318 percent
+[S1-U08] core 1 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 1 get_command: n=1000 min 1 mean 1.628 max 26 us; round trips 1000/1000
+[S1-U08] core 1 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[TEST] S1-U08 PASS  put_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  put_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_command: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_command: max <= 1000 us (core 1)
+[TEST] s1u08 SUMMARY 8 passed, 0 failed
+[S1-U08] round 3, core 0, priority 14 (below the WiFi service; report only)
+[S1-U08] core 0 timer overhead: n=1000 min 0 mean 0.046 max 1 us (not subtracted)
+[S1-U08] core 0 put_telemetry: first call (cold, deployed) 165 us; batch mean (warm) 26.850 us
+[S1-U08] core 0 put_telemetry: n=1000 min 26 mean 27.264 max 156 us; round trips 1000/1000
+[S1-U08] core 0 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033000, warm 0.005370 percent
+[S1-U08] core 0 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 get_telemetry: first call (cold, deployed) 110 us; batch mean (warm) 21.296 us
+[S1-U08] core 0 get_telemetry: n=1000 min 21 mean 21.729 max 571 us; round trips 1000/1000
+[S1-U08] core 0 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022000, warm 0.004259 percent
+[S1-U08] core 0 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 put_command: first call (cold, deployed) 11 us; batch mean (warm) 0.954 us
+[S1-U08] core 0 put_command: n=1000 min 1 mean 1.178 max 3 us; round trips 1000/1000
+[S1-U08] core 0 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003666, warm 0.000318 percent
+[S1-U08] core 0 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 0 get_command: n=1000 min 1 mean 1.426 max 4 us; round trips 1000/1000
+[S1-U08] core 0 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[S1-U08] round 3 done; next round in 30 s
+
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+[S1-U08] round 4, core 1, priority 14
+[S1-U08] core 1 timer overhead: n=1000 min 0 mean 0.040 max 1 us (not subtracted)
+[S1-U08] core 1 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 26.789 us
+[S1-U08] core 1 put_telemetry: n=1000 min 26 mean 27.488 max 190 us; round trips 1000/1000
+[S1-U08] core 1 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005357 percent
+[S1-U08] core 1 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 get_telemetry: first call (cold, deployed) 111 us; batch mean (warm) 21.176 us
+[S1-U08] core 1 get_telemetry: n=1000 min 21 mean 21.420 max 206 us; round trips 1000/1000
+[S1-U08] core 1 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022200, warm 0.004235 percent
+[S1-U08] core 1 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 put_command: first call (cold, deployed) 10 us; batch mean (warm) 0.954 us
+[S1-U08] core 1 put_command: n=1000 min 0 mean 1.162 max 3 us; round trips 1000/1000
+[S1-U08] core 1 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003333, warm 0.000318 percent
+[S1-U08] core 1 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 1 get_command: n=1000 min 1 mean 1.461 max 26 us; round trips 1000/1000
+[S1-U08] core 1 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[TEST] S1-U08 PASS  put_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  put_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_command: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_command: max <= 1000 us (core 1)
+[TEST] s1u08 SUMMARY 8 passed, 0 failed
+[S1-U08] round 4, core 0, priority 14 (below the WiFi service; report only)
+[S1-U08] core 0 timer overhead: n=1000 min 0 mean 0.044 max 1 us (not subtracted)
+[S1-U08] core 0 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 26.956 us
+[S1-U08] core 0 put_telemetry: n=1000 min 26 mean 35.672 max 8303 us; round trips 1000/1000
+[S1-U08] core 0 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005391 percent
+[S1-U08] core 0 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 get_telemetry: first call (cold, deployed) 110 us; batch mean (warm) 21.246 us
+[S1-U08] core 0 get_telemetry: n=1000 min 21 mean 21.343 max 191 us; round trips 1000/1000
+[S1-U08] core 0 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022000, warm 0.004249 percent
+[S1-U08] core 0 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 put_command: first call (cold, deployed) 11 us; batch mean (warm) 0.955 us
+[S1-U08] core 0 put_command: n=1000 min 0 mean 1.178 max 10 us; round trips 1000/1000
+[S1-U08] core 0 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003666, warm 0.000318 percent
+[S1-U08] core 0 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 0 get_command: n=1000 min 1 mean 1.415 max 4 us; round trips 1000/1000
+[S1-U08] core 0 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[S1-U08] round 4 done; next round in 30 s
+
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+[S1-U08] round 5, core 1, priority 14
+[S1-U08] core 1 timer overhead: n=1000 min 0 mean 0.041 max 1 us (not subtracted)
+[S1-U08] core 1 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 26.789 us
+[S1-U08] core 1 put_telemetry: n=1000 min 26 mean 27.451 max 239 us; round trips 1000/1000
+[S1-U08] core 1 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005357 percent
+[S1-U08] core 1 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 get_telemetry: first call (cold, deployed) 111 us; batch mean (warm) 21.176 us
+[S1-U08] core 1 get_telemetry: n=1000 min 21 mean 21.515 max 172 us; round trips 1000/1000
+[S1-U08] core 1 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022200, warm 0.004235 percent
+[S1-U08] core 1 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 put_command: first call (cold, deployed) 11 us; batch mean (warm) 0.954 us
+[S1-U08] core 1 put_command: n=1000 min 0 mean 1.176 max 3 us; round trips 1000/1000
+[S1-U08] core 1 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003666, warm 0.000318 percent
+[S1-U08] core 1 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 1 get_command: n=1000 min 1 mean 1.602 max 28 us; round trips 1000/1000
+[S1-U08] core 1 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[TEST] S1-U08 PASS  put_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  put_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_command: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_command: max <= 1000 us (core 1)
+[TEST] s1u08 SUMMARY 8 passed, 0 failed
+[S1-U08] round 5, core 0, priority 14 (below the WiFi service; report only)
+[S1-U08] core 0 timer overhead: n=1000 min 0 mean 0.050 max 1 us (not subtracted)
+[S1-U08] core 0 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 26.849 us
+[S1-U08] core 0 put_telemetry: n=1000 min 26 mean 27.282 max 148 us; round trips 1000/1000
+[S1-U08] core 0 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005369 percent
+[S1-U08] core 0 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 get_telemetry: first call (cold, deployed) 110 us; batch mean (warm) 21.238 us
+[S1-U08] core 0 get_telemetry: n=1000 min 21 mean 21.857 max 562 us; round trips 1000/1000
+[S1-U08] core 0 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022000, warm 0.004247 percent
+[S1-U08] core 0 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 put_command: first call (cold, deployed) 10 us; batch mean (warm) 0.954 us
+[S1-U08] core 0 put_command: n=1000 min 0 mean 1.163 max 3 us; round trips 1000/1000
+[S1-U08] core 0 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003333, warm 0.000318 percent
+[S1-U08] core 0 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 0 get_command: n=1000 min 1 mean 1.410 max 4 us; round trips 1000/1000
+[S1-U08] core 0 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[S1-U08] round 5 done; next round in 30 s
+
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+[S1-U08] round 6, core 1, priority 14
+[S1-U08] core 1 timer overhead: n=1000 min 0 mean 0.040 max 1 us (not subtracted)
+[S1-U08] core 1 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 27.444 us
+[S1-U08] core 1 put_telemetry: n=1000 min 26 mean 27.596 max 185 us; round trips 1000/1000
+[S1-U08] core 1 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005488 percent
+[S1-U08] core 1 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 get_telemetry: first call (cold, deployed) 110 us; batch mean (warm) 21.283 us
+[S1-U08] core 1 get_telemetry: n=1000 min 21 mean 21.645 max 227 us; round trips 1000/1000
+[S1-U08] core 1 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022000, warm 0.004256 percent
+[S1-U08] core 1 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 put_command: first call (cold, deployed) 11 us; batch mean (warm) 0.954 us
+[S1-U08] core 1 put_command: n=1000 min 0 mean 1.168 max 3 us; round trips 1000/1000
+[S1-U08] core 1 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003666, warm 0.000318 percent
+[S1-U08] core 1 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 1 get_command: n=1000 min 1 mean 1.448 max 22 us; round trips 1000/1000
+[S1-U08] core 1 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[TEST] S1-U08 PASS  put_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  put_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_command: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_command: max <= 1000 us (core 1)
+[TEST] s1u08 SUMMARY 8 passed, 0 failed
+wifi: link status -> joined AP, waiting for IP (1)
+[S1-U08] round 6, core 0, priority 14 (below the WiFi service; report only)
+[S1-U08] core 0 timer overhead: n=1000 min 0 mean 0.043 max 1 us (not subtracted)
+[S1-U08] core 0 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 27.132 us
+[S1-U08] core 0 put_telemetry: n=1000 min 26 mean 28.936 max 941 us; round trips 1000/1000
+[S1-U08] core 0 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005426 percent
+[S1-U08] core 0 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 get_telemetry: first call (cold, deployed) 111 us; batch mean (warm) 21.592 us
+[S1-U08] core 0 get_telemetry: n=1000 min 21 mean 21.802 max 413 us; round trips 1000/1000
+[S1-U08] core 0 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022200, warm 0.004318 percent
+[S1-U08] core 0 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 put_command: first call (cold, deployed) 10 us; batch mean (warm) 0.954 us
+[S1-U08] core 0 put_command: n=1000 min 0 mean 1.163 max 3 us; round trips 1000/1000
+[S1-U08] core 0 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003333, warm 0.000318 percent
+[S1-U08] core 0 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 0 get_command: n=1000 min 1 mean 1.486 max 66 us; round trips 1000/1000
+[S1-U08] core 0 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[S1-U08] round 6 done; next round in 30 s
+
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+[S1-U08] round 7, core 1, priority 14
+[S1-U08] core 1 timer overhead: n=1000 min 0 mean 0.038 max 1 us (not subtracted)
+[S1-U08] core 1 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 26.778 us
+[S1-U08] core 1 put_telemetry: n=1000 min 26 mean 27.428 max 210 us; round trips 1000/1000
+[S1-U08] core 1 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005355 percent
+[S1-U08] core 1 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 get_telemetry: first call (cold, deployed) 110 us; batch mean (warm) 21.176 us
+[S1-U08] core 1 get_telemetry: n=1000 min 21 mean 21.429 max 143 us; round trips 1000/1000
+[S1-U08] core 1 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022000, warm 0.004235 percent
+[S1-U08] core 1 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 put_command: first call (cold, deployed) 11 us; batch mean (warm) 0.954 us
+[S1-U08] core 1 put_command: n=1000 min 0 mean 1.183 max 3 us; round trips 1000/1000
+[S1-U08] core 1 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003666, warm 0.000318 percent
+[S1-U08] core 1 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 1 get_command: n=1000 min 1 mean 1.625 max 25 us; round trips 1000/1000
+[S1-U08] core 1 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[TEST] S1-U08 PASS  put_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  put_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_command: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_command: max <= 1000 us (core 1)
+[TEST] s1u08 SUMMARY 8 passed, 0 failed
+[S1-U08] round 7, core 0, priority 14 (below the WiFi service; report only)
+[S1-U08] core 0 timer overhead: n=1000 min 0 mean 0.044 max 1 us (not subtracted)
+[S1-U08] core 0 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 26.853 us
+[S1-U08] core 0 put_telemetry: n=1000 min 26 mean 27.152 max 78 us; round trips 1000/1000
+[S1-U08] core 0 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005370 percent
+[S1-U08] core 0 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 get_telemetry: first call (cold, deployed) 110 us; batch mean (warm) 21.228 us
+[S1-U08] core 0 get_telemetry: n=1000 min 21 mean 21.308 max 138 us; round trips 1000/1000
+[S1-U08] core 0 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022000, warm 0.004245 percent
+[S1-U08] core 0 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 put_command: first call (cold, deployed) 10 us; batch mean (warm) 0.954 us
+[S1-U08] core 0 put_command: n=1000 min 0 mean 1.186 max 3 us; round trips 1000/1000
+[S1-U08] core 0 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003333, warm 0.000318 percent
+[S1-U08] core 0 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.403 us
+[S1-U08] core 0 get_command: n=1000 min 1 mean 1.421 max 3 us; round trips 1000/1000
+[S1-U08] core 0 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[S1-U08] round 7 done; next round in 30 s
+
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+[S1-U08] round 8, core 1, priority 14
+[S1-U08] core 1 timer overhead: n=1000 min 0 mean 0.044 max 1 us (not subtracted)
+[S1-U08] core 1 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 26.781 us
+[S1-U08] core 1 put_telemetry: n=1000 min 26 mean 27.445 max 196 us; round trips 1000/1000
+[S1-U08] core 1 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005356 percent
+[S1-U08] core 1 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 get_telemetry: first call (cold, deployed) 111 us; batch mean (warm) 21.198 us
+[S1-U08] core 1 get_telemetry: n=1000 min 21 mean 21.818 max 150 us; round trips 1000/1000
+[S1-U08] core 1 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022200, warm 0.004239 percent
+[S1-U08] core 1 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 put_command: first call (cold, deployed) 11 us; batch mean (warm) 0.954 us
+[S1-U08] core 1 put_command: n=1000 min 0 mean 1.178 max 3 us; round trips 1000/1000
+[S1-U08] core 1 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003666, warm 0.000318 percent
+[S1-U08] core 1 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 1 get_command: n=1000 min 1 mean 1.458 max 28 us; round trips 1000/1000
+[S1-U08] core 1 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[TEST] S1-U08 PASS  put_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  put_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_command: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_command: max <= 1000 us (core 1)
+[TEST] s1u08 SUMMARY 8 passed, 0 failed
+[S1-U08] round 8, core 0, priority 14 (below the WiFi service; report only)
+[S1-U08] core 0 timer overhead: n=1000 min 0 mean 0.040 max 1 us (not subtracted)
+[S1-U08] core 0 put_telemetry: first call (cold, deployed) 165 us; batch mean (warm) 26.955 us
+[S1-U08] core 0 put_telemetry: n=1000 min 26 mean 27.450 max 195 us; round trips 1000/1000
+[S1-U08] core 0 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033000, warm 0.005391 percent
+[S1-U08] core 0 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 get_telemetry: first call (cold, deployed) 110 us; batch mean (warm) 21.245 us
+[S1-U08] core 0 get_telemetry: n=1000 min 21 mean 21.193 max 55 us; round trips 1000/1000
+[S1-U08] core 0 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022000, warm 0.004249 percent
+[S1-U08] core 0 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 put_command: first call (cold, deployed) 11 us; batch mean (warm) 0.954 us
+[S1-U08] core 0 put_command: n=1000 min 0 mean 1.194 max 14 us; round trips 1000/1000
+[S1-U08] core 0 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003666, warm 0.000318 percent
+[S1-U08] core 0 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 0 get_command: n=1000 min 1 mean 1.428 max 4 us; round trips 1000/1000
+[S1-U08] core 0 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[S1-U08] round 8 done; next round in 30 s
+
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+[S1-U08] round 9, core 1, priority 14
+[S1-U08] core 1 timer overhead: n=1000 min 0 mean 0.038 max 1 us (not subtracted)
+[S1-U08] core 1 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 26.786 us
+[S1-U08] core 1 put_telemetry: n=1000 min 26 mean 27.440 max 230 us; round trips 1000/1000
+[S1-U08] core 1 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005357 percent
+[S1-U08] core 1 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 get_telemetry: first call (cold, deployed) 111 us; batch mean (warm) 21.177 us
+[S1-U08] core 1 get_telemetry: n=1000 min 21 mean 21.409 max 231 us; round trips 1000/1000
+[S1-U08] core 1 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022200, warm 0.004235 percent
+[S1-U08] core 1 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 1 put_command: first call (cold, deployed) 11 us; batch mean (warm) 0.954 us
+[S1-U08] core 1 put_command: n=1000 min 1 mean 1.174 max 3 us; round trips 1000/1000
+[S1-U08] core 1 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003666, warm 0.000318 percent
+[S1-U08] core 1 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 1 get_command: n=1000 min 1 mean 1.667 max 26 us; round trips 1000/1000
+[S1-U08] core 1 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[TEST] S1-U08 PASS  put_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_telemetry: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_telemetry: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  put_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  put_command: max <= 1000 us (core 1)
+[TEST] S1-U08 PASS  get_command: 1000 calls round-trip (core 1)
+[TEST] S1-U08 PASS  get_command: max <= 1000 us (core 1)
+[TEST] s1u08 SUMMARY 8 passed, 0 failed
+[S1-U08] round 9, core 0, priority 14 (below the WiFi service; report only)
+[S1-U08] core 0 timer overhead: n=1000 min 0 mean 0.045 max 1 us (not subtracted)
+[S1-U08] core 0 put_telemetry: first call (cold, deployed) 166 us; batch mean (warm) 26.861 us
+[S1-U08] core 0 put_telemetry: n=1000 min 26 mean 35.461 max 8289 us; round trips 1000/1000
+[S1-U08] core 0 put_telemetry: CPU share at 2 Hz of one core: deployed 0.033200, warm 0.005372 percent
+[S1-U08] core 0 put_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 get_telemetry: first call (cold, deployed) 110 us; batch mean (warm) 21.243 us
+[S1-U08] core 0 get_telemetry: n=1000 min 21 mean 21.895 max 562 us; round trips 1000/1000
+[S1-U08] core 0 get_telemetry: CPU share at 2 Hz of one core: deployed 0.022000, warm 0.004248 percent
+[S1-U08] core 0 get_telemetry: estimate 25 to 40 us (information, not a gate)
+[S1-U08] core 0 put_command: first call (cold, deployed) 11 us; batch mean (warm) 0.954 us
+[S1-U08] core 0 put_command: n=1000 min 0 mean 1.165 max 3 us; round trips 1000/1000
+[S1-U08] core 0 put_command: CPU share of the 300 ms NFR15 budget: deployed 0.003666, warm 0.000318 percent
+[S1-U08] core 0 get_command: first call (cold, deployed) 19 us; batch mean (warm) 1.402 us
+[S1-U08] core 0 get_command: n=1000 min 1 mean 1.444 max 3 us; round trips 1000/1000
+[S1-U08] core 0 get_command: CPU share of the 300 ms NFR15 budget: deployed 0.006333, warm 0.000467 percent
+[S1-U08] round 9 done; next round in 30 s
+
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)
+wifi: joining "your-network-name" ...
+wifi: link status -> joined AP, waiting for IP (1)
+wifi: link status -> FAILED: SSID not found (out of range, wrong name, or 5GHz-only network -- this chip is 2.4GHz only) (-2)

@@ -1,0 +1,35 @@
+S1-U09 run_link_test.sh, 2026-10-26 21:53:53 +08
+commit: e003301
+cc: Apple clang version 17.0.0 (clang-1700.6.4.2)
+== stage 1: build the host test
+stage 1: ok
+== stage 2: run
+-- publish rejections
+-- publish accepted cases
+-- get_status
+-- receive_command
+-- incoming commands: 2-byte limit, whole and in fragments, topic length
+-- init order, good configuration
+-- a second init after success does nothing
+-- init when the queue cannot be created
+-- last_poll_msec / b_stale
+-- poll before init: no crash, no publish, stamp still happens
+-- poll after a successful init publishes
+-- start_connect() carries the configured keep-alive
+-- reconnect backoff doubles and then holds its cap
+-- topic mapping: full topic of each ID, bad queued ID
+RESULT: all passed
+stage 2: ok
+== stage 3: compile-time checks
+unmutated copy: clean compile
+L1 MQTT_LINK_COMMAND_MAX MSG_CMD_BYTES -> 3U: caught by mqtt_link_check_caps_t
+L2 MQTT_LINK_PAYLOAD_MAX MSG_MAX_BYTES -> 24U: caught by mqtt_link_check_caps_t
+L3 TOPIC_ACK "ack" -> 49 characters: caught by mqtt_link_check_suffix_t
+L4 MQTT_LINK_TOPIC_COUNT 3U -> 4U: caught by mqtt_link_check_table_t
+stage 3: 4/4 mutations caught
+== stage 4: run-time check of the topic mapping
+R0 unmutated copy: all passed
+  FAIL line 938
+R1 TOPIC_EVENT "event" -> "ack": caught by the topic mapping test
+stage 4: 1/1 mutation caught
+S1-U09: PASS (host test all passed, clean compile of the copy, 4/4 compile-time mutations caught, 1/1 run-time mutation caught)

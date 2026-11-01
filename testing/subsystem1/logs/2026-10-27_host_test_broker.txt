@@ -1,0 +1,313 @@
+S1-U12 broker_test.py, 2026-10-27 00:56:46 +08
+commit: f2e2f54
+python: Python 3.13.7
+mosquitto_sub: mosquitto_sub version 2.1.2 running on libmosquitto 2.1.0.
+mosquitto_pub: mosquitto_pub version 2.1.2 running on libmosquitto 2.1.0.
+== stage 1: broker
+configuration: listener 1883 127.0.0.1, allow_anonymous true, persistence false, log_type all
+broker listens on: 127.0.0.1:1883
+stage 1: ok
+== stage 2: stream
+subscriber: mosquitto_sub -h 127.0.0.1 -p 1883 -q 1 -t 's1test/stream' -F '%x' | python3 app_program/subsystem1/dashboard/s1_decode.py --describe --session
+publisher, once per vector: mosquitto_pub -h 127.0.0.1 -p 1883 -q 1 -t 's1test/stream' -s (payload in binary on stdin)
+published 18; broker: Received PUBLISH 18, Sending PUBLISH 36, Received PUBACK 36
+exit status: subscriber 0, decoder 0, raw subscriber 0
+lines: stream 18, direct 18; error lines in the stream: 0
+diff direct stream: no differences
+raw -F '%x' output: 534 bytes, 18 newlines, 0 carriage returns; the 18 payloads in lowercase hex, one per line
+stage 2: ok
+== stage 3: STOP
+subscriber: mosquitto_sub -h 127.0.0.1 -p 1883 -q 1 -t 'robocar/car1/cmd/#' -C 2 -F '%x' | python3 app_program/subsystem1/dashboard/s1_decode.py --describe
+publisher: printf '\024\205' | mosquitto_pub -h 127.0.0.1 -p 1883 -q 1 -t 'robocar/car1/cmd' -s
+publisher: printf '\024\205' | mosquitto_pub -h 127.0.0.1 -p 1883 -q 1 -t 'robocar/car1/cmd/ui' -s
+exit status: subscriber 0, decoder 0
+decoded: {"cmd_id": 5, "msg_type": 4, "opcode": 2, "opcode_name": "STOP", "type": "COMMAND", "valid": true, "version": 1}
+decoded: {"cmd_id": 5, "msg_type": 4, "opcode": 2, "opcode_name": "STOP", "type": "COMMAND", "valid": true, "version": 1}
+broker received: 'robocar/car1/cmd' at QoS 1, 'robocar/car1/cmd/ui' at QoS 1
+broker sent on: 'robocar/car1/cmd' at QoS 1, 'robocar/car1/cmd/ui' at QoS 1
+stage 3: ok
+== stage 4: broker stopped, exit status 0; 127.0.0.1:1883 free
+== broker log
+1793033806: Info: running mosquitto as user: <user>.
+1793033806: mosquitto version 2.1.2 starting
+1793033806: Config loaded from <TMPDIR>/s1u12.2zw_1qhf/broker.conf.
+1793033806: Bridge support available.
+1793033806: Persistence support available.
+1793033806: TLS support available.
+1793033806: TLS-PSK support available.
+1793033806: Websockets support available.
+1793033806: Opening ipv4 listen socket on port 1883.
+1793033806: mosquitto version 2.1.2 running
+1793033806: New connection from 127.0.0.1:61566 on port 1883.
+1793033806: Client 127.0.0.1 [127.0.0.1:61566] disconnected: connection closed by client.
+1793033806: Client 127.0.0.1 [127.0.0.1:61566] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61567 on port 1883.
+1793033806: New client connected from 127.0.0.1:61567 as s1u12-stream (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-stream (0, 0)
+1793033806: Received SUBSCRIBE from s1u12-stream
+1793033806: 	s1test/stream (QoS 1)
+1793033806: s1u12-stream 1 s1test/stream
+1793033806: Sending SUBACK to s1u12-stream
+1793033806: New connection from 127.0.0.1:61568 on port 1883.
+1793033806: New client connected from 127.0.0.1:61568 as s1u12-raw (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-raw (0, 0)
+1793033806: Received SUBSCRIBE from s1u12-raw
+1793033806: 	s1test/stream (QoS 1)
+1793033806: s1u12-raw 1 s1test/stream
+1793033806: Sending SUBACK to s1u12-raw
+1793033806: New connection from 127.0.0.1:61569 on port 1883.
+1793033806: New client connected from 127.0.0.1:61569 as s1u12-pub-01 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-01 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-01 (d0, q1, r0, m1, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m1, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m1, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBACK to s1u12-pub-01 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 1, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 1, RC:0)
+1793033806: Client s1u12-pub-01 [127.0.0.1:61569] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-01 [127.0.0.1:61569] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61570 on port 1883.
+1793033806: New client connected from 127.0.0.1:61570 as s1u12-pub-02 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-02 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-02 (d0, q1, r0, m1, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m2, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m2, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBACK to s1u12-pub-02 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 2, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 2, RC:0)
+1793033806: Client s1u12-pub-02 [127.0.0.1:61570] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-02 [127.0.0.1:61570] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61571 on port 1883.
+1793033806: New client connected from 127.0.0.1:61571 as s1u12-pub-03 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-03 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-03 (d0, q1, r0, m1, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m3, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m3, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBACK to s1u12-pub-03 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 3, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 3, RC:0)
+1793033806: Client s1u12-pub-03 [127.0.0.1:61571] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-03 [127.0.0.1:61571] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61572 on port 1883.
+1793033806: New client connected from 127.0.0.1:61572 as s1u12-pub-04 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-04 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-04 (d0, q1, r0, m1, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m4, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m4, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBACK to s1u12-pub-04 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 4, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 4, RC:0)
+1793033806: Client s1u12-pub-04 [127.0.0.1:61572] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-04 [127.0.0.1:61572] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61573 on port 1883.
+1793033806: New client connected from 127.0.0.1:61573 as s1u12-pub-05 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-05 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-05 (d0, q1, r0, m1, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m5, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m5, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBACK to s1u12-pub-05 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 5, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 5, RC:0)
+1793033806: Client s1u12-pub-05 [127.0.0.1:61573] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-05 [127.0.0.1:61573] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61574 on port 1883.
+1793033806: New client connected from 127.0.0.1:61574 as s1u12-pub-06 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-06 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-06 (d0, q1, r0, m1, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m6, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m6, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBACK to s1u12-pub-06 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 6, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 6, RC:0)
+1793033806: Client s1u12-pub-06 [127.0.0.1:61574] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-06 [127.0.0.1:61574] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61575 on port 1883.
+1793033806: New client connected from 127.0.0.1:61575 as s1u12-pub-07 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-07 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-07 (d0, q1, r0, m1, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m7, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m7, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBACK to s1u12-pub-07 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 7, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 7, RC:0)
+1793033806: Client s1u12-pub-07 [127.0.0.1:61575] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-07 [127.0.0.1:61575] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61576 on port 1883.
+1793033806: New client connected from 127.0.0.1:61576 as s1u12-pub-08 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-08 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-08 (d0, q1, r0, m1, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m8, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m8, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBACK to s1u12-pub-08 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 8, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 8, RC:0)
+1793033806: Client s1u12-pub-08 [127.0.0.1:61576] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-08 [127.0.0.1:61576] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61577 on port 1883.
+1793033806: New client connected from 127.0.0.1:61577 as s1u12-pub-09 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-09 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-09 (d0, q1, r0, m1, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m9, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m9, 's1test/stream', ... (25 bytes))
+1793033806: Sending PUBACK to s1u12-pub-09 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 9, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 9, RC:0)
+1793033806: Client s1u12-pub-09 [127.0.0.1:61577] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-09 [127.0.0.1:61577] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61578 on port 1883.
+1793033806: New client connected from 127.0.0.1:61578 as s1u12-pub-10 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-10 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-10 (d0, q1, r0, m1, 's1test/stream', ... (9 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m10, 's1test/stream', ... (9 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m10, 's1test/stream', ... (9 bytes))
+1793033806: Sending PUBACK to s1u12-pub-10 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 10, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 10, RC:0)
+1793033806: Client s1u12-pub-10 [127.0.0.1:61578] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-10 [127.0.0.1:61578] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61579 on port 1883.
+1793033806: New client connected from 127.0.0.1:61579 as s1u12-pub-11 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-11 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-11 (d0, q1, r0, m1, 's1test/stream', ... (7 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m11, 's1test/stream', ... (7 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m11, 's1test/stream', ... (7 bytes))
+1793033806: Sending PUBACK to s1u12-pub-11 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 11, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 11, RC:0)
+1793033806: Client s1u12-pub-11 [127.0.0.1:61579] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-11 [127.0.0.1:61579] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61580 on port 1883.
+1793033806: New client connected from 127.0.0.1:61580 as s1u12-pub-12 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-12 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-12 (d0, q1, r0, m1, 's1test/stream', ... (2 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m12, 's1test/stream', ... (2 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m12, 's1test/stream', ... (2 bytes))
+1793033806: Sending PUBACK to s1u12-pub-12 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 12, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 12, RC:0)
+1793033806: Client s1u12-pub-12 [127.0.0.1:61580] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-12 [127.0.0.1:61580] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61582 on port 1883.
+1793033806: New client connected from 127.0.0.1:61582 as s1u12-pub-13 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-13 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-13 (d0, q1, r0, m1, 's1test/stream', ... (2 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m13, 's1test/stream', ... (2 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m13, 's1test/stream', ... (2 bytes))
+1793033806: Sending PUBACK to s1u12-pub-13 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 13, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 13, RC:0)
+1793033806: Client s1u12-pub-13 [127.0.0.1:61582] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-13 [127.0.0.1:61582] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61583 on port 1883.
+1793033806: New client connected from 127.0.0.1:61583 as s1u12-pub-14 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-14 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-14 (d0, q1, r0, m1, 's1test/stream', ... (2 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m14, 's1test/stream', ... (2 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m14, 's1test/stream', ... (2 bytes))
+1793033806: Sending PUBACK to s1u12-pub-14 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 14, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 14, RC:0)
+1793033806: Client s1u12-pub-14 [127.0.0.1:61583] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-14 [127.0.0.1:61583] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61584 on port 1883.
+1793033806: New client connected from 127.0.0.1:61584 as s1u12-pub-15 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-15 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-15 (d0, q1, r0, m1, 's1test/stream', ... (2 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m15, 's1test/stream', ... (2 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m15, 's1test/stream', ... (2 bytes))
+1793033806: Sending PUBACK to s1u12-pub-15 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 15, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 15, RC:0)
+1793033806: Client s1u12-pub-15 [127.0.0.1:61584] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-15 [127.0.0.1:61584] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61585 on port 1883.
+1793033806: New client connected from 127.0.0.1:61585 as s1u12-pub-16 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-16 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-16 (d0, q1, r0, m1, 's1test/stream', ... (3 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m16, 's1test/stream', ... (3 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m16, 's1test/stream', ... (3 bytes))
+1793033806: Sending PUBACK to s1u12-pub-16 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 16, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 16, RC:0)
+1793033806: Client s1u12-pub-16 [127.0.0.1:61585] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-16 [127.0.0.1:61585] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61586 on port 1883.
+1793033806: New client connected from 127.0.0.1:61586 as s1u12-pub-17 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-17 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-17 (d0, q1, r0, m1, 's1test/stream', ... (3 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m17, 's1test/stream', ... (3 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m17, 's1test/stream', ... (3 bytes))
+1793033806: Sending PUBACK to s1u12-pub-17 (m1, rc0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 17, RC:0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 17, RC:0)
+1793033806: Client s1u12-pub-17 [127.0.0.1:61586] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-17 [127.0.0.1:61586] disconnected: connection closed by client.
+1793033806: New connection from 127.0.0.1:61587 on port 1883.
+1793033806: New client connected from 127.0.0.1:61587 as s1u12-pub-18 (p4, c1, k60).
+1793033806: No will message specified.
+1793033806: Sending CONNACK to s1u12-pub-18 (0, 0)
+1793033806: Received PUBLISH from s1u12-pub-18 (d0, q1, r0, m1, 's1test/stream', ... (3 bytes))
+1793033806: Sending PUBLISH to s1u12-stream (d0, q1, r0, m18, 's1test/stream', ... (3 bytes))
+1793033806: Sending PUBLISH to s1u12-raw (d0, q1, r0, m18, 's1test/stream', ... (3 bytes))
+1793033806: Sending PUBACK to s1u12-pub-18 (m1, rc0)
+1793033806: Received PUBACK from s1u12-stream (Mid: 18, RC:0)
+1793033806: Received PUBACK from s1u12-raw (Mid: 18, RC:0)
+1793033806: Client s1u12-pub-18 [127.0.0.1:61587] disconnected: connection closed by client.
+1793033806: Client s1u12-pub-18 [127.0.0.1:61587] disconnected: connection closed by client.
+1793033807: Received DISCONNECT from s1u12-stream
+1793033807: Client s1u12-stream [127.0.0.1:61567] disconnected.
+1793033807: Client s1u12-stream [127.0.0.1:61567] disconnected: connection closed by client.
+1793033807: Received DISCONNECT from s1u12-raw
+1793033807: Client s1u12-raw [127.0.0.1:61568] disconnected.
+1793033807: Client s1u12-raw [127.0.0.1:61568] disconnected: connection closed by client.
+1793033807: New connection from 127.0.0.1:61588 on port 1883.
+1793033807: New client connected from 127.0.0.1:61588 as s1u12-cmd (p4, c1, k60).
+1793033807: No will message specified.
+1793033807: Sending CONNACK to s1u12-cmd (0, 0)
+1793033807: Received SUBSCRIBE from s1u12-cmd
+1793033807: 	robocar/car1/cmd/# (QoS 1)
+1793033807: s1u12-cmd 1 robocar/car1/cmd/#
+1793033807: Sending SUBACK to s1u12-cmd
+1793033807: New connection from 127.0.0.1:61589 on port 1883.
+1793033807: New client connected from 127.0.0.1:61589 as s1u12-stop-1 (p4, c1, k60).
+1793033807: No will message specified.
+1793033807: Sending CONNACK to s1u12-stop-1 (0, 0)
+1793033807: Received PUBLISH from s1u12-stop-1 (d0, q1, r0, m1, 'robocar/car1/cmd', ... (2 bytes))
+1793033807: Sending PUBLISH to s1u12-cmd (d0, q1, r0, m1, 'robocar/car1/cmd', ... (2 bytes))
+1793033807: Sending PUBACK to s1u12-stop-1 (m1, rc0)
+1793033807: Received PUBACK from s1u12-cmd (Mid: 1, RC:0)
+1793033807: Client s1u12-stop-1 [127.0.0.1:61589] disconnected: connection closed by client.
+1793033807: Client s1u12-stop-1 [127.0.0.1:61589] disconnected: connection closed by client.
+1793033807: New connection from 127.0.0.1:61590 on port 1883.
+1793033807: New client connected from 127.0.0.1:61590 as s1u12-stop-2 (p4, c1, k60).
+1793033807: No will message specified.
+1793033807: Sending CONNACK to s1u12-stop-2 (0, 0)
+1793033807: Received PUBLISH from s1u12-stop-2 (d0, q1, r0, m1, 'robocar/car1/cmd/ui', ... (2 bytes))
+1793033807: Sending PUBLISH to s1u12-cmd (d0, q1, r0, m2, 'robocar/car1/cmd/ui', ... (2 bytes))
+1793033807: Sending PUBACK to s1u12-stop-2 (m1, rc0)
+1793033807: Received PUBACK from s1u12-cmd (Mid: 2, RC:0)
+1793033807: Received DISCONNECT from s1u12-cmd
+1793033807: Client s1u12-cmd [127.0.0.1:61588] disconnected.
+1793033807: Client s1u12-stop-2 [127.0.0.1:61590] disconnected: connection closed by client.
+1793033807: Client s1u12-stop-2 [127.0.0.1:61590] disconnected: connection closed by client.
+1793033807: mosquitto version 2.1.2 terminating
+S1-U12: PASS (18/18 vectors decoded through the broker as directly, 0 error lines; STOP id 5 from robocar/car1/cmd and robocar/car1/cmd/ui received on robocar/car1/cmd/# at QoS 1; broker on 127.0.0.1:1883 only, stopped)

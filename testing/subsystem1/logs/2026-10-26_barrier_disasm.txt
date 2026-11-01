@@ -1,0 +1,167 @@
+S1 barrier change (e003301): disassembly of the status seqlock, single-core build
+Date: 2026-10-26. Commit: e003301 (S1: drop the compiler extension from mqtt_link.c).
+
+What this shows: with CNF_SMP=0 (SMP=0 NET=lwip MQTT=1) mqtt_queue_barrier() is an
+empty function in mqtt_queue.c, and g_published and g_version are volatile. In both
+functions below the status copy is a call to memcpy, and it sits between two calls to
+mqtt_queue_barrier() and between the two accesses to g_version. No dmb instruction is
+left in mqtt_link.o.
+
+Source: git archive e003301, app_program/subsystem1/, with mqtt_config.h made from
+mqtt_config.example.h (MQTT_LINK_CFG_SET 1, placeholder broker); these two functions do
+not use the configuration.
+
+== arm-none-eabi-gcc --version
+arm-none-eabi-gcc (Arm GNU Toolchain 15.3.Rel1 (Build arm-15.149)) 15.3.1 20260627
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+== arm-none-eabi-objdump --version (first line)
+GNU objdump (Arm GNU Toolchain 15.3.Rel1 (Build arm-15.149)) 2.45.1.20260126
+
+== Compile command (make -n -B SMP=0 NET=lwip MQTT=1, run from build_make/)
+Paths are shown relative or as $PICO_SDK_PATH; the dependency-file options -MMD, -MP,
+-MF and -MT were dropped for this standalone compile and do not change the code.
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -ffreestanding -std=gnu11 -O2 -g3 -mfloat-abi=soft
+-DAPP_TEST=0 -DAPP_DRIVE=0 -DTM_CONSOLE_UART=0 -DBOARD_UART0_FREE=1 -DTM_CONSOLE_USB_CDC=1 -DNDEBUG
+-I"../lib/libtm/sysdepend/pico_rp2040/usb" -I"$PICO_SDK_PATH/lib/tinyusb/src"
+-I"$PICO_SDK_PATH/src/common/pico_base_headers/include"
+-I"$PICO_SDK_PATH/src/common/pico_binary_info/include"
+-I"$PICO_SDK_PATH/src/rp2040/pico_platform/include"
+-I"$PICO_SDK_PATH/src/rp2_common/pico_platform_compiler/include"
+-I"$PICO_SDK_PATH/src/rp2_common/pico_platform_sections/include"
+-I"$PICO_SDK_PATH/src/rp2_common/pico_platform_panic/include"
+-I"$PICO_SDK_PATH/src/rp2_common/pico_platform_common/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_base/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_irq/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_resets/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_sync/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_sync_spin_lock/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_timer/include"
+-I"$PICO_SDK_PATH/src/rp2040/hardware_regs/include"
+-I"$PICO_SDK_PATH/src/rp2040/hardware_structs/include" -DTM_WIFI_CYW43=1 -DCYW43_LWIP=1
+-DCYW43_ENABLE_BLUETOOTH=0 -DCYW43_USE_OTP_MAC=1 -DPICO_CYW43_LOGGING_ENABLED=0 -DPICO_RP2040=1
+-DPICO_32BIT=1 -DPICO_ON_DEVICE=1 -DPICO_BUILD=1 -DPICO_NO_HARDWARE=0 -DRASPBERRYPI_PICO_W=1
+-DCYW43_DEFAULT_PIN_WL_REG_ON=23u -DCYW43_DEFAULT_PIN_WL_DATA_OUT=24u
+-DCYW43_DEFAULT_PIN_WL_DATA_IN=24u -DCYW43_DEFAULT_PIN_WL_HOST_WAKE=24u
+-DCYW43_DEFAULT_PIN_WL_CLOCK=29u -DCYW43_DEFAULT_PIN_WL_CS=25u -DNDEBUG -ffunction-sections
+-fdata-sections -I"../lib/libwifi/sysdepend/pico_rp2040" -I"../lib/libtm/sysdepend/pico_rp2040/usb"
+-I"$PICO_SDK_PATH/lib/cyw43-driver/src" -I"$PICO_SDK_PATH/lib/cyw43-driver/firmware"
+-I"$PICO_SDK_PATH/src/rp2_common/pico_cyw43_driver/include" -I"$PICO_SDK_PATH/src/boards/include"
+-I"$PICO_SDK_PATH/src/common/pico_base_headers/include"
+-I"$PICO_SDK_PATH/src/common/hardware_claim/include"
+-I"$PICO_SDK_PATH/src/common/pico_binary_info/include"
+-I"$PICO_SDK_PATH/src/common/pico_util/include" -I"$PICO_SDK_PATH/src/rp2040/pico_platform/include"
+-I"$PICO_SDK_PATH/src/rp2040/hardware_regs/include"
+-I"$PICO_SDK_PATH/src/rp2040/hardware_structs/include"
+-I"$PICO_SDK_PATH/src/rp2_common/pico_platform_common/include"
+-I"$PICO_SDK_PATH/src/rp2_common/pico_platform_compiler/include"
+-I"$PICO_SDK_PATH/src/rp2_common/pico_platform_sections/include"
+-I"$PICO_SDK_PATH/src/rp2_common/pico_platform_panic/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_base/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_pio/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_gpio/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_dma/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_irq/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_sync/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_sync_spin_lock/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_clocks/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_resets/include"
+-I"$PICO_SDK_PATH/src/rp2_common/hardware_timer/include" -DTM_NET_LWIP=1
+-I"../lib/liblwip/sysdepend/pico_rp2040/include" -I"../lib/liblwip/sysdepend/pico_rp2040"
+-I"$PICO_SDK_PATH/lib/lwip/src/include" -DTM_MQTT=1 -D_PICO_RP2040_ -I"../include" -I"../config"
+-I"../kernel/knlinc" -c -o mqtt_link.o ../app_program/subsystem1/mqtt_link.c
+
+== dmb instructions in mqtt_link.o: 0
+
+== arm-none-eabi-objdump -d -r --no-show-raw-insn mqtt_link.o: publish_status
+00000000 <publish_status>:
+   0:	push	{r4, lr}
+   2:	ldr	r4, [pc, #32]	@ (24 <publish_status+0x24>)
+   4:	ldr	r3, [r4, #0]
+   6:	adds	r3, #1
+   8:	str	r3, [r4, #0]
+   a:	bl	0 <mqtt_queue_barrier>
+			a: R_ARM_THM_CALL	mqtt_queue_barrier
+   e:	movs	r2, #60	@ 0x3c
+  10:	ldr	r1, [pc, #20]	@ (28 <publish_status+0x28>)
+  12:	ldr	r0, [pc, #24]	@ (2c <publish_status+0x2c>)
+  14:	bl	0 <memcpy>
+			14: R_ARM_THM_CALL	memcpy
+  18:	bl	0 <mqtt_queue_barrier>
+			18: R_ARM_THM_CALL	mqtt_queue_barrier
+  1c:	ldr	r3, [r4, #0]
+  1e:	adds	r3, #1
+  20:	str	r3, [r4, #0]
+  22:	pop	{r4, pc}
+	...
+			24: R_ARM_ABS32	.bss.g_version
+			28: R_ARM_ABS32	.bss.g_status
+			2c: R_ARM_ABS32	.bss.g_published
+
+== arm-none-eabi-objdump -d -r --no-show-raw-insn mqtt_link.o: mqtt_link_get_status
+00000000 <mqtt_link_get_status>:
+   0:	push	{r4, r5, r6, r7, lr}
+   2:	mov	lr, r8
+   4:	movs	r6, r0
+   6:	push	{lr}
+   8:	cmp	r0, #0
+   a:	beq.n	68 <mqtt_link_get_status+0x68>
+   c:	ldr	r3, [pc, #104]	@ (78 <mqtt_link_get_status+0x78>)
+   e:	movs	r4, #8
+  10:	mov	r8, r3
+  12:	ldr	r7, [pc, #104]	@ (7c <mqtt_link_get_status+0x7c>)
+  14:	ldr	r5, [r7, #0]
+  16:	bl	0 <mqtt_queue_barrier>
+			16: R_ARM_THM_CALL	mqtt_queue_barrier
+  1a:	movs	r2, #60	@ 0x3c
+  1c:	mov	r1, r8
+  1e:	movs	r0, r6
+  20:	bl	0 <memcpy>
+			20: R_ARM_THM_CALL	memcpy
+  24:	bl	0 <mqtt_queue_barrier>
+			24: R_ARM_THM_CALL	mqtt_queue_barrier
+  28:	movs	r3, #1
+  2a:	tst	r3, r5
+  2c:	beq.n	58 <mqtt_link_get_status+0x58>
+  2e:	subs	r4, #1
+  30:	cmp	r4, #0
+  32:	bne.n	14 <mqtt_link_get_status+0x14>
+  34:	bl	0 <mqtt_queue_full_count>
+			34: R_ARM_THM_CALL	mqtt_queue_full_count
+  38:	str	r0, [r6, #32]
+  3a:	bl	0 <mqtt_queue_now_msec>
+			3a: R_ARM_THM_CALL	mqtt_queue_now_msec
+  3e:	ldr	r3, [r6, #44]	@ 0x2c
+  40:	movs	r2, #250	@ 0xfa
+  42:	subs	r0, r0, r3
+  44:	movs	r3, #0
+  46:	lsls	r2, r2, #2
+  48:	cmp	r0, r2
+  4a:	adcs	r3, r3
+  4c:	movs	r2, #57	@ 0x39
+  4e:	strb	r3, [r6, r2]
+  50:	movs	r0, r4
+  52:	pop	{r7}
+  54:	mov	r8, r7
+  56:	pop	{r4, r5, r6, r7, pc}
+  58:	subs	r4, #1
+  5a:	ldr	r3, [r7, #0]
+  5c:	cmp	r4, #0
+  5e:	beq.n	6c <mqtt_link_get_status+0x6c>
+  60:	cmp	r3, r5
+  62:	bne.n	14 <mqtt_link_get_status+0x14>
+  64:	movs	r4, #1
+  66:	b.n	34 <mqtt_link_get_status+0x34>
+  68:	movs	r4, #0
+  6a:	b.n	50 <mqtt_link_get_status+0x50>
+  6c:	subs	r3, r3, r5
+  6e:	negs	r2, r3
+  70:	adcs	r3, r2
+  72:	uxtb	r4, r3
+  74:	b.n	34 <mqtt_link_get_status+0x34>
+  76:	nop			@ (mov r8, r8)
+	...
+			78: R_ARM_ABS32	.bss.g_published
+			7c: R_ARM_ABS32	.bss.g_version
