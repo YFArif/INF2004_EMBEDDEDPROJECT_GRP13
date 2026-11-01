@@ -1,0 +1,22 @@
+S1-U16 part A s1_dashboard.py --check, 2026-11-01 17:20:34 +08
+commit: 9948ed4 (clean tree)
+python: Python 3.13.7
+command: python3 -I -B testing/subsystem1/s1_dashboard.py --check (outside the Claude Code sandbox, which blocks binding a local port)
+==
+S1-U16 part A: s1_dashboard.py --check (simulate mode, no broker)
+A1  PASS: page 200 on 127.0.0.1; refused on 1 of 1 other IPv4 addresses; wrong Host 403; no token 403; wrong token 403; text/plain 415; op as a list 400, as a number 400; page headers CSP, nosniff and no-store: True; /api/sim in live mode 404
+A3  PASS: first event snapshot; status online (retained True): True; light green 0.000 s after the first heartbeat; rssi text 'not measured'
+A4  PASS: fake car READY: True; START 200, cmd_id 0; second START 409; START disabled then enabled: True; ack matched, queued, 85.0 ms
+A5  PASS: cmd_ids 1..63 then 0..6 as expected: True; acks matched to their own id: 70 of 70; unmatched 0; no ack 0; payload and cmd event agree with the reply's cmd_id: 70 of 70
+A6  PASS: START 200; ack matched, result 1, label rejected
+A7  PASS: dropped ack: no_ack after 2.07 s; delayed ack: no_ack, then late queued (late) 3019.0 ms; doubled ack: first matched, second duplicate
+A8  PASS: light red 3.246 s after the last heartbeat; START and RESET disabled, STOP enabled: True; STOP published while red: True; green after the resume: True
+A9  PASS: offline status and red light: True, logged: True; online and green again: True; connect_count 1 -> 2 logged: True
+A2  PASS: STOP tag without disabled: True; no script line disables it: True; stop true in all 9 controls events and the snapshot: True
+A13 PASS: cmd_rtt self-test: PASS; golden ACK 158500: STOP id 5 queued; 75 ack labels all queued, rejected or reserved: True; forbidden words in 151 cmd and ack events: none
+A11 PASS: 76 publishes, 0 with a wrong argument (QoS 1, topic s1u16/cmd/dash, -s, no -r or --retain, login only through -o, host scrubbed); one options file, mode 600, holding the login: True; removed after exit: True
+A12 PASS: 0 hits of the host, user or password in the page, the stream, /api/state, the log, stdout, stderr and a request handler's error; error line masked: True; handler error one masked line, no traceback: True; port and prefix from the file: True
+A10 PASS: banner raised: True; in a new connection's snapshot: True; cleared: True; with --banner-off: banner unavailable: True; no banner for a retained command: True
+steps run: A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13
+S1-U16 part A: PASS
+exit: 0
