@@ -220,7 +220,7 @@ Test cases (S1-U05). "stored" is the 7-bit field value.
 | connect_count | 0 to 255, saturates | 8 | 39 | guess | `mqtt_link` status `connect_count`. |
 | tel_drop | 0 to 255, saturates | 8 | 47 | guess | Telemetry frames dropped on a full buffer. |
 | evt_drop | 0 to 255, saturates | 8 | 55 | guess | Events dropped on a full `mbf_event`. |
-| cmd_reject | 0 to 255, saturates | 8 | 63 | guess | Codec rejections plus the driver's `command_dropped` (section 5.1). |
+| cmd_reject | 0 to 255, saturates | 8 | 63 | guess | Codec rejections, post failures and the driver's `command_dropped` (section 5.1). |
 | padding | 0 | 1 | 71 | - | |
 
 **Total: 71 data bits + 1 padding bit = 72 bits = 9 bytes.**
@@ -249,7 +249,7 @@ reserves for incoming commands):
 | version, msg_type | see 2.1 | 8 | 0 | see 2.1 | msg_type = 5 |
 | opcode | 0 to 3, echoed | 2 | 8 | guess | 0 when the command could not be parsed. |
 | cmd_id | 0 to 63, echoed | 6 | 10 | guess | 0 when the command could not be parsed. |
-| result | 0 accepted, 1 rejected (bad length, version or opcode), 2 and 3 reserved | 2 | 16 | guess | |
+| result | 0 accepted, 1 rejected (bad length, version or opcode, or a post failure), 2 and 3 reserved | 2 | 16 | guess | Stage 4a: 0 means queued for S5 (`subsystem5_command_post()` returned `E_OK`), not carried out; the dashboard labels it "queued". |
 | padding | 0 | 6 | 18 | - | |
 
 **Total: 18 data bits + 6 padding bits = 24 bits = 3 bytes.**
@@ -264,16 +264,18 @@ can be acked:
 | Payload longer than `MQTT_LINK_COMMAND_MAX` (2 B once the cap comes from the layout header, 9.2) | The driver, before the codec: `incoming_publish_cb` accepts a message only if `total_len <= MQTT_LINK_COMMAND_MAX` (`mqtt_link.c:1363`); otherwise the payload is never copied | **No.** The cmd_id is never read, so there is nothing to echo. The dashboard sees a timeout. | `command_dropped` in the driver status (`mqtt_link.c:1220`) |
 | Topic suffix longer than `MQTT_LINK_TOPIC_MAX`, or the command queue full | The driver, same path | No | `command_dropped` (`mqtt_link.c:1220` and `1228`) |
 | Shorter than 2 B, wrong version or type, or opcode 0 | The codec, in `telemetry_task` | Yes, result 1. opcode and cmd_id are echoed when the length, version and type are right; otherwise both are 0. | `cmd_reject` (kept by `telemetry_task`) |
+| Valid, but `subsystem5_command_post()` fails (S5's command queue full or missing): a post failure | `telemetry_task` (Stage 4a) | Yes, result 1, opcode and cmd_id echoed. | `cmd_reject` (kept by `telemetry_task`) |
 
 Line numbers in this table are as of `df58a14`.
 
 The driver does count the oversize case, but in its own
 `command_dropped`, which also counts over-long topics and a full queue.
-It does not reach the heartbeat by itself. **Proposal:** the heartbeat
-`cmd_reject` field sends the sum of the codec rejections and the driver's
-`command_dropped` (read with `mqtt_link_get_status()`, saturating at 255).
-That needs no driver change. Keeping them apart would need a second
-8-bit heartbeat field, which this layout does not include.
+It does not reach the heartbeat by itself. The heartbeat `cmd_reject`
+field therefore sends the sum of the codec rejections, the post failures
+and the driver's `command_dropped` (read with `mqtt_link_get_status()`,
+saturating at 255); Stage 4a's `telemetry_task` does this. That needs no
+driver change. Keeping them apart would need more 8-bit heartbeat
+fields, which this layout does not include.
 
 ## 6. EVENT
 

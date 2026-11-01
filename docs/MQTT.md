@@ -23,7 +23,7 @@ SDK's copy, `STABLE-2_2_1_RELEASE`.
 | Message codec (`msg_codec`) | Built, host-tested and timed on the Pico | `app_program/subsystem1/`; TEST_LOG S1-U05, S1-U08 |
 | Dashboard decoder (`s1_decode.py`) | Built and host-tested | `app_program/subsystem1/dashboard/`; TEST_LOG S1-U11, S1-U12 |
 | Stage 3: the radio service task calls `mqtt_link_poll()` | Adapter written: `mqtt_utk_start()` calls `mqtt_link_poll(netif_default)`. Instructor approval 27 Oct 2026; team agreement in person 29 Oct 2026. On the robot: S1-U13 PASS at `9a01717`, 31 Oct 2026 | `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c`; TEAM.md section 3 ("WiFi and MQTT are special"); TEST_LOG S1-U13 |
-| `telemetry_task`: builds the frames, handles commands | **Planned** | - |
+| `telemetry_task`, Stage 4a: START, STOP and RESET forwarded to S5 with an ack, and the 1 Hz heartbeat | Written on the local branch `buddy1-integration` (main plus Stage 3) and host-tested (S1-U14). Not run on the robot yet (S1-U06). Telemetry frames, events and the WiFi fault bit are Stage 4b | `app_program/subsystem1/telemetry_task.c`, `s1_telem.c`; section 1.1; TEST_LOG S1-U14, S1-U06 |
 
 Stage 3 replaced the template's demo client in `mqtt_utk.c` (a text
 heartbeat on `MQTT_TOPIC`, 60 s keep-alive) with the adapter, and the
@@ -37,6 +37,43 @@ hotspot drops and a power cut (section 9). It also logged five
 unexpected disconnects, not explained yet: four after the second boot,
 each followed by `online` with no reboot, and one in the first boot,
 followed by a power cycle (TEST_LOG S1-U13).
+
+### 1.1 Stage 4a: commands, ack and heartbeat
+
+`telemetry_task` runs at priority 14 on core 0, with its own 2048-byte
+stack (Week 6 report section 3; NFR9 keeps it off core 1). In `MQTT=1`
+builds `subsystem1_start()` starts it once `mqtt_link_init()` has
+succeeded. Each pass it waits up to 50 ms in
+`mqtt_link_receive_command()`; a command wakes it at once, so the wait
+adds nothing to a STOP's round trip (NFR15).
+
+- **Command to S5.** The codec checks the 2-byte command. A valid START,
+  STOP or RESET goes to `subsystem5_command_post(opcode, cmd_id)`, which
+  queues it for `vehicle_ctrl_task` without blocking and raises
+  `EV_COMMAND`.
+- **Ack.** One 3-byte ack per command the driver delivers, on
+  `<prefix>/ack` at QoS 1, not retained. Result 0 means **queued for S5**:
+  the post returned `E_OK`. `vehicle_ctrl_task` decides later, on
+  core 1, and S1 cannot see that verdict, so the dashboard labels a
+  result 0 "queued", not "started". S5 refuses, for example, START in
+  FAULT or while running, and RESET outside FAULT or FINISHED
+  (`s5_mission_command()`); its verdict shows only on the console
+  (`[S5] EVT 0x65 a=<opcode> b=<1 or 0>`). Result 1 means the codec
+  refused the command (echo rules in S1_binary_frame.md section 5.1) or
+  the post failed (S5's queue full or missing): a **post failure**.
+- **Heartbeat.** 9 bytes on the telemetry topic at QoS 0, once a second
+  on absolute deadlines, and only while the session is up and the driver
+  snapshot is fresh, so an outage does not fill the publish queue that
+  the acks need. In Stage 4a rssi is 0 ("not measured": no RSSI can be
+  read outside the radio service task yet), tel_drop and evt_drop are 0,
+  and cmd_reject is the codec rejections plus the post failures plus the
+  driver's `command_dropped`.
+- **Offline.** The session is clean: a command sent while the robot is
+  offline is lost and never acked. A command already received when the
+  session drops is still posted; its ack waits in the publish queue.
+  Never publish a command with retain: lwIP does not report the retain
+  flag, so the robot would run a retained command again after every
+  reconnect.
 
 ## 2. Configuration
 
@@ -158,12 +195,13 @@ refuses to publish a payload over 25 bytes (`MQTT_LINK_PAYLOAD_MAX`).
 | Message | Rate | Source |
 |---|---|---|
 | TELEMETRY | 2 Hz | **planned**: S1_binary_frame.md section 3 |
-| HEARTBEAT | 1 Hz | **planned**: S1_binary_frame.md section 4 |
-| EVENT | When something happens | **planned** |
-| ACK | One per command | **planned** |
+| HEARTBEAT | 1 Hz while the session is up | Stage 4a: `telemetry_task.c`, `S1_TELEM_HB_PERIOD_MSEC` |
+| EVENT | When something happens | **planned** (Stage 4b) |
+| ACK | One per command the driver delivers | Stage 4a: `telemetry_task.c` |
 
-None of these rates exists in the code yet (`telemetry_task` is not
-built), and none is measured.
+TELEMETRY and EVENT do not exist in the code yet (Stage 4b). The
+heartbeat and the ack exist since Stage 4a; neither is measured on the
+robot yet (S1-U06).
 
 ## 9. Recovery
 
@@ -384,13 +422,18 @@ STOP round trip under 300 ms) and of the NFR14 test.
 | Only one task may read commands | "Commands" note in `mqtt_link.h` |
 | The robot notices a silent broker 5 to 10 s late | section 3 |
 | The retry-delay reset after a 10 s session has no test yet | `STABLE_SESSION_MSEC` |
-| Heartbeat RSSI is not available yet (it must be read inside the radio service task), and the S4 terrain fields will read 0 until S4's data exists | **planned** (`telemetry_task`) |
+| Heartbeat RSSI is sent as 0 ("not measured") until it can be read inside the radio service task, and the S4 terrain fields will read 0 until S4's data exists | `s1_telem_heartbeat()`; **planned** |
+| An ack's result 0 means queued for S5, not carried out; S5's verdict is not visible to S1 | section 1.1 |
+| A retained command runs again after every reconnect: lwIP does not report the retain flag | section 1.1 |
 | Every layout field is still marked "guess" or "from Version B" until its owner confirms it | S1_binary_frame.md section 1 |
 
 ## 14. What changes next
 
 - S1-U13 done (31 Oct 2026): sections 1, 9 and 12 carry its results.
-- With `telemetry_task`: the planned values in sections 5, 8 and 10 become
+- Stage 4a written (1 Nov 2026): sections 1, 1.1, 8 and 13. S1-U06 adds
+  the measured heartbeat rate and STOP round trip.
+- With Stage 4b (telemetry frames, events, the WiFi fault bit, S5's
+  verdict in the ack): the planned values in sections 5, 8 and 10 become
   code, and the measured rates are added.
 - Sections 2, 3, 4, 7, 11 and 13 stay as they are, unless the layout
   version changes.
