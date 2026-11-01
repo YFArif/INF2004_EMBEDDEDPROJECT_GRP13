@@ -24,6 +24,7 @@ SDK's copy, `STABLE-2_2_1_RELEASE`.
 | Dashboard decoder (`s1_decode.py`) | Built and host-tested | `app_program/subsystem1/dashboard/`; TEST_LOG S1-U11, S1-U12 |
 | Stage 3: the radio service task calls `mqtt_link_poll()` | Adapter written: `mqtt_utk_start()` calls `mqtt_link_poll(netif_default)`. Instructor approval 27 Oct 2026; team agreement in person 29 Oct 2026. On the robot: S1-U13 PASS at `9a01717`, 31 Oct 2026 | `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c`; TEAM.md section 3 ("WiFi and MQTT are special"); TEST_LOG S1-U13 |
 | `telemetry_task`, Stage 4a: START, STOP and RESET forwarded to S5 with an ack, and the 1 Hz heartbeat | Written on the local branch `buddy1-integration` (main plus Stage 3) and host-tested (S1-U14). Not run on the robot yet (S1-U06). Telemetry frames, events and the WiFi fault bit are Stage 4b | `app_program/subsystem1/telemetry_task.c`, `s1_telem.c`; section 1.1; TEST_LOG S1-U14, S1-U06 |
+| Laptop dashboard (`s1_dashboard.py`) | Written on `buddy1-integration`: START, STOP and RESET with each ack matched by cmd_id, the online light and heartbeat, the retained-command banner, and `--simulate` (a fake car). Test S1-U16: part A automated in simulate mode, part B on the robot after S1-U06 | `testing/subsystem1/s1_dashboard.py`; [S1_dashboard.md](S1_dashboard.md); TEST_LOG S1-U16 |
 
 Stage 3 replaced the template's demo client in `mqtt_utk.c` (a text
 heartbeat on `MQTT_TOPIC`, 60 s keep-alive) with the adapter, and the
