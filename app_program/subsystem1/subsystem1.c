@@ -7,9 +7,14 @@
 
 #include "subsystem1.h"
 #include "mqtt_link.h"	/* empty unless TM_MQTT (MQTT=1 builds) */
+#include "telemetry_task.h"	/* empty unless TM_MQTT */
 
 EXPORT ID	tid_led;	/* IF-05, see subsystem1.h */
 EXPORT ID	cyc_led;
+
+#if TM_MQTT
+LOCAL BOOL	mqtt_ok = FALSE;	/* mqtt_link_init() succeeded */
+#endif
 
 EXPORT ER subsystem1_init(void)
 {
@@ -20,6 +25,8 @@ EXPORT ER subsystem1_init(void)
 	   leaves the car running without MQTT; mqtt_link_get_status() shows why. */
 	if (MQTT_LINK_OK != mqtt_link_init()) {
 		tm_printf((UB*)"S1: mqtt_link_init failed\n");
+	} else {
+		mqtt_ok = TRUE;
 	}
 #endif
 
@@ -40,5 +47,13 @@ EXPORT ER subsystem1_start(void)
 	if (tid_led < E_OK) {
 		return tid_led;
 	}
+#if TM_MQTT
+	/* telemetry_task (Stage 4a): dashboard commands and the heartbeat.
+	   Only with a working MQTT link; without one, or if it cannot start,
+	   the car runs on without it. */
+	if (mqtt_ok && (telemetry_task_start() < 0)) {
+		tm_printf((UB*)"S1: telemetry_task not started\n");
+	}
+#endif
 	return tk_sta_cyc(cyc_led);	/* start the cyclic handler now */
 }
