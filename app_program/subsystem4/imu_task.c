@@ -68,6 +68,8 @@
 #define HUMP_ENTER_CDEG     (500)
 #define HUMP_FLAT_CDEG      (200)
 #define HUMP_HOLD_CYCLES    (5u)
+#define SIDE_ENTER_CDEG     (300)       /* One-wheel hump: 3 deg roll     */
+#define SIDE_FLAT_CDEG      (150)       /* (a ~5 deg course hump).        */
 #define WHEELBASE_MM        (78)        /* Axle to ball, 77.5 mm (ruler). */
 #define HUMP_ABANDON_CYCLES (100u)      /* 2 s level and still: not a hump.*/
 #define ANGLE_LP_DIV        (4)         /* Pitch / roll low-pass.         */
@@ -942,7 +944,7 @@ imu_side_hump (subsystem2_odom_t const * p_odom)
 
     if (!g_imu.b_side)
     {
-        g_imu.side_hold = (roll > HUMP_ENTER_CDEG) ? (g_imu.side_hold + 1u)
+        g_imu.side_hold = (roll > SIDE_ENTER_CDEG) ? (g_imu.side_hold + 1u)
                                                    : 0u;
         if (g_imu.side_hold >= HUMP_HOLD_CYCLES)
         {
@@ -961,7 +963,7 @@ imu_side_hump (subsystem2_odom_t const * p_odom)
             g_imu.side_roll_max_cdeg = roll;
         }
 
-        g_imu.side_hold = (roll < HUMP_FLAT_CDEG) ? (g_imu.side_hold + 1u)
+        g_imu.side_hold = (roll < SIDE_FLAT_CDEG) ? (g_imu.side_hold + 1u)
                                                   : 0u;
         if (g_imu.side_hold >= HUMP_HOLD_CYCLES)
         {
