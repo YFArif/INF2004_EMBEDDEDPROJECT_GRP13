@@ -30,8 +30,8 @@ standard library only. Test: S1-U16 in `testing/subsystem1/TEST_LOG.md`.
 
 | Item | Version | Notes |
 |---|---|---|
-| Python | 3.8 or later | Tested with 3.13. No packages to install |
-| mosquitto (broker and clients) | 2.0 or later | Tested with 2.1.2. macOS: `brew install mosquitto`. Check with `mosquitto_sub --help \| head -2` |
+| Python | 3.8 or later | Tested with 3.13. No packages to install. Windows: use `py -3` (section 15) |
+| mosquitto (broker and clients) | 2.0 or later | Tested with 2.1.2. macOS: `brew install mosquitto`. Windows: section 15. Check with `mosquitto_sub --help \| head -2` |
 | This repository | branch `buddy1-integration` | It must contain `app_program/subsystem1/telemetry_task.c` (Stage 4a). Ask Caleb if your clone does not have the branch |
 | Pico SDK and ARM compiler | as in `README.md` section 1 | Only to build the robot image (section 5) |
 | A phone hotspot | 2.4 GHz, WPA2 | Section 3 |
@@ -363,4 +363,207 @@ first.
   yet (Stage 4b).
 - One dashboard per robot. A second client's commands are logged as
   "command from another client", but its acks can confuse the matching.
-- Tested on macOS with mosquitto 2.1.2 and Python 3.13 only.
+- Tested on macOS with mosquitto 2.1.2 and Python 3.13.
+- Tested on one Windows laptop (Python 3, mosquitto 2.1.2) with no robot:
+  section 15. Not tested on Windows with a robot.
+
+## 15. Windows
+
+This section was tested on one Windows laptop (Python 3, mosquitto 2.1.2)
+with no robot: every check in 15.5 passed. Not tested on Windows: a robot
+connecting through Windows Firewall, building the firmware (`README.md`
+section 1 says to use WSL), and the items in 15.6.
+
+Run the broker and the dashboard in a normal PowerShell window on
+Windows itself. Every command below is for PowerShell, from the repository
+root unless it says otherwise.
+
+### 15.1 Python and mosquitto
+
+- **Python:** install Python 3 from python.org and check it with
+  `py -3 --version`. Wherever this guide says `python3`, use `py -3`:
+  Windows usually has no `python3`.
+- **mosquitto:** run the Windows installer from mosquitto.org/download
+  (it needs administrator rights). It installs to
+  `C:\Program Files\mosquitto`, which is not on the PATH.
+
+In every new PowerShell window, before any `mosquitto_*` command and
+before starting the dashboard (it starts `mosquitto_sub` and
+`mosquitto_pub` itself), run:
+
+```powershell
+$env:Path += ";C:\Program Files\mosquitto"
+```
+
+Check that it worked:
+
+```powershell
+mosquitto_sub --help
+```
+
+The first lines say `mosquitto_sub version 2.x.x`. Without the PATH line
+the dashboard stops with "mosquitto_sub is not on the PATH" (ignore the
+"brew install" hint in that message: it is for macOS).
+
+### 15.2 Stop the mosquitto Windows service first
+
+The installer also sets up a background service named `mosquitto`. With
+its default settings it listens on 127.0.0.1 only. If it is running when
+you start your own broker (15.3), two brokers share port 1883. The
+dashboard connects to 127.0.0.1, so it reaches the service's broker, while
+a robot connecting to the laptop's hotspot address would reach yours. They
+never see each other: the robot light would stay grey and nothing reports
+an error. This happened on the test laptop.
+
+In an **administrator** PowerShell, check for the service:
+
+```powershell
+Get-Service mosquitto
+```
+
+If it says `Running`, stop it:
+
+```powershell
+Stop-Service mosquitto
+```
+
+Stop it coming back after a restart:
+
+```powershell
+Set-Service mosquitto -StartupType Manual
+```
+
+After you start your broker (15.3), check that only one process listens:
+
+```powershell
+netstat -ano | findstr :1883
+```
+
+You should see `LISTENING` on `0.0.0.0:1883` and `[::]:1883`, all with the
+same process id. A `LISTENING` line on `127.0.0.1:1883` with a different
+process id means the service is still running.
+
+### 15.3 Start the broker
+
+Create the four-line `mosquitto.conf` of section 6, outside the
+repository:
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\s1-broker" | Out-Null
+```
+
+```powershell
+Set-Content -Path "$HOME\s1-broker\mosquitto.conf" -Value "listener 1883","allow_anonymous true","persistence false","sys_interval 5" -Encoding ascii
+```
+
+Start the broker and leave the window open:
+
+```powershell
+mosquitto -c "$HOME\s1-broker\mosquitto.conf" -v
+```
+
+It prints "Opening ipv4 listen socket on port 1883" and "mosquitto version
+2.x.x running". The log's times are seconds since 1970. When the dashboard
+connects, the log shows `New client connected from 127.0.0.1:... as
+s1dash-<number>`; the number is the process id of the dashboard's
+`mosquitto_sub`, which changes every time you restart the dashboard.
+
+### 15.4 Windows Firewall and the network type
+
+The robot connects in from the hotspot, so Windows Firewall must allow
+mosquitto in. The first time a broker listens, Windows asks. The checks in
+15.5 use 127.0.0.1 only and do not need it.
+
+Windows may treat a phone hotspot as a **Public** network. The broker
+accepts any client without a login (section 6), so do not allow mosquitto
+on Public networks. Allow it on Private networks only, and set your own
+hotspot's network to Private once you have joined it. Look at
+`NetworkCategory` in the output (it also prints the hotspot's name:
+do not paste it into chats):
+
+```powershell
+Get-NetConnectionProfile
+```
+
+If it says `Public`, run this in an administrator PowerShell, with the
+`InterfaceAlias` from that output (usually `Wi-Fi`):
+
+```powershell
+Set-NetConnectionProfile -InterfaceAlias "Wi-Fi" -NetworkCategory Private
+```
+
+This step has not been tested with a robot yet.
+
+### 15.5 Check your setup without a robot
+
+Each step builds on the one before. Use one PowerShell window per command
+that stays running, each with the PATH line of 15.1.
+
+1. **The dashboard alone.** No broker needed. Open
+   `http://127.0.0.1:8765/` and use section 12:
+
+   ```powershell
+   py -3 -I -B testing/subsystem1/s1_dashboard.py --simulate
+   ```
+
+2. **The live path.** Start the broker (15.3) in one window and the
+   dashboard in another:
+
+   ```powershell
+   py -3 -I -B testing/subsystem1/s1_dashboard.py --host 127.0.0.1 --prefix robot
+   ```
+
+   Within about 6 s the page says "broker connected". The robot light is
+   grey and START and RESET are dimmed.
+
+3. **The command bytes.** In a third window, watch the command topic:
+
+   ```powershell
+   mosquitto_sub -h 127.0.0.1 -t robot/cmd/dash -F "%t %x"
+   ```
+
+   Click STOP. A fresh dashboard's first command has id 0, so the window
+   prints `robot/cmd/dash 1480`. The page shows "pending", then "no ack"
+   after 2 s, because no robot answers.
+
+4. **A fake robot.** In a fourth window, publish the robot's `online`
+   status:
+
+   ```powershell
+   mosquitto_pub -h 127.0.0.1 -t robot/status -r -m online
+   ```
+
+   The light turns red, "online, but no heartbeat for more than 3 s".
+   Now send 20 heartbeats, one a second (each is a valid 9-byte
+   HEARTBEAT frame, `docs/S1_binary_frame.md` section 4):
+
+   ```powershell
+   1..20 | ForEach-Object { [IO.File]::WriteAllBytes("$HOME\s1-broker\hb.bin",[byte[]](0x12,$_,0x00,$_,0x00,0x02,0x00,0x00,0x00)); mosquitto_pub -h 127.0.0.1 -t robot/telemetry -f "$HOME\s1-broker\hb.bin"; Start-Sleep -Seconds 1 }
+   ```
+
+   While it runs the light is green, the heartbeat age stays under about
+   1.5 s, the uptime counts up and START and RESET light up. A START
+   click prints `robot/cmd/dash 1441` in the third window and ends in "no
+   ack". About 3 s after the last heartbeat the light turns red again.
+   Clear the fake status when you finish:
+
+   ```powershell
+   mosquitto_pub -h 127.0.0.1 -t robot/status -r -n
+   ```
+
+### 15.6 Not available on Windows
+
+`s1_dashboard.py --check` and `testing/subsystem1/cmd_rtt.py` stop their
+`mosquitto` helpers with SIGINT, which Windows does not support, and
+`--check` tests file modes. Read from the code, not run on Windows: run
+them on macOS or Linux.
+
+### 15.7 Windows troubleshooting
+
+| What you see | Check |
+|---|---|
+| `py` is not recognised | Install Python 3 (15.1), or try `python` |
+| "mosquitto_sub is not on the PATH" | The PATH line of 15.1, in this window |
+| Broker light red | Is the broker window running? `netstat -ano \| findstr :1883` |
+| Robot on, light grey, and the broker log never shows the robot's client id | A second broker (15.2), the address in the image (section 4), or the firewall (15.4) |
+| `netstat` shows two different process ids listening on port 1883 | The mosquitto service is still running (15.2) |
