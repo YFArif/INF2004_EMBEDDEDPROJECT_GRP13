@@ -74,7 +74,8 @@
 #define EV_PROFILE_READY    (0x00004000u)   /* S5: profile published.    */
 #define EV_OBST_PASSED      (0x00008000u)   /* S5: side watch finished.  */
 #define EV_COMMAND          (0x00010000u)   /* S1: a command is queued.  */
-#define EV_ALL              (0x0001FFFFu)
+#define EV_CORNER_CLOSE     (0x00020000u)   /* S5: corner watch alarm.   */
+#define EV_ALL              (0x0003FFFFu)
 
 /* ---------------------------------------------------------------------
  *  flg_fault: latched fault causes. Bit n is fault n, the numbering of
@@ -98,7 +99,10 @@
 #define OB_WATCH_LEFT       (0x08u)     /* Watch the obstacle on the     */
 #define OB_WATCH_RIGHT      (0x10u)     /* left/right until passed.      */
 #define OB_CAL_SWEEP        (0x20u)     /* Slow servo sweep, S5-U03.     */
-#define OB_ALL_REQUESTS     (0x3Fu)
+#define OB_CORNER_LEFT      (0x40u)     /* Watch diagonally ahead-left / */
+#define OB_CORNER_RIGHT     (0x80u)     /* -right for the obstacle's     */
+                                        /* corner while driving out.     */
+#define OB_ALL_REQUESTS     (0xFFu)
 
 /** Controller states, numbered as S1's telemetry ctrl_state field. */
 typedef enum
@@ -167,7 +171,9 @@ typedef enum
     S5_OBST_SLOW,           /* Obstacle under 35 cm; still pinging.      */
     S5_OBST_SCANNING,       /* Coarse and fine scan in progress.         */
     S5_OBST_WATCH,          /* Watching the obstacle beside the robot.   */
-    S5_OBST_FAULT           /* Ultrasonic failed; waiting for OB_RESUME. */
+    S5_OBST_FAULT,          /* Ultrasonic failed; waiting for OB_RESUME. */
+    S5_OBST_CORNER          /* Watching diagonally for the obstacle's    */
+                            /* corner while the robot drives out.        */
 } subsystem5_obst_state_t;
 
 /** Live ultrasonic status, updated after every ping. */

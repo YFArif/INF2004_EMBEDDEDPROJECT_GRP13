@@ -72,6 +72,18 @@
 #define WATCH_PASSED_MM     (400u)      /* Nothing beside: passed.       */
 #define WATCH_PASSED_PINGS  (2u)
 #define WATCH_UNSEEN_MM     (150)       /* Not seen this far: passed.    */
+#define WATCH_SURE_PINGS    (3u)        /* Seen this often: a real side, */
+                                        /* so losing it means passed.    */
+
+/* Corner watch while the robot drives out diagonally (s5_avoid.c): the
+ * servo looks 45 degrees off ahead, towards the obstacle. The front
+ * corner on that side is about 115 mm from the sensor in that direction,
+ * so two pings in a row under CORNER_CLOSE_MM mean the corner is about
+ * to touch the obstacle.
+ */
+#define CORNER_DEG          (45)
+#define CORNER_CLOSE_MM     (140u)
+#define CORNER_PINGS        (2u)
 
 /* Calibration sweep (S5-U03): hold each angle long enough to measure. */
 #define CAL_FIRST_DEG       (30)
@@ -111,6 +123,10 @@ static bool                     g_b_watch_seen   = false;
 static int32_t                  g_watch_start_mm = 0;
 static uint32_t                 g_watch_far_run  = 0u;
 static int32_t                  g_watch_deg      = DRV_SERVO_AHEAD_DEG;
+static uint32_t                 g_watch_seen_run = 0u;  /* Pings seen.   */
+static int32_t                  g_watch_last_mm  = 0;   /* Odometry when */
+                                                        /* last seen.    */
+static uint32_t                 g_corner_run     = 0u;
 
 static void           handle_requests(uint32_t requests);
 static void           step_state(void);
@@ -127,6 +143,8 @@ static void           start_watch(int32_t side_deg);
 static void           watch_step(void);
 static void           finish_watch(void);
 static void           run_cal_sweep(void);
+static void           start_corner(int32_t corner_deg);
+static void           corner_step(void);
 static void           enter_monitoring(void);
 static void           enter_hold(void);
 static void           enter_fault(void);
@@ -235,6 +253,14 @@ handle_requests (uint32_t requests)
     {
         run_cal_sweep();
     }
+    else if (0u != (requests & OB_CORNER_LEFT))
+    {
+        start_corner(DRV_SERVO_AHEAD_DEG + CORNER_DEG);
+    }
+    else if (0u != (requests & OB_CORNER_RIGHT))
+    {
+        start_corner(DRV_SERVO_AHEAD_DEG - CORNER_DEG);
+    }
     else
     {
         // Unknown bits are ignored.
@@ -257,6 +283,10 @@ step_state (void)
 
         case S5_OBST_WATCH:
             watch_step();
+        break;
+
+        case S5_OBST_CORNER:
+            corner_step();
         break;
 
         default:
@@ -515,7 +545,9 @@ start_watch (int32_t side_deg)
 {
     g_b_watch_seen   = false;
     g_watch_start_mm = s5_links_odom_dist_mm();
+    g_watch_last_mm  = g_watch_start_mm;
     g_watch_far_run  = 0u;
+    g_watch_seen_run = 0u;
     g_watch_deg      = side_deg;
 
     point_servo(side_deg);
@@ -540,41 +572,54 @@ watch_step (void)
     {
         // Busy or one unanswered ping: wait for a real reading.
     }
-    else if (!g_b_watch_seen)
+    else if (s5_ranger_is_within(&reading, WATCH_SEEN_MM))
     {
-        // Stage 1: wait until the obstacle is beside the robot. A shallow
-        // obstacle may already be behind the sensor: if it is not seen
-        // within WATCH_UNSEEN_MM, it counts as passed (depth unknown).
-        int32_t travelled = s5_math_abs(s5_links_odom_dist_mm()
-                                        - g_watch_start_mm);
-
-        if (s5_ranger_is_within(&reading, WATCH_SEEN_MM))
+        // Beside the robot. The depth is measured from the first sight.
+        if (!g_b_watch_seen)
         {
             g_b_watch_seen   = true;
             g_watch_start_mm = s5_links_odom_dist_mm();
         }
-        else if (travelled >= WATCH_UNSEEN_MM)
-        {
-            s5_event_trace("WATCH never seen beside: travelled_mm 0",
-                           travelled, 0);
-            g_watch_start_mm = s5_links_odom_dist_mm();
-            finish_watch();
-        }
-        else
-        {
-            // Keep looking.
-        }
+
+        g_watch_seen_run++;
+        g_watch_far_run = 0u;
+        g_watch_last_mm = s5_links_odom_dist_mm();
     }
     else
     {
-        // Stage 2: wait until it has been left behind.
+        // Not beside. Passed only if the side was seen for sure
+        // (WATCH_SURE_PINGS) and is now gone (WATCH_PASSED_PINGS), or if
+        // nothing has been seen for WATCH_UNSEEN_MM. One stray echo is
+        // not enough (log 2026-11-05_0124_track: seen once at 172 mm,
+        // "passed" after 1 cm, and turning in hit the box).
+        int32_t unseen = s5_math_abs(s5_links_odom_dist_mm()
+                                     - g_watch_last_mm);
+
         g_watch_far_run = count_run(g_watch_far_run,
                                     !s5_ranger_is_within(&reading,
                                                          WATCH_PASSED_MM));
 
-        if (g_watch_far_run >= WATCH_PASSED_PINGS)
+        if ((g_watch_seen_run >= WATCH_SURE_PINGS)
+            && (g_watch_far_run >= WATCH_PASSED_PINGS))
         {
             finish_watch();
+        }
+        else if (unseen >= WATCH_UNSEEN_MM)
+        {
+            // NOTE: The cast is safe: the count is a few dozen pings.
+            s5_event_trace("WATCH not seen for sure: unseen_mm seen_pings",
+                           unseen, (int32_t) g_watch_seen_run);
+
+            if (!g_b_watch_seen)
+            {
+                g_watch_start_mm = s5_links_odom_dist_mm();
+            }
+
+            finish_watch();
+        }
+        else
+        {
+            // Keep watching.
         }
     }
 }
@@ -605,6 +650,57 @@ finish_watch (void)
 
     enter_hold();
     subsystem5_mission_signal(EV_OBST_PASSED);
+}
+
+/*!
+ * @brief Point the sensor diagonally towards the obstacle and start the
+ *        corner watch (OB_CORNER_xxx).
+ *
+ * @param[in] corner_deg Servo angle, 45 (right) or 135 (left).
+ */
+static void
+start_corner (int32_t corner_deg)
+{
+    g_corner_run = 0u;
+    point_servo(corner_deg);
+    set_state(S5_OBST_CORNER);
+}
+
+/*!
+ * @brief One diagonal ping: CORNER_PINGS in a row closer than
+ *        CORNER_CLOSE_MM raise EV_CORNER_CLOSE and end the watch.
+ */
+static void
+corner_step (void)
+{
+    s5_ranger_reading_t reading;
+
+    take_reading(&reading);
+
+    if (S5_RANGER_FAULT == reading.status)
+    {
+        enter_fault();
+    }
+    else if (!s5_ranger_is_conclusive(&reading))
+    {
+        // Busy or one unanswered ping: wait for a real reading.
+    }
+    else
+    {
+        g_corner_run = count_run(g_corner_run,
+                                 s5_ranger_is_within(&reading,
+                                                     CORNER_CLOSE_MM));
+
+        if (g_corner_run >= CORNER_PINGS)
+        {
+            // NOTE: The cast is safe: the servo angle is 0 ... 180.
+            s5_event_trace("CORNER close: range_mm servo_deg",
+                           (int32_t) reading.dist_mm,
+                           (int32_t) drv_servo_angle());
+            enter_hold();
+            subsystem5_mission_signal(EV_CORNER_CLOSE);
+        }
+    }
 }
 
 /*!

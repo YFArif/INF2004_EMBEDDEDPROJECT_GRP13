@@ -21,23 +21,39 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* Chassis geometry. TODO: measure the robot and update (S5-U04). The
- * setback is from log 2026-11-04_s5_stop_2 (sensor read 121 mm with the
- * front 30 mm from the box); the rest are estimates on the safe side.
- * The margin was 50 mm until log 2026-11-04_s5_avoid_3, where turning
- * back parallel touched the box: it also covers the estimates' error.
+/* Chassis geometry, from the team's measurements (2026-11-05):
+ * - Width: S2's track, tyre centre to centre, 112 mm (subsystem2.h),
+ *   plus one tyre width (~26 mm, not measured): about 140 mm.
+ * - Axle to front: drive axle (rear) to the front ball caster 77.5 mm,
+ *   ruler (S4, imu_task.c WHEELBASE_MM), plus the ball and the bumper.
+ * - Setback: from log 2026-11-04_s5_stop_2 (sensor read 121 mm with the
+ *   front 30 mm from the box).
+ * The margin was raised to 100 mm while the width was guessed at 180 mm
+ * (log 2026-11-04_s5_avoid_3); with the measured width it is 50 mm
+ * again, and the side gap check (s5_avoid.c) eases out if too close.
+ * TODO: ruler check of the outside width and the setback (S5-U04).
  */
-#define S5_ROBOT_WIDTH_MM       (180)   /* Widest point, wheels included.*/
+#define S5_ROBOT_WIDTH_MM       (140)   /* Widest point, wheels included.*/
 #define S5_ROBOT_LENGTH_MM      (200)   /* Front bumper to rear.         */
 #define S5_AXLE_TO_FRONT_MM     (100)   /* Turning centre to the front.  */
-#define S5_SENSOR_SETBACK_MM    (90)    /* Sensor face behind the front. */
+#define S5_SENSOR_SETBACK_MM    (75)    /* Sensor face behind the front, */
+                                        /* measured 7-8 cm (2026-11-05). */
 #define S5_AXLE_TO_LINE_IR_MM   (80)    /* Turning centre to S3's IR.    */
-#define S5_PATH_MARGIN_MM       (100)   /* Gap kept from the obstacle.   */
+#define S5_PATH_MARGIN_MM       (50)    /* Gap kept from the obstacle.   */
+#define S5_PASS_MARGIN_MM       (50)    /* Gap aimed for when passing.   */
+                                        /* 30 needed side-check jogs,    */
+                                        /* which swing the tail into the */
+                                        /* obstacle (2026-11-05_0224).   */
 
 /* Scan thresholds (Week 6 report 6.4, preliminary until S5-U04). */
 #define S5_HIT_RANGE_MM         (400)   /* Closer than this is a hit.    */
 #define S5_EDGE_JUMP_MM         (100)   /* Larger range step is an edge. */
 #define S5_EDGE_CORR_DEG        (6)     /* Edge correction, A16.         */
+#define S5_PASS_TRIM_DEG        (0)     /* Edge trim for the sideways    */
+                                        /* move. 0 until the servo's     */
+                                        /* right-side angles are checked:*/
+                                        /* with 10 the robot passed too  */
+                                        /* close (2026-11-05_0224).      */
 #define S5_CLEAR_DEPTH_MM       (300)   /* Look this far past the edge.  */
 #define S5_CLEAR_OPEN_MM        (1000)  /* Clearance with nothing seen.  */
 

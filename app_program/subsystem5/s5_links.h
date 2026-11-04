@@ -53,6 +53,7 @@ void            s5_links_line_recalibrate(void);
 void            s5_links_line_enable(bool b_enable);
 void            s5_links_line_search(s5_links_side_t side);
 s5_links_side_t s5_links_line_side(void);
+bool            s5_links_line_sees_black(void);
 uint32_t        s5_links_line_events(void);
 bool            s5_links_nav_take(subsystem5_nav_msg_t * p_msg);
 

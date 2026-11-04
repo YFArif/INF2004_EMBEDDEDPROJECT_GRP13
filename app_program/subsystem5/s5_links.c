@@ -36,12 +36,14 @@
  * 40 mm/s it crawled. LINE_SPEED_MMS is between: S3's drive test used
  * 100 mm/s as its default until 29 Oct. Tune it here (60 ... 120).
  */
-#define LINE_SPEED_MMS      (80u)
+#define LINE_SPEED_MMS      (60u)
 #define LINE_KP_X100        (25)
 #define LINE_KD_X100        (25)
 #define LINE_BOOST_X100     (250)       /* Curve authority.              */
 #define LINE_STEER_PER_MMS  (2u)        /* Full lock = 2 x the speed.    */
 #define FLOOR_TEST_MMS      (150u)      /* No line to follow: faster.    */
+#define LINE_BLACK_U8       (128u)      /* Half way, white 0 to black    */
+                                        /* 255: S3_LN_FOUND (500/1000).  */
 #define STILL_MAX_MS        (500u)      /* Longest wait for still wheels.*/
 #define LF_SEARCH_BOTH      (LF_SEARCH_L | LF_SEARCH_R)
 #define FLG_S3_ALL          (FLG_S3_JUNCTION | FLG_S3_LOST \
@@ -325,6 +327,27 @@ s5_links_line_side (void)
     }
 
     return (side);
+}
+
+/*!
+ * @brief Tell whether either of S3's line sensors sees black now
+ *        (IF-S3b; it only reads S3's status).
+ *
+ * @return true if one reads at least half way from white to black.
+ */
+bool
+s5_links_line_sees_black (void)
+{
+    s3_line_status_t status  = {0};
+    bool             b_black = false;
+
+    if (g_b_line_used && (E_OK == s3_get_line_status(&status)))
+    {
+        b_black = (status.n_outer >= LINE_BLACK_U8)
+                  || (status.n_centre >= LINE_BLACK_U8);
+    }
+
+    return (b_black);
 }
 
 /*!

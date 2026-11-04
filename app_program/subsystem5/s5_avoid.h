@@ -26,8 +26,12 @@ typedef enum
     S5_AVOID_REVERSING,         /* Backing off before a rescan.          */
     S5_AVOID_MAKE_ROOM,         /* Bypass step 0: room to turn out.      */
     S5_AVOID_TURN_OUT,          /* Bypass step 1.                        */
+    S5_AVOID_STEER_OUT,         /* Step 1a: corner close, turn out more. */
     S5_AVOID_MOVE_OUT,          /* Step 2.                               */
-    S5_AVOID_TURN_PARALLEL,     /* Step 3.                               */
+    S5_AVOID_HALF_PARALLEL,     /* Step 3, first half of the turn back.  */
+    S5_AVOID_WHEEL_CHECK,       /* Step 3w: gap at the rear wheels.      */
+    S5_AVOID_WHEEL_OUT,         /* Too close: turn out again, move out.  */
+    S5_AVOID_TURN_PARALLEL,     /* Step 3, second half of the turn back. */
     S5_AVOID_SIDE_CHECK,        /* Step 3a: measure the gap beside.      */
     S5_AVOID_JOG_OUT,           /* Step 3b: too close, turn out again,   */
     S5_AVOID_JOG_MOVE,          /* move further out,                     */
@@ -48,13 +52,16 @@ typedef enum
     S5_AVOID_BUSY = 0,          /* Still working.                        */
     S5_AVOID_RESUME,            /* Done: resume line following.          */
     S5_AVOID_PLAN_ONLY,         /* Bypass switched off: stop here.       */
-    S5_AVOID_FAILURE            /* Failed: see s5_avoid_fault().         */
+    S5_AVOID_FAILURE,           /* Failed: see s5_avoid_fault().         */
+    S5_AVOID_SEARCH             /* Back, but the line not found where it */
+                                /* should be: search on the spot.        */
 } s5_avoid_result_t;
 
 void                    s5_avoid_set_bypass(bool b_enabled);
 void                    s5_avoid_start(uint32_t now_ms);
 s5_avoid_result_t       s5_avoid_step(uint32_t events, uint32_t now_ms);
 subsystem5_ctrl_fault_t s5_avoid_fault(void);
+bool                    s5_avoid_passed_left(void);
 
 #endif /* S5_AVOID_H */
 

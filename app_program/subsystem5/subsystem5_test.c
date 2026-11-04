@@ -241,12 +241,12 @@ plan_is_right (void)
     s5_plan_t    plan    = {S5_PLAN_CONTINUE, 0, 0u, 0u, 0u, 0u, 0u};
     bool         b_ok    = true;
 
-    // Wall close on the left (192 < 280 mm needed): go right; the 45
+    // Wall close on the left (150 < 190 mm needed): go right; the 45
     // degree leg covers a 197 mm shift with about 279 mm.
     profile.b_on_path      = true;
     profile.b_left_edge    = true;
     profile.b_right_edge   = true;
-    profile.clear_left_mm  = 192u;
+    profile.clear_left_mm  = 150u;
     profile.clear_right_mm = S5_CLEAR_OPEN_MM;
     profile.shift_left_mm  = 197u;
     profile.shift_right_mm = 197u;
@@ -260,12 +260,18 @@ plan_is_right (void)
     s5_plan_make(&profile, &plan);
     b_ok = b_ok && (S5_PLAN_LEFT == plan.action) && (45 == plan.turn_deg);
 
-    // Both sides wide enough: the smaller detour (right), even though
-    // the left is more open.
+    // Both sides wide enough: the larger gap (left), even though the
+    // right needs the smaller shift.
     profile.shift_left_mm  = 250u;
     profile.shift_right_mm = 150u;
     s5_plan_make(&profile, &plan);
+    b_ok = b_ok && (S5_PLAN_LEFT == plan.action);
+
+    // Same gap on both sides: the smaller shift (right).
+    profile.clear_right_mm = 600u;
+    s5_plan_make(&profile, &plan);
     b_ok = b_ok && (S5_PLAN_RIGHT == plan.action);
+    profile.clear_right_mm = 400u;
     profile.shift_left_mm  = 197u;
     profile.shift_right_mm = 197u;
 

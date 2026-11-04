@@ -6,12 +6,12 @@
  * - Nothing in the robot's path: continue.
  * - A side may be used only if its edge was found and its clearance is
  *   at least the robot's width plus S5_PATH_MARGIN_MM.
- * - If both sides may be used, take the one needing the smaller sideways
- *   shift, so the robot stays closest to the line (Project Write-up:
- *   avoidance "should minimise deviation from the original route"). The
- *   ultrasonic cannot see the edge of the track, so a wide-open side
- *   must not draw the robot away from it. On a tie, the larger
- *   clearance; then the left.
+ * - If both sides may be used, take the one with the larger clearance
+ *   (Week 6 report: "bypass on the side with greater clearance"; the
+ *   brief: "on the left-hand side we've got a bigger gap"). On a tie,
+ *   the one needing the smaller sideways shift, so the robot stays
+ *   closest to the line (Project Write-up: avoidance "should minimise
+ *   deviation from the original route"); then the left.
  * - If neither may be used: reverse and rescan.
  *
  * @par Leg lengths
@@ -85,12 +85,12 @@ s5_plan_make (s5_profile_t const * p_profile, s5_plan_t * p_plan)
     }
     else if (b_left_ok && b_right_ok)
     {
-        // Smaller shift first; then the larger gap; then the left.
-        bool b_left = (p_profile->shift_left_mm < p_profile->shift_right_mm)
-                      || ((p_profile->shift_left_mm
-                           == p_profile->shift_right_mm)
-                          && (p_profile->clear_left_mm
-                              >= p_profile->clear_right_mm));
+        // Larger gap first; then the smaller shift; then the left.
+        bool b_left = (p_profile->clear_left_mm > p_profile->clear_right_mm)
+                      || ((p_profile->clear_left_mm
+                           == p_profile->clear_right_mm)
+                          && (p_profile->shift_left_mm
+                              <= p_profile->shift_right_mm));
 
         fill_bypass(p_plan, b_left, p_profile);
     }

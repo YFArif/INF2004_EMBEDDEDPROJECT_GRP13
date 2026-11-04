@@ -12,10 +12,28 @@
  * @par Finding the line again
  * On the way back S3 searches from the side the robot went round on (a
  * bypass on the left leaves the robot left of the line), and the return
- * leg may run SEARCH_EXTRA_MM past the plan before giving up. While S3
+ * leg may run SEARCH_EXTRA_MM past the plan. Still not found: the
+ * mission's line recovery sweeps on the spot (S5_AVOID_SEARCH) instead
+ * of driving further out, so a line that curves away near the end of
+ * the track does not draw the robot off the map. While S3
  * is not ready (s5_links_line_is_ready() false: not calibrated, or
  * switched off by the floor tests) the return leg is driven its planned
  * length and the line is taken as found there.
+ *
+ * @par Checking the gap at the rear wheels (step 3w)
+ * The robot turns about the middle of its rear axle, and the diagonal
+ * ends with that axle about level with the obstacle's front face. The
+ * rear wheel on the obstacle's side swings towards it while turning
+ * parallel, and clipped a wide box's front corner (2026-11-05, Anna:
+ * short turns and the scan's trimmed edges eat the 50 mm margin). So the
+ * turn back is done in two halves. Between them the robot stands still
+ * and pings sideways: the sensor sits about 10 mm ahead of the rear
+ * axle, and half turned back the beam meets the obstacle's side nearly
+ * square (at the full 45 degrees it would glance off). The sideways gap
+ * there is the gap at the rear wheel. Under WHEEL_NEED_MM: turn out
+ * again and drive out the missing distance (corner watch on), then try
+ * again; at most WHEEL_CHECKS_MAX times, then NO_PATH. No echo: the
+ * side is clear.
  *
  * @par Checking the gap beside the obstacle (step 3a)
  * Turns are not exact, and the edge from the scan is an estimate, so
@@ -28,6 +46,19 @@
  * JOGS_MAX times, then NO_PATH rather than graze. No echo means the side
  * is not beside the sensor yet: it carries on. The return leg grows by
  * every extra move, so the robot still comes back to the line.
+ * While passing, a side ping under SIDE_NEED_MM stops the robot and runs
+ * this check again (log 2026-11-05_0136_track: not quite parallel, the
+ * side closed in from 169 to 143 mm and the robot rubbed a wide box).
+ *
+ * @par Meeting the line early
+ * The line may bend towards the robot, or the robot drift back, while it
+ * passes the obstacle. If S3's sensors see black for LINE_MET_TICKS steps
+ * in a row on the tail, the line is already under the robot: the bypass
+ * ends there and line following resumes (log 2026-11-05_0154_track: both
+ * sensors black, then the turn in drove away from the line and the
+ * search found nothing). Not while passing: the obstacle may still be
+ * beside the robot, and following the line there steered into a box
+ * (log 2026-11-05_0224_track).
  * TODO: Set SIDE_NEED_MM from the measured robot (sensor line to the
  * widest point, plus about 25 mm).
  *
@@ -49,14 +80,27 @@
 #include "s5_profile.h"
 #include "subsystem5.h"
 
-#define SPEED_MMS           (150u)      /* All bypass legs, for accuracy.*/
+#define SPEED_MMS           (70u)       /* Moves and turns going round:  */
+                                        /* slow for accuracy and for S3  */
+                                        /* to see the line (was 150).    */
+#define STEER_DEG           (15)        /* Corner close: turn out more.  */
+#define WHEEL_NEED_MM       ((S5_ROBOT_WIDTH_MM / 2) + 30)  /* Sensor to */
+                                        /* the obstacle's side, at the   */
+                                        /* rear wheels: half the robot   */
+                                        /* plus the wheel's swing (15 mm)*/
+                                        /* and 15 mm to spare.           */
+#define WHEEL_CHECKS_MAX    (2u)
+#define OUT_MAX_DEG         (90)        /* Never further than sideways.  */
 #define REVERSE_MM          (100)       /* Week 6 report 6.4.            */
 #define RETRIES_MAX         (2u)        /* Then NO_PATH.                 */
 #define WATCH_MAX_MM        (800)       /* Longest obstacle expected.    */
-#define SEARCH_EXTRA_MM     (300)       /* NFR10: line within 300 mm.    */
+#define SEARCH_EXTRA_MM     (100)       /* Past where the line should be.*/
+                                        /* Then search on the spot: an   */
+                                        /* end-of-track curve must not   */
+                                        /* draw the robot off the map.   */
 #define SCAN_TIMEOUT_MS     (8000u)     /* A scan takes about 2.5 s.     */
 #define MOTION_SLACK_MS     (2000u)     /* Added to every motion limit.  */
-#define TURN_MS_PER_DEG     (20u)       /* About 3 x the time at 150 mm/s*/
+#define TURN_MS_PER_DEG     (40u)       /* About 2 x the time at 70 mm/s.*/
 #define MS_PER_S            (1000u)
 #define MM_PER_CM           (10u)
 #define SIDE_NEED_MM        (110)       /* Sensor to the obstacle's side.*/
@@ -64,6 +108,7 @@
 #define SIDE_NONE_MM        (0xFFFFu)   /* No echo beside yet.           */
 #define JOG_DEG             (20)        /* Gentle: little swing.         */
 #define JOGS_MAX            (3u)
+#define LINE_MET_TICKS      (3u)        /* Black this often in a row.    */
 #define LEG_MAX_MM          (32767)     /* Back leg is uint16_t.         */
 
 /** Everything the avoidance remembers between steps. */
@@ -80,12 +125,21 @@ typedef struct
     int32_t                 jog_mm;         /* Current extra move.       */
     uint32_t                side_min_mm;    /* Closest beside, this check*/
     uint32_t                check_pings;    /* Ping count at its start.  */
+    int32_t                 out_deg;        /* Turned out so far (> 0).  */
+    int32_t                 shift_mm;       /* Sideways move planned.    */
+    int32_t                 out_done_mm;    /* Sideways move done.       */
+    int32_t                 move_mark_mm;   /* Odometry at MOVE start.   */
+    int32_t                 half_deg;       /* First half of the turn    */
+                                            /* back to parallel.         */
+    uint32_t                wheel_checks;   /* Rear-wheel moves out.     */
+    uint32_t                black_run;      /* Steps in a row on black.  */
 } avoid_t;
 
 static avoid_t       g_avoid       = {S5_AVOID_IDLE, {S5_PLAN_CONTINUE, 0, 0u,
                                      0u, 0u, 0u, 0u}, 0u, 0u, 0u, 0u,
                                      S5_CTRL_FAULT_NONE, 0u, 0,
-                                     SIDE_NONE_MM, 0u};
+                                     SIDE_NONE_MM, 0u, 0, 0, 0, 0, 0,
+                                     0u, 0u};
 static volatile bool g_b_bypass_on = true;
 
 static s5_avoid_result_t step_scanning(uint32_t events, uint32_t now_ms);
@@ -95,6 +149,16 @@ static s5_avoid_result_t step_return(uint32_t events, uint32_t now_ms);
 static s5_avoid_result_t step_side_check(uint32_t now_ms);
 static void              start_side_check(uint32_t now_ms);
 static void              request_watch(void);
+static bool              side_too_close(void);
+static bool              line_met(void);
+static void              start_out(uint32_t now_ms);
+static void              move_out(uint32_t now_ms);
+static s5_avoid_result_t corner_close(uint32_t now_ms);
+static void              half_parallel(uint32_t now_ms);
+static void              start_side_ping(s5_avoid_state_t state,
+                                         uint32_t now_ms);
+static void              collect_side_ping(void);
+static s5_avoid_result_t step_wheel_check(uint32_t now_ms);
 static void              request_scan(uint32_t now_ms);
 static void              start_move(int32_t dist_mm, uint32_t now_ms);
 static void              start_turn(int32_t angle_deg, uint32_t now_ms);
@@ -123,9 +187,10 @@ s5_avoid_set_bypass (bool b_enabled)
 void
 s5_avoid_start (uint32_t now_ms)
 {
-    g_avoid.retries = 0u;
-    g_avoid.jogs    = 0u;
-    g_avoid.fault   = S5_CTRL_FAULT_NONE;
+    g_avoid.retries   = 0u;
+    g_avoid.jogs      = 0u;
+    g_avoid.black_run = 0u;
+    g_avoid.fault     = S5_CTRL_FAULT_NONE;
     request_scan(now_ms);
 }
 
@@ -156,6 +221,10 @@ s5_avoid_step (uint32_t events, uint32_t now_ms)
             result = step_side_check(now_ms);
         break;
 
+        case S5_AVOID_WHEEL_CHECK:
+            result = step_wheel_check(now_ms);
+        break;
+
         case S5_AVOID_IDLE:
         case S5_AVOID_DONE:
             result = S5_AVOID_RESUME;
@@ -172,6 +241,18 @@ s5_avoid_step (uint32_t events, uint32_t now_ms)
     }
 
     return (result);
+}
+
+/*!
+ * @brief Which side the last bypass went round: the line is then on the
+ *        other side of the robot (the obstacle's side).
+ *
+ * @return True if the robot went round the obstacle's left.
+ */
+bool
+s5_avoid_passed_left (void)
+{
+    return (g_avoid.plan.turn_deg > 0);
 }
 
 /*!
@@ -282,8 +363,113 @@ act_on_plan (uint32_t now_ms)
     else
     {
         s5_links_motion_release();
-        start_turn(p_plan->turn_deg, now_ms);
-        enter(S5_AVOID_TURN_OUT);
+        start_out(now_ms);
+    }
+
+    return (result);
+}
+
+/*!
+ * @brief Step 1: turn out, and note the sideways move the plan needs
+ *        (its 45 degree leg covers it).
+ *
+ * @param[in] now_ms Current time.
+ */
+static void
+start_out (uint32_t now_ms)
+{
+    int32_t turn = g_avoid.plan.turn_deg;
+
+    // NOTE: The cast widens uint16_t, so no value is lost.
+    g_avoid.out_deg     = s5_math_abs(turn);
+    g_avoid.shift_mm    = s5_math_mul_q15((int32_t) g_avoid.plan.out_mm,
+                                          s5_math_sin_q15(g_avoid.out_deg));
+    g_avoid.out_done_mm  = 0;
+    g_avoid.wheel_checks = 0u;
+    start_turn(turn, now_ms);
+    enter(S5_AVOID_TURN_OUT);
+}
+
+/*!
+ * @brief Step 2: drive out the rest of the sideways move at the current
+ *        angle, with the corner watch on (the obstacle's side).
+ *
+ * @param[in] now_ms Current time.
+ */
+static void
+move_out (uint32_t now_ms)
+{
+    int32_t remaining = g_avoid.shift_mm - g_avoid.out_done_mm;
+
+    if (remaining <= 0)
+    {
+        // Already far enough out (after a steer-out).
+        half_parallel(now_ms);
+    }
+    else
+    {
+        int32_t leg = (remaining * S5_MATH_Q15_ONE)
+                      / s5_math_sin_q15(g_avoid.out_deg);
+
+        // Passing on the left leaves the obstacle on the right.
+        subsystem5_obst_request((g_avoid.plan.turn_deg > 0)
+                                ? OB_CORNER_RIGHT : OB_CORNER_LEFT);
+        g_avoid.move_mark_mm = s5_links_odom_dist_mm();
+        start_move(leg, now_ms);
+        enter(S5_AVOID_MOVE_OUT);
+    }
+}
+
+/*!
+ * @brief Step 3, first half: corner watch off, turn back half of
+ *        everything turned out; then the rear-wheel check.
+ *
+ * @param[in] now_ms Current time.
+ */
+static void
+half_parallel (uint32_t now_ms)
+{
+    int32_t sign = (g_avoid.plan.turn_deg > 0) ? 1 : -1;
+
+    subsystem5_obst_request(OB_HOLD);
+    g_avoid.half_deg = g_avoid.out_deg / 2;
+    start_turn(-sign * g_avoid.half_deg, now_ms);
+    enter(S5_AVOID_HALF_PARALLEL);
+}
+
+/*!
+ * @brief The corner watch saw the obstacle close to the front corner
+ *        while driving out (a short turn, or a wider obstacle than
+ *        scanned): stop, turn STEER_DEG further out, drive on.
+ *
+ * @param[in] now_ms Current time.
+ *
+ * @return BUSY, or FAILURE if already moving sideways.
+ */
+static s5_avoid_result_t
+corner_close (uint32_t now_ms)
+{
+    s5_avoid_result_t result = S5_AVOID_BUSY;
+    int32_t           driven = s5_links_odom_dist_mm()
+                               - g_avoid.move_mark_mm;
+    int32_t           sign   = (g_avoid.plan.turn_deg > 0) ? 1 : -1;
+
+    s5_links_motion_settle();
+    g_avoid.out_done_mm += s5_math_mul_q15(driven,
+                                           s5_math_sin_q15(g_avoid.out_deg));
+
+    if ((g_avoid.out_deg + STEER_DEG) <= OUT_MAX_DEG)
+    {
+        s5_event_trace("AVOID corner close: turning out to deg, done_mm",
+                       g_avoid.out_deg + STEER_DEG, g_avoid.out_done_mm);
+        g_avoid.out_deg += STEER_DEG;
+        start_turn(sign * STEER_DEG, now_ms);
+        enter(S5_AVOID_STEER_OUT);
+    }
+    else
+    {
+        // Already moving sideways and still too close: no way past.
+        result = fail(S5_CTRL_FAULT_NO_PATH);
     }
 
     return (result);
@@ -306,12 +492,37 @@ step_bypass (uint32_t events, uint32_t now_ms)
     bool              b_pass = (0u != (events & EV_OBST_PASSED));
     int32_t           turn   = g_avoid.plan.turn_deg;
 
-    if ((S5_AVOID_PASSING == g_avoid.state) && (b_pass || b_done))
+    if ((S5_AVOID_MOVE_OUT == g_avoid.state)
+        && (0u != (events & EV_CORNER_CLOSE)))
+    {
+        result = corner_close(now_ms);
+    }
+    else if ((S5_AVOID_PASSING == g_avoid.state) && (b_pass || b_done))
     {
         // Passed (or drove the longest expected obstacle): clear the rear.
         s5_links_motion_stop();
         start_move(g_avoid.plan.tail_mm, now_ms);
         enter(S5_AVOID_TAIL);
+    }
+    else if ((S5_AVOID_PASSING == g_avoid.state) && side_too_close())
+    {
+        // Drifting into the obstacle's side: stop and measure again; the
+        // side check eases out, then passing starts over.
+        s5_event_trace("PASS side too close: range_mm need_mm",
+                       (int32_t) g_avoid.side_min_mm, SIDE_NEED_MM);
+        s5_links_motion_stop();
+        start_side_check(now_ms);
+    }
+    else if ((S5_AVOID_TAIL == g_avoid.state) && line_met())
+    {
+        // The line is already under the robot: no turn in. The search
+        // side is the one the return leg would use.
+        s5_event_trace("AVOID line met on the tail: resuming 0", 0, 0);
+        s5_links_motion_stop();
+        s5_links_line_search((turn > 0) ? S5_LINKS_SIDE_LEFT
+                                        : S5_LINKS_SIDE_RIGHT);
+        enter(S5_AVOID_DONE);
+        result = S5_AVOID_RESUME;
     }
     else if (!b_done)
     {
@@ -327,18 +538,30 @@ step_bypass (uint32_t events, uint32_t now_ms)
             break;
 
             case S5_AVOID_MAKE_ROOM:
-                start_turn(turn, now_ms);
-                enter(S5_AVOID_TURN_OUT);
+                start_out(now_ms);
             break;
 
             case S5_AVOID_TURN_OUT:
-                start_move(g_avoid.plan.out_mm, now_ms);
-                enter(S5_AVOID_MOVE_OUT);
+            // After a steer-out the rest of the move is driven too.
+            case S5_AVOID_STEER_OUT:
+                move_out(now_ms);
             break;
 
             case S5_AVOID_MOVE_OUT:
-                start_turn(-turn, now_ms);
-                enter(S5_AVOID_TURN_PARALLEL);
+                // Count the sideways distance this leg covered.
+                g_avoid.out_done_mm +=
+                    s5_math_mul_q15(s5_links_odom_dist_mm()
+                                    - g_avoid.move_mark_mm,
+                                    s5_math_sin_q15(g_avoid.out_deg));
+                half_parallel(now_ms);
+            break;
+
+            case S5_AVOID_HALF_PARALLEL:
+                start_side_ping(S5_AVOID_WHEEL_CHECK, now_ms);
+            break;
+
+            case S5_AVOID_WHEEL_OUT:
+                move_out(now_ms);
             break;
 
             case S5_AVOID_TURN_PARALLEL:
@@ -428,7 +651,12 @@ step_return (uint32_t events, uint32_t now_ms)
     }
     else if (b_done)
     {
-        result = fail(S5_CTRL_FAULT_LINE_NOT_FOUND);
+        // Not found where it should be (it may curve away): no further
+        // out; the mission's line recovery sweeps on the spot.
+        s5_event_trace("AVOID line not found on return: searching here 0",
+                       0, 0);
+        enter(S5_AVOID_DONE);
+        result = S5_AVOID_SEARCH;
     }
     else if (is_timed_out(now_ms))
     {
@@ -451,6 +679,19 @@ step_return (uint32_t events, uint32_t now_ms)
 static void
 start_side_check (uint32_t now_ms)
 {
+    start_side_ping(S5_AVOID_SIDE_CHECK, now_ms);
+}
+
+/*!
+ * @brief Stand still and ping sideways at the obstacle (side check and
+ *        rear-wheel check).
+ *
+ * @param[in] state  The checking state to enter.
+ * @param[in] now_ms Current time.
+ */
+static void
+start_side_ping (s5_avoid_state_t state, uint32_t now_ms)
+{
     subsystem5_obst_status_t status = {0};
 
     // Remember the ping count: the published status still holds the
@@ -462,7 +703,93 @@ start_side_check (uint32_t now_ms)
     request_watch();
     g_avoid.side_min_mm   = SIDE_NONE_MM;
     g_avoid.wait_start_ms = now_ms;
-    enter(S5_AVOID_SIDE_CHECK);
+    enter(state);
+}
+
+/*!
+ * @brief Keep the closest new sideways ping: only pings taken after the
+ *        check began, with the servo pointing sideways, count.
+ */
+static void
+collect_side_ping (void)
+{
+    subsystem5_obst_status_t status   = {0};
+    int32_t                  side_deg = (g_avoid.plan.turn_deg > 0)
+                                        ? DRV_SERVO_RIGHT_DEG
+                                        : DRV_SERVO_LEFT_DEG;
+
+    subsystem5_obst_status_get(&status);
+
+    if (status.b_range_valid && (side_deg == status.servo_deg)
+        && (status.ping_count != g_avoid.check_pings)
+        && (status.range_mm < g_avoid.side_min_mm))
+    {
+        g_avoid.side_min_mm = status.range_mm;
+    }
+}
+
+/*!
+ * @brief WHEEL_CHECK: the gap at the rear wheels, half turned back.
+ *        Enough (or no echo): finish the turn. Too little: turn out
+ *        again and move out the missing distance.
+ *
+ * @param[in] now_ms Current time.
+ *
+ * @return BUSY, or FAILURE after WHEEL_CHECKS_MAX moves out.
+ */
+static s5_avoid_result_t
+step_wheel_check (uint32_t now_ms)
+{
+    s5_avoid_result_t result = S5_AVOID_BUSY;
+    int32_t           sign   = (g_avoid.plan.turn_deg > 0) ? 1 : -1;
+    int32_t           rest   = g_avoid.out_deg - g_avoid.half_deg;
+    int32_t           gap    = SIDE_NONE_MM;
+
+    collect_side_ping();
+
+    // The beam is rest degrees off square to the obstacle's side.
+    // NOTE: The cast is safe: side_min_mm is at most SIDE_NONE_MM.
+    if (SIDE_NONE_MM != g_avoid.side_min_mm)
+    {
+        gap = s5_math_mul_q15((int32_t) g_avoid.side_min_mm,
+                              s5_math_cos_q15(rest));
+    }
+
+    if ((now_ms - g_avoid.wait_start_ms) < SIDE_CHECK_MS)
+    {
+        // Still measuring.
+    }
+    else if (gap >= WHEEL_NEED_MM)
+    {
+        s5_event_trace("WHEEL gap_mm ok, need_mm", gap, WHEEL_NEED_MM);
+        subsystem5_obst_request(OB_HOLD);
+        start_turn(-sign * rest, now_ms);
+        enter(S5_AVOID_TURN_PARALLEL);
+    }
+    else if (g_avoid.wheel_checks >= WHEEL_CHECKS_MAX)
+    {
+        result = fail(S5_CTRL_FAULT_NO_PATH);
+    }
+    else
+    {
+        // NOTE: The cast is safe: the back leg is limited to LEG_MAX_MM.
+        int32_t missing = WHEEL_NEED_MM - gap;
+        int32_t back    = (int32_t) g_avoid.plan.back_mm
+                          + ((missing * S5_MATH_Q15_ONE)
+                             / s5_math_sin_q15(S5_PLAN_TURN_DEG));
+
+        s5_event_trace("WHEEL gap_mm too close, moving out mm", gap,
+                       missing);
+        g_avoid.wheel_checks++;
+        g_avoid.shift_mm    += missing;
+        g_avoid.plan.back_mm = (uint16_t) ((back > LEG_MAX_MM) ? LEG_MAX_MM
+                                                               : back);
+        subsystem5_obst_request(OB_HOLD);
+        start_turn(sign * g_avoid.half_deg, now_ms);
+        enter(S5_AVOID_WHEEL_OUT);
+    }
+
+    return (result);
 }
 
 /*!
@@ -476,21 +803,10 @@ start_side_check (uint32_t now_ms)
 static s5_avoid_result_t
 step_side_check (uint32_t now_ms)
 {
-    s5_avoid_result_t        result   = S5_AVOID_BUSY;
-    subsystem5_obst_status_t status   = {0};
-    int32_t                  turn     = g_avoid.plan.turn_deg;
-    int32_t                  side_deg = (turn > 0) ? DRV_SERVO_RIGHT_DEG
-                                                   : DRV_SERVO_LEFT_DEG;
+    s5_avoid_result_t result = S5_AVOID_BUSY;
+    int32_t           turn   = g_avoid.plan.turn_deg;
 
-    // Only new pings, taken with the servo pointing sideways, count.
-    subsystem5_obst_status_get(&status);
-
-    if (status.b_range_valid && (side_deg == status.servo_deg)
-        && (status.ping_count != g_avoid.check_pings)
-        && (status.range_mm < g_avoid.side_min_mm))
-    {
-        g_avoid.side_min_mm = status.range_mm;
-    }
+    collect_side_ping();
 
     if ((now_ms - g_avoid.wait_start_ms) < SIDE_CHECK_MS)
     {
@@ -537,6 +853,55 @@ step_side_check (uint32_t now_ms)
     }
 
     return (result);
+}
+
+/*!
+ * @brief While passing: is the latest sideways ping closer than
+ *        SIDE_NEED_MM? Keeps that range in side_min_mm for the trace.
+ *
+ * @return True if the obstacle's side is too close.
+ */
+static bool
+side_too_close (void)
+{
+    subsystem5_obst_status_t status   = {0};
+    bool                     b_close  = false;
+    int32_t                  side_deg = (g_avoid.plan.turn_deg > 0)
+                                        ? DRV_SERVO_RIGHT_DEG
+                                        : DRV_SERVO_LEFT_DEG;
+
+    subsystem5_obst_status_get(&status);
+
+    // NOTE: The cast is safe: SIDE_NEED_MM is a few hundred mm.
+    if (status.b_range_valid && (side_deg == status.servo_deg)
+        && (status.range_mm < (uint16_t) SIDE_NEED_MM))
+    {
+        g_avoid.side_min_mm = status.range_mm;
+        b_close             = true;
+    }
+
+    return (b_close);
+}
+
+/*!
+ * @brief On the tail: have S3's sensors seen black for LINE_MET_TICKS
+ *        steps in a row? One dark speck is not the line.
+ *
+ * @return True once the line is under the robot.
+ */
+static bool
+line_met (void)
+{
+    if (s5_links_line_sees_black())
+    {
+        g_avoid.black_run++;
+    }
+    else
+    {
+        g_avoid.black_run = 0u;
+    }
+
+    return (g_avoid.black_run >= LINE_MET_TICKS);
 }
 
 /*!
@@ -599,7 +964,7 @@ start_turn (int32_t angle_deg, uint32_t now_ms)
                                      : (uint32_t) angle_deg;
 
     // NOTE: The casts above are safe: |angle_deg| is at most 180.
-    s5_links_motion_turn(angle_deg, 0u);
+    s5_links_motion_turn(angle_deg, SPEED_MMS);
     g_avoid.wait_start_ms = now_ms;
     g_avoid.wait_limit_ms = (angle * TURN_MS_PER_DEG) + MOTION_SLACK_MS;
 }
