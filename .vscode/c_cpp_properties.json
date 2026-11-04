@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        {
+            "name": "Pico W (micro T-Kernel, make TEST=1)",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/config",
+                "${workspaceFolder}/kernel/knlinc",
+                "${workspaceFolder}/app_program"
+            ],
+            "defines": [
+                "_PICO_RP2040_",
+                "CNF_SMP=1",
+                "APP_TEST=1",
+                "TM_CONSOLE_USB_CDC=1",
+                "TM_CONSOLE_UART=0",
+                "BOARD_UART0_FREE=1",
+                "TM_WIFI_CYW43=1",
+                "NDEBUG"
+            ],
+            "cStandard": "gnu11",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}

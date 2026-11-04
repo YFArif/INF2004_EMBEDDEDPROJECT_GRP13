@@ -53,7 +53,7 @@ int main (void)
 
     check("only 27 elements",        g_a, 27U, S3_C39_BAD_COUNT, 0, 0U);
 
-    memcpy(buf, g_a, sizeof(buf)); buf[12] = 40U;                  /* blurred narrow bar */
+    memcpy(buf, g_a, sizeof(buf)); buf[12] = 44U;                  /* blurred narrow bar: 50/44 < 1.2 */
     check("blurred bar -> reject",   buf, 29U, S3_C39_BAD_RATIO, 0, 0U);
 
     for (i = 0U; i < 29U; i++) { buf[i] = 20U; }                   /* all equal = noise */

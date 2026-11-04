@@ -18,13 +18,15 @@
 #define S3_CONFIG_H
 
 #include "s3_line.h"        /* S3_LN_L_ON_LEFT / S3_LN_L_ON_RIGHT.      */
+#include "s3_experiment.h"
 
 /* ---------------------------------------------------------------------
- *  Line sensor layout (v25 CENTRED PAIR, s3_line.h). Both sensors sit ON
- *  the line, 12 mm apart centre to centre, the pair centred on the car:
+ *  Line sensor layout (v29 EDGE PAIR, s3_line.h). One sensor on EACH
+ *  edge of the 18 mm line, 18 mm apart centre to centre, the pair
+ *  centred on the car. Centred, both read GREY (about 500):
  *
- *        white |####  L  ####  R  ####| white     (looking down, car
- *                     <-12 mm->                    pointing up the page)
+ *        white  L|##################|R  white     (looking down, car
+ *                <------ 18 mm ----->              pointing up the page)
  *
  *  On our car the GP26 ("Left IR") sensor is on the robot's RIGHT and
  *  GP27 ("Centre IR") on its LEFT. If they are mounted the other way
@@ -34,10 +36,10 @@
 #ifndef S3_IR_L_SIDE
 #define S3_IR_L_SIDE            (S3_LN_L_ON_RIGHT)
 #endif
-#define S3_IR_SPACING_MM        (12)    /* Mounting: centre to centre.   */
+#define S3_IR_SPACING_MM        (18)    /* Mounting: centre to centre.   */
 #define S3_LAYOUT_TXT           ((S3_LN_L_ON_LEFT == S3_IR_L_SIDE) ? \
-                                 "both on line, GP26 LEFT" :           \
-                                 "both on line, GP26 RIGHT")
+                                 "edge pair 18 mm, GP26 LEFT" :        \
+                                 "edge pair 18 mm, GP26 RIGHT")
 
 /* ---------------------------------------------------------------------
  *  Tasks (Week 6 report section 3, TEAM.md section 4). Both run on core 1
@@ -70,6 +72,9 @@
 #define S3_ODOM_MAX_STEP_MM     (1000)  /* A bigger jump is a reset.     */
 #define S3_CAL_RELAX_MS         (1000u) /* Calibration relax period.     */
 #define S3_STATUS_PRINT_MS      (200u)  /* "S3 LINE" console period.     */
+#define S3_BC_HOLD_MS           (3500u) /* Max soft steer over a code    */
+                                        /* (130 mm code at 40 mm/s).     */
+#define S3_BC_HOLD_DIV          (2)     /* Steering / 2 over a barcode.  */
 
 /* ---------------------------------------------------------------------
  *  Barcode
@@ -87,9 +92,27 @@
 #ifndef S3_DRIVE_TEST
 #define S3_DRIVE_TEST           (0)
 #endif
+#if ((S3_EXPERIMENT_MODE != 0) && (S3_DRIVE_TEST != 0))
+#error "Choose either the preserved drive test or the GP27 experiment"
+#endif
+#if (S3_DRIVE_TEST != 0) && APP_TEST
+#error "S3 drive test must not compete with subsystem self-tests"
+#endif
+#ifndef S3_DRIVE_STRAIGHT
+#define S3_DRIVE_STRAIGHT       (0)     /* 1 = barcode sensor test: drive */
+#endif                                  /* straight, no line following.   */
+#define S3_DRIVE_STRAIGHT_MM    (600)   /* Straight test distance.       */
+#ifndef S3_DRIVE_SPEED_MMS
+#define S3_DRIVE_SPEED_MMS      (40u)
+#endif
+#if ((S3_DRIVE_SPEED_MMS < 1) || (S3_DRIVE_SPEED_MMS > 300))
+#error "S3_DRIVE_SPEED_MMS must be 1..300 (including headroom for 1.5x boost)"
+#endif
 #define S3_LINE_VERBOSE         (!S3_DRIVE_TEST) /* Drive task owns logs. */
+#ifndef S3_BC_VERBOSE
 #define S3_BC_VERBOSE           (0)     /* 1 = every barcode attempt;    */
                                         /* 0 = only "S3 NAV" lines.      */
+#endif
 #ifndef S3_TIMING
 #define S3_TIMING               (!S3_DRIVE_TEST) /* Quiet drive prompts. */
                                         /* sampler interrupt and line    */
@@ -101,12 +124,10 @@
  *  TEST ONLY: line following on Buddy 2's motors before the Vehicle
  *  Controller exists (task_drive_test.c). Keep 0 in main.
  * --------------------------------------------------------------------- */
-#define S3_DRIVE_LOST_MM        (300u)  /* Stop after LOST this far.     */
-#define S3_DRIVE_LOST_MS        (2000u) /* ... or LOST this long (a car  */
-                                        /* that stopped never got far).  */
 #define S3_DRIVE_STILL_MS       (2000u) /* Stop if the odometry has not  */
                                         /* changed this long.            */
-#define S3_DRIVE_MAX_MM         (3000u) /* Stop after this distance.     */
+#define S3_DRIVE_MAX_MM         (30000u)/* Stop after this distance (was */
+                                        /* 3 m: stopped mid-course).     */
 #define S3_DRIVE_BTN1_PIN       (20u)   /* Button 1 (GP20): PRESS = start */
                                         /* (no hold); any press while    */
                                         /* driving = stop. Read only.    */
@@ -120,13 +141,15 @@
                                         /* START while not READY).       */
 #define S3_DRIVE_GO_COUNT_S     (3u)    /* Countdown after START.        */
 #define S3_DRIVE_LOG_MS         (100u)  /* "S3 LOG" line while driving.  */
-#define S3_DRIVE_CAL_BLACK_MIN  (2500u) /* Refuse to start until BOTH    */
+#define S3_DRIVE_CAL_BLACK_MIN  (1800u) /* Refuse to start until BOTH    */
                                         /* sensors' black level is at    */
                                         /* least this (raw). Car 28 Oct: */
                                         /* full sweep 2955 ... 3939; a   */
                                         /* half sweep was "valid" at     */
                                         /* 2099 and kept rising while    */
-                                        /* driving.                      */
+                                        /* driving. 30 Oct remount: GP26 */
+                                        /* sweep peaked 2331, so 2500    */
+                                        /* never passed.                 */
 
 #endif /* S3_CONFIG_H */
 

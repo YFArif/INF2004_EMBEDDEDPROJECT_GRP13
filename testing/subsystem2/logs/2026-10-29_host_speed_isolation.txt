@@ -1,0 +1,61 @@
+commit: 22fda8a (+ uncommitted changes in S2)
+compiler: gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+S2-U09 host test of motion_task.c (simulated robot)
+-- speed control (NFR4)
+[HOST] H01 PASS  step 0->250 mm/s, load 1.00: in band at 240 ms, worst error after 500 ms 0.9 (limit 25), overshoot 0% (limit 20%)
+[HOST] H02 PASS  step 0->250 mm/s, load 0.85: in band at 280 ms, worst error after 500 ms 4.2 (limit 25), overshoot 0% (limit 20%)
+[HOST] H03 PASS  step 0->250 mm/s, load 0.60: in band at 480 ms, worst error after 500 ms 19.9 (limit 25), overshoot 0% (limit 20%)
+[HOST] H11 PASS  step 0->250 mm/s, load 0.85: in band at 280 ms, worst error after 500 ms 4.2 (limit 25), overshoot 0% (limit 20%)
+[HOST] H21-tick-interval PASS  interval 40000 us, wrap=0: measured 8 expected 8 mm/s
+[HOST] H21-tick-interval PASS  interval 50000 us, wrap=0: measured 6 expected 6 mm/s
+[HOST] H21-tick-interval PASS  interval 90000 us, wrap=0: measured 3 expected 3 mm/s
+[HOST] H21-tick-interval PASS  interval 100000 us, wrap=0: measured 16 expected 16 mm/s
+[HOST] H21-tick-interval PASS  interval 40000 us, wrap=1: measured 8 expected 8 mm/s
+[HOST] H21-tick-interval PASS  interval 50000 us, wrap=1: measured 6 expected 6 mm/s
+[HOST] H21-tick-interval PASS  interval 90000 us, wrap=1: measured 3 expected 3 mm/s
+[HOST] H21-tick-interval PASS  interval 100000 us, wrap=1: measured 16 expected 16 mm/s
+[HOST] H20-low-speed PASS  FOLLOW 10: five-second physical mean L 10.20 R 10.46 mm/s; targets 10/10 (15% tolerance, no steering)
+[HOST] H20-low-speed PASS  FOLLOW 15: five-second physical mean L 15.64 R 15.33 mm/s; targets 15/15 (15% tolerance, no steering)
+[HOST] H20-low-speed PASS  FOLLOW 10: five-second physical mean L 10.20 R 10.46 mm/s; targets 10/10 (15% tolerance, no steering)
+[HOST] H20-low-speed PASS  FOLLOW 40: five-second physical mean L 40.80 R 40.43 mm/s; targets 40/40 (15% tolerance, no steering)
+[HOST] H20-low-speed PASS  FOLLOW 60: five-second physical mean L 60.52 R 60.64 mm/s; targets 60/60 (15% tolerance, no steering)
+[HOST] H20-low-speed PASS  FOLLOW 40: five-second physical mean L 40.12 R 40.43 mm/s; targets 40/40 (15% tolerance, no steering)
+[HOST] H18 PASS  step 0->250 mm/s, load 0.85: in band at 300 ms, worst error after 500 ms 8.0 (limit 25), overshoot 0% (limit 20%)
+[HOST] H18 PASS  step 0->250 mm/s, load 0.85: in band at 340 ms, worst error after 500 ms 10.7 (limit 25), overshoot 4% (limit 20%)
+[HOST] H18 PASS  step 0->250 mm/s, load 0.60: in band at 460 ms, worst error after 500 ms 12.2 (limit 25), overshoot 1% (limit 20%)
+-- MOVE and TURN (FR6, NFR5)
+[HOST] H04 PASS  MOVE 1000 mm @ 0: stopped at 999.7 mm (tol 10), heading -0.20 deg, odom 999 mm, 3640 ms, EV_MOTION_DONE x1
+[HOST] H04 PASS  MOVE 300 mm @ 150: stopped at 300.5 mm (tol 5), heading 0.03 deg, odom 300 mm, 2140 ms, EV_MOTION_DONE x1
+[HOST] H05 PASS  MOVE -100 mm @ 0: stopped at -99.9 mm (tol 5), heading -0.20 deg, odom -99 mm, 660 ms, EV_MOTION_DONE x1
+[HOST] H06 PASS  TURN 90 deg: turned 90.35 deg (tol 3), odom heading 90.08 deg, centre moved 0.0 mm, 760 ms, EV_MOTION_DONE x1
+[HOST] H06 PASS  TURN -90 deg: turned -89.32 deg (tol 3), odom heading -89.11 deg, centre moved -0.0 mm, 740 ms, EV_MOTION_DONE x1
+[HOST] H06 PASS  TURN 180 deg: turned 179.24 deg (tol 3), odom heading 179.10 deg, centre moved 0.0 mm, 1360 ms, EV_MOTION_DONE x1
+[HOST] H06 PASS  TURN 45 deg: turned 44.52 deg (tol 3), odom heading 44.40 deg, centre moved 0.0 mm, 440 ms, EV_MOTION_DONE x1
+[HOST] H06 PASS  TURN 360 deg: turned 359.82 deg (tol 3), odom heading -0.52 deg, centre moved 0.0 mm, 2600 ms, EV_MOTION_DONE x1
+[HOST] H06 PASS  TURN -540 deg: turned -539.74 deg (tol 3), odom heading -179.35 deg, centre moved -0.0 mm, 3800 ms, EV_MOTION_DONE x1
+[HOST] H19-probe PASS  TURN 4 deg: turned 4.50 deg (tol 3), odom heading 4.45 deg, centre moved 0.1 mm, 140 ms, EV_MOTION_DONE x1
+[HOST] H19-probe PASS  TURN -8 deg: turned -7.71 deg (tol 3), odom heading -7.52 deg, centre moved -0.1 mm, 200 ms, EV_MOTION_DONE x1
+[HOST] H19-probe PASS  TURN 16 deg: turned 16.53 deg (tol 3), odom heading 16.47 deg, centre moved 0.0 mm, 360 ms, EV_MOTION_DONE x1
+[HOST] H19-probe PASS  TURN -24 deg: turned -23.62 deg (tol 3), odom heading -23.32 deg, centre moved -0.0 mm, 480 ms, EV_MOTION_DONE x1
+[HOST] H19-probe PASS  TURN 12 deg: turned 12.02 deg (tol 3), odom heading 11.71 deg, centre moved 0.0 mm, 280 ms, EV_MOTION_DONE x1
+[HOST] H19-probe PASS  TURN 90 deg: turned 90.24 deg (tol 3), odom heading 90.08 deg, centre moved 0.0 mm, 1620 ms, EV_MOTION_DONE x1
+-- commands, E-stop and faults (IF-04, IF-05, FR15)
+[HOST] H07 PASS  STOP during MOVE: IDLE and braked in the same cycle
+[HOST] H07 PASS  STOP cancels the MOVE: no EV_MOTION_DONE, stopped at 259 mm
+[HOST] H08 PASS  MF_ESTOP brakes in the first cycle that sees it
+[HOST] H08 PASS  while latched: MOVE discarded, CLEAR ignored, still braked
+[HOST] H08 PASS  flag cleared but no CLEAR yet: stays braked
+[HOST] H08 PASS  CLEAR then MOVE sent together: the MOVE runs
+[HOST] H08 PASS  and finishes with EV_MOTION_DONE
+[HOST] H09 PASS  left wheel held: stall after 300 ms (300 ms of high duty), MF_ESTOP set, S5_FAULT_STALL x1, EV_FAULT x1
+[HOST] H10 PASS  FOLLOW 250, steer +50 (corner slow-down to 210): left 160 mm/s, right 260 mm/s, heading +66 deg (left)
+[HOST] H13 PASS  FOLLOW 300 -> 150 while following: L 150 R 150 mm/s after 0.8 s, never left FOLLOWING
+[HOST] H14 PASS  MOVE then TURN in one cycle: only the TURN runs (send the next command after EV_MOTION_DONE)
+[HOST] H17 PASS  unknown command type: discarded and counted, still FOLLOWING
+[HOST] H17 PASS  TURN 32767 deg is clipped to 720: turned 719 deg
+-- measurement and robustness
+[HOST] H12 PASS  measured wheel speed vs true at 300 mm/s: mean error L 0.5, R 0.4 mm/s (limit 9 = 3 %)
+[HOST] H15 PASS  60 s at 400 mm/s (timer wraps after 5 s): odom 23947 mm, true 23948 mm
+[HOST] H19 PASS  MOVE 1000 with the right wheel 1.4 % short per tick: -59 mm sideways (right), as on the floor; calibrated: 2.1 mm
+[HOST] H16 PASS  FOLLOW 900 is clipped to 500 mm/s: fastest 501 mm/s (limit +10%)
+S2-U09: PASS (53 passed, 0 failed)

@@ -12,7 +12,7 @@
 #         | tee testing/subsystem3/logs/YYYY-MM-DD_host.txt
 #
 # Builds the pure-C S3 files (s3_line.c, s3_code39.c, s3_analog.c) with
-# strict warnings as errors, then runs the six test programs. The line
+# strict warnings as errors, then runs the seven test programs. The line
 # test and the track simulation also run under the address and
 # undefined-behaviour sanitizers. The last line is "S3 HOST: PASS (...)"
 # or "S3 HOST: FAIL (...)". Nothing in the repository is changed; the
@@ -84,11 +84,12 @@ build analog     ""     "$TEST_DIR/test_analog.c"     "$SRC/s3_analog.c" \
 build line       "$SAN" "$TEST_DIR/test_line.c"       "$SRC/s3_line.c" \
                                                       "$SRC/s3_code39.c" && run line
 build sim        "$SAN" "$TEST_DIR/sim_track.c"       "$SRC/s3_line.c" && run sim
+build probe      "$SAN" "$TEST_DIR/test_probe.c"      "$SRC/s3_probe.c" && run probe
 
 if [ -n "$FAILED" ]
 then
     echo "S3 HOST: FAIL ($RAN programs run; failed:$FAILED)"
     exit 1
 fi
-echo "S3 HOST: PASS ($RAN of 6 programs, all checks passed)"
+echo "S3 HOST: PASS ($RAN of 7 programs, all checks passed)"
 exit 0

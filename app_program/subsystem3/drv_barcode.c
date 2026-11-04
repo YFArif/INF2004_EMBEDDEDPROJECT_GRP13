@@ -38,6 +38,11 @@
 #define PRE_SAMPLES         (200000u / DRV_ADC_SAMPLE_US)  /* 200 ms    */
                                         /* kept before and after.       */
 #define QUIET_SAMPLES       (DRV_BARCODE_QUIET_US / DRV_ADC_SAMPLE_US)
+#define QUIET_X             (3u)        /* Quiet = 3 x longest stripe   */
+#define DEBOUNCE_SAMPLES    (6u)        /* DOUT held 3 ms = real edge.  */
+#define READING_EDGES       (4u)        /* Edges before "reading".      */
+#define SIO_GPIO_IN_REG     (0xD0000004u)
+#define QUIET_MAX_SAMPLES   (1500000u / DRV_ADC_SAMPLE_US)  /* <= 1.5 s */
 
 /* Activity window state, g_act bits. */
 #define ACT_OPEN_BIT        (1u)
@@ -51,11 +56,18 @@ static volatile uint8_t  g_gap_rd;
 static volatile uint8_t  g_glitches;    /* Free-running; task takes     */
 static volatile uint8_t  g_gap_lost;    /* differences.                 */
 static volatile uint32_t g_last_us;     /* Time of the last kept edge.  */
+static volatile uint32_t g_prev_us;     /* ... and of the one before.   */
+static volatile uint32_t g_sw_sum;      /* AOUT at each DOUT edge, and */
+static volatile uint32_t g_sw_n;        /* how many (this pass).       */
+static volatile uint32_t g_db_level;    /* Debounced DOUT level, and   */
+static volatile uint32_t g_db_count;    /* samples the pin differed.   */
 
 /* Analogue path: written by the interrupts only. */
 static volatile uint8_t  g_ring[DRV_BARCODE_RING];
 static volatile uint32_t g_act_first;
 static volatile uint32_t g_act_last;
+static volatile uint32_t g_act_gap;     /* Longest quiet stretch inside */
+                                        /* this pass (one stripe).      */
 static volatile uint8_t  g_act;         /* ACT_xxx_BIT.                 */
 static volatile uint8_t  g_act_ref;     /* Sample at the last activity. */
 
@@ -65,6 +77,7 @@ static uint8_t  g_win[DRV_BARCODE_RING];
 
 static void gpio_isr(UINT intno);
 static void mark_active(uint32_t idx, uint8_t src_bit);
+static void dout_edge(uint32_t now_us, uint32_t idx);
 
 /*!
  * @brief Set up DOUT and attach the edge handler to S2's shared
@@ -103,8 +116,9 @@ drv_barcode_init (void)
 S3_RAM_FUNC(drv_barcode_sample_isr) void
 drv_barcode_sample_isr (uint32_t idx)
 {
-    uint8_t value = drv_adc_to8(drv_adc_convert(DRV_BARCODE_ADC_CH));
-    int32_t diff;
+    uint8_t  value = drv_adc_to8(drv_adc_convert(DRV_BARCODE_ADC_CH));
+    int32_t  diff;
+    uint32_t level;
 
     g_ring[idx & RING_MASK] = value;
     if (0u == idx)
@@ -117,6 +131,36 @@ drv_barcode_sample_isr (uint32_t idx)
         g_act_ref = value;
         mark_active(idx, ACT_AOUT_BIT);
     }
+
+    /* DOUT: a new level counts once it has held DEBOUNCE_SAMPLES (3 ms;
+     * a 3 mm stripe at 40 mm/s lasts 75 ms). Edge time = when it began. */
+    level = (in_w(SIO_GPIO_IN_REG) >> DRV_BARCODE_DOUT_PIN) & 1u;
+    if (level == g_db_level)
+    {
+        g_db_count = 0u;
+    }
+    else if (++g_db_count >= DEBOUNCE_SAMPLES)
+    {
+        g_db_level = level;
+        g_db_count = 0u;
+        dout_edge(in_w(TIMER_TIMERAWL) - (DEBOUNCE_SAMPLES * DRV_ADC_SAMPLE_US),
+                  idx);
+    }
+    else
+    {
+        ;   /* Not held long enough yet: chatter or the start of an edge. */
+    }
+}
+
+/*!
+ * @brief True while a barcode is passing: a pass is open and DOUT has
+ *        seen at least READING_EDGES debounced edges (2 bars), so one
+ *        crossing of the track line does not count.
+ */
+bool
+drv_barcode_reading (void)
+{
+    return (0u != (g_act & ACT_OPEN_BIT)) && (g_sw_n >= READING_EDGES);
 }
 
 /*!
@@ -131,9 +175,14 @@ drv_barcode_pass_done (void)
     bool     b_ana_open = (0u != (g_act & ACT_OPEN_BIT));
     bool     b_dig_busy = b_dig_open &&
                           ((now_us - g_last_us) <= DRV_BARCODE_QUIET_US);
-    bool     b_ana_busy = b_ana_open &&
-                          ((drv_adc_sample_index() - g_act_last) <=
-                           QUIET_SAMPLES);
+    /* Quiet = 3 x the longest stripe so far (>= DRV_BARCODE_QUIET_US), so
+     * a slow pass or a car slowing on the code is not cut into pieces. */
+    uint32_t quiet      = QUIET_X * g_act_gap;
+    bool     b_ana_busy;
+
+    quiet      = (quiet < QUIET_SAMPLES) ? QUIET_SAMPLES :
+                 ((quiet > QUIET_MAX_SAMPLES) ? QUIET_MAX_SAMPLES : quiet);
+    b_ana_busy = b_ana_open && ((drv_adc_sample_index() - g_act_last) <= quiet);
 
     return (b_dig_open || b_ana_open) && (!b_dig_busy) && (!b_ana_busy);
 }
@@ -172,6 +221,12 @@ drv_barcode_take_pass (drv_barcode_pass_t * p_pass)
     p_pass->p_dur     = g_dur;
     p_pass->b_clipped = false;
     p_pass->src       = 0u;
+    DI(imask);
+    p_pass->dout_n     = g_sw_n;
+    p_pass->dout_level = (0u != g_sw_n) ? (g_sw_sum / g_sw_n) : 0u;
+    g_sw_sum           = 0u;
+    g_sw_n             = 0u;
+    EI(imask);
 
     /* Analogue: snapshot the window indices with interrupts off. */
     DI(imask);
@@ -224,17 +279,29 @@ gpio_isr (UINT intno)
         return;                         /* Not our pin.                 */
     }
     out_w(BC_IO_INTR_REG, status);
+    /* Raw edges only counted: car 30 Oct, DOUT flipped 500-2400 times per
+     * pass on WHITE (LED looked clean). Edges now come from the debounced
+     * level in drv_barcode_sample_isr(). */
+    g_glitches = (uint8_t) (g_glitches + 1u);
+    (void) now_us;
+    (void) wr;
+    (void) next;
+    (void) gap;
+}
 
-    mark_active(drv_adc_sample_index(), ACT_DOUT_BIT);
+/*!
+ * @brief One debounced DOUT edge (sampler interrupt): store its gap.
+ */
+S3_RAM_FUNC(dout_edge) static void
+dout_edge (uint32_t now_us, uint32_t idx)
+{
+    uint8_t  wr   = g_gap_wr;
+    uint8_t  next = (uint8_t) ((wr + 1u) & DIG_MASK);
+    uint32_t gap  = (now_us - g_last_us) >> GAP_SHIFT;
 
-    wr   = g_gap_wr;
-    next = (uint8_t) ((wr + 1u) & DIG_MASK);
-    gap  = (now_us - g_last_us) >> GAP_SHIFT;
-    if ((wr != g_gap_rd) && ((now_us - g_last_us) < DRV_BARCODE_GLITCH_US))
-    {
-        g_glitches = (uint8_t) (g_glitches + 1u);   /* Chatter.         */
-        return;
-    }
+    mark_active(idx, ACT_DOUT_BIT);
+    g_sw_sum += g_ring[idx & RING_MASK];
+    g_sw_n++;
     if (next == g_gap_rd)
     {
         g_gap_lost = (uint8_t) (g_gap_lost + 1u);   /* Full: keep older. */
@@ -259,6 +326,11 @@ mark_active (uint32_t idx, uint8_t src_bit)
     {
         g_act       = ACT_OPEN_BIT;
         g_act_first = idx;
+        g_act_gap   = 0u;
+    }
+    else if ((idx - g_act_last) > g_act_gap)
+    {
+        g_act_gap = idx - g_act_last;
     }
     g_act_last = idx;
     g_act      = (uint8_t) (g_act | src_bit);

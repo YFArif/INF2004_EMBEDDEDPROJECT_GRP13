@@ -20,9 +20,19 @@
 /* Samples are 8-bit (ADC 12-bit >> 4, Change Requirement 1: the barcode
  * only needs ~230 grey levels between white ~240 and black ~3960; noise is
  * ~5 counts of 4096, below one 8-bit step). Thresholds are 8-bit units. */
-#define S3_AN_MIN_RANGE     (19u)   /* Below this max - min: just noise.  */
-#define S3_AN_MIN_PROM      (9u)    /* Smallest peak / valley prominence. */
-#define S3_AN_PROM_PCT      (12u)   /* Prominence = 12 % of max - min.    */
+#define S3_AN_MIN_RANGE     (12u)   /* 192 ADC counts: minimum useful     */
+                                    /* white/black range after 8-bit      */
+                                    /* quantisation.                      */
+#define S3_AN_MIN_PROM      (4u)    /* Smallest peak / valley prominence. */
+#define S3_AN_PROM_PCT      (6u)    /* Prominence = 6 % of the observed    */
+                                    /* range, with S3_AN_MIN_PROM floor.   */
+#define S3_AN_LEAD_SAMPLES  (200u)  /* White lead-in used for the noise  */
+                                    /* level (100 ms; the window starts  */
+                                    /* 200 ms before the first stripe).  */
+#define S3_AN_NOISE_X       (3u)    /* Prominence = 3 x lead-in noise    */
+                                    /* (capped by the % rule above).     */
+#define S3_AN_FRAG_DIV      (4u)    /* Stripe < median / 4 = noise,       */
+                                    /* merged into its neighbours.        */
 #define S3_AN_MAX_EXTREMA   (80u)
 
 typedef struct
@@ -45,6 +55,10 @@ typedef struct
 uint32_t s3_analog_widths(uint8_t const * p_x, uint32_t n, uint32_t dt_us,
                           uint32_t * p_dur, uint32_t max_dur,
                           s3_an_stats_t * p_stats);
+
+/* Join white stripes much shorter than the median white (DOUT flicker
+   inside a bar) with the bars around them. Returns the new count. */
+uint32_t s3_merge_gaps(uint32_t * p_dur, uint32_t n);
 
 #endif /* S3_ANALOG_H */
 

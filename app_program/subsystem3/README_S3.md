@@ -1,6 +1,159 @@
-# Subsystem 3 (Buddy 3, Sean): integration guide (v25)
+# Subsystem 3 (Buddy 3, Sean): integration guide
 
-S3 covers IR line following, line-lost detection (junction detection is off in the v25 layout), Code 39 barcode decoding, and the navigation command.
+S3 covers IR line following, line-lost detection (junction detection remains off), Code 39 barcode decoding, and the navigation command.
+
+## Sean edge-pair baseline: isolated speed test (29 Oct)
+
+Current normal controller is Sean's `22fda8a` edge-pair update, not the
+older single-edge v24 controller. Use **18 mm sensing-centre spacing**,
+one sensor on each boundary of an 18 mm black line: GP27 physical LEFT,
+GP26 physical RIGHT, both approximately grey when centred. Preserve the
+existing sensor height that gave usable analogue transitions.
+
+Build in WSL from `build_make`, with `PICO_SDK_PATH` set:
+
+```
+make -j8 DRIVE=1 DRIVE_SPEED=10
+```
+
+Output: `mtk3pico_smp1_usb_cdc_wifi_drive10.uf2`. Use `DRIVE_SPEED=40`
+for a separate `_drive40.uf2`. The build profile tracks both mode and speed
+to prevent reuse of stale objects. Default `make -j8` remains the normal
+integrated image, **not** this slow test; S5's normal mission speed is unchanged.
+
+The test excludes S5 tasks: previously both S3 drive and S5 could read GP20
+and issue competing FOLLOW commands, including S5's 300 mm/s request.
+**No ultrasonic protection is active in this isolated test.** Stop with
+GP20; test in clear space with access to power.
+
+Startup begins calibration automatically, but the sensors still have to
+see white and black: sweep the car sideways by hand, wait for READY, then
+centre the sensors on their edges. GP20 starts after the countdown and
+stops while running. GP21 while running toggles base / 1.5x speed
+(10/15 or 40/60 mm/s), on release after at least 60 ms pressed. Steering
+limits scale with speed. Every new run starts unboosted. While stopped,
+GP21 retains Sean's gain preset selection / hold-to-recalibrate behaviour.
+The existing 3 m, prolonged LOST and no-odometry stop guards remain.
+
+S2 now accepts real encoder intervals up to its existing 100 ms stopped
+threshold, rather than substituting 20 ms for intervals over 40 ms.
+This matters at very low speed; no wheel PID gains were changed.
+Host tests check actual model displacement over five seconds and exact
+wheel targets at 10/15/10/40/60/40 mm/s, including live FOLLOW updates.
+These are simulation checks, not a physical speed calibration. Record
+the `S3 DRIVE GO`, `S3 DRIVE SPEED`, and wheel target/measured/duty logs
+and time a measured straight distance on the car before claiming accuracy.
+
+Older sections below describe preserved diagnostic/experimental images;
+they are not the current edge-pair test layout.
+
+## v31 live WHITE/GREY/BLACK alerts (29 Oct)
+
+Build `S3_v31_IR_GREY_ALERT.uf2` with `sh testing/subsystem3/build_probe.sh 3`.
+Same motor-locked viewer and GP20 white / GP21 black reference capture as v30.
+Each sensor is classified from the latest ADC snapshot every 20 ms, not
+from the half-second mean. Entering grey prints `>>> GREY DETECTED` with
+sensor pin, time, raw and normalised value. Other zone transitions print
+`IR CHANGE`. No hysteresis is applied: repeated alerts near a threshold
+expose fluctuations rather than hide them. USB output can add latency.
+Periodic output twice per second shows the current zone/raw/normalised
+reading and separately the window mean/min/max.
+Thresholds: WHITE <250, GREY 250..750 inclusive, BLACK >750 (0..1000).
+Missing/invalid calibration is UNCAL/INVALID, never a guessed colour.
+Recapturing a reference invalidates classification until capture finishes.
+Grey is intermediate reflectance, not proof of a physical edge.
+
+## v30 stationary IR height check (29 Oct, preserved image)
+
+Flash `build_make/S3_v30_IR_HEIGHT_VIEW.uf2`, built with
+`sh testing/subsystem3/build_probe.sh 3` in WSL. Mode 3 starts the
+sensor viewer instead of the follower; S5 tasks remain excluded.
+The viewer latches S2 E-stop at entry and never clears it or sends
+FOLLOW/MOVE/TURN. Neither button starts the motors.
+
+At operating height, place BOTH sensors over white, then tap/release
+GP20 and hold still for the next 0.5 s. Repeat over a sufficiently wide
+black patch with GP21. References remain fixed until captured again.
+Readings print twice per second: GP27 physical LEFT and GP26 physical
+RIGHT, approximate 12-bit raw mean/min/max (from existing averaged ADC
+snapshots), and normalised `n` from 0 white to 1000 black. `n=-1` is
+explicitly invalid, not white. Contrast below 600 counts prints an error.
+This viewer does not discard high raw readings: lifting the car can give
+misleading dark readings, so keep the wheels/sensors at operating height.
+
+Then position GP27 over the left edge of an 18 mm line and GP26 2 mm
+outside its right edge (20 mm sensing-centre spacing). Slide sideways
+slowly and compare the readings. Neither exactly 500 at the boundary nor
+improved accuracy is guaranteed: this measures response/contrast at the
+new height, not absolute position accuracy. Power-cycle into a different
+image to drive again. The build script restores normal mode 0.
+
+## v29 isolated GP27 experiment (29 Oct, Arif)
+
+The centred-pair controller and v28 drive test are preserved, not replaced.
+`s3_experiment.h` defaults to mode 0 (normal firmware). Mode 1 selects
+`S3_v29_GP27_RECOVERY.uf2`; mode 2 selects `S3_v29_ARMED_LEFT90.uf2`.
+Build both from the repository root in WSL with
+`sh testing/subsystem3/build_probe.sh`. It restores mode 0 and rebuilds normal
+firmware afterwards. Do not combine with `S3_DRIVE_TEST=1` or `APP_TEST=1`.
+
+**Experimental wiring/layout:** GP27 is the physical LEFT sensor, over the
+18 mm black line. GP26 is RIGHT, on white. Arif specifies 20 mm clear gap
+between the black sensor bodies, not centre-to-centre. Both sensors must be
+at the same forward position and operating height. The measured GP27 lead
+ahead of the drive-wheel axle line is 130 mm. The alignment estimate is
+139 mm from the first both-black sample (130 plus half the crossing width).
+Optical footprint, lateral offset and braking travel can require calibration.
+
+**Isolation/safety:** these are supervised clear-floor experiments, not
+integrated mission firmware. S5's tasks (including ultrasonic protection)
+are disabled so S5 cannot also command the motors or read the buttons.
+The normal S3 line task is not started. S2 remains the only motor driver;
+its encoder control, E-stop latch and stall handling remain intact.
+GP20 is start/stop; the physical power switch remains the emergency backup.
+There is no overall run timer or 3 m limit. Individual manoeuvres have
+8 s timeouts; no forward odometry for 2 s, stopped ADC updates, or task
+lateness over 120 ms latch E-stop. Command-send failure also latches E-stop.
+
+**Calibration/start:**
+
+1. Flash image 1 first. Open the serial monitor and wait for SWEEP NOW.
+2. Sweep BOTH sensors across white and black at operating height. Once
+   `ready=1`, tap/release GP20 to lock calibration. Learning then stops.
+3. Place GP27 on black, GP26 on white. Tap/release GP20 again to start
+   after a three-second countdown. A GP20 press cancels the countdown.
+4. GP20 while running stops. GP21 held while waiting recalibrates.
+   E-stop is never automatically cleared; power-cycle after a latched fault.
+
+**Follow/recovery:** straight FOLLOW at 40 mm/s while GP27 remains dark.
+Below 400/1000, request STOP on the first sampled loss, wait for S2 idle
+and 120 ms settling, then search using relative turns
+`+4, -8, +16, -24, +12` degrees at 60 mm/s wheel speed. The intended
+headings relative to the loss heading are `+4, -4, +12, -12, 0`.
+More than 18 degrees measured deviation stops the search. Three dark
+samples (>=650) trigger a brake and a second stationary confirmation
+before resuming. Five unsuccessful legs stop with NOT_FOUND.
+This is deliberately stop-and-search, not smooth PD edge following:
+one fully black sensor does not identify which direction the line moved.
+
+**Armed left turn (image 2):** tap/release GP21 during FOLLOW to arm ONE
+left turn. Require at least 100 ms of GP26 white after arming, then both
+sensors >=650 for at least 2 mm of travel. Unarmed both-black and
+both-black during recovery do not trigger turns. Additional GP21 taps
+while already armed do not restart the detector.
+Continue straight to the estimated axle alignment; losing GP27 during
+alignment stops rather than turning blind. Brake, request S2 TURN +90,
+wait for completion, and verify/reacquire the outgoing line using GP27.
+The instruction is consumed once and following resumes; press GP21 again
+for the next crossing. This tests a button instruction, NOT the barcode/S5
+bridge. Darkness is only a crossing candidate under the stated track
+assumptions, not a universal proof of a junction.
+
+GP27 is NOT guaranteed to remain black during a pivot. Encoder angle
+accuracy, turn placement, search speed and real line reacquisition need
+hardware tests. Test on a straight with an artificial loss before trying
+one isolated cross. Logs show state, armed flag, both normalised sensors,
+distance, heading, completion counter, wheel targets and measured speeds.
 
 ## v27 drive test (28 Oct, Arif): quiet, clearly separated test stages
 

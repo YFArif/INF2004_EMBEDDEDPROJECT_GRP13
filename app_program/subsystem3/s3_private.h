@@ -53,6 +53,7 @@ typedef struct
 ER           task_barcode_start(void);
 ER           task_line_start(void);
 ER           task_drive_test_start(void);
+ER           task_probe_start(void);
 
 /* Time and distance. */
 uint32_t     s3_now_ms(void);

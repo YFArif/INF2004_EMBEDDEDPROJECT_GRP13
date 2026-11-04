@@ -52,6 +52,8 @@ static bool         pass_decode(char * p_ch, uint8_t * p_rev, uint8_t * p_src);
 static void         nav_publish(char ch, uint8_t rev, uint8_t src);
 #if (1 == S3_BC_VERBOSE)
 static void         result_print(s3_c39_result_t res, char ch);
+static void         stripes_print(char const * p_tag,
+                                  uint32_t const * p_dur, uint32_t n);
 static char const * result_txt(s3_c39_result_t res);
 static char const * opener_txt(uint32_t src);
 #endif
@@ -129,8 +131,12 @@ hardware_start (void)
               (INT) DRV_IR_CENTRE_ADC_CH, (INT) DRV_IR_CENTRE_PIN,
               S3_LAYOUT_TXT);
 
+#if (S3_EXPERIMENT_MODE != 0)
+    CHECK(task_probe_start(), "task_probe_start");
+#else
     CHECK(task_line_start(), "task_line_start");
     CHECK(task_drive_test_start(), "task_drive_test_start");
+#endif
 }
 
 /*!
@@ -142,6 +148,11 @@ static bool
 pass_decode (char * p_ch, uint8_t * p_rev, uint8_t * p_src)
 {
     static uint32_t    an_dur[S3_AN_MAX_EXTREMA];  /* Static: stack.     */
+    static uint32_t    dig_dur[S3_AN_MAX_EXTREMA];
+    static uint32_t    dig_alt[S3_AN_MAX_EXTREMA];  /* Shifted retry.    */
+    uint32_t           n_raw = 0u;
+    uint32_t           n_dig = 0u;
+    uint32_t           i;
     drv_barcode_pass_t pass;
     s3_an_stats_t      stats = {0};
     s3_c39_result_t    res_d = S3_C39_BAD_COUNT;
@@ -158,7 +169,26 @@ pass_decode (char * p_ch, uint8_t * p_rev, uint8_t * p_src)
     /* Digital path: not trusted if edges were dropped. */
     if ((pass.n_edges >= 2u) && (0u == pass.lost))
     {
-        res_d = s3_code39_decode(pass.p_dur, pass.n_edges - 1u, &ch_d, &rev_d);
+        n_raw = pass.n_edges - 1u;
+        n_raw = (n_raw > S3_AN_MAX_EXTREMA) ? S3_AN_MAX_EXTREMA : n_raw;
+        for (i = 0u; i < n_raw; i++)
+        {
+            dig_dur[i] = pass.p_dur[i];
+            dig_alt[i] = pass.p_dur[i];
+        }
+        n_dig = s3_merge_gaps(dig_dur, n_raw);  /* DOUT flicker in a bar. */
+        res_d = s3_code39_decode(dig_dur, n_dig, &ch_d, &rev_d);
+
+        /* Pass began on black: stripe 0 is white and the odd stripes are
+         * bars, so the merge above can join away a narrow bar. Retry with
+         * the whites counted from stripe 1. */
+        if ((S3_C39_OK != res_d) && (n_raw > 1u) &&
+            (S3_C39_OK == s3_code39_decode(dig_alt,
+                              s3_merge_gaps(&dig_alt[1], n_raw - 1u) + 1u,
+                              &ch_d, &rev_d)))
+        {
+            res_d = S3_C39_OK;
+        }
     }
 
     /* Analogue path. */
@@ -181,6 +211,19 @@ pass_decode (char * p_ch, uint8_t * p_rev, uint8_t * p_src)
               (INT) n_an, (INT) stats.min << 4, (INT) stats.max << 4,
               (INT) stats.prominence << 4);
     result_print(res_a, ch_a);
+    /* Sensitivity: where DOUT switches between this pass's white and
+     * black (low % = trips near white, chatters; high % = misses narrow
+     * bars). Contrast = black - white seen by AOUT. */
+    tm_printf((UB *) "S3 SENS contrast=%d (white %d black %d), DOUT switches "
+                     "at %d = %d%% of the way to black (%d switches)\n",
+              (INT) ((stats.max - stats.min) << 4), (INT) stats.min << 4,
+              (INT) stats.max << 4, (INT) pass.dout_level << 4,
+              (INT) ((stats.max > stats.min) && (pass.dout_n > 0u) ?
+                     ((((INT) pass.dout_level - (INT) stats.min) * 100) /
+                      ((INT) stats.max - (INT) stats.min)) : -1),
+              (INT) pass.dout_n);
+    stripes_print("digital", dig_dur, n_dig);
+    stripes_print("analog ", an_dur, n_an);
 #endif
 
     if ((S3_C39_OK == res_d) && (S3_C39_OK == res_a))
@@ -287,6 +330,38 @@ result_print (s3_c39_result_t res, char ch)
     {
         tm_printf((UB *) "failed (%s)\n", result_txt(res));
     }
+}
+
+/*!
+ * @brief Every stripe of one path, e.g. "S3 STRIPES analog : 29 = nb 75,
+ *        tw 190, ...": n/t = narrow/thick, b/w = black/white, ms. Stripe 1
+ *        is taken as black. Narrow/thick is a rough guide for comparing
+ *        with the printed code (>= 1.6 x the shortest stripe of the same
+ *        colour = thick), not the decoder's decision.
+ */
+static void
+stripes_print (char const * p_tag, uint32_t const * p_dur, uint32_t n)
+{
+    uint32_t min_dur[2] = {UINT32_MAX, UINT32_MAX};
+    uint32_t i;
+
+    for (i = 0u; i < n; i++)
+    {
+        if (p_dur[i] < min_dur[i & 1u])
+        {
+            min_dur[i & 1u] = p_dur[i];
+        }
+    }
+    tm_printf((UB *) "S3 STRIPES %s: %d =", p_tag, (INT) n);
+    for (i = 0u; i < n; i++)
+    {
+        tm_printf((UB *) " %c%c %d%s",
+                  ((p_dur[i] * 10u) >= (min_dur[i & 1u] * 16u)) ? 't' : 'n',
+                  (0u == (i & 1u)) ? 'b' : 'w',
+                  (INT) (p_dur[i] / US_PER_MS),
+                  ((i + 1u) < n) ? "," : "");
+    }
+    tm_printf((UB *) "\n");
 }
 
 static char const *

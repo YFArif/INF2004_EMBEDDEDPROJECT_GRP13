@@ -4,17 +4,22 @@
  *        Buddy 2's motors before the Vehicle Controller exists.
  *
  * @par How to use
- * Wait for the calibration countdown and SWEEP NOW banner. Sweep both
- * sensors across white and black, then wait for CALIBRATION READY.
- * Put both sensors on black, tap and release GP20, then wait for the
+ * Put the car centred on the line before the calibration countdown ends:
+ * it then turns +-25 deg on the spot by itself (auto_sweep()) so both
+ * sensors see white and black; sweep by hand only if it says so. Wait
+ * for CALIBRATION READY.
+ * Centre the car on the line (each sensor on an edge, both GREY), tap
+ * and release GP20, then wait for the
  * 3 s drive countdown. Any GP20 press while driving stops the car.
- * GP21: short press changes preset; hold 2 s restarts calibration.
+ * GP21 (while waiting only): short press
+ * changes preset and holding 2 s restarts calibration.
  * Waiting prompts print only when readiness changes; wheel and sensor
  * diagnostics print during driving. Both
  * buttons are only read, with the pad pull-up, as in subsystem2_step.c.
  *
  * @par Stops by itself
- * Button 1, LINE LOST for S3_DRIVE_LOST_MM or S3_DRIVE_LOST_MS, no
+ * Button 1, LINE LOST and not found by the 3 recovery sweeps
+ * (line_recover()), no
  * odometry change for S3_DRIVE_STILL_MS (LOST is measured in distance, so
  * a car that stopped moving stayed in FOLLOW for ever: log 28 Oct), an S2
  * emergency stop (for example a wheel stall: duty >= 40 % and no encoder
@@ -52,6 +57,22 @@
 #define U8_BLACK_ABOVE      (191u)
 #define PERMILLE            (1000u)
 #define U8_FULL             (255u)
+#define U8_FOUND            ((S3_LN_FOUND * U8_FULL) / PERMILLE)
+
+/* LINE_RECOVERY sweeps, + = towards the side the line was last seen.
+ * Same pattern as S5 (s5_mission.c, FR15); if all miss, turn back,
+ * reverse RECOVERY_BACK_MM and sweep once more. */
+#define RECOVERY_STEPS      (3u)
+#define RECOVERY_ROUNDS     (2u)
+#define RECOVERY_SPEED_MMS  (40u)   /* Car 29 Oct: S2's 150 too abrupt. */
+#define RECOVERY_BACK_MM    (60)    /* About the distance driven LOST.  */
+#define RECOVERY_MOVE_MS    (10000u)/* One step longer = S2 problem.    */
+#define STOPPED_WAIT_MS     (1000u)
+#define AUTO_SWEEP_DEG      (25)    /* Sensor moves ~20 mm sideways.    */
+#define DRIVE_BOOST_X100    (250)   /* Curve authority once one sensor   */
+                                    /* is black: e = 800 -> ~95 % lock. */
+#define DRIVE_STEER_MAX_MMS (2u * S3_DRIVE_SPEED_MMS) /* Full lock stops */
+                                    /* the inner wheel (S2 applies 50 %).*/
 
 /** Preset: Kp x100, Kd x100, speed mm/s, steer_sp at full lock mm/s. */
 typedef struct
@@ -62,25 +83,28 @@ typedef struct
     uint16_t steer_max_mms;
 } drive_preset_t;
 
-/* v25 (28 Oct): gains for the CENTRED pair (both sensors on the line,
- * 12 mm apart). e = n_right - n_left runs -1000 ... +1000, so Kp 100
- * gives full lock when one sensor is white and the other black. Host
- * sweep: every set below finishes every track in the model (UNVERIFIED
- * on the car). Speed 40 mm/s and steer_max = speed throughout, so presets
- * differ ONLY in gains and can be compared directly. */
+/* v29 (29 Oct): gains for the EDGE pair (one sensor on each edge, 18 mm
+ * apart). e = n_right - n_left reaches +-1000 within a few mm, so Kp
+ * 100 = full lock at about 3 mm off centre. Host sweep (s3_line.h): Kp
+ * below about 55 cannot hold an r200 curve at steer_max 40 (UNVERIFIED
+ * on the car). Car 30 Oct: at steer_max 40 curves saturated (inner wheel
+ * >= 12 mm/s, lazy) and straights weaved +-40 mm/s. Now steer_max is 2x
+ * speed with Kp halved, so near the centre the mm/s per e is LOWER than
+ * before (Kp 25 x 80 < 60 x 40) and only the curve boost (|e| > 500)
+ * uses the extra authority. */
 static drive_preset_t const g_presets[] =
 {
-    {100,   0,  40,  40},   /* 0: default.                              */
-    { 75,   0,  40,  40},   /* 1: softer (if it weaves on straights).   */
-    {150,   0,  40,  40},   /* 2: stronger (if it is late on corners).  */
-    {100,  25,  40,  40},   /* 3: a little D (if it overshoots).        */
-    {200,   0,  40,  40}    /* 4: much stronger (if it still runs wide).*/
+    {25,  25, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS}, /* default */
+    {20,   0, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS},
+    {30,  25, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS},
+    {25,  50, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS},
+    {40,  25, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS}
 };
 
 #define N_PRESETS   (sizeof(g_presets) / sizeof(g_presets[0]))
 
 /* End-of-run diagnosis limits (run_summary). */
-#define DIAG_BOTH_BLACK_MIN_PCT (30u)   /* Both sensors on the line.    */
+#define DIAG_BOTH_GREY_MIN_PCT  (30u)   /* Both on their edges.         */
 #define DIAG_BOTH_WHITE_MAX_PCT (10u)   /* Both off the line.           */
 #define DIAG_FLIPS_PER_M_MAX    (20u)   /* Steering side changes per m. */
 #define DIAG_WHEEL_ERR_MAX_MMS  (15u)   /* Mean |target - measured|.    */
@@ -89,7 +113,7 @@ static drive_preset_t const g_presets[] =
 typedef struct
 {
     uint32_t polls;
-    uint32_t both_black;
+    uint32_t both_grey;         /* Centred: each sensor on its edge.    */
     uint32_t one_white;
     uint32_t both_white;
     uint32_t white_from;        /* moved_mm + 1 when both went white.   */
@@ -105,6 +129,10 @@ static void drive_task(INT stacd, void * p_exinf);
 static bool button1_down(void);
 static bool button2_down(void);
 static void button_input(uint32_t pin);
+static bool line_recover(int32_t last_dv, uint16_t speed_mms);
+static int  recovery_move(bool b_turn, int16_t value);
+static void wheels_stop(void);
+static void auto_sweep(void);
 static void preset_next(void);
 static void preset_apply(void);
 static void wait_start(void);
@@ -116,6 +144,9 @@ static bool cal_ready(s3_cal_levels_t const * p_cal);
 static void cal_watch(bool * p_ready, bool * p_reported);
 static bool estop_clear_ok(void);
 static void drive_run(void);
+#if (1 == S3_DRIVE_STRAIGHT)
+static void straight_run(void);
+#endif
 static int32_t sensor_permille(s3_line_status_t const * p_st, bool b_left);
 static char    zone_char(int32_t n_permille);
 static void    run_log(uint32_t ms, uint32_t moved_mm,
@@ -147,6 +178,28 @@ drive_task (INT stacd, void * p_exinf)
     button_input(S3_DRIVE_BTN2_PIN);
     tk_dly_tsk(SETTLE_MS);
     preset_apply();
+#if (1 == S3_DRIVE_STRAIGHT)
+    for (;;)                        /* No line, no calibration needed.   */
+    {
+        tm_printf((UB *) "S3 STRAIGHT TEST READY: press GP20 to drive.\n");
+        while (button1_down())      /* Let go of the last press first.   */
+        {
+            tk_dly_tsk(POLL_MS);
+        }
+        for (i = 0u; i < PRESS_MS; i = button1_down() ? (i + POLL_MS) : 0u)
+        {
+            tk_dly_tsk(POLL_MS);    /* Held PRESS_MS = a real press.     */
+        }
+        while (button1_down())      /* Drive on RELEASE: a held start    */
+        {                           /* press would read as "stop".       */
+            tk_dly_tsk(POLL_MS);
+        }
+        if (estop_clear_ok())
+        {
+            straight_run();
+        }
+    }
+#endif
     cal_countdown();
 
     for (;;)
@@ -177,12 +230,14 @@ drive_task (INT stacd, void * p_exinf)
 static void
 cal_countdown (void)
 {
-    uint32_t i;
+    s3_cal_levels_t cal = {0};
+    uint32_t        i;
 
     tm_printf((UB *) "\n================================================\n"
                      "  STEP 1: GET READY TO CALIBRATE - NOT DRIVING\n"
                      "================================================\n"
-                     "Keep wheels on the floor. Wait for SWEEP NOW.\n"
+                     "Put the car centred on the line, wheels on the floor.\n"
+                     "It will turn left and right by itself to calibrate.\n"
                      "Calibration starts in %d s.\n",
               (INT) S3_DRIVE_CAL_COUNT_S);
     for (i = S3_DRIVE_CAL_COUNT_S; i > 0u; i--)
@@ -193,11 +248,60 @@ cal_countdown (void)
     s3_request_recalibrate();
     tk_dly_tsk(SETTLE_MS);
     tm_printf((UB *) "\n================================================\n"
-                     "  STEP 2: SWEEP NOW - MOTORS NOT COMMANDED\n"
+                     "  STEP 2: AUTO SWEEP - CAR TURNS ON THE SPOT\n"
                      "================================================\n"
-                     "Slide sideways across WHITE and BLACK repeatedly.\n"
-                     "Keep wheels on the floor. Do not press START yet.\n"
-                     "Wait for CALIBRATION READY below.\n");
+                     "Car must start centred on the line. GP20 aborts.\n");
+    auto_sweep();
+    s3_cal_levels_get(&cal);
+    if (!cal_ready(&cal))
+    {
+        tm_printf((UB *) "AUTO SWEEP not enough: slide the car sideways "
+                         "across WHITE and BLACK by hand.\n"
+                         "Wait for CALIBRATION READY below.\n");
+    }
+}
+
+/*!
+ * @brief Turn slowly left, right and back on the spot so both sensors
+ *        cross the line (line_task learns white and black every step).
+ *        Ends facing the start heading. Skipped if S2 is E-stopped.
+ */
+static void
+auto_sweep (void)
+{
+    static int16_t const sweep_deg[] = {AUTO_SWEEP_DEG, -2 * AUTO_SWEEP_DEG,
+                                        AUTO_SWEEP_DEG};
+    subsystem2_status_t  s2 = {0};
+    uint32_t             i;
+    uint32_t             waited;
+
+    for (i = 0u; i < (sizeof(sweep_deg) / sizeof(sweep_deg[0])); i++)
+    {
+        if (subsystem2_estop_is_set())
+        {
+            return;
+        }
+        wheels_stop();
+        if (E_OK != subsystem2_turn(sweep_deg[i], RECOVERY_SPEED_MMS))
+        {
+            return;
+        }
+        waited = 0u;
+        do
+        {
+            tk_dly_tsk(POLL_MS);
+            waited += POLL_MS;
+            if (button1_down())
+            {
+                wheels_stop();
+                return;
+            }
+            subsystem2_status_get(&s2);
+        } while (((waited < (uint32_t) SETTLE_MS) ||
+                  (S2_STATE_TURNING == s2.state)) &&
+                 (waited < RECOVERY_MOVE_MS));
+    }
+    wheels_stop();
 }
 /*!
  * @brief Only start from a calibrated sensor that can tell which side the
@@ -214,15 +318,15 @@ start_allowed (void)
     {
         tm_printf((UB *) "S3 DRIVE NOT STARTED: line state is %s. Sweep the "
                          "car sideways across the line until it is "
-                         "calibrated, then put both sensors on the line.\n",
+                         "calibrated, then centre it on the line.\n",
                   s3_state_txt((uint32_t) st.state, 0u));
         return false;
     }
     if ((st.n_centre < U8_WHITE_BELOW) && (st.n_outer < U8_WHITE_BELOW))
     {
         tm_printf((UB *) "S3 DRIVE NOT STARTED: neither sensor is on the line "
-                         "(GP27=%d, GP26=%d of 1000). Put the car so both "
-                         "sensors are over the black line.\n",
+                         "(GP27=%d, GP26=%d of 1000). Centre the car on "
+                         "the line, one sensor on each edge.\n",
                   (INT) ((st.n_centre * PERMILLE) / U8_FULL),
                   (INT) ((st.n_outer * PERMILLE) / U8_FULL));
         return false;
@@ -294,7 +398,8 @@ cal_watch (bool * p_ready, bool * p_reported)
             tm_printf((UB *) "\n================================================\n"
                              "  STEP 3: CALIBRATION READY - WAITING FOR YOU\n"
                              "================================================\n"
-                             "Stop sweeping. Put BOTH sensors on BLACK.\n"
+                             "Stop sweeping. Centre the car on the line:\n"
+                             "one sensor on each edge, both GREY.\n"
                              "Tap and RELEASE GP20 to start (3 s countdown).\n"
                              "GP21: tap = preset; hold 2 s = recalibrate.\n"
                              "No driving until you press GP20.\n");
@@ -335,6 +440,61 @@ estop_clear_ok (void)
  *        Logs every S3_DRIVE_LOG_MS (run_log) and ends with a summary
  *        that points at the likely cause (run_summary).
  */
+#if (1 == S3_DRIVE_STRAIGHT)
+/*!
+ * @brief Barcode sensor test (STRAIGHT=1): S2 encoder MOVE straight at
+ *        S3_DRIVE_SPEED_MMS for S3_DRIVE_STRAIGHT_MM, no line following,
+ *        so every pass is at the same speed. GP20 stops early.
+ */
+static void
+straight_run (void)
+{
+    uint32_t start_mm = s3_odom_mm();
+    uint32_t last_mm  = start_mm;
+    uint32_t still_ms = 0u;
+    uint32_t now_mm;
+    ER       er;
+
+    er = subsystem2_move((int16_t) S3_DRIVE_STRAIGHT_MM,
+                         (uint16_t) S3_DRIVE_SPEED_MMS);
+    if (E_OK != er)
+    {
+        subsystem2_estop_set();
+        tm_printf((UB *) "S3 STRAIGHT command failed (%d); E-stop set.\n",
+                  (INT) er);
+        return;
+    }
+    tm_printf((UB *) "S3 STRAIGHT TEST GO: %d mm at %d mm/s, line following "
+                     "OFF. GP20 stops.\n",
+              (INT) S3_DRIVE_STRAIGHT_MM, (INT) S3_DRIVE_SPEED_MMS);
+    for (;;)
+    {
+        tk_dly_tsk(POLL_MS);
+        now_mm = s3_odom_mm();
+        if (button1_down() || subsystem2_estop_is_set())
+        {
+            break;
+        }
+        if (now_mm != last_mm)
+        {
+            last_mm  = now_mm;
+            still_ms = 0u;
+        }
+        else if ((still_ms += POLL_MS) >= S3_DRIVE_STILL_MS)
+        {
+            break;                      /* MOVE finished (or stalled).   */
+        }
+    }
+    wheels_stop();
+    tm_printf((UB *) "S3 STRAIGHT TEST DONE after %d mm.\n",
+              (INT) (now_mm - start_mm));
+    while (button1_down())          /* The stop press must not restart.  */
+    {
+        tk_dly_tsk(POLL_MS);
+    }
+}
+#endif
+
 static void
 drive_run (void)
 {
@@ -346,10 +506,9 @@ drive_run (void)
     uint32_t               moved_mm  = 0u;
     uint32_t               ms        = 0u;
     uint32_t               log_ms    = 0u;
-    uint32_t               lost_from = 0u;  /* moved_mm + 1 at LOST.     */
-    uint32_t               lost_ms   = 0u;  /* Time spent LOST.          */
     uint32_t               still_ms  = 0u;  /* Time without odometry.    */
     uint32_t               last_mm   = 0u;
+    uint32_t               junc_seen;       /* st.junctions last printed. */
     char const *           p_why     = "?";
     ER                     er;
 
@@ -357,15 +516,25 @@ drive_run (void)
                      "  STEP 4: RUNNING - PRESS GP20 TO STOP\n"
                      "================================================\n");
     er = subsystem2_follow(p_set->speed_mms);
+    if (E_OK != er)
+    {
+        subsystem2_estop_set();
+        tm_printf((UB *) "S3 DRIVE command failed (%d); E-stop set.\n", (INT) er);
+        return;
+    }
     tm_printf((UB *) "S3 DRIVE GO preset %d: %d mm/s, kp=%d kd=%d, steer max "
                      "%d mm/s, %s (er=%d). Press BUTTON 1 to stop.\n",
               (INT) g_preset, (INT) p_set->speed_mms, (INT) p_set->kp_x100,
               (INT) p_set->kd_x100, (INT) p_set->steer_max_mms, S3_LAYOUT_TXT,
               (INT) er);
+    tm_printf((UB *) "S3 DRIVE ISOLATED: S5 disabled, no ultrasonic guard. "
+                     "GP20 stops.\n");
     tm_printf((UB *) "S3 LOG legend: t ms | mm | sensors L R (0 white .. "
                      "1000 black) zone (B black, G grey, W white) | dv "
                      "(+ = right) | S2 wheel target, measured, duty L/R | "
                      "encoder ticks L/R | heading 0.01 deg\n");
+    (void) s3_get_line_status(&st);
+    junc_seen = st.junctions;
     for (;;)
     {
         tk_dly_tsk(POLL_MS);
@@ -374,6 +543,12 @@ drive_run (void)
         moved_mm = s3_odom_mm() - start_mm;    /* Reversing wraps huge.  */
         (void) s3_get_line_status(&st);
         stats_add(&stats, &st, moved_mm);
+        if (st.junctions != junc_seen)
+        {
+            junc_seen = st.junctions;
+            tm_printf((UB *) "S3 DRIVE JUNCTION detected at %d mm (both "
+                             "sensors black)\n", (INT) moved_mm);
+        }
         if (log_ms >= S3_DRIVE_LOG_MS)
         {
             log_ms = 0u;
@@ -396,27 +571,17 @@ drive_run (void)
             p_why = "S2 E-STOP (wheel stall?), see S2 counters below";
             break;
         }
-        /* LOST keeps the last (full) correction, so the car usually turns
-         * back onto the line by itself; stop only if it stays lost, by
-         * distance or, if it is not moving, by time. */
+        /* LINE_RECOVERY (design 6.1 SEARCHING, FR15): stop and sweep;
+         * not found after 3 sweeps = LINE_NOT_FOUND fault. */
         if (S3_LINE_LOST == st.state)
         {
-            lost_ms += POLL_MS;
-            if (0u == lost_from)
+            if (!line_recover(st.steer_dv, p_set->speed_mms))
             {
-                lost_from = moved_mm + 1u;
-            }
-            if (((moved_mm + 1u - lost_from) >= S3_DRIVE_LOST_MM) ||
-                (lost_ms >= S3_DRIVE_LOST_MS))
-            {
-                p_why = "LINE LOST, not found again";
+                p_why = "LINE NOT FOUND after 3 sweeps (FAULT)";
                 break;
             }
-        }
-        else
-        {
-            lost_from = 0u;
-            lost_ms   = 0u;
+            last_mm  = s3_odom_mm() - start_mm;
+            still_ms = 0u;
         }
         if (moved_mm >= S3_DRIVE_MAX_MM)
         {
@@ -424,7 +589,13 @@ drive_run (void)
             break;
         }
     }
-    (void) subsystem2_stop();
+    er = subsystem2_stop();
+    if (E_OK != er)
+    {
+        subsystem2_estop_set();
+        tm_printf((UB *) "S3 DRIVE STOP failed (%d); E-stop set.\n", (INT) er);
+    }
+    s3_set_steer_max(p_set->steer_max_mms);
     subsystem2_status_get(&s2);
     tm_printf((UB *) "\n================ RUN STOPPED ================\n"
                      "S3 DRIVE STOP (%s) after %d mm, %d ms. S2: stalls=%d "
@@ -508,9 +679,10 @@ stats_add (drive_stats_t * p_s, s3_line_status_t const * p_st,
     int32_t             err_r;
 
     p_s->polls++;
-    if ((n_l > S3_LN_BLACK) && (n_r > S3_LN_BLACK))
+    if ((n_l >= S3_LN_WHITE) && (n_l <= S3_LN_BLACK) &&
+        (n_r >= S3_LN_WHITE) && (n_r <= S3_LN_BLACK))
     {
-        p_s->both_black++;
+        p_s->both_grey++;
     }
     if (b_lw && b_rw)
     {
@@ -556,38 +728,41 @@ static void
 run_summary (drive_stats_t const * p_s, uint32_t moved_mm)
 {
     uint32_t n         = (0u == p_s->polls) ? 1u : p_s->polls;
-    uint32_t pct_bb    = (100u * p_s->both_black) / n;
+    uint32_t pct_gg    = (100u * p_s->both_grey) / n;
     uint32_t pct_one   = (100u * p_s->one_white) / n;
     uint32_t pct_ww    = (100u * p_s->both_white) / n;
     uint32_t flips_m   = (moved_mm < 100u) ? 0u :
                          (p_s->flips * 1000u) / moved_mm;
     uint32_t wheel_err = p_s->wheel_err_sum / (2u * n);
 
-    tm_printf((UB *) "S3 SUMMARY: both sensors black %d %%, one sensor white "
-                     "%d %%, both white %d %% (longest %d mm). Steering "
-                     "flips %d (%d per m). Wheel speed error mean %d mm/s.\n",
-              (INT) pct_bb, (INT) pct_one, (INT) pct_ww,
+    tm_printf((UB *) "S3 SUMMARY: both sensors grey (centred) %d %%, one "
+                     "sensor white %d %%, both white %d %% (longest %d mm). "
+                     "Steering flips %d (%d per m). Wheel speed error mean "
+                     "%d mm/s.\n",
+              (INT) pct_gg, (INT) pct_one, (INT) pct_ww,
               (INT) p_s->white_max_mm, (INT) p_s->flips, (INT) flips_m,
               (INT) wheel_err);
-    if (pct_bb < DIAG_BOTH_BLACK_MIN_PCT)
+    if (pct_gg < DIAG_BOTH_GREY_MIN_PCT)
     {
-        tm_printf((UB *) "S3 DIAG: SENSORS: both were black together only "
-                         "%d %% of the time. They are too far apart or not "
-                         "centred on the line: park on the line, both must "
-                         "read BLACK in \"S3 LINE\".\n", (INT) pct_bb);
+        tm_printf((UB *) "S3 DIAG: SENSORS: both were grey together only "
+                         "%d %% of the time. The car weaves, or the sensors "
+                         "are not on the edges: park centred on the line, "
+                         "both must read EDGE in \"S3 LINE\".\n",
+                  (INT) pct_gg);
     }
     if (pct_ww > DIAG_BOTH_WHITE_MAX_PCT)
     {
-        tm_printf((UB *) "S3 DIAG: LINE BETWEEN SENSORS: both white %d %% of "
-                         "the time while driving: the line passes between "
-                         "the sensors (gap too wide) or the car leaves it.\n",
+        tm_printf((UB *) "S3 DIAG: OFF LINE: both white %d %% of the time "
+                         "while driving: the car leaves the line (too late "
+                         "on curves: try a stronger preset), or the sensors "
+                         "are wider apart than the line.\n",
                   (INT) pct_ww);
     }
     if (flips_m > DIAG_FLIPS_PER_M_MAX)
     {
         tm_printf((UB *) "S3 DIAG: OVERSTEER / WEAVE: steering changed side "
-                         "%d times per metre. Try preset 1 (softer), or move "
-                         "the sensors closer.\n", (INT) flips_m);
+                         "%d times per metre. Try a softer preset (lower "
+                         "Kp) or one with D.\n", (INT) flips_m);
     }
     if (wheel_err > DIAG_WHEEL_ERR_MAX_MMS)
     {
@@ -596,7 +771,7 @@ run_summary (drive_stats_t const * p_s, uint32_t moved_mm)
                          "encoders (enc L/R in S3 LOG must both rise) and "
                          "S2 tuning.\n", (INT) wheel_err);
     }
-    if ((pct_bb >= DIAG_BOTH_BLACK_MIN_PCT) &&
+    if ((pct_gg >= DIAG_BOTH_GREY_MIN_PCT) &&
         (pct_ww <= DIAG_BOTH_WHITE_MAX_PCT) &&
         (flips_m <= DIAG_FLIPS_PER_M_MAX) &&
         (wheel_err <= DIAG_WHEEL_ERR_MAX_MMS))
@@ -662,6 +837,126 @@ wait_start (void)
         }
     }
 }
+/*!
+ * @brief LINE_RECOVERY (design 6.1 SEARCHING): stop, then turn slowly on
+ *        the spot 30 deg towards the side the line was last seen, 60 back
+ *        and 90 again. If all miss: turn back to the heading at the loss,
+ *        reverse RECOVERY_BACK_MM, and sweep once more. Every step stops
+ *        as soon as either sensor sees the line.
+ *
+ * @param[in] last_dv   Steering when LOST (+ = right): the line's side.
+ * @param[in] speed_mms Follow speed to resume at.
+ *
+ * @return true = found, following again; false = not found, GP20
+ *         pressed or an S2 fault.
+ */
+static bool
+line_recover (int32_t last_dv, uint16_t speed_mms)
+{
+    static int16_t const sweep_deg[RECOVERY_STEPS] = {30, -60, 90};
+    int16_t              side = (last_dv > 0) ? -1 : 1;   /* + = left. */
+    uint32_t             round;
+    uint32_t             step;
+    int                  res = 0;
+
+    for (round = 0u; (round < RECOVERY_ROUNDS) && (0 == res); round++)
+    {
+        for (step = 0u; (step < RECOVERY_STEPS) && (0 == res); step++)
+        {
+            tm_printf((UB *) "S3 DRIVE LINE LOST: round %d sweep %d, turn "
+                             "%d deg\n", (INT) (round + 1u), (INT) (step + 1u),
+                      (INT) (sweep_deg[step] * side));
+            res = recovery_move(true, (int16_t) (sweep_deg[step] * side));
+        }
+        if ((0 == res) && ((round + 1u) < RECOVERY_ROUNDS))
+        {
+            /* The sweeps end 60 deg towards side: face the old heading,
+             * then back up to where the line was. */
+            tm_printf((UB *) "S3 DRIVE LINE LOST: turn back, reverse %d mm\n",
+                      (INT) RECOVERY_BACK_MM);
+            res = recovery_move(true, (int16_t) (-60 * side));
+            if (0 == res)
+            {
+                res = recovery_move(false, (int16_t) -RECOVERY_BACK_MM);
+            }
+        }
+    }
+    if (res > 0)
+    {
+        tm_printf((UB *) "S3 DRIVE LINE FOUND\n");
+        return (E_OK == subsystem2_follow(speed_mms));
+    }
+    return false;
+}
+
+/*!
+ * @brief One recovery step at RECOVERY_SPEED_MMS, from standstill.
+ *
+ * @param[in] b_turn true = TURN value deg (+ = left); false = MOVE value mm.
+ *
+ * @return 1 = a sensor saw the line (stopped); 0 = step done, no line;
+ *         -1 = GP20, an S2 fault or a command error.
+ */
+static int
+recovery_move (bool b_turn, int16_t value)
+{
+    s3_line_status_t    st       = {0};
+    subsystem2_status_t s2       = {0};
+    uint32_t            waited   = 0u;
+    subsystem2_state_t  busy     = b_turn ? S2_STATE_TURNING :
+                                            S2_STATE_MOVING;
+    ER                  er;
+
+    wheels_stop();
+    er = b_turn ? subsystem2_turn(value, RECOVERY_SPEED_MMS) :
+                  subsystem2_move(value, RECOVERY_SPEED_MMS);
+    if (E_OK != er)
+    {
+        return -1;
+    }
+    do
+    {
+        tk_dly_tsk(POLL_MS);
+        waited += POLL_MS;
+        (void) s3_get_line_status(&st);
+        if ((st.n_centre > U8_FOUND) || (st.n_outer > U8_FOUND))
+        {
+            wheels_stop();
+            return 1;
+        }
+        if (button1_down() || subsystem2_estop_is_set())
+        {
+            return -1;
+        }
+        subsystem2_status_get(&s2);
+        /* The first SETTLE_MS: S2 may not have taken the command yet. */
+    } while (((waited < (uint32_t) SETTLE_MS) || (busy == s2.state)) &&
+             (waited < RECOVERY_MOVE_MS));
+    return (waited < RECOVERY_MOVE_MS) ? 0 : -1;
+}
+
+/*!
+ * @brief Stop and wait until both wheels read 0 mm/s. S2 learns a wheel's
+ *        direction only at standstill, so a new command on a wheel still
+ *        rolling backwards made it count forward as -550 mm/s and drive
+ *        it flat out (car 29 Oct: a 360 deg spin after a sweep).
+ */
+static void
+wheels_stop (void)
+{
+    subsystem2_odom_t odom   = {0};
+    uint32_t          waited = 0u;
+
+    (void) subsystem2_stop();
+    do
+    {
+        tk_dly_tsk(POLL_MS);
+        waited += POLL_MS;
+        subsystem2_odom_get(&odom);
+    } while (((0 != odom.speed_l_mms) || (0 != odom.speed_r_mms)) &&
+             (waited < STOPPED_WAIT_MS));
+}
+
 static void
 preset_next (void)
 {
@@ -675,7 +970,7 @@ preset_apply (void)
     drive_preset_t const * p_set = &g_presets[g_preset];
 
     s3_set_line_gains(p_set->kp_x100, p_set->kd_x100);
-    s3_set_line_shape(0);
+    s3_set_line_shape(DRIVE_BOOST_X100);
     s3_set_steer_max(p_set->steer_max_mms);
     tm_printf((UB *) "S3 DRIVE PRESET %d of %d: %d mm/s, kp=%d kd=%d, steer "
                      "max %d mm/s\n",

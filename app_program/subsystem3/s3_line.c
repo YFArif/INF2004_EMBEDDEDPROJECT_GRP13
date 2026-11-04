@@ -1,7 +1,7 @@
 /** @file s3_line.c
  *
- * @brief Subsystem 3 -- line following with both sensors on the line
- *        (centred pair, v25) and per-sensor calibration. See s3_line.h.
+ * @brief Subsystem 3 -- line following with one sensor on each edge
+ *        (edge pair, v29) and per-sensor calibration. See s3_line.h.
  */
 
 #include <stdbool.h>
@@ -230,13 +230,48 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
     err        = n_right - n_left;
     p_out->pos = err / 2;
 
-    if ((n_left >= S3_LN_WHITE) || (n_right >= S3_LN_WHITE))
+    if ((n_left + n_right) > S3_LN_JUNC_SUM)    /* Car 30 Oct: 807 + 674. */
+    {
+        /* 2a. Both black: a junction or crossing line (a plain line is
+         *     never under both). Straight across; one event after
+         *     S3_LN_JUNC_MM, then JUNCTION until a sensor leaves black. */
+        uint16_t prev_um = p_ln->both_black_um;
+
+        p_ln->both_black_um = add_sat16(p_ln->both_black_um, moved_um);
+        p_ln->both_white_um = 0u;
+        p_ln->e_prev_valid  = 0u;   /* No D kick on the way out.         */
+        steer               = 0;
+        p_ln->steer_prev    = 0;
+        if ((uint32_t) p_ln->both_black_um >= MM_TO_UM(S3_LN_JUNC_MM))
+        {
+            if ((uint32_t) prev_um < MM_TO_UM(S3_LN_JUNC_MM))
+            {
+                p_out->junction_event = 1u;
+            }
+            p_ln->state = S3_LN_JUNCTION;
+        }
+        else
+        {
+            p_ln->state = S3_LN_FOLLOW;
+        }
+    }
+    else if ((n_left >= S3_LN_WHITE) || (n_right >= S3_LN_WHITE))
     {
         /* 2. A sensor sees the line: PD, and remember the side. */
+        p_ln->both_black_um = 0u;
         steer = pd_steer(p_ln, err, dt_us, prev_state);
+        p_ln->steer_prev = (int16_t) steer;
         if ((err > S3_LN_SIDE_MIN) || (err < -S3_LN_SIDE_MIN))
         {
+            if (((err > 0) ? 1u : 0u) != p_ln->last_right)
+            {
+                p_ln->seen_black = 0u;  /* Crossed to the other sensor.  */
+            }
             p_ln->last_right = (err > 0) ? 1u : 0u;
+        }
+        if ((n_left > S3_LN_BLACK) || (n_right > S3_LN_BLACK))
+        {
+            p_ln->seen_black = 1u;  /* The line is under this sensor.    */
         }
         p_out->overshoot    = ((n_left < S3_LN_WHITE) ||
                                (n_right < S3_LN_WHITE)) ? 1u : 0u;
@@ -245,11 +280,16 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
     }
     else
     {
-        /* 3. Both white. A weak reading still names the side; steer 0
-         *    for S3_LN_HOLD_MM, then ramp from S3_LN_SOFT_PERMILLE to
-         *    full lock at S3_LN_LOST_MM (state LOST from there). */
+        /* 3. Both white. A weak reading still names the side.
+         *    CENTRED (no sensor black since the line was last on the
+         *    other sensor): it faded in between the spots, keep the
+         *    last PD steer (a curve in progress), never ramp.
+         *    OFF LINE: keep the last PD steer for S3_LN_HOLD_MM, then
+         *    ramp from S3_LN_SOFT_PERMILLE to full lock at
+         *    S3_LN_LOST_MM (state LOST from there). */
         p_ln->e_prev_valid  = 0u;   /* No D kick when the line returns.  */
-        p_out->off_line     = 1u;
+        p_ln->both_black_um = 0u;
+        p_out->off_line     = p_ln->seen_black;
         if (err > S3_LN_SIDE_MIN)
         {
             p_ln->last_right = 1u;
@@ -262,8 +302,24 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
         {
             ;   /* No evidence: keep the last side. */
         }
-        p_ln->both_white_um = add_sat16(p_ln->both_white_um, moved_um);
-        steer               = off_line_steer(p_ln->both_white_um);
+        if (0u == p_ln->seen_black)
+        {
+            p_ln->both_white_um = add_sat16(p_ln->both_white_um,
+                                            moved_um / S3_LN_CENTRE_DIV);
+            steer               = 0;
+        }
+        else
+        {
+            p_ln->both_white_um = add_sat16(p_ln->both_white_um, moved_um);
+            steer               = off_line_steer(p_ln->both_white_um);
+        }
+        if (steer < ((p_ln->steer_prev < 0) ? -p_ln->steer_prev :
+                                              p_ln->steer_prev))
+        {
+            /* Never weaker than the turn in progress (curves). */
+            steer = (p_ln->steer_prev < 0) ? -p_ln->steer_prev :
+                                             p_ln->steer_prev;
+        }
         if (0u == p_ln->last_right)
         {
             steer = -steer;
@@ -309,6 +365,8 @@ search_step (s3_line_t * p_ln, int32_t n_max, s3_line_out_t * p_out)
     p_out->line_found_event = 1u;
     p_ln->mode              = S3_LN_MODE_FOLLOW;
     reset_tracking(p_ln);
+    p_ln->seen_black        = 1u;   /* Losing it again = OFF LINE to the */
+                                    /* search side, not CENTRED.          */
     p_ln->state             = S3_LN_FOLLOW;
     return 1;
 }
@@ -342,7 +400,7 @@ pd_steer (s3_line_t * p_ln, int32_t err, uint32_t dt_us,
     }
     else
     {
-        ;   /* Both sensors on the line: Kp only. */
+        ;   /* Near the centre: Kp only. */
     }
 
     if ((0u != p_ln->e_prev_valid) && (dt_us > 0u))
@@ -370,6 +428,9 @@ reset_tracking (s3_line_t * p_ln)
 {
     p_ln->e_prev_valid  = 0u;
     p_ln->both_white_um = 0u;
+    p_ln->both_black_um = 0u;
+    p_ln->steer_prev    = 0;
+    p_ln->seen_black    = 0u;
 }
 
 /*!
