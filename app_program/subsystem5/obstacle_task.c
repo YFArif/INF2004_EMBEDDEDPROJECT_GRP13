@@ -12,6 +12,13 @@
  *   15 cm set S2's MF_ESTOP latch directly (subsystem2_estop_set), raise
  *   EV_OBSTACLE and enter HOLD, so braking never waits for
  *   vehicle_ctrl_task (NFR6).
+ * - Lost target: in SLOW, "no echo" right after an echo under 40 cm
+ *   means the beam has lost the obstacle (the robot drifted, or the
+ *   obstacle is below the beam), not that the path is clear. Such pings
+ *   never count towards clearing. The robot keeps driving slowly, and
+ *   once S2's odometry says it has covered the last range down to 15 cm,
+ *   it stops exactly as for a near echo; the scan then decides. Turns on
+ *   the spot do not move the robot's centre, so they never trigger it.
  * - SCANNING: coarse and fine scan (s5_scan.c), then the profile is
  *   published with EV_PROFILE_READY and the task enters HOLD.
  * - WATCH: servo pointed at the obstacle's side while the robot drives
@@ -91,6 +98,9 @@ static subsystem5_obst_status_t g_status         = {0};
 static uint32_t                 g_near_run       = 0u;
 static uint32_t                 g_clear_run      = 0u;
 static uint32_t                 g_stop_run       = 0u;
+static bool                     g_b_track        = false;
+static int32_t                  g_track_mm       = 0;   /* Last near echo. */
+static int32_t                  g_track_odom_mm  = 0;   /* Odom at it.     */
 static s5_profile_t             g_profile        = {0};
 static s5_scan_result_t         g_scan           = {0};
 static bool                     g_b_watch_seen   = false;
@@ -102,7 +112,9 @@ static void           handle_requests(uint32_t requests);
 static void           step_state(void);
 static void           monitor_step(void);
 static void           update_monitor(s5_ranger_reading_t const * p_reading);
-static void           stop_robot(s5_ranger_reading_t const * p_reading);
+static void           update_track(s5_ranger_reading_t const * p_reading);
+static void           check_lost_target(void);
+static void           stop_robot(uint32_t dist_mm);
 static void           run_scan(void);
 static void           publish_scan_profile(void);
 static void           publish_clear_profile(void);
@@ -256,9 +268,16 @@ monitor_step (void)
     {
         enter_fault();
     }
+    else if ((S5_RANGER_CLEAR == reading.status) && g_b_track)
+    {
+        // The obstacle was close a moment ago: the beam has lost it, so
+        // this ping says nothing about the path being clear.
+        check_lost_target();
+    }
     else if (s5_ranger_is_conclusive(&reading))
     {
         update_monitor(&reading);
+        update_track(&reading);
     }
     else
     {
@@ -284,7 +303,7 @@ update_monitor (s5_ranger_reading_t const * p_reading)
 
     if (g_stop_run >= STOP_PINGS)
     {
-        stop_robot(p_reading);
+        stop_robot(p_reading->dist_mm);
     }
     else if ((S5_OBST_MONITORING == g_state) && (g_near_run >= NEAR_PINGS))
     {
@@ -307,17 +326,58 @@ update_monitor (s5_ranger_reading_t const * p_reading)
 }
 
 /*!
- * @brief Brake now, tell the controller, and wait for a scan request.
+ * @brief In SLOW, remember the last echo under SLOW_EXIT_MM and where
+ *        the robot was; anything else ends the tracking.
  *
- * @param[in] p_reading The reading that triggered the stop.
+ * @param[in] p_reading A conclusive reading, already counted.
  */
 static void
-stop_robot (s5_ranger_reading_t const * p_reading)
+update_track (s5_ranger_reading_t const * p_reading)
+{
+    g_b_track = (S5_OBST_SLOW == g_state)
+                && s5_ranger_is_within(p_reading, SLOW_EXIT_MM);
+
+    if (g_b_track)
+    {
+        // NOTE: The cast widens uint16_t, so no value is lost.
+        g_track_mm      = (int32_t) p_reading->dist_mm;
+        g_track_odom_mm = s5_links_odom_dist_mm();
+    }
+}
+
+/*!
+ * @brief The tracked obstacle gave no echo: stop once the distance
+ *        driven since its last echo brings the robot to STOP_BELOW_MM.
+ */
+static void
+check_lost_target (void)
+{
+    int32_t driven_mm = s5_links_odom_dist_mm() - g_track_odom_mm;
+    int32_t left_mm   = g_track_mm - driven_mm;
+
+    // NOTE: The cast is safe: STOP_BELOW_MM is 150.
+    if (left_mm <= (int32_t) STOP_BELOW_MM)
+    {
+        s5_event_trace("MONITOR lost close: last_mm driven_mm", g_track_mm,
+                       driven_mm);
+
+        // NOTE: The cast is safe: left_mm is 1 ... 150 when converted.
+        stop_robot((left_mm > 0) ? (uint32_t) left_mm : 0u);
+    }
+}
+
+/*!
+ * @brief Brake now, tell the controller, and wait for a scan request.
+ *
+ * @param[in] dist_mm Range that triggered the stop (measured or
+ *                    estimated), for the event.
+ */
+static void
+stop_robot (uint32_t dist_mm)
 {
     s5_links_motion_estop();
     subsystem5_mission_signal(EV_OBSTACLE);
-    s5_event_post(S5_EVENT_OBST_STOP, p_reading->dist_mm,
-                  DRV_SERVO_AHEAD_DEG);
+    s5_event_post(S5_EVENT_OBST_STOP, dist_mm, DRV_SERVO_AHEAD_DEG);
     enter_hold();
 }
 
@@ -575,6 +635,7 @@ enter_monitoring (void)
     g_near_run  = 0u;
     g_clear_run = 0u;
     g_stop_run  = 0u;
+    g_b_track   = false;
     set_state(S5_OBST_MONITORING);
 }
 
