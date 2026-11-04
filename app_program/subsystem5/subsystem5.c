@@ -14,25 +14,25 @@
  * - flg_obst:    requests to obstacle_task, one waiter.
  * - mtx_obst:    guards the obstacle profile, the live status and the
  *                controller state (IF-09).
- * - mbf_nav:     barcode commands from S3 (IF-01).
  * - mbf_cmd:     dashboard commands from S1.
+ * Barcode commands come from S3's own mbf_nav (IF-01), read through
+ * s5_links_nav_take().
  */
 
 #include <stdbool.h>
 #include <stdint.h>
 
 #include "obstacle_task.h"
+#include "s5_links.h"
 #include "s5_profile.h"
 #include "subsystem5.h"
 #include "vehicle_ctrl_task.h"
-#include "../subsystem3/s3_config.h"
 
 /* Message buffer sizing: each message takes a 4-byte header plus its
  * size rounded up to 4 bytes (kernel messagebuf.h).
  */
 #define MBF_HEADER_BYTES    (4u)
 #define MBF_ROUND_BYTES     (4u)
-#define NAV_QUEUE_LEN       (4u)
 #define CMD_QUEUE_LEN       (8u)
 #define CMD_BYTES           (2u)        /* {opcode, cmd_id}.             */
 
@@ -40,7 +40,6 @@ static ID                       g_flg_mission = 0;
 static ID                       g_flg_fault   = 0;
 static ID                       g_flg_obst    = 0;
 static ID                       g_mtx_obst    = 0;
-static ID                       g_mbf_nav     = 0;
 static ID                       g_mbf_cmd     = 0;
 static s5_profile_t             g_profile     = {0};
 static subsystem5_obst_status_t g_obst_status = {0};
@@ -69,7 +68,6 @@ subsystem5_init (void)
     cmtx.mtxatr = TA_INHERIT;
     g_mtx_obst  = tk_cre_mtx(&cmtx);
 
-    g_mbf_nav = create_buffer(sizeof(subsystem5_nav_msg_t), NAV_QUEUE_LEN);
     g_mbf_cmd = create_buffer(CMD_BYTES, CMD_QUEUE_LEN);
 
     if (g_flg_mission < E_OK)
@@ -87,10 +85,6 @@ subsystem5_init (void)
     else if (g_mtx_obst < E_OK)
     {
         result = g_mtx_obst;
-    }
-    else if (g_mbf_nav < E_OK)
-    {
-        result = g_mbf_nav;
     }
     else if (g_mbf_cmd < E_OK)
     {
@@ -111,72 +105,43 @@ subsystem5_init (void)
  *
  * NOTE: obstacle_task runs on core 0 with the WiFi task; vehicle_ctrl_task
  * runs on core 1 with the control loop (Week 6 report section 3).
+ *
+ * WARNING: While an isolated S3 test is built in (s3_config.h), S3 owns
+ * the motors and buttons, so S5's tasks are not started and the robot
+ * has NO obstacle protection. A line on the console says so.
  */
 ER
 subsystem5_start (void)
 {
-#if ((S3_EXPERIMENT_MODE != 0) || (S3_DRIVE_TEST != 0))
-    tm_printf((UB *) "S5 tasks DISABLED: isolated S3 test owns motors/buttons; "
-                     "no ultrasonic protection.\n");
-    return E_OK;
-#else
-    ER result  = E_OK;
-    ID tid_obs = app_start_task(obstacle_task, S5_PRI_OBSTACLE, TP_PRC1,
-                                "obstacle_task");
-    ID tid_veh = app_start_task(vehicle_ctrl_task, S5_PRI_VEHICLE, TP_PRC2,
-                                "vehicle_ctrl_task");
+    ER result = E_OK;
 
-    if (tid_obs < E_OK)
+    if (!s5_links_tasks_allowed())
     {
-        result = tid_obs;
-    }
-    else if (tid_veh < E_OK)
-    {
-        result = tid_veh;
+        tm_printf((UB *) "S5 tasks DISABLED: isolated S3 test owns the "
+                         "motors and buttons; no ultrasonic protection.\n");
     }
     else
     {
-        result = E_OK;
+        ID tid_obs = app_start_task(obstacle_task, S5_PRI_OBSTACLE,
+                                    TP_PRC1, "obstacle_task");
+        ID tid_veh = app_start_task(vehicle_ctrl_task, S5_PRI_VEHICLE,
+                                    TP_PRC2, "vehicle_ctrl_task");
+
+        if (tid_obs < E_OK)
+        {
+            result = tid_obs;
+        }
+        else if (tid_veh < E_OK)
+        {
+            result = tid_veh;
+        }
+        else
+        {
+            result = E_OK;
+        }
     }
 
     return (result);
-#endif
-}
-
-/*!
- * @brief Queue a barcode command for vehicle_ctrl_task (IF-01, S3) and
- *        raise EV_BARCODE.
- *
- * @param[in] p_msg The decoded command; copied, so it may be reused.
- *
- * @return E_OK, or E_TMOUT if NAV_QUEUE_LEN commands are already waiting.
- */
-ER
-subsystem5_nav_post (subsystem5_nav_msg_t const * p_msg)
-{
-    // NOTE: The cast is safe: the message is a few bytes.
-    ER result = tk_snd_mbf(g_mbf_nav, p_msg, (INT) sizeof(*p_msg), TMO_POL);
-
-    if (E_OK == result)
-    {
-        subsystem5_mission_signal(EV_BARCODE);
-    }
-
-    return (result);
-}
-
-/*!
- * @brief Take the oldest queued barcode command (vehicle_ctrl_task only).
- *
- * @param[out] p_msg The command.
- *
- * @return true if one was waiting.
- */
-bool
-subsystem5_nav_take (subsystem5_nav_msg_t * p_msg)
-{
-    // NOTE: The cast is safe: the message is a few bytes.
-    return ((INT) sizeof(*p_msg) == tk_rcv_mbf(g_mbf_nav, p_msg, TMO_POL));
 }
 
 /*!

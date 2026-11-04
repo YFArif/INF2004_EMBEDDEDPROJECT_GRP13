@@ -4,6 +4,7 @@
  *        so that buttons are read and time limits are checked.
  *
  * @par Each wake-up
+ * 0. S3's events (flg_s3) are added to the mission events.
  * 1. Dashboard commands (mbf_cmd): carried out and acknowledged.
  * 2. EV_START, EV_STOP and EV_RESET raised directly by another task:
  *    carried out like commands, without an acknowledgement.
@@ -52,6 +53,10 @@ vehicle_ctrl_task (INT stacd, void * p_exinf)
 
         // A time-out only means "no event this tick"; events stays 0.
         (void) subsystem5_mission_wait(EV_ALL, TICK_MS, &events);
+
+        // S3's events wait on its own flag; they are at most one tick
+        // (50 ms, 15 mm at cruise speed) late.
+        events |= s5_links_line_events();
 
         uint32_t now_ms = subsystem5_now_ms();
 

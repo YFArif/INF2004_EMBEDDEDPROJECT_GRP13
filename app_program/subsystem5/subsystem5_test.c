@@ -10,7 +10,9 @@
  *             scan and plan, but do not drive round it.
  * - 3 avoid : auto, then S5-U05 x3 on the floor: the full bypass.
  * The floor runs wait for Button 1 (GP20) before each run, like the S2
- * floor tests ("[S5-STEP]" lines, which s5_test.ps1 reacts to).
+ * floor tests ("[S5-STEP]" lines, which s5_test.ps1 reacts to). They
+ * switch S3's line following off (s5_links_line_use()), so the robot
+ * drives straight and a patterned floor cannot steer it.
  *
  * @par
  * The tests never touch the sensor, servo or motors directly. They send
@@ -236,10 +238,10 @@ static bool
 plan_is_right (void)
 {
     s5_profile_t profile = {0};
-    s5_plan_t    plan    = {S5_PLAN_CONTINUE, 0, 0u, 0u, 0u, 0u};
+    s5_plan_t    plan    = {S5_PLAN_CONTINUE, 0, 0u, 0u, 0u, 0u, 0u};
     bool         b_ok    = true;
 
-    // Wall close on the left (192 < 200 mm needed): go right; the 45
+    // Wall close on the left (192 < 280 mm needed): go right; the 45
     // degree leg covers a 197 mm shift with about 279 mm.
     profile.b_on_path      = true;
     profile.b_left_edge    = true;
@@ -252,11 +254,20 @@ plan_is_right (void)
     b_ok = b_ok && (S5_PLAN_RIGHT == plan.action) && (-45 == plan.turn_deg)
            && (is_between(plan.out_mm, 270, 290));
 
-    // Both sides wide enough: the larger gap (left).
+    // Both sides wide enough, same shift: the larger gap (left).
     profile.clear_left_mm  = 600u;
     profile.clear_right_mm = 400u;
     s5_plan_make(&profile, &plan);
     b_ok = b_ok && (S5_PLAN_LEFT == plan.action) && (45 == plan.turn_deg);
+
+    // Both sides wide enough: the smaller detour (right), even though
+    // the left is more open.
+    profile.shift_left_mm  = 250u;
+    profile.shift_right_mm = 150u;
+    s5_plan_make(&profile, &plan);
+    b_ok = b_ok && (S5_PLAN_RIGHT == plan.action);
+    profile.shift_left_mm  = 197u;
+    profile.shift_right_mm = 197u;
 
     // Neither side wide enough: reverse and rescan.
     profile.clear_left_mm  = 120u;
@@ -409,6 +420,7 @@ stop_run (uint32_t run)
 
     s5_mission_arm(true);
     s5_avoid_set_bypass(false);
+    s5_links_line_use(false);
     command(S5_CMD_START);
 
     subsystem5_ctrl_state_t end = wait_state(STOP_RUN_MS, false);
@@ -438,6 +450,7 @@ avoid_run (uint32_t run)
 
     s5_mission_arm(true);
     s5_avoid_set_bypass(true);
+    s5_links_line_use(false);
     command(S5_CMD_START);
 
     subsystem5_ctrl_state_t end = wait_state(AVOID_RUN_MS, true);

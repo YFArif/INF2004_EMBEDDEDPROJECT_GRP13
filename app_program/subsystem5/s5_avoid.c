@@ -9,10 +9,27 @@
  * runs out, avoidance fails with S5_CTRL_FAULT_MOTION_TIMEOUT instead of
  * waiting for ever.
  *
- * @par Without S3 (s5_links_line_is_real() false)
- * The return leg is driven its planned length and the line is taken as
- * found there, so the whole manoeuvre can be tested before line_task is
- * merged.
+ * @par Finding the line again
+ * On the way back S3 searches from the side the robot went round on (a
+ * bypass on the left leaves the robot left of the line), and the return
+ * leg may run SEARCH_EXTRA_MM past the plan before giving up. While S3
+ * is not ready (s5_links_line_is_ready() false: not calibrated, or
+ * switched off by the floor tests) the return leg is driven its planned
+ * length and the line is taken as found there.
+ *
+ * @par Checking the gap beside the obstacle (step 3a)
+ * Turns are not exact, and the edge from the scan is an estimate, so
+ * after turning parallel the robot stands still while the side watch
+ * measures the real gap to the obstacle's side. Closer than
+ * SIDE_NEED_MM from the sensor (log 2026-11-04_s5_avoid_4: the widest
+ * part of the robot grazed with 86 mm beside the sensor), it eases out
+ * by exactly the missing distance: a JOG_DEG turn out, the short leg,
+ * the turn back, then a new measurement with fresh pings only. At most
+ * JOGS_MAX times, then NO_PATH rather than graze. No echo means the side
+ * is not beside the sensor yet: it carries on. The return leg grows by
+ * every extra move, so the robot still comes back to the line.
+ * TODO: Set SIDE_NEED_MM from the measured robot (sensor line to the
+ * widest point, plus about 25 mm).
  *
  * NOTE: When the side watch reports the obstacle passed, the long MOVE
  * alongside is cut short with STOP. If its EV_MOTION_DONE arrives in the
@@ -23,9 +40,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "drv_servo.h"      /* Side-watch angles only.                  */
 #include "s5_avoid.h"
 #include "s5_event.h"
 #include "s5_links.h"
+#include "s5_math.h"
 #include "s5_plan.h"
 #include "s5_profile.h"
 #include "subsystem5.h"
@@ -40,6 +59,12 @@
 #define TURN_MS_PER_DEG     (20u)       /* About 3 x the time at 150 mm/s*/
 #define MS_PER_S            (1000u)
 #define MM_PER_CM           (10u)
+#define SIDE_NEED_MM        (110)       /* Sensor to the obstacle's side.*/
+#define SIDE_CHECK_MS       (900u)      /* Servo 400 ms, then ~8 pings.  */
+#define SIDE_NONE_MM        (0xFFFFu)   /* No echo beside yet.           */
+#define JOG_DEG             (20)        /* Gentle: little swing.         */
+#define JOGS_MAX            (3u)
+#define LEG_MAX_MM          (32767)     /* Back leg is uint16_t.         */
 
 /** Everything the avoidance remembers between steps. */
 typedef struct
@@ -51,17 +76,25 @@ typedef struct
     uint32_t                wait_limit_ms;
     uint32_t                profile_seq;
     subsystem5_ctrl_fault_t fault;
+    uint32_t                jogs;           /* Extra moves out so far.   */
+    int32_t                 jog_mm;         /* Current extra move.       */
+    uint32_t                side_min_mm;    /* Closest beside, this check*/
+    uint32_t                check_pings;    /* Ping count at its start.  */
 } avoid_t;
 
 static avoid_t       g_avoid       = {S5_AVOID_IDLE, {S5_PLAN_CONTINUE, 0, 0u,
-                                     0u, 0u, 0u}, 0u, 0u, 0u, 0u,
-                                     S5_CTRL_FAULT_NONE};
+                                     0u, 0u, 0u, 0u}, 0u, 0u, 0u, 0u,
+                                     S5_CTRL_FAULT_NONE, 0u, 0,
+                                     SIDE_NONE_MM, 0u};
 static volatile bool g_b_bypass_on = true;
 
 static s5_avoid_result_t step_scanning(uint32_t events, uint32_t now_ms);
 static s5_avoid_result_t act_on_plan(uint32_t now_ms);
 static s5_avoid_result_t step_bypass(uint32_t events, uint32_t now_ms);
 static s5_avoid_result_t step_return(uint32_t events, uint32_t now_ms);
+static s5_avoid_result_t step_side_check(uint32_t now_ms);
+static void              start_side_check(uint32_t now_ms);
+static void              request_watch(void);
 static void              request_scan(uint32_t now_ms);
 static void              start_move(int32_t dist_mm, uint32_t now_ms);
 static void              start_turn(int32_t angle_deg, uint32_t now_ms);
@@ -91,6 +124,7 @@ void
 s5_avoid_start (uint32_t now_ms)
 {
     g_avoid.retries = 0u;
+    g_avoid.jogs    = 0u;
     g_avoid.fault   = S5_CTRL_FAULT_NONE;
     request_scan(now_ms);
 }
@@ -116,6 +150,10 @@ s5_avoid_step (uint32_t events, uint32_t now_ms)
 
         case S5_AVOID_RETURN:
             result = step_return(events, now_ms);
+        break;
+
+        case S5_AVOID_SIDE_CHECK:
+            result = step_side_check(now_ms);
         break;
 
         case S5_AVOID_IDLE:
@@ -203,6 +241,9 @@ act_on_plan (uint32_t now_ms)
                    (int32_t) p_plan->out_mm);
     s5_event_trace("PLAN turn_deg tail_mm", p_plan->turn_deg,
                    (int32_t) p_plan->tail_mm);
+    s5_event_trace("PLAN reverse_first_mm clearance_mm",
+                   (int32_t) p_plan->room_mm,
+                   (int32_t) p_plan->clearance_mm);
 
     if (!g_b_bypass_on)
     {
@@ -229,6 +270,14 @@ act_on_plan (uint32_t now_ms)
             start_move(-REVERSE_MM, now_ms);
             enter(S5_AVOID_REVERSING);
         }
+    }
+    else if (0u != p_plan->room_mm)
+    {
+        // Too close to turn out without touching it: reverse first.
+        // NOTE: The cast widens uint16_t, so no value is lost.
+        s5_links_motion_release();
+        start_move(-(int32_t) p_plan->room_mm, now_ms);
+        enter(S5_AVOID_MAKE_ROOM);
     }
     else
     {
@@ -277,6 +326,11 @@ step_bypass (uint32_t events, uint32_t now_ms)
                 request_scan(now_ms);
             break;
 
+            case S5_AVOID_MAKE_ROOM:
+                start_turn(turn, now_ms);
+                enter(S5_AVOID_TURN_OUT);
+            break;
+
             case S5_AVOID_TURN_OUT:
                 start_move(g_avoid.plan.out_mm, now_ms);
                 enter(S5_AVOID_MOVE_OUT);
@@ -288,11 +342,19 @@ step_bypass (uint32_t events, uint32_t now_ms)
             break;
 
             case S5_AVOID_TURN_PARALLEL:
-                // Bypassing on the left leaves the obstacle on the right.
-                subsystem5_obst_request((turn > 0) ? OB_WATCH_RIGHT
-                                                   : OB_WATCH_LEFT);
-                start_move(WATCH_MAX_MM, now_ms);
-                enter(S5_AVOID_PASSING);
+            // The jog ends parallel too: measure the gap again.
+            case S5_AVOID_JOG_BACK:
+                start_side_check(now_ms);
+            break;
+
+            case S5_AVOID_JOG_OUT:
+                start_move(g_avoid.jog_mm, now_ms);
+                enter(S5_AVOID_JOG_MOVE);
+            break;
+
+            case S5_AVOID_JOG_MOVE:
+                start_turn((turn > 0) ? -JOG_DEG : JOG_DEG, now_ms);
+                enter(S5_AVOID_JOG_BACK);
             break;
 
             case S5_AVOID_TAIL:
@@ -301,15 +363,23 @@ step_bypass (uint32_t events, uint32_t now_ms)
             break;
 
             case S5_AVOID_TURN_IN:
-                s5_links_line_search(true);
+                s5_links_line_search((turn > 0) ? S5_LINKS_SIDE_LEFT
+                                                : S5_LINKS_SIDE_RIGHT);
                 start_move(g_avoid.plan.back_mm
-                           + (s5_links_line_is_real() ? SEARCH_EXTRA_MM : 0),
+                           + (s5_links_line_is_ready() ? SEARCH_EXTRA_MM
+                                                       : 0),
                            now_ms);
                 enter(S5_AVOID_RETURN);
             break;
 
+            case S5_AVOID_ONTO_LINE:
+                start_turn(g_avoid.plan.turn_deg, now_ms);
+                enter(S5_AVOID_REALIGN);
+            break;
+
             case S5_AVOID_REALIGN:
-                s5_links_line_search(false);
+                // The search ends in resume_following(), after LF_ENABLE
+                // is set, so S3 is never DISABLED in between.
                 enter(S5_AVOID_DONE);
                 result = S5_AVOID_RESUME;
             break;
@@ -339,10 +409,20 @@ step_return (uint32_t events, uint32_t now_ms)
     bool              b_found = (0u != (events & EV_LINE_FOUND));
     bool              b_done  = (0u != (events & EV_MOTION_DONE));
 
-    if (b_found || (b_done && (!s5_links_line_is_real())))
+    if (b_found)
     {
-        // On the line (or, without S3, where the line should be).
+        // S3's sensors are on the line, ahead of the turning centre.
+        // Turning now would swing them off it again (log
+        // 2026-11-04_1719_track: "OFF LINE -> searching" after the turn,
+        // and S3 steered hard to find it). Drive the turning centre onto
+        // the line first; the turn then swings the sensors along it.
         s5_links_motion_stop();
+        start_move(S5_AXLE_TO_LINE_IR_MM, now_ms);
+        enter(S5_AVOID_ONTO_LINE);
+    }
+    else if (b_done && (!s5_links_line_is_ready()))
+    {
+        // Without S3, where the line should be.
         start_turn(g_avoid.plan.turn_deg, now_ms);
         enter(S5_AVOID_REALIGN);
     }
@@ -360,6 +440,114 @@ step_return (uint32_t events, uint32_t now_ms)
     }
 
     return (result);
+}
+
+/*!
+ * @brief Point the sensor at the obstacle's side and start measuring
+ *        the gap, with the robot standing still (step 3a).
+ *
+ * @param[in] now_ms Current time.
+ */
+static void
+start_side_check (uint32_t now_ms)
+{
+    subsystem5_obst_status_t status = {0};
+
+    // Remember the ping count: the published status still holds the
+    // last reading before this check (log 2026-11-04_s5_avoid_6: an old
+    // 97 mm caused a second, needless move out).
+    subsystem5_obst_status_get(&status);
+    g_avoid.check_pings   = status.ping_count;
+
+    request_watch();
+    g_avoid.side_min_mm   = SIDE_NONE_MM;
+    g_avoid.wait_start_ms = now_ms;
+    enter(S5_AVOID_SIDE_CHECK);
+}
+
+/*!
+ * @brief SIDE_CHECK: keep the closest sideways range for SIDE_CHECK_MS,
+ *        then drive past, or move further out first.
+ *
+ * @param[in] now_ms Current time.
+ *
+ * @return BUSY, or FAILURE if still too close after JOGS_MAX moves.
+ */
+static s5_avoid_result_t
+step_side_check (uint32_t now_ms)
+{
+    s5_avoid_result_t        result   = S5_AVOID_BUSY;
+    subsystem5_obst_status_t status   = {0};
+    int32_t                  turn     = g_avoid.plan.turn_deg;
+    int32_t                  side_deg = (turn > 0) ? DRV_SERVO_RIGHT_DEG
+                                                   : DRV_SERVO_LEFT_DEG;
+
+    // Only new pings, taken with the servo pointing sideways, count.
+    subsystem5_obst_status_get(&status);
+
+    if (status.b_range_valid && (side_deg == status.servo_deg)
+        && (status.ping_count != g_avoid.check_pings)
+        && (status.range_mm < g_avoid.side_min_mm))
+    {
+        g_avoid.side_min_mm = status.range_mm;
+    }
+
+    if ((now_ms - g_avoid.wait_start_ms) < SIDE_CHECK_MS)
+    {
+        // Still measuring.
+    }
+    else if (g_avoid.side_min_mm >= (uint32_t) SIDE_NEED_MM)
+    {
+        // Wide enough, or nothing beside yet: drive past, watching.
+        // NOTE: The cast is safe: SIDE_NEED_MM is a few hundred mm.
+        s5_event_trace("SIDE gap_mm ok, need_mm",
+                       (int32_t) g_avoid.side_min_mm, SIDE_NEED_MM);
+
+        // Restart the watch, so a pass seen while standing still is
+        // not lost and the depth is measured from here.
+        request_watch();
+        start_move(WATCH_MAX_MM, now_ms);
+        enter(S5_AVOID_PASSING);
+    }
+    else if (g_avoid.jogs >= JOGS_MAX)
+    {
+        result = fail(S5_CTRL_FAULT_NO_PATH);
+    }
+    else
+    {
+        // NOTE: The casts are safe: the gap is below SIDE_NEED_MM, so
+        // the missing distance is 1 ... SIDE_NEED_MM, and the back leg
+        // is limited to 0 ... LEG_MAX_MM.
+        int32_t missing = SIDE_NEED_MM - (int32_t) g_avoid.side_min_mm;
+        int32_t jog_deg = (turn > 0) ? JOG_DEG : -JOG_DEG;
+        int32_t back    = (int32_t) g_avoid.plan.back_mm
+                          + ((missing * S5_MATH_Q15_ONE)
+                             / s5_math_sin_q15(s5_math_abs(turn)));
+
+        s5_event_trace("SIDE gap_mm too close, moving out mm",
+                       (int32_t) g_avoid.side_min_mm, missing);
+        g_avoid.jogs++;
+        g_avoid.jog_mm       = (missing * S5_MATH_Q15_ONE)
+                               / s5_math_sin_q15(JOG_DEG);
+        g_avoid.plan.back_mm = (uint16_t) ((back > LEG_MAX_MM) ? LEG_MAX_MM
+                                                               : back);
+        subsystem5_obst_request(OB_HOLD);
+        start_turn(jog_deg, now_ms);
+        enter(S5_AVOID_JOG_OUT);
+    }
+
+    return (result);
+}
+
+/*!
+ * @brief Start the side watch on the obstacle's side: a bypass on the
+ *        left leaves the obstacle on the right.
+ */
+static void
+request_watch (void)
+{
+    subsystem5_obst_request((g_avoid.plan.turn_deg > 0) ? OB_WATCH_RIGHT
+                                                        : OB_WATCH_LEFT);
 }
 
 /*!
@@ -411,7 +599,7 @@ start_turn (int32_t angle_deg, uint32_t now_ms)
                                      : (uint32_t) angle_deg;
 
     // NOTE: The casts above are safe: |angle_deg| is at most 180.
-    s5_links_motion_turn(angle_deg);
+    s5_links_motion_turn(angle_deg, 0u);
     g_avoid.wait_start_ms = now_ms;
     g_avoid.wait_limit_ms = (angle * TURN_MS_PER_DEG) + MOTION_SLACK_MS;
 }
@@ -440,7 +628,7 @@ static s5_avoid_result_t
 fail (subsystem5_ctrl_fault_t fault)
 {
     s5_links_motion_stop();
-    s5_links_line_search(false);
+    s5_links_line_search(S5_LINKS_SIDE_NONE);
     subsystem5_obst_request(OB_HOLD);
     g_avoid.fault = fault;
     enter(S5_AVOID_FAILED);

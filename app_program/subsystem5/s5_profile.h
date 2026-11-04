@@ -21,10 +21,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* Chassis geometry. TODO: measure the robot and update (S5-U04). */
-#define S5_ROBOT_WIDTH_MM       (150)   /* Outside of tyre to tyre.      */
+/* Chassis geometry. TODO: measure the robot and update (S5-U04). The
+ * setback is from log 2026-11-04_s5_stop_2 (sensor read 121 mm with the
+ * front 30 mm from the box); the rest are estimates on the safe side.
+ * The margin was 50 mm until log 2026-11-04_s5_avoid_3, where turning
+ * back parallel touched the box: it also covers the estimates' error.
+ */
+#define S5_ROBOT_WIDTH_MM       (180)   /* Widest point, wheels included.*/
 #define S5_ROBOT_LENGTH_MM      (200)   /* Front bumper to rear.         */
-#define S5_PATH_MARGIN_MM       (50)    /* Gap kept from the obstacle.   */
+#define S5_AXLE_TO_FRONT_MM     (100)   /* Turning centre to the front.  */
+#define S5_SENSOR_SETBACK_MM    (90)    /* Sensor face behind the front. */
+#define S5_AXLE_TO_LINE_IR_MM   (80)    /* Turning centre to S3's IR.    */
+#define S5_PATH_MARGIN_MM       (100)   /* Gap kept from the obstacle.   */
 
 /* Scan thresholds (Week 6 report 6.4, preliminary until S5-U04). */
 #define S5_HIT_RANGE_MM         (400)   /* Closer than this is a hit.    */

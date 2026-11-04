@@ -5,7 +5,8 @@
  *
  * @par States (subsystem5_obst_state_t)
  * - MONITORING: servo ahead, one ping per 60 ms. Three pings under 35 cm
- *   raise EV_OBSTACLE_NEAR and enter SLOW.
+ *   raise EV_OBSTACLE_NEAR and enter SLOW. All distances here are from
+ *   the robot's front, not from the sensor (S5_SENSOR_SETBACK_MM).
  * - SLOW: still pinging. Three pings at 40 cm or more raise
  *   EV_OBSTACLE_CLEAR and return to MONITORING (the 5 cm gap stops
  *   flicker). From MONITORING or SLOW, two raw pings in a row under
@@ -55,10 +56,13 @@
 #include "s5_scan.h"
 #include "subsystem5.h"
 
-/* Forward monitoring (Week 6 report 6.4; preliminary until S5-U05). */
-#define SLOW_BELOW_MM       (350u)
-#define SLOW_EXIT_MM        (400u)
-#define STOP_BELOW_MM       (150u)
+/* Forward monitoring (Week 6 report 6.4; preliminary until S5-U05). The
+ * distances are from the robot's front; the sensor sits
+ * S5_SENSOR_SETBACK_MM behind it, so that is added to each.
+ */
+#define SLOW_BELOW_MM       (350u + S5_SENSOR_SETBACK_MM)
+#define SLOW_EXIT_MM        (400u + S5_SENSOR_SETBACK_MM)
+#define STOP_BELOW_MM       (150u + S5_SENSOR_SETBACK_MM)
 #define NEAR_PINGS          (3u)
 #define CLEAR_PINGS         (3u)
 #define STOP_PINGS          (2u)
@@ -182,18 +186,16 @@ obstacle_task (INT stacd, void * p_exinf)
 }
 
 /*!
- * @brief Carry out the highest-priority pending request.
+ * @brief Carry out pending requests: OB_HOLD (or else OB_RESUME) first,
+ *        then the first of the others. A scan sent together with a HOLD
+ *        is therefore still carried out, not lost.
  *
  * @param[in] requests OB_xxx bits taken from flg_obst.
  */
 static void
 handle_requests (uint32_t requests)
 {
-    if (0u == requests)
-    {
-        // Nothing to do.
-    }
-    else if (0u != (requests & OB_HOLD))
+    if (0u != (requests & OB_HOLD))
     {
         enter_hold();
     }
@@ -203,6 +205,15 @@ handle_requests (uint32_t requests)
         // if the sensor is still broken it faults again within 0.3 s.
         s5_ranger_reset_fault();
         enter_monitoring();
+    }
+    else
+    {
+        // No change of mode requested.
+    }
+
+    if (0u == (requests & ~(OB_HOLD | OB_RESUME)))
+    {
+        // No job requested.
     }
     else if (S5_OBST_FAULT == g_state)
     {
