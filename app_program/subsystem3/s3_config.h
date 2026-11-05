@@ -18,28 +18,28 @@
 #define S3_CONFIG_H
 
 #include "s3_line.h"        /* S3_LN_L_ON_LEFT / S3_LN_L_ON_RIGHT.      */
-#include "s3_experiment.h"
+#define S3_EXPERIMENT_MODE      (0)     /* Old S3 floor experiments were */
+                                        /* removed (5 Nov); kept at 0   */
+                                        /* because subsystem5.c reads it.*/
 
 /* ---------------------------------------------------------------------
- *  Line sensor layout (v29 EDGE PAIR, s3_line.h). One sensor on EACH
- *  edge of the 18 mm line, 18 mm apart centre to centre, the pair
- *  centred on the car. Centred, both read GREY (about 500):
+ *  Line sensor layout (single edge, s3_line.h). GP27 ("Centre IR") sits
+ *  on the line's LEFT edge (grey, about 500) with the car centred on the
+ *  line; GP26 ("Left IR", mounted on the robot's RIGHT) is a guard 25-30
+ *  mm further right, on white (junctions, big drifts):
  *
- *        white  L|##################|R  white     (looking down, car
- *                <------ 18 mm ----->              pointing up the page)
+ *        white  27|########## 18 mm ##########|  white   26   (looking
+ *                                                              down)
  *
- *  On our car the GP26 ("Left IR") sensor is on the robot's RIGHT and
- *  GP27 ("Centre IR") on its LEFT. If they are mounted the other way
- *  round, set S3_LN_L_ON_LEFT here. Nothing else changes. Wrong setting:
- *  the car steers AWAY from the line at once.
+ *  Mounted mirrored (guard on the LEFT): set S3_LN_L_ON_LEFT here.
+ *  Wrong setting: the car steers AWAY from the line at once.
  * --------------------------------------------------------------------- */
 #ifndef S3_IR_L_SIDE
 #define S3_IR_L_SIDE            (S3_LN_L_ON_RIGHT)
 #endif
-#define S3_IR_SPACING_MM        (18)    /* Mounting: centre to centre.   */
 #define S3_LAYOUT_TXT           ((S3_LN_L_ON_LEFT == S3_IR_L_SIDE) ? \
-                                 "edge pair 18 mm, GP26 LEFT" :        \
-                                 "edge pair 18 mm, GP26 RIGHT")
+                                 "single edge, GP27 on the RIGHT edge, GP26 guard LEFT" : \
+                                 "single edge, GP27 on the LEFT edge, GP26 guard RIGHT")
 
 /* ---------------------------------------------------------------------
  *  Tasks (Week 6 report section 3, TEAM.md section 4). Both run on core 1
@@ -92,9 +92,6 @@
 #ifndef S3_DRIVE_TEST
 #define S3_DRIVE_TEST           (0)
 #endif
-#if ((S3_EXPERIMENT_MODE != 0) && (S3_DRIVE_TEST != 0))
-#error "Choose either the preserved drive test or the GP27 experiment"
-#endif
 #if (S3_DRIVE_TEST != 0) && APP_TEST
 #error "S3 drive test must not compete with subsystem self-tests"
 #endif
@@ -136,7 +133,7 @@
 #define S3_DRIVE_RECAL_MS       (2000u) /* Hold Button 2 this long while */
                                         /* waiting = recalibrate (after  */
                                         /* the countdown below).         */
-#define S3_DRIVE_CAL_COUNT_S    (10u)   /* Countdown before calibration  */
+#define S3_DRIVE_CAL_COUNT_S    (1u)    /* Countdown before calibration  */
                                         /* starts (power-up, recal, or   */
                                         /* START while not READY).       */
 #define S3_DRIVE_GO_COUNT_S     (3u)    /* Countdown after START.        */

@@ -1,7 +1,7 @@
 /** @file s3_line.c
  *
- * @brief Subsystem 3 -- line following with one sensor on each edge
- *        (edge pair, v29) and per-sensor calibration. See s3_line.h.
+ * @brief Subsystem 3 -- line following, single edge (GP27 on the line's
+ *        left edge, GP26 a guard) and per-sensor calibration. See s3_line.h.
  */
 
 #include <stdbool.h>
@@ -218,9 +218,77 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
         return;                     /* Steer 0, no events.               */
     }
 
-    n_left  = (0u != p_ln->l_right) ? p_out->n_c : p_out->n_l;
-    n_right = (0u != p_ln->l_right) ? p_out->n_l : p_out->n_c;
-    if (0 == search_step(p_ln, (n_left > n_right) ? n_left : n_right, p_out))
+    /* Single edge (v30): GP27 rides the line's near edge (grey), GP26 is a
+     * guard out on white on the far side. Turned into the edge-pair
+     * readings the rules below use: the edge sensor is the near side, and
+     * 1000 - edge (or the guard, if darker) the far side. Edge white = the
+     * line has slipped towards the guard: only the guard is left to see. */
+    {
+        int32_t n_in;
+        int32_t n_out;
+        int32_t n_e = p_out->n_c;
+
+        /* The line's own black reads only ~850-900 (car 5 Nov 21:14: max
+         * 909; calibration black came from darker tape), so the dark half
+         * is stretched: S3_LN_EDGE_FULL -> 1000, grey 500 unchanged. Else
+         * left drifts steer weaker than white does and DEEP is never hit
+         * (the left curve crossed the line and steered right). */
+        if (n_e > (PERMILLE / 2))
+        {
+            n_e = (PERMILLE / 2) + (((n_e - (PERMILLE / 2)) * (PERMILLE / 2)) /
+                                    (S3_LN_EDGE_FULL - (PERMILLE / 2)));
+            n_e = (n_e > PERMILLE) ? PERMILLE : n_e;
+        }
+
+        if (n_e > S3_LN_EDGE_DEEP)
+        {
+            p_ln->edge_black   = 1u;
+            p_ln->edge_grey_um = 0u;
+        }
+        else if (n_e >= S3_LN_WHITE)
+        {
+            p_ln->edge_grey_um = add_sat16(p_ln->edge_grey_um, moved_um);
+            if ((uint32_t) p_ln->edge_grey_um >=
+                MM_TO_UM(S3_LN_EDGE_SETTLE_MM))
+            {
+                p_ln->edge_black = 0u;
+            }
+        }
+        else
+        {
+            ;   /* White: keep the flag, it says which side the line is. */
+        }
+        if (p_out->n_l >= S3_LN_WHITE)
+        {
+            p_ln->edge_black = 0u;  /* Guard sees it: line on its side. */
+        }
+
+        if (0u != p_ln->edge_black)
+        {
+            /* Went DEEP black: it is crossing the line (sharp inside
+             * corner); lighter may be the far edge, so only the guard is
+             * the far side. Deep (not 750), so straights never switch
+             * formula (car 5 Nov 19:37: that jump made them wave). */
+            n_in  = n_e;
+            n_out = p_out->n_l;
+        }
+        else
+        {
+            /* Edge sensor white too: the line is on the guard side, steer
+             * as hard as black steers the other way (car 5 Nov 18:29:
+             * white held dv +5 and the car drifted off).
+             * shortcut: no LOST from this side (both never read white),
+             * the car keeps full lock towards the guard; fine on a track,
+             * add a white-distance limit if it ever circles. */
+            n_in  = n_e;
+            n_out = PERMILLE - n_e;
+            n_out = (p_out->n_l > n_out) ? p_out->n_l : n_out;
+        }
+        n_left  = (0u != p_ln->l_right) ? n_in : n_out;
+        n_right = (0u != p_ln->l_right) ? n_out : n_in;
+    }
+    if (0 == search_step(p_ln, (p_out->n_c > p_out->n_l) ? p_out->n_c :
+                                                        p_out->n_l, p_out))
     {
         return;                     /* Still searching.                  */
     }
@@ -280,16 +348,13 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
     }
     else
     {
-        /* 3. Both white. A weak reading still names the side.
-         *    CENTRED (no sensor black since the line was last on the
-         *    other sensor): it faded in between the spots, keep the
-         *    last PD steer (a curve in progress), never ramp.
-         *    OFF LINE: keep the last PD steer for S3_LN_HOLD_MM, then
-         *    ramp from S3_LN_SOFT_PERMILLE to full lock at
-         *    S3_LN_LOST_MM (state LOST from there). */
+        /* 3. Both white (only after the edge sensor crossed the line):
+         *    OFF LINE. Keep the last PD steer for S3_LN_HOLD_MM, then ramp
+         *    from S3_LN_SOFT_PERMILLE to full lock at S3_LN_LOST_MM (state
+         *    LOST from there). */
         p_ln->e_prev_valid  = 0u;   /* No D kick when the line returns.  */
         p_ln->both_black_um = 0u;
-        p_out->off_line     = p_ln->seen_black;
+        p_out->off_line     = 1u;
         if (err > S3_LN_SIDE_MIN)
         {
             p_ln->last_right = 1u;
@@ -302,17 +367,8 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
         {
             ;   /* No evidence: keep the last side. */
         }
-        if (0u == p_ln->seen_black)
-        {
-            p_ln->both_white_um = add_sat16(p_ln->both_white_um,
-                                            moved_um / S3_LN_CENTRE_DIV);
-            steer               = 0;
-        }
-        else
-        {
-            p_ln->both_white_um = add_sat16(p_ln->both_white_um, moved_um);
-            steer               = off_line_steer(p_ln->both_white_um);
-        }
+        p_ln->both_white_um = add_sat16(p_ln->both_white_um, moved_um);
+        steer               = off_line_steer(p_ln->both_white_um);
         if (steer < ((p_ln->steer_prev < 0) ? -p_ln->steer_prev :
                                               p_ln->steer_prev))
         {
@@ -367,6 +423,9 @@ search_step (s3_line_t * p_ln, int32_t n_max, s3_line_out_t * p_out)
     reset_tracking(p_ln);
     p_ln->seen_black        = 1u;   /* Losing it again = OFF LINE to the */
                                     /* search side, not CENTRED.          */
+    p_ln->edge_black        = (p_ln->last_right != p_ln->l_right) ? 1u : 0u;
+                                    /* Came from the guard side: white    */
+                                    /* again = line on the edge side.     */
     p_ln->state             = S3_LN_FOLLOW;
     return 1;
 }
@@ -431,6 +490,8 @@ reset_tracking (s3_line_t * p_ln)
     p_ln->both_black_um = 0u;
     p_ln->steer_prev    = 0;
     p_ln->seen_black    = 0u;
+    p_ln->edge_black    = 0u;
+    p_ln->edge_grey_um  = 0u;
 }
 
 /*!

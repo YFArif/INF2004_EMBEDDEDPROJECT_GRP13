@@ -1,39 +1,18 @@
 /** @file s3_line.h
  *
  * @brief Subsystem 3 -- line following: per-sensor calibration and the
- *        PD controller that keeps one line sensor on EACH edge of the
- *        black line (pure C, no kernel calls, unit-tested on a laptop:
+ *        PD controller (pure C, no kernel calls, unit-tested on a laptop:
  *        testing/subsystem3/host/test_line.c, sim_track.c).
  *
- * @par Geometry: EDGE PAIR (v29, 29 Oct; replaces the v25 centred pair)
- *
- *         <------ 18 mm ------>
- *         L                    R    each sensor centre ON an edge
- *   white |####################| white          line 18 mm wide
- *
- * - The sensors are 18 mm apart centre to centre, the line width, the
- *   pair centred on the car. Centred on the line, each spot is half on
- *   black: both read GREY (about 500 permille), e = 0.
- * - When the car drifts, one sensor moves onto the line (darker) and
- *   the other off it (lighter), so BOTH change and e = n_RIGHT - n_LEFT
- *   moves at once, with no dead band in the middle (the v25 pair had
- *   +-3 mm where both read black and e stayed 0). e > 0: the right
- *   sensor is darker, the line is to the right -> steer right.
- * - e reaches +-1000 after only half a spot width (2-4 mm), so Kp is
- *   much lower than v25's 100, or the car weaves.
- * - Past that, one sensor is black and the other white (e saturated)
- *   until the black one crosses the far edge: the car is pulled back
- *   from up to about 18 mm either side. Both white = really off the
- *   line, so OFF LINE turns towards the last side at once.
- * - Both BLACK cannot happen on a plain 18 mm line: it is a junction or
- *   a crossing line (FR3), see S3_LN_JUNC_MM.
- * - Which ADC channel is on which side: s3_line_init() l_side (the "Left
- *   IR" channel GP26 on the robot's LEFT or RIGHT; S3_IR_L_SIDE in
- *   s3_config.h). The other channel (GP27, "Centre IR") is on the other
- *   side.
- * - Spacing: narrower than about 14 mm and both read black near the
- *   centre (dead band, and false junctions); wider than about 22 mm and
- *   both read white near the centre (false OFF LINE).
+ * @par Geometry now: SINGLE EDGE (v30, 5 Nov)
+ * GP27 ("Centre IR") sits on the line's LEFT edge with the car centred
+ * on the line; GP26 is a guard further out on the right, on white, for
+ * junctions and big drifts. s3_line_step() turns these into the
+ * edge-pair readings the rules below use (far side = 1000 - edge, or the
+ * guard if darker), so every rule below still applies. edge_black: after
+ * the edge sensor went DEEP black (S3_LN_EDGE_DEEP), only the guard
+ * counts as the far side until it has been grey S3_LN_EDGE_SETTLE_MM or
+ * the guard sees the line (sharp inside corners). UNVERIFIED on the car.
  *
  * @par Units
  * Normalised readings are permille, 0 = white, 1000 = black. Steering
@@ -46,22 +25,14 @@
  *   the period varies.
  * - Last side: while |e| > S3_LN_SIDE_MIN, remember which side the line
  *   is on (the darker sensor).
- * - Junction: both black -> steer 0 (straight across); after
- *   S3_LN_JUNC_MM one junction_event and state JUNCTION, until either
- *   sensor is not black.
- * - CENTRED: both white, but no sensor went black since the line was
- *   last on the other sensor -> the line faded INWARDS between the
- *   spots: keep the last PD steer, never ramp; LOST only after
- *   S3_LN_LOST_MM x S3_LN_CENTRE_DIV.
- * - OFF LINE: both white after a sensor saw black (the line passed under
- *   it, out to that side) -> S3_LN_SOFT_PERMILLE towards the last side,
- *   rising to full lock at S3_LN_LOST_MM, until either sensor is darker
- *   than WHITE again (then PD).
- * - Lost: both white for S3_LN_LOST_MM -> one lost_event, state LOST,
- *   still full lock towards the last side until a sensor sees the line.
+ * - Junction: n_LEFT + n_RIGHT > S3_LN_JUNC_SUM -> steer 0 (straight
+ *   across); after S3_LN_JUNC_MM one junction_event and state JUNCTION.
+ * - OFF LINE / Lost: both white (only after the edge sensor crossed
+ *   the line) -> keep the last PD steer (S3_LN_HOLD_MM), then
+ *   S3_LN_SOFT_PERMILLE rising to full lock at S3_LN_LOST_MM (state
+ *   LOST, one lost_event).
  * - Search (Vehicle Controller): steer 0 until either sensor is above
- *   S3_LN_FOUND, then follow. SEARCH_FROM_LEFT (car left of the line)
- *   presets the last side to RIGHT, FROM_RIGHT to LEFT.
+ *   S3_LN_FOUND, then follow.
  * - Calibration learns on every step; relaxing is the caller's job.
  */
 
@@ -148,18 +119,22 @@ int32_t  s3_ir_cal_norm(s3_ir_cal_t const * p_cal, uint16_t value);
 #define S3_LN_SOFT_PERMILLE (350)   /* ... then this much steer towards   */
                                     /* the remembered side, rising        */
                                     /* linearly to full lock at LOST_MM.  */
-#define S3_LN_CENTRE_DIV    (4u)    /* CENTRED both white counts 1/4 of   */
-                                    /* the distance: LOST after 160 mm.   */
-                                    /* Car log 30 Oct 15:42: centred, one */
-                                    /* sensor grey and the other 0, then  */
-                                    /* both white; the ramp there swung   */
-                                    /* full lock to full lock (weave).    */
 #define S3_LN_JUNC_SUM      (1300)  /* n_L + n_R above this = junction  */
                                     /* (plain line: both grey, ~1000;   */
                                     /* car junction 807 + 674 = 1481).  */
 #define S3_LN_JUNC_MM       (5u)   /* Both black this far = junction     */
                                     /* (one sample of noise is 0.4 mm at  */
                                     /* 40 mm/s; a crossing line is 18).   */
+#define S3_LN_EDGE_FULL     (850)   /* Edge reading on the line's own   */
+                                    /* black (car 5 Nov: <= 909) = 1000. */
+#define S3_LN_EDGE_DEEP     (950)   /* Edge sensor this dark = it is    */
+                                    /* crossing the line (car straights */
+                                    /* peak ~850).                      */
+#define S3_LN_EDGE_SETTLE_MM (10u)  /* Edge sensor grey this far after  */
+                                    /* black = back on its own edge. Out */
+                                    /* to white sooner = it crossed the  */
+                                    /* line (sharp inside corner): the   */
+                                    /* line is on the edge side.         */
 #define S3_LN_FOUND         (500)   /* Search: a sensor above this =      */
                                     /* line found.                        */
 #define S3_LN_SEARCH_NUM    (5)     /* OFF LINE / LOST: full lock is      */
@@ -207,6 +182,7 @@ typedef struct
     int16_t      steer_prev;    /* Last PD steering, permille.           */
     uint16_t     both_white_um; /* Distance with both sensors white.     */
     uint16_t     both_black_um; /* Distance with both sensors black.     */
+    uint16_t     edge_grey_um;  /* Edge sensor out of black this far.    */
     unsigned int state        : 3;  /* s3_ln_state_t.                    */
     unsigned int mode         : 2;  /* s3_ln_mode_t.                     */
     unsigned int req_mode     : 2;  /* Last mode REQUESTED by the VC.    */
@@ -214,6 +190,7 @@ typedef struct
     unsigned int e_prev_valid : 1;
     unsigned int last_right   : 1;  /* Line last seen: 1 = to the right. */
     unsigned int seen_black   : 1;  /* Black since the line changed side.*/
+    unsigned int edge_black   : 1;  /* Edge sensor black, not settled.   */
 } s3_line_t;
 
 /** Result of one step. */

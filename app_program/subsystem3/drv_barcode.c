@@ -56,7 +56,6 @@ static volatile uint8_t  g_gap_rd;
 static volatile uint8_t  g_glitches;    /* Free-running; task takes     */
 static volatile uint8_t  g_gap_lost;    /* differences.                 */
 static volatile uint32_t g_last_us;     /* Time of the last kept edge.  */
-static volatile uint32_t g_prev_us;     /* ... and of the one before.   */
 static volatile uint32_t g_sw_sum;      /* AOUT at each DOUT edge, and */
 static volatile uint32_t g_sw_n;        /* how many (this pass).       */
 static volatile uint32_t g_db_level;    /* Debounced DOUT level, and   */
@@ -267,11 +266,7 @@ drv_barcode_take_pass (drv_barcode_pass_t * p_pass)
 S3_RAM_FUNC(gpio_isr) static void
 gpio_isr (UINT intno)
 {
-    uint32_t now_us = in_w(TIMER_TIMERAWL);
     uint32_t status = in_w(BC_PROC1_INTS_REG) & BC_EDGE_BITS;
-    uint8_t  wr;
-    uint8_t  next;
-    uint32_t gap;
 
     (void) intno;
     if (0u == status)
@@ -283,10 +278,6 @@ gpio_isr (UINT intno)
      * pass on WHITE (LED looked clean). Edges now come from the debounced
      * level in drv_barcode_sample_isr(). */
     g_glitches = (uint8_t) (g_glitches + 1u);
-    (void) now_us;
-    (void) wr;
-    (void) next;
-    (void) gap;
 }
 
 /*!
