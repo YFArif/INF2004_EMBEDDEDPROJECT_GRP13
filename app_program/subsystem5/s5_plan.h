@@ -5,12 +5,16 @@
  *        work out the legs of the bypass (FR11, Week 6 report 6.4 PLAN).
  *
  * @par The bypass (seen from above, bypassing on the left)
+ *   0. MOVE -room_mm, only if the obstacle is too close for steps 1
+ *      and 2 to miss it.
  *   1. TURN +turn_deg (away from the obstacle).
  *   2. MOVE out_mm: the robot ends shift_mm to the side.
  *   3. TURN -turn_deg: parallel to the line again.
+ *      (s5_avoid.c then measures the real gap beside the obstacle and,
+ *      if too close, moves further out; back_mm grows to match.)
  *   4. MOVE alongside while obstacle_task watches the obstacle's side,
  *      until it has been passed (the obstacle's depth is measured here).
- *   5. MOVE tail_mm, so the robot's rear also clears the obstacle.
+ *   5. MOVE tail_mm, so turning in clears the obstacle's back corner.
  *   6. TURN -turn_deg (toward the line).
  *   7. MOVE back_mm toward the line, looking for it.
  *   8. TURN +turn_deg: along the line, then line following resumes.
@@ -48,6 +52,7 @@ typedef struct
     uint16_t            tail_mm;        /* Step 5.                       */
     uint16_t            back_mm;        /* Step 7, before any search.    */
     uint16_t            clearance_mm;   /* Free gap on the chosen side.  */
+    uint16_t            room_mm;        /* Step 0; 0 = no reverse.       */
 } s5_plan_t;
 
 void s5_plan_make(s5_profile_t const * p_profile, s5_plan_t * p_plan);

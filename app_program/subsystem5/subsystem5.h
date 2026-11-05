@@ -15,10 +15,11 @@
  *
  * @par Kernel objects (created in subsystem5_init)
  * flg_mission (IF-03), flg_fault (S1 fault_mask), flg_obst (requests to
- * obstacle_task), mtx_obst (IF-09 and the controller state), mbf_nav
- * (IF-01 barcode commands from S3) and mbf_cmd (commands from S1). Their
- * IDs stay inside subsystem5.c; other subsystems use the functions below
- * instead, so no variable is declared extern here (BARR-C 4.2c).
+ * obstacle_task), mtx_obst (IF-09 and the controller state) and mbf_cmd
+ * (commands from S1). Their IDs stay inside subsystem5.c; other
+ * subsystems use the functions below instead, so no variable is declared
+ * extern here (BARR-C 4.2c). S3's objects (flg_line, flg_s3, mbf_nav)
+ * are used only in s5_links.c.
  *
  * @par Deviations from BARR-C:2018 (approval: project manager, TBD)
  * - micro T-Kernel types (ID, ER, INT, UINT, TMO, T_xxx) appear only
@@ -53,16 +54,17 @@
 
 /* ---------------------------------------------------------------------
  *  IF-03 flg_mission: events for vehicle_ctrl_task. Any subsystem sets
- *  them with subsystem5_mission_signal().
+ *  them with subsystem5_mission_signal(). S3's events arrive on its own
+ *  flg_s3 and are turned into EV_xxx bits by s5_links_line_events().
  * --------------------------------------------------------------------- */
 #define EV_START            (0x00000001u)   /* S1 or GP20: start a run.  */
 #define EV_STOP             (0x00000002u)   /* S1: stop the run.         */
 #define EV_RESET            (0x00000004u)   /* S1: leave FAULT.          */
 #define EV_CAL              (0x00000008u)   /* GP21: calibrate.          */
-#define EV_BARCODE          (0x00000010u)   /* S3: NAV_MSG waiting.      */
-#define EV_JUNCTION         (0x00000020u)   /* S3.                       */
-#define EV_LINE_LOST        (0x00000040u)   /* S3.                       */
-#define EV_LINE_FOUND       (0x00000080u)   /* S3.                       */
+#define EV_BARCODE          (0x00000010u)   /* S3: barcode in mbf_nav.   */
+#define EV_JUNCTION         (0x00000020u)   /* S3: junction under robot. */
+#define EV_LINE_LOST        (0x00000040u)   /* S3: no line for 40 mm.    */
+#define EV_LINE_FOUND       (0x00000080u)   /* S3: a search found it.    */
 #define EV_MOTION_DONE      (0x00000100u)   /* S2: MOVE or TURN done.    */
 #define EV_IMPACT           (0x00000200u)   /* S4: collision.            */
 #define EV_FAULT            (0x00000400u)   /* Any: see flg_fault.       */
@@ -72,7 +74,8 @@
 #define EV_PROFILE_READY    (0x00004000u)   /* S5: profile published.    */
 #define EV_OBST_PASSED      (0x00008000u)   /* S5: side watch finished.  */
 #define EV_COMMAND          (0x00010000u)   /* S1: a command is queued.  */
-#define EV_ALL              (0x0001FFFFu)
+#define EV_CORNER_CLOSE     (0x00020000u)   /* S5: corner watch alarm.   */
+#define EV_ALL              (0x0003FFFFu)
 
 /* ---------------------------------------------------------------------
  *  flg_fault: latched fault causes. Bit n is fault n, the numbering of
@@ -86,9 +89,9 @@
 #define S5_FAULT_WIFI       (0x10u)     /* S1: link down, level.         */
 
 /* ---------------------------------------------------------------------
- *  Requests to obstacle_task (flg_obst). Send one at a time with
- *  subsystem5_obst_request(); if several are pending only the first in
- *  this list is carried out.
+ *  Requests to obstacle_task (flg_obst), sent with
+ *  subsystem5_obst_request(). If several are pending, OB_HOLD (or else
+ *  OB_RESUME) is carried out first, then the first of the others.
  * --------------------------------------------------------------------- */
 #define OB_HOLD             (0x01u)     /* Stop pinging, centre servo.   */
 #define OB_RESUME           (0x02u)     /* Back to forward monitoring.   */
@@ -96,7 +99,10 @@
 #define OB_WATCH_LEFT       (0x08u)     /* Watch the obstacle on the     */
 #define OB_WATCH_RIGHT      (0x10u)     /* left/right until passed.      */
 #define OB_CAL_SWEEP        (0x20u)     /* Slow servo sweep, S5-U03.     */
-#define OB_ALL_REQUESTS     (0x3Fu)
+#define OB_CORNER_LEFT      (0x40u)     /* Watch diagonally ahead-left / */
+#define OB_CORNER_RIGHT     (0x80u)     /* -right for the obstacle's     */
+                                        /* corner while driving out.     */
+#define OB_ALL_REQUESTS     (0xFFu)
 
 /** Controller states, numbered as S1's telemetry ctrl_state field. */
 typedef enum
@@ -129,8 +135,8 @@ typedef enum
 } subsystem5_ctrl_fault_t;
 
 /* ---------------------------------------------------------------------
- *  IF-01: barcode commands from S3 (subsystem5_nav_post). The message
- *  buffer copies each message, so S3 needs no static ring.
+ *  IF-01: barcode commands, converted from S3's mbf_nav messages by
+ *  s5_links_nav_take().
  * --------------------------------------------------------------------- */
 typedef enum
 {
@@ -165,7 +171,9 @@ typedef enum
     S5_OBST_SLOW,           /* Obstacle under 35 cm; still pinging.      */
     S5_OBST_SCANNING,       /* Coarse and fine scan in progress.         */
     S5_OBST_WATCH,          /* Watching the obstacle beside the robot.   */
-    S5_OBST_FAULT           /* Ultrasonic failed; waiting for OB_RESUME. */
+    S5_OBST_FAULT,          /* Ultrasonic failed; waiting for OB_RESUME. */
+    S5_OBST_CORNER          /* Watching diagonally for the obstacle's    */
+                            /* corner while the robot drives out.        */
 } subsystem5_obst_state_t;
 
 /** Live ultrasonic status, updated after every ping. */
@@ -185,7 +193,6 @@ uint32_t subsystem5_fault_get(void);
 void     subsystem5_obst_request(uint32_t requests);
 void     subsystem5_profile_get(s5_profile_t * p_profile);
 void     subsystem5_obst_status_get(subsystem5_obst_status_t * p_status);
-ER       subsystem5_nav_post(subsystem5_nav_msg_t const * p_msg);  /* S3. */
 ER       subsystem5_command_post(uint8_t opcode, uint8_t cmd_id);  /* S1. */
 subsystem5_ctrl_state_t subsystem5_ctrl_state_get(void);
 
@@ -208,7 +215,6 @@ void     subsystem5_profile_put(s5_profile_t const * p_profile);
 void     subsystem5_obst_status_put(subsystem5_obst_status_t const * p_status);
 void     subsystem5_delay_ms(uint32_t delay_ms);
 uint32_t subsystem5_now_ms(void);
-bool     subsystem5_nav_take(subsystem5_nav_msg_t * p_msg);
 bool     subsystem5_command_take(uint8_t * p_opcode, uint8_t * p_cmd_id);
 void     subsystem5_ctrl_state_put(subsystem5_ctrl_state_t state);
 

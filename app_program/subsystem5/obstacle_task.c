@@ -5,13 +5,21 @@
  *
  * @par States (subsystem5_obst_state_t)
  * - MONITORING: servo ahead, one ping per 60 ms. Three pings under 35 cm
- *   raise EV_OBSTACLE_NEAR and enter SLOW.
+ *   raise EV_OBSTACLE_NEAR and enter SLOW. All distances here are from
+ *   the robot's front, not from the sensor (S5_SENSOR_SETBACK_MM).
  * - SLOW: still pinging. Three pings at 40 cm or more raise
  *   EV_OBSTACLE_CLEAR and return to MONITORING (the 5 cm gap stops
  *   flicker). From MONITORING or SLOW, two raw pings in a row under
  *   15 cm set S2's MF_ESTOP latch directly (subsystem2_estop_set), raise
  *   EV_OBSTACLE and enter HOLD, so braking never waits for
  *   vehicle_ctrl_task (NFR6).
+ * - Lost target: in SLOW, "no echo" right after an echo under 40 cm
+ *   means the beam has lost the obstacle (the robot drifted, or the
+ *   obstacle is below the beam), not that the path is clear. Such pings
+ *   never count towards clearing. The robot keeps driving slowly, and
+ *   once S2's odometry says it has covered the last range down to 15 cm,
+ *   it stops exactly as for a near echo; the scan then decides. Turns on
+ *   the spot do not move the robot's centre, so they never trigger it.
  * - SCANNING: coarse and fine scan (s5_scan.c), then the profile is
  *   published with EV_PROFILE_READY and the task enters HOLD.
  * - WATCH: servo pointed at the obstacle's side while the robot drives
@@ -48,10 +56,13 @@
 #include "s5_scan.h"
 #include "subsystem5.h"
 
-/* Forward monitoring (Week 6 report 6.4; preliminary until S5-U05). */
-#define SLOW_BELOW_MM       (350u)
-#define SLOW_EXIT_MM        (400u)
-#define STOP_BELOW_MM       (150u)
+/* Forward monitoring (Week 6 report 6.4; preliminary until S5-U05). The
+ * distances are from the robot's front; the sensor sits
+ * S5_SENSOR_SETBACK_MM behind it, so that is added to each.
+ */
+#define SLOW_BELOW_MM       (350u + S5_SENSOR_SETBACK_MM)
+#define SLOW_EXIT_MM        (400u + S5_SENSOR_SETBACK_MM)
+#define STOP_BELOW_MM       (150u + S5_SENSOR_SETBACK_MM)
 #define NEAR_PINGS          (3u)
 #define CLEAR_PINGS         (3u)
 #define STOP_PINGS          (2u)
@@ -61,6 +72,18 @@
 #define WATCH_PASSED_MM     (400u)      /* Nothing beside: passed.       */
 #define WATCH_PASSED_PINGS  (2u)
 #define WATCH_UNSEEN_MM     (150)       /* Not seen this far: passed.    */
+#define WATCH_SURE_PINGS    (3u)        /* Seen this often: a real side, */
+                                        /* so losing it means passed.    */
+
+/* Corner watch while the robot drives out diagonally (s5_avoid.c): the
+ * servo looks 45 degrees off ahead, towards the obstacle. The front
+ * corner on that side is about 115 mm from the sensor in that direction,
+ * so two pings in a row under CORNER_CLOSE_MM mean the corner is about
+ * to touch the obstacle.
+ */
+#define CORNER_DEG          (45)
+#define CORNER_CLOSE_MM     (140u)
+#define CORNER_PINGS        (2u)
 
 /* Calibration sweep (S5-U03): hold each angle long enough to measure. */
 #define CAL_FIRST_DEG       (30)
@@ -91,18 +114,27 @@ static subsystem5_obst_status_t g_status         = {0};
 static uint32_t                 g_near_run       = 0u;
 static uint32_t                 g_clear_run      = 0u;
 static uint32_t                 g_stop_run       = 0u;
+static bool                     g_b_track        = false;
+static int32_t                  g_track_mm       = 0;   /* Last near echo. */
+static int32_t                  g_track_odom_mm  = 0;   /* Odom at it.     */
 static s5_profile_t             g_profile        = {0};
 static s5_scan_result_t         g_scan           = {0};
 static bool                     g_b_watch_seen   = false;
 static int32_t                  g_watch_start_mm = 0;
 static uint32_t                 g_watch_far_run  = 0u;
 static int32_t                  g_watch_deg      = DRV_SERVO_AHEAD_DEG;
+static uint32_t                 g_watch_seen_run = 0u;  /* Pings seen.   */
+static int32_t                  g_watch_last_mm  = 0;   /* Odometry when */
+                                                        /* last seen.    */
+static uint32_t                 g_corner_run     = 0u;
 
 static void           handle_requests(uint32_t requests);
 static void           step_state(void);
 static void           monitor_step(void);
 static void           update_monitor(s5_ranger_reading_t const * p_reading);
-static void           stop_robot(s5_ranger_reading_t const * p_reading);
+static void           update_track(s5_ranger_reading_t const * p_reading);
+static void           check_lost_target(void);
+static void           stop_robot(uint32_t dist_mm);
 static void           run_scan(void);
 static void           publish_scan_profile(void);
 static void           publish_clear_profile(void);
@@ -111,6 +143,8 @@ static void           start_watch(int32_t side_deg);
 static void           watch_step(void);
 static void           finish_watch(void);
 static void           run_cal_sweep(void);
+static void           start_corner(int32_t corner_deg);
+static void           corner_step(void);
 static void           enter_monitoring(void);
 static void           enter_hold(void);
 static void           enter_fault(void);
@@ -170,18 +204,16 @@ obstacle_task (INT stacd, void * p_exinf)
 }
 
 /*!
- * @brief Carry out the highest-priority pending request.
+ * @brief Carry out pending requests: OB_HOLD (or else OB_RESUME) first,
+ *        then the first of the others. A scan sent together with a HOLD
+ *        is therefore still carried out, not lost.
  *
  * @param[in] requests OB_xxx bits taken from flg_obst.
  */
 static void
 handle_requests (uint32_t requests)
 {
-    if (0u == requests)
-    {
-        // Nothing to do.
-    }
-    else if (0u != (requests & OB_HOLD))
+    if (0u != (requests & OB_HOLD))
     {
         enter_hold();
     }
@@ -191,6 +223,15 @@ handle_requests (uint32_t requests)
         // if the sensor is still broken it faults again within 0.3 s.
         s5_ranger_reset_fault();
         enter_monitoring();
+    }
+    else
+    {
+        // No change of mode requested.
+    }
+
+    if (0u == (requests & ~(OB_HOLD | OB_RESUME)))
+    {
+        // No job requested.
     }
     else if (S5_OBST_FAULT == g_state)
     {
@@ -211,6 +252,14 @@ handle_requests (uint32_t requests)
     else if (0u != (requests & OB_CAL_SWEEP))
     {
         run_cal_sweep();
+    }
+    else if (0u != (requests & OB_CORNER_LEFT))
+    {
+        start_corner(DRV_SERVO_AHEAD_DEG + CORNER_DEG);
+    }
+    else if (0u != (requests & OB_CORNER_RIGHT))
+    {
+        start_corner(DRV_SERVO_AHEAD_DEG - CORNER_DEG);
     }
     else
     {
@@ -236,6 +285,10 @@ step_state (void)
             watch_step();
         break;
 
+        case S5_OBST_CORNER:
+            corner_step();
+        break;
+
         default:
             // HOLD and FAULT wait for a request; SCANNING has finished.
         break;
@@ -256,9 +309,16 @@ monitor_step (void)
     {
         enter_fault();
     }
+    else if ((S5_RANGER_CLEAR == reading.status) && g_b_track)
+    {
+        // The obstacle was close a moment ago: the beam has lost it, so
+        // this ping says nothing about the path being clear.
+        check_lost_target();
+    }
     else if (s5_ranger_is_conclusive(&reading))
     {
         update_monitor(&reading);
+        update_track(&reading);
     }
     else
     {
@@ -284,7 +344,7 @@ update_monitor (s5_ranger_reading_t const * p_reading)
 
     if (g_stop_run >= STOP_PINGS)
     {
-        stop_robot(p_reading);
+        stop_robot(p_reading->dist_mm);
     }
     else if ((S5_OBST_MONITORING == g_state) && (g_near_run >= NEAR_PINGS))
     {
@@ -307,17 +367,58 @@ update_monitor (s5_ranger_reading_t const * p_reading)
 }
 
 /*!
- * @brief Brake now, tell the controller, and wait for a scan request.
+ * @brief In SLOW, remember the last echo under SLOW_EXIT_MM and where
+ *        the robot was; anything else ends the tracking.
  *
- * @param[in] p_reading The reading that triggered the stop.
+ * @param[in] p_reading A conclusive reading, already counted.
  */
 static void
-stop_robot (s5_ranger_reading_t const * p_reading)
+update_track (s5_ranger_reading_t const * p_reading)
+{
+    g_b_track = (S5_OBST_SLOW == g_state)
+                && s5_ranger_is_within(p_reading, SLOW_EXIT_MM);
+
+    if (g_b_track)
+    {
+        // NOTE: The cast widens uint16_t, so no value is lost.
+        g_track_mm      = (int32_t) p_reading->dist_mm;
+        g_track_odom_mm = s5_links_odom_dist_mm();
+    }
+}
+
+/*!
+ * @brief The tracked obstacle gave no echo: stop once the distance
+ *        driven since its last echo brings the robot to STOP_BELOW_MM.
+ */
+static void
+check_lost_target (void)
+{
+    int32_t driven_mm = s5_links_odom_dist_mm() - g_track_odom_mm;
+    int32_t left_mm   = g_track_mm - driven_mm;
+
+    // NOTE: The cast is safe: STOP_BELOW_MM is 150.
+    if (left_mm <= (int32_t) STOP_BELOW_MM)
+    {
+        s5_event_trace("MONITOR lost close: last_mm driven_mm", g_track_mm,
+                       driven_mm);
+
+        // NOTE: The cast is safe: left_mm is 1 ... 150 when converted.
+        stop_robot((left_mm > 0) ? (uint32_t) left_mm : 0u);
+    }
+}
+
+/*!
+ * @brief Brake now, tell the controller, and wait for a scan request.
+ *
+ * @param[in] dist_mm Range that triggered the stop (measured or
+ *                    estimated), for the event.
+ */
+static void
+stop_robot (uint32_t dist_mm)
 {
     s5_links_motion_estop();
     subsystem5_mission_signal(EV_OBSTACLE);
-    s5_event_post(S5_EVENT_OBST_STOP, p_reading->dist_mm,
-                  DRV_SERVO_AHEAD_DEG);
+    s5_event_post(S5_EVENT_OBST_STOP, dist_mm, DRV_SERVO_AHEAD_DEG);
     enter_hold();
 }
 
@@ -444,7 +545,9 @@ start_watch (int32_t side_deg)
 {
     g_b_watch_seen   = false;
     g_watch_start_mm = s5_links_odom_dist_mm();
+    g_watch_last_mm  = g_watch_start_mm;
     g_watch_far_run  = 0u;
+    g_watch_seen_run = 0u;
     g_watch_deg      = side_deg;
 
     point_servo(side_deg);
@@ -469,41 +572,54 @@ watch_step (void)
     {
         // Busy or one unanswered ping: wait for a real reading.
     }
-    else if (!g_b_watch_seen)
+    else if (s5_ranger_is_within(&reading, WATCH_SEEN_MM))
     {
-        // Stage 1: wait until the obstacle is beside the robot. A shallow
-        // obstacle may already be behind the sensor: if it is not seen
-        // within WATCH_UNSEEN_MM, it counts as passed (depth unknown).
-        int32_t travelled = s5_math_abs(s5_links_odom_dist_mm()
-                                        - g_watch_start_mm);
-
-        if (s5_ranger_is_within(&reading, WATCH_SEEN_MM))
+        // Beside the robot. The depth is measured from the first sight.
+        if (!g_b_watch_seen)
         {
             g_b_watch_seen   = true;
             g_watch_start_mm = s5_links_odom_dist_mm();
         }
-        else if (travelled >= WATCH_UNSEEN_MM)
-        {
-            s5_event_trace("WATCH never seen beside: travelled_mm 0",
-                           travelled, 0);
-            g_watch_start_mm = s5_links_odom_dist_mm();
-            finish_watch();
-        }
-        else
-        {
-            // Keep looking.
-        }
+
+        g_watch_seen_run++;
+        g_watch_far_run = 0u;
+        g_watch_last_mm = s5_links_odom_dist_mm();
     }
     else
     {
-        // Stage 2: wait until it has been left behind.
+        // Not beside. Passed only if the side was seen for sure
+        // (WATCH_SURE_PINGS) and is now gone (WATCH_PASSED_PINGS), or if
+        // nothing has been seen for WATCH_UNSEEN_MM. One stray echo is
+        // not enough (log 2026-11-05_0124_track: seen once at 172 mm,
+        // "passed" after 1 cm, and turning in hit the box).
+        int32_t unseen = s5_math_abs(s5_links_odom_dist_mm()
+                                     - g_watch_last_mm);
+
         g_watch_far_run = count_run(g_watch_far_run,
                                     !s5_ranger_is_within(&reading,
                                                          WATCH_PASSED_MM));
 
-        if (g_watch_far_run >= WATCH_PASSED_PINGS)
+        if ((g_watch_seen_run >= WATCH_SURE_PINGS)
+            && (g_watch_far_run >= WATCH_PASSED_PINGS))
         {
             finish_watch();
+        }
+        else if (unseen >= WATCH_UNSEEN_MM)
+        {
+            // NOTE: The cast is safe: the count is a few dozen pings.
+            s5_event_trace("WATCH not seen for sure: unseen_mm seen_pings",
+                           unseen, (int32_t) g_watch_seen_run);
+
+            if (!g_b_watch_seen)
+            {
+                g_watch_start_mm = s5_links_odom_dist_mm();
+            }
+
+            finish_watch();
+        }
+        else
+        {
+            // Keep watching.
         }
     }
 }
@@ -534,6 +650,57 @@ finish_watch (void)
 
     enter_hold();
     subsystem5_mission_signal(EV_OBST_PASSED);
+}
+
+/*!
+ * @brief Point the sensor diagonally towards the obstacle and start the
+ *        corner watch (OB_CORNER_xxx).
+ *
+ * @param[in] corner_deg Servo angle, 45 (right) or 135 (left).
+ */
+static void
+start_corner (int32_t corner_deg)
+{
+    g_corner_run = 0u;
+    point_servo(corner_deg);
+    set_state(S5_OBST_CORNER);
+}
+
+/*!
+ * @brief One diagonal ping: CORNER_PINGS in a row closer than
+ *        CORNER_CLOSE_MM raise EV_CORNER_CLOSE and end the watch.
+ */
+static void
+corner_step (void)
+{
+    s5_ranger_reading_t reading;
+
+    take_reading(&reading);
+
+    if (S5_RANGER_FAULT == reading.status)
+    {
+        enter_fault();
+    }
+    else if (!s5_ranger_is_conclusive(&reading))
+    {
+        // Busy or one unanswered ping: wait for a real reading.
+    }
+    else
+    {
+        g_corner_run = count_run(g_corner_run,
+                                 s5_ranger_is_within(&reading,
+                                                     CORNER_CLOSE_MM));
+
+        if (g_corner_run >= CORNER_PINGS)
+        {
+            // NOTE: The cast is safe: the servo angle is 0 ... 180.
+            s5_event_trace("CORNER close: range_mm servo_deg",
+                           (int32_t) reading.dist_mm,
+                           (int32_t) drv_servo_angle());
+            enter_hold();
+            subsystem5_mission_signal(EV_CORNER_CLOSE);
+        }
+    }
 }
 
 /*!
@@ -575,6 +742,7 @@ enter_monitoring (void)
     g_near_run  = 0u;
     g_clear_run = 0u;
     g_stop_run  = 0u;
+    g_b_track   = false;
     set_state(S5_OBST_MONITORING);
 }
 
