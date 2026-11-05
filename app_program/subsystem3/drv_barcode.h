@@ -4,11 +4,12 @@
  *        GP7 and analogue output (AOUT) on GP28 (ADC channel 2).
  *
  * @par Two independent paths
- * DIGITAL: the module's comparator output. A GPIO edge interrupt stores
- * the time between edges in a ring of 16-bit gaps (16 us units). Edges
- * closer than DRV_BARCODE_GLITCH_US are chatter: counted, not stored.
+ * DIGITAL: the module's comparator output. The sampler interrupt reads
+ * the pin every 0.5 ms; a level held 3 ms is an edge, and the time
+ * between edges goes into a ring of 16-bit gaps (16 us units). The GPIO
+ * edge interrupt only counts raw flips (chatter).
  * ANALOGUE: the sampler interrupt (drv_adc.c) stores every AOUT sample
- * as 8 bits in a 2 s ring. A move of DRV_BARCODE_ACT_STEP away from the
+ * as 8 bits in an 8.2 s ring. A move of DRV_BARCODE_ACT_STEP away from the
  * level at the last activity, or any DOUT edge, opens an "activity
  * window".
  * A pass is finished when both paths have been quiet for
@@ -37,8 +38,6 @@
 #define DRV_BARCODE_DOUT_PIN    (7u)    /* Rewired 28 Oct (was GP6).    */
 #define DRV_BARCODE_ADC_CH      (2u)    /* AOUT on GP28 (was GP26).     */
 
-#define DRV_BARCODE_GLITCH_US   (2000u)     /* Measured chatter: 0.5 ... */
-                                            /* 0.85 ms.                  */
 #define DRV_BARCODE_QUIET_US    (300000u)   /* Whole code at 0.30 m/s =  */
                                             /* 470 ms.                   */
 #define DRV_BARCODE_ACT_STEP    (6)         /* 8-bit units (= 96 of      */
@@ -48,7 +47,8 @@
                                             /* low-level noise.            */
 #define DRV_BARCODE_DIG_RING    (64u)       /* Power of 2; a code needs  */
                                             /* 30 edges.                 */
-#define DRV_BARCODE_RING        (8192u)     /* 8192 x 0.5 ms = 4.096 s.  */
+#define DRV_BARCODE_RING        (16384u)    /* 16384 x 0.5 ms = 8.2 s    */
+                                            /* (4 s cut off the A run).  */
 
 /** Opened by: bit 0 = AOUT moved, bit 1 = DOUT edge. */
 #define DRV_BARCODE_SRC_AOUT    (1u)
@@ -66,12 +66,15 @@ typedef struct
     uint8_t const *  p_win;     /* Analogue window, 8-bit samples.       */
     uint32_t         n_win;     /* Samples in the window.                */
     uint32_t         src;       /* DRV_BARCODE_SRC_xxx bits.             */
+    uint32_t         dout_level;  /* Mean AOUT (8-bit) at DOUT switches:  */
+    uint32_t         dout_n;      /* the trimpot threshold. 0 = none.     */
     bool             b_clipped; /* Pass too slow: its start was lost.    */
 } drv_barcode_pass_t;
 
 ER   drv_barcode_init(void);
 void drv_barcode_sample_isr(uint32_t idx);
 bool drv_barcode_pass_done(void);
+bool drv_barcode_reading(void);
 void drv_barcode_take_pass(drv_barcode_pass_t * p_pass);
 
 #endif /* DRV_BARCODE_H */

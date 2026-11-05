@@ -20,7 +20,7 @@ subsystem, ask its owner or open a pull request for them to review.
 | 1   | _example:_ LED heartbeat on GP19                      |            |                 | `app_program/subsystem1/` | `testing/subsystem1/` |
 | 2   | Motion control: motors, encoders, PID, MOVE / TURN / FOLLOW, E-stop latch | 2501261    |                 | `app_program/subsystem2/` | `testing/subsystem2/` |
 | 3   | IR line following, junction / line-lost detection, Code 39 barcode navigation | 2500316    |                 | `app_program/subsystem3/` | `testing/subsystem3/` |
-| 4   | _example:_ Monitor: prints reports, pauses the LED    |            |                 | `app_program/subsystem4/` | `testing/subsystem4/` |
+| 4   | IMU motion and terrain monitoring: calibration, tilt, hump height, impact E-stop, turn rate, motion class | 2502114    |                 | `app_program/subsystem4/` | `testing/subsystem4/` |
 | 5   | Obstacle scan, avoidance, vehicle controller          | 2502447    |                 | `app_program/subsystem5/` | `testing/subsystem5/` |
 
 Shared files (`app_program/app_main.c`, `app_program/app.h`, this file)
@@ -52,8 +52,8 @@ fixed.
 | GP1                    |               | (taken whenever the team builds with `CRASH_REPORT=1`) |
 | GP2                    | S5            | HC-SR04 TRIG, output (Grove 2 pin 1)                   |
 | GP3                    | S5            | HC-SR04 ECHO via 5 V to 3.3 V divider; PWM 1B gated in |
-| GP4                    |               |                                                        |
-| GP5                    |               |                                                        |
+| GP4                    | S4            | IMU SDA, I2C0 (Grove 3), LSM303DLHC, polled by imu_task |
+| GP5                    | S4            | IMU SCL, I2C0 (Grove 3), LSM303DLHC, polled by imu_task |
 | GP6                    |               |                                                        |
 | GP7                    | S3            | barcode DOUT, edge interrupt (rewired 28 Oct, was GP6)  |
 | GP8                    | S2            | left motor M1A (PWM slice 4A, 20 kHz)                  |
@@ -106,7 +106,7 @@ the drivers have no locking to stop it.
 | Peripheral               | Owner subsystem | Owning task                 | Pins            |
 | ------------------------ | --------------- | --------------------------- | --------------- |
 | UART1                    |                 |                             |                 |
-| I2C0                     |                 |                             |                 |
+| I2C0                     | S4              | imu_task (own polled driver; DEVCNF_USE_IIC stays 0) | GP4, GP5        |
 | I2C1                     |                 |                             |                 |
 | SPI0                     |                 |                             |                 |
 | SPI1                     |                 |                             |                 |
@@ -150,7 +150,7 @@ change it only by team agreement. Write down every task you create.
 | 1         | 12–13         | _example:_ led_task – 12 – any         |
 | 2         | 14–15         | motion_task – 9 – core 1 (Week 6 report §3); _example:_ producer_task – 14 – core 1 |
 | 3         | 16–17         | task_line – 8 – core 1, task_barcode – 12 – core 1 (Week 6 report §3); _example:_ consumer_task – 16 – core 0 |
-| 4         | 18–19         | _example:_ monitor_task – 18 – any     |
+| 4         | 18–19         | imu_task – 10 – core 0 (Week 6 report §3) |
 | 5         | 20–21         | vehicle_ctrl_task – 7 – core 1; obstacle_task – 11 – core 0 (Week 6 report §3 proposal, pending team agreement) |
 
 Core: `TP_PRC1` = core 0, `TP_PRC2` = core 1, or "any".
@@ -180,15 +180,15 @@ limit there. The numbers below are the example's usage.
 
 | Object               | Limit | S1  | S2  | S3  | S4  | S5  |
 | -------------------- | ----- | --- | --- | --- | --- | --- |
-| Task                 | 32    | 1   | 1   | 1   | 1   | 2   |
+| Task                 | 32    | 1   | 1   | 1   | 1 (imu_task) | 2   |
 | Semaphore            | 16    |     | 1   |     |     |     |
-| Event flag           | 16    |     |     |     | 1   | 3   |
+| Event flag           | 16    |     |     |     | 2 (flg_imu, template flg_events) | 3   |
 | Mailbox              | 12    |     |     | 1   |     |     |
-| Mutex                | 12    |     |     | 1   |     | 1   |
-| Message buffer       | 12    |     |     |     | 1   | 2   |
+| Mutex                | 12    |     |     | 1   | 1 (mtx_terrain) | 1   |
+| Message buffer       | 12    |     |     |     | 1 (template mbf_summary) | 2   |
 | Fixed memory pool    | 12    |     | 1   |     |     |     |
 | Variable memory pool | 12    |     |     |     |     |     |
-| Cyclic handler       | 12    | 1   |     |     |     |     |
-| Alarm handler        | 12    |     |     |     | 1   |     |
+| Cyclic handler       | 12    | 1   |     |     | 1 (cyc_imu) |     |
+| Alarm handler        | 12    |     |     |     |     |     |
 
 (The kernel's USB and WiFi service tasks also use a few of these.)
