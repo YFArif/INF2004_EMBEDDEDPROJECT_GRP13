@@ -1,0 +1,20 @@
+S1-U08 run_codec_timing.sh, 2026-10-20 01:36:21 +08
+commit: 3814f93
+arm-none-eabi-gcc: arm-none-eabi-gcc (Arm GNU Toolchain 15.3.Rel1 (Build arm-15.149)) 15.3.1 20260627
+step 1: exported HEAD with placeholder configs
+step 2: baseline image built, no warnings (339368 96 82356 text/data/bss)
+step 3: baseline re-linked with the 11 codec functions as roots
+step 4: S1-U08 image built, no warnings
+step 5: msg_codec.c compiled alone at -Os
+== flash and RAM, report only (text/data/bss, bytes)
+1. image with the codec vs baseline: 343492/96/82356 vs 339368/96/82356, difference +4124/+0/+0
+2. msg_codec.o sections placed in the S1-U08 image: 4124/0/0
+3. S1-U08 image (test app instead of app_main.c, for the record): 335524/96/82524
+4. msg_codec.o compiled alone at -Os (for the record): 1774/0/0
+== S1-U08 image: docs/context/evidence-2026-10-20/s1u08/s1u08_codec_timing.uf2
+sha256: e4892b008e66ef49fca0819fb0b2938d97793bc9bc36c60652ed8bf36f5b0fca
+To flash: hold BOOTSEL, plug in the Pico W, then
+    cp docs/context/evidence-2026-10-20/s1u08/s1u08_codec_timing.uf2 /Volumes/RPI-RP2/
+To capture (start it first; the app waits 5 s, then reports every 30 s):
+    cat /dev/cu.usbmodem* | tee testing/subsystem1/logs/YYYY-MM-DD_s1u08_codec_timing.txt
+S1-U08 build: OK

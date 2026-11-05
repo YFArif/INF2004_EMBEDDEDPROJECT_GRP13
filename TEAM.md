@@ -147,7 +147,7 @@ change it only by team agreement. Write down every task you create.
 
 | Subsystem | Priority band | Tasks (name – priority – core)         |
 | --------- | ------------- | -------------------------------------- |
-| 1         | 12–13         | _example:_ led_task – 12 – any         |
+| 1         | 12–13         | telemetry_task – 14 – core 0, `MQTT=1` builds only (Week 6 report §3; outside the 12–13 band, pending team agreement); _example:_ led_task – 12 – any |
 | 2         | 14–15         | motion_task – 9 – core 1 (Week 6 report §3); _example:_ producer_task – 14 – core 1 |
 | 3         | 16–17         | task_line – 8 – core 1, task_barcode – 12 – core 1 (Week 6 report §3); _example:_ consumer_task – 16 – core 0 |
 | 4         | 18–19         | imu_task – 10 – core 0 (Week 6 report §3) |
@@ -169,6 +169,7 @@ sends to it or waits on it. Agree on the data format before coding.
 | IF-04 | S4 → S3   | shared data under a mutex (owned by S3)     | `app_stats`, `mtx_stats`    | `APP_STATS`, read only while locked                  | _example_ |
 | IF-05 | S4 → S1   | task control                                | `tid_led`                   | `tk_sus_tsk` / `tk_rsm_tsk` / `tk_chg_pri`           | _example_ |
 | IF-06 |           |                                             |                             |                                                      |           |
+| IF-10 | all tasks → S1 → broker; broker → S1 → one reader task | two message buffers owned by S1 (created by `mqtt_link_init()`, IDs not exported), reached only through functions; the radio service task `cyw43_utk_task` (template code in lib/libwifi) drains them via `mqtt_utk_start()` → `mqtt_link_poll(netif_default)` every 2 ms while the link is up | `mqtt_link_publish()`, `mqtt_link_receive_command()`, `mqtt_link_get_status()` in `app_program/subsystem1/mqtt_link.h` | publish: topic ID (`MQTT_LINK_TOPIC_TELEMETRY` 0, `_EVENT` 1, `_ACK` 2) + packed payload ≤ 25 B (`docs/S1_binary_frame.md`), QoS 0/1, retain; never blocks; `MQTT_LINK_ERR_FULL` when 8 are queued; about 72 B of the caller's stack. Commands: one 2-byte COMMAND per call, one reader task only (planned: S1 `telemetry_task`, which routes to S5). Status: snapshot, any task. `<prefix>/status` online/offline belongs to the driver | the team, in person, 29 Oct 2026; instructor "go ahead", 27 Oct 2026 |
 
 Each interface is tested by at least one integration test
 (`testing/integration/TEST_LOG.md`).

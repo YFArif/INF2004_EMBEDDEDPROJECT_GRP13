@@ -1,0 +1,14 @@
+2026-10-31T21:57:23 <BROKER_HOST> A
+2026-10-31T21:57:23 lan-listener reachable yes after 0.0 s
+2026-10-31T22:12:29 none
+2026-10-31T22:14:46 <BROKER_HOST> A
+2026-10-31T22:14:46 lan-listener reachable yes after 0.0 s
+2026-10-31T22:21:29 none
+2026-10-31T22:21:48 <BROKER_HOST> A
+2026-10-31T22:21:48 lan-listener reachable yes after 0.0 s
+2026-10-31T22:30:43 none
+2026-10-31T22:31:42 <BROKER_HOST> A
+2026-10-31T22:31:42 lan-listener reachable yes after 0.0 s
+2026-10-31T22:36:00 none
+2026-10-31T22:36:56 <BROKER_HOST> A
+2026-10-31T22:36:56 lan-listener reachable yes after 0.0 s

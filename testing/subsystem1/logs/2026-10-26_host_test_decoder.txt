@@ -1,0 +1,41 @@
+S1-U11 run_decoder_test.sh, 2026-10-26 22:19:11 +08
+commit: 385e53b
+python: Python 3.13.7
+== stage 1: golden.py --check
+golden.py --check: 18/18 vectors agree (golden.py, document 10.2, codec_vectors.c)
+stage 1: ok
+== stage 2: decoder_test.py
+test_bad_lines (__main__.CommandLine.test_bad_lines) ... ok
+test_golden_lines (__main__.CommandLine.test_golden_lines) ... ok
+test_options (__main__.CommandLine.test_options) ... ok
+test_usage (__main__.CommandLine.test_usage) ... ok
+test_command_and_ack (__main__.Describe.test_command_and_ack) ... ok
+test_fault_bits (__main__.Describe.test_fault_bits) ... ok
+test_telemetry (__main__.Describe.test_telemetry) ... ok
+test_bytearray (__main__.GoldenVectors.test_bytearray) ... ok
+test_count (__main__.GoldenVectors.test_count) ... ok
+test_decode (__main__.GoldenVectors.test_decode) ... ok
+test_fields (__main__.LayoutHeader.test_fields) ... ok
+test_version_types_lengths (__main__.LayoutHeader.test_version_types_lengths) ... ok
+test_seq_gaps (__main__.LostFrames.test_seq_gaps) ... ok
+test_empty (__main__.Malformed.test_empty) ... ok
+test_length (__main__.Malformed.test_length) ... ok
+test_not_bytes (__main__.Malformed.test_not_bytes) ... ok
+test_type (__main__.Malformed.test_type) ... ok
+test_version (__main__.Malformed.test_version) ... ok
+test_padding_ignored (__main__.Padding.test_padding_ignored) ... ok
+test_rule (__main__.Reconstruction.test_rule) ... ok
+test_session (__main__.Reconstruction.test_session) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 0.072s
+
+OK
+stage 2: ok
+== stage 3: mutations
+M1 bit stream read little-endian: caught (FAILED (failures=30))
+M2 signed fields without the offset subtracted: caught (FAILED (failures=11))
+M3 version 0 accepted: caught (FAILED (failures=2))
+M4 longer messages accepted: caught (FAILED (failures=5))
+stage 3: 4/4 mutations caught
+S1-U11: PASS (golden.py --check ok, 21 decoder tests passed, 4/4 mutations caught)
