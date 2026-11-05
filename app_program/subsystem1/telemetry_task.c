@@ -29,7 +29,9 @@
 #include <stdint.h>
 
 #include "../app.h"
+#include "../subsystem4/subsystem4.h"
 #include "../subsystem5/subsystem5.h"
+#include "msg_codec.h"
 #include "msg_layout.h"
 #include "mqtt_link.h"
 #include "s1_telem.h"
@@ -52,6 +54,12 @@ typedef uint8_t telemetry_task_check_t[((MSG_OP_START == S5_CMD_START)
 #define STACK_FILL                  (0xDEADBEEFDEADBEEFULL)
 #define MSEC_PER_SEC                1000U
 
+/* Telemetry frame at 2 Hz. Only the S4 fields are filled for now; the
+ * other subsystems' fields are sent as 0 until they are added.
+ */
+#define TEL_PERIOD_MSEC             500U
+#define TEL_HALF_RANGE_MSEC         0x80000000U
+
 #if S1_TELEM_STACK_REPORT
 #define REPORT_PERIOD_MSEC          60000U
 #define REPORT_HALF_RANGE_MSEC      0x80000000U
@@ -64,11 +72,13 @@ static uint64_t         g_stack[STACK_WORDS];
 /* Written by telemetry_task only. */
 static s1_telem_stats_t g_stats;
 static uint8_t          g_hb_seq;
+static uint8_t          g_tel_seq;
 
 static void     telemetry_task(INT stacd, void * p_exinf);
 static int32_t  post_to_s5(uint8_t opcode, uint8_t cmd_id);
 static void     handle_command(const mqtt_link_command_t * p_cmd);
 static void     send_heartbeat(void);
+static void     send_telemetry(void);
 static uint32_t now_msec(void);
 static uint32_t uptime_s(void);
 #if S1_TELEM_STACK_REPORT
@@ -164,6 +174,7 @@ telemetry_task (INT stacd, void * p_exinf)
 {
     mqtt_link_command_t cmd = {0U, {0U}};
     uint32_t            next_hb_msec = now_msec();
+    uint32_t            next_tel_msec = next_hb_msec;
 #if S1_TELEM_STACK_REPORT
     uint32_t            next_report_msec = next_hb_msec;
 #endif
@@ -208,6 +219,12 @@ telemetry_task (INT stacd, void * p_exinf)
         if (s1_telem_hb_due(now_msec(), &next_hb_msec))
         {
             send_heartbeat();
+        }
+
+        if ((now_msec() - next_tel_msec) < TEL_HALF_RANGE_MSEC)
+        {
+            next_tel_msec += TEL_PERIOD_MSEC;
+            send_telemetry();
         }
 
 #if S1_TELEM_STACK_REPORT
@@ -313,6 +330,49 @@ send_heartbeat (void)
         {
             g_stats.hb_publish_failed =
                 s1_telem_sat_add(g_stats.hb_publish_failed, 1U);
+        }
+    }
+}
+
+/*!
+ * @brief Publish one telemetry frame, if the session is up.
+ *
+ * Fills the S4 fields from subsystem4_terrain_get(). Every other field
+ * is 0 for now. A frame the full queue dropped shows as a seq gap.
+ */
+static void
+send_telemetry (void)
+{
+    mqtt_link_status_t      status;
+    subsystem4_terrain_t    terrain;
+    msg_codec_telemetry_t   tel = {0};
+    uint8_t                 buf[MSG_TEL_BYTES] = {0U};
+    uint32_t                len = 0U;
+    bool                    b_fresh = mqtt_link_get_status(&status);
+
+    if (b_fresh && s1_telem_hb_should_publish(status.state, status.b_stale))
+    {
+        subsystem4_terrain_get(&terrain);
+
+        tel.seq          = g_tel_seq;
+        tel.pitch_hdeg   = terrain.pitch_hdeg;
+        tel.roll_hdeg    = terrain.roll_hdeg;
+        tel.hump_state   = terrain.hump_state;
+        tel.peak_mm      = terrain.peak_mm;
+        tel.hump_count   = terrain.hump_count;
+        tel.motion_class = terrain.motion_class;
+        tel.turn_dps     = terrain.turn_rate_dps;
+        tel.b_imu_ok     = terrain.b_imu_ok;
+        tel.b_cal_done   = terrain.b_cal_done;
+
+        len = msg_codec_put_telemetry(&tel, buf, (uint32_t)sizeof(buf));
+
+        if (MSG_TEL_BYTES == len)
+        {
+            /* Modulo 256 by design. */
+            g_tel_seq = (uint8_t)(g_tel_seq + 1U);
+            (void)mqtt_link_publish(MQTT_LINK_TOPIC_TELEMETRY, buf,
+                                    (uint16_t)len, MQTT_LINK_QOS_0, false);
         }
     }
 }
