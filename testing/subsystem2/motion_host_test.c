@@ -876,6 +876,157 @@ test_bad_command (void)
           (int) TURN_MAX_DEG, true_heading_deg());
 }
 
+static void
+test_rolling_reverse (uint32_t start_us, int32_t direction)
+{
+    uint32_t idx = 0u;
+    double   dist = 0.0;
+    bool     b_braked = false;
+
+    sim_reset(SIM_LOAD_FLOOR, start_us);
+    for (idx = 0u; idx < WHEEL_COUNT; idx++)
+    {
+        g_sim[idx].speed_mms = direction * 150.0;
+        g_motion.wheel[idx].direction = direction;
+        g_motion.wheel[idx].speed_mms = direction * 150;
+    }
+    dist = true_dist_mm();
+    send(S2_CMD_MOVE, (int16_t) (-direction * 100), 100u);
+    sim_cycle();
+    b_braked = (0 == g_status.duty_l) && (0 == g_status.duty_r);
+    idx = sim_run_until_idle(500u);
+    sim_run(SETTLE_CYCLES);
+    check("H23-reverse", b_braked && (0u != idx) &&
+          (1u == g_done_events) &&
+          (fabs((true_dist_mm() - dist) + (direction * 100.0)) <= 5.0) &&
+          (fabs((double) g_odom.dist_mm - true_dist_mm()) <= 3.0),
+          "rolling %d -> MOVE opposite, wrap=%u: brake first=%u,"
+          " distance %.1f, odom %d, done x%u",
+          (int) direction, (unsigned) (start_us != 0u),
+          (unsigned) b_braked, true_dist_mm(), (int) g_odom.dist_mm,
+          (unsigned) g_done_events);
+}
+
+static void
+test_turn_to_follow (int16_t angle)
+{
+    uint32_t used = 0u;
+    double   head = 0.0;
+    double   dist = 0.0;
+
+    sim_reset(SIM_LOAD_FLOOR, 0u);
+    send(S2_CMD_TURN, angle, 0u);
+    used = sim_run_until_idle(500u);
+    head = true_heading_deg();
+    dist = true_dist_mm();
+    send(S2_CMD_FOLLOW, 0, 80u);
+    sim_run(100u);
+    check("H24-Sean", (0u != used) && (1u == g_done_events) &&
+          (S2_STATE_FOLLOWING == g_status.state) && !g_b_estop &&
+          (fabs(g_sim[WHEEL_LEFT].speed_mms - 80.0) <= 5.0) &&
+          (fabs(g_sim[WHEEL_RIGHT].speed_mms - 80.0) <= 5.0) &&
+          (fabs(true_heading_deg() - head) <= 3.0) &&
+          (true_dist_mm() > dist + 100.0) &&
+          (fabs((double) g_odom.dist_mm - true_dist_mm()) <= 3.0),
+          "TURN %d -> FOLLOW without caller settling: speeds %.1f/%.1f,"
+          " extra heading %.2f deg, odom error %.1f mm",
+          (int) angle, g_sim[WHEEL_LEFT].speed_mms,
+          g_sim[WHEEL_RIGHT].speed_mms, true_heading_deg() - head,
+          (double) g_odom.dist_mm - true_dist_mm());
+}
+
+static void
+test_anna_chain (int16_t angle)
+{
+    uint32_t turn_used = 0u;
+    uint32_t move_used = 0u;
+    double   dist = 0.0;
+
+    sim_reset(SIM_LOAD_FLOOR, 0u);
+    send(S2_CMD_FOLLOW, 0, 100u);
+    sim_run(50u);
+    send(S2_CMD_STOP, 0, 0u);
+    send(S2_CMD_TURN, angle, 0u);
+    turn_used = sim_run_until_idle(500u);
+    dist = true_dist_mm();
+    send(S2_CMD_MOVE, 200, 100u);
+    move_used = sim_run_until_idle(500u);
+    sim_run(SETTLE_CYCLES);
+    check("H25-Anna", (0u != turn_used) && (0u != move_used) &&
+          (2u == g_done_events) && !g_b_estop &&
+          (fabs(true_heading_deg() - angle) <= 3.0) &&
+          (fabs((true_dist_mm() - dist) - 200.0) <= 5.0) &&
+          (fabs((double) g_odom.dist_mm - true_dist_mm()) <= 3.0),
+          "FOLLOW -> queued STOP/TURN %d -> MOVE 200 without settling:"
+          " heading %.2f, move %.1f, done x%u",
+          (int) angle, true_heading_deg(), true_dist_mm() - dist,
+          (unsigned) g_done_events);
+}
+
+static void
+test_direction_guards (void)
+{
+    wheel_t * p_left = NULL;
+    bool b_braked = false;
+
+    sim_reset(SIM_LOAD_FLOOR, UINT32_MAX - 50000u);
+    p_left = &g_motion.wheel[WHEEL_LEFT];
+    p_left->speed_mms = 0;
+    p_left->tick_time_us = g_now_us - 80000u;
+    send(S2_CMD_MOVE, -100, 100u);
+    motion_cycle();
+    check("H26-quiet", (0 == g_status.duty_l) &&
+          (0 == g_status.duty_r) && (1 == p_left->direction),
+          "zero speed with a recent tick does not permit direction change");
+
+    g_b_estop = true;
+    sim_cycle();
+    g_b_estop = false;
+    send(S2_CMD_CLEAR, 0, 0u);
+    sim_cycle();
+    sim_run(20u);
+    check("H26-estop", (S2_STATE_IDLE == g_status.state) &&
+          (0 == g_status.duty_l) && (0 == g_status.duty_r) &&
+          (0u == g_done_events),
+          "E-stop during reversal cancels motion; CLEAR cannot restart it");
+
+    sim_reset(SIM_LOAD_FLOOR, 0u);
+    p_left = &g_motion.wheel[WHEEL_LEFT];
+    p_left->tick_time_us = g_now_us - (SPEED_STOPPED_US - 1u);
+    g_motion.wheel[WHEEL_RIGHT].tick_time_us =
+        g_now_us - SPEED_STOPPED_US;
+    check("H26-boundary", !direction_ready(-40, 40) &&
+          (1 == p_left->direction),
+          "99,999 us without a tick still blocks reversal (timer wrap)");
+    g_now_us++;
+    check("H26-boundary", direction_ready(-40, 40),
+          "100,000 us without a tick releases the reversal wait");
+
+    sim_reset(SIM_LOAD_FLOOR, 0u);
+    p_left = &g_motion.wheel[WHEEL_LEFT];
+    p_left->speed_mms = 200;
+    p_left->target_mms = 40;
+    wheel_drive(p_left, 40);
+    check("H26-PID", (0 == p_left->duty) && (1 == p_left->direction),
+          "opposite PID output while decelerating brakes, not powered reverse");
+
+    sim_reset(SIM_LOAD_FLOOR, 0u);
+    send(S2_CMD_FOLLOW, 0, 80u);
+    sim_run(50u);
+    g_steer_mms = 100;
+    sim_cycle();
+    b_braked = (0 == g_status.duty_l) && (0 == g_status.duty_r);
+    g_steer_mms = -100;
+    sim_cycle();
+    g_steer_mms = 0;
+    sim_run(100u);
+    check("H26-steer", b_braked && !g_b_estop &&
+          (S2_STATE_FOLLOWING == g_status.state) &&
+          (fabs(g_sim[WHEEL_LEFT].speed_mms - 80.0) <= 5.0) &&
+          (fabs(g_sim[WHEEL_RIGHT].speed_mms - 80.0) <= 5.0),
+          "rapid steering reversals brake then resume the latest steering");
+}
+
 int
 main (void)
 {
@@ -936,6 +1087,14 @@ main (void)
     test_speed_change();
     test_latest_wins();
     test_bad_command();
+    test_rolling_reverse(0u, 1);
+    test_rolling_reverse(0u, -1);
+    test_rolling_reverse(UINT32_MAX - 50000u, -1);
+    test_turn_to_follow(90);
+    test_turn_to_follow(-90);
+    test_anna_chain(90);
+    test_anna_chain(-90);
+    test_direction_guards();
 
     (void) printf("-- measurement and robustness\n");
     test_speed_accuracy();

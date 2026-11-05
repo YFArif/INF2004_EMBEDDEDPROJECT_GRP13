@@ -29,8 +29,10 @@
  *   setting MF_ESTOP itself and reporting S5_FAULT_STALL with EV_FAULT.
  *
  * @par Direction
- * The encoders have one phase and cannot tell direction, so each new tick
- * is counted in the direction of the duty last applied to that wheel.
+ * The encoders have one phase and cannot tell direction. Keep the last
+ * drive direction while braking; before reversing, brake both wheels
+ * until neither has produced a tick for 100 ms. Opposite PID output
+ * brakes instead of powering a reversal with an ambiguous encoder sign.
  *
  * @par
  * Gains and limits marked "preliminary" are tuned in S2-U02 and S2-U03.
@@ -135,6 +137,7 @@ typedef struct
     subsystem2_state_t  state;
     int32_t             speed_mms;  /* Speed of the active command.       */
     int32_t             goal_um;    /* MOVE / TURN travel per wheel.      */
+    bool                b_reverse_wait;
     int32_t             head_l_um;  /* Wheel distances at the last        */
     int32_t             head_r_um;  /* heading update.                    */
     int32_t             head_um;    /* Heading as R - L at S2_TRACK_MM,   */
@@ -169,6 +172,8 @@ static bool    travel_targets(int32_t * p_want_left,
                               int32_t * p_want_right);
 static void    wheel_measure(wheel_t * p_wheel, uint32_t now_us);
 static void    wheel_drive(wheel_t * p_wheel, int32_t want_mms);
+static bool    wheel_stopped(wheel_t const * p_wheel);
+static bool    direction_ready(int32_t want_left, int32_t want_right);
 static bool    wheel_stalled(wheel_t * p_wheel);
 static void    wheel_reset(wheel_t * p_wheel);
 static int32_t wheel_dist_um(wheel_t const * p_wheel);
@@ -418,7 +423,7 @@ control_run (void)
         break;
     }
 
-    if (b_drive)
+    if (b_drive && direction_ready(want_left, want_right))
     {
         wheel_drive(&g_motion.wheel[WHEEL_LEFT], want_left);
         wheel_drive(&g_motion.wheel[WHEEL_RIGHT], want_right);
@@ -432,6 +437,51 @@ control_run (void)
             stall_handle();
         }
     }
+}
+
+static bool
+wheel_stopped (wheel_t const * p_wheel)
+{
+    return ((0u == p_wheel->new_ticks) &&
+            ((drv_encoder_now_us() - p_wheel->tick_time_us) >=
+             SPEED_STOPPED_US));
+}
+
+/*!
+ * @brief Brake both wheels before a requested reversal, keeping odometry
+ *        signed in the old direction until the encoder quiet interval.
+ */
+static bool
+direction_ready (int32_t want_left, int32_t want_right)
+{
+    wheel_t * p_left = &g_motion.wheel[WHEEL_LEFT];
+    wheel_t * p_right = &g_motion.wheel[WHEEL_RIGHT];
+    bool b_left_stopped = wheel_stopped(p_left);
+    bool b_right_stopped = wheel_stopped(p_right);
+    bool b_left_reverse = (want_left * p_left->direction) < 0;
+    bool b_right_reverse = (want_right * p_right->direction) < 0;
+
+    if ((b_left_reverse && !b_left_stopped) ||
+        (b_right_reverse && !b_right_stopped))
+    {
+        g_motion.b_reverse_wait = true;
+    }
+
+    if (g_motion.b_reverse_wait)
+    {
+        if (b_left_stopped && b_right_stopped)
+        {
+            g_motion.b_reverse_wait = false;
+        }
+        else
+        {
+            drv_motor_brake();
+            wheel_reset(p_left);
+            wheel_reset(p_right);
+        }
+    }
+
+    return (!g_motion.b_reverse_wait);
 }
 
 /*!
@@ -600,6 +650,16 @@ wheel_drive (wheel_t * p_wheel, int32_t want_mms)
                              -ACCEL_MMS_PER_CYCLE, ACCEL_MMS_PER_CYCLE);
     bool    b_ramp   = (step != (want_mms - p_wheel->target_mms));
 
+    if ((want_mms * p_wheel->direction) < 0)
+    {
+        // direction_ready() has already established the quiet interval.
+        wheel_reset(p_wheel);
+        p_wheel->direction = (want_mms > 0) ? 1 : -1;
+        integral = 0;
+        step = clamp(want_mms, -ACCEL_MMS_PER_CYCLE, ACCEL_MMS_PER_CYCLE);
+        b_ramp = (step != want_mms);
+    }
+
     p_wheel->target_mms += step;
 
     if (0 == p_wheel->target_mms)
@@ -623,6 +683,10 @@ wheel_drive (wheel_t * p_wheel, int32_t want_mms)
               (((p_wheel->speed_mms - p_wheel->speed_prev_mms) * KD_NUM) /
                KD_DEN);
         duty = clamp(raw, -DUTY_LIMIT, DUTY_LIMIT);
+        if ((duty * p_wheel->direction) < 0)
+        {
+            duty = 0;
+        }
 
         // Anti-windup: keep the new integral unless the output is
         // saturated and the error would push it further.
@@ -630,26 +694,6 @@ wheel_drive (wheel_t * p_wheel, int32_t want_mms)
         {
             p_wheel->integral = integral;
         }
-    }
-
-    // The encoders cannot see direction, so new ticks are counted in
-    // p_wheel->direction. A wheel cannot reverse without stopping, so the
-    // direction changes only once the wheel has stopped (no tick for
-    // 100 ms). Following the duty sign instead miscounted ticks whenever
-    // the controller braked a still-rolling wheel with reverse duty: at
-    // the end of a TURN the progress then went backward and forward, and
-    // one TURN on 2026-10-23 never finished (S2-U03, u03_2 log).
-    if ((0 == p_wheel->speed_mms) && (duty > 0))
-    {
-        p_wheel->direction = 1;
-    }
-    else if ((0 == p_wheel->speed_mms) && (duty < 0))
-    {
-        p_wheel->direction = -1;
-    }
-    else
-    {
-        // Still rolling, or braked: ticks go the way it was moving.
     }
 
     p_wheel->speed_prev_mms = p_wheel->speed_mms;
@@ -722,6 +766,7 @@ enter_idle (void)
     wheel_reset(&g_motion.wheel[WHEEL_LEFT]);
     wheel_reset(&g_motion.wheel[WHEEL_RIGHT]);
     g_motion.state = S2_STATE_IDLE;
+    g_motion.b_reverse_wait = false;
 }
 
 /*!
@@ -735,6 +780,7 @@ enter_estop (void)
     wheel_reset(&g_motion.wheel[WHEEL_LEFT]);
     wheel_reset(&g_motion.wheel[WHEEL_RIGHT]);
     g_motion.state = S2_STATE_ESTOP;
+    g_motion.b_reverse_wait = false;
     g_motion.status.estop_count++;
 }
 

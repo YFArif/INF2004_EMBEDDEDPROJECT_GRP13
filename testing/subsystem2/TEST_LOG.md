@@ -6,6 +6,50 @@ See `testing/README.md` for how to run tests and record results.
 
 ## Test cases
 
+### Rolling reversal logic regression, 2026-11-06
+
+Scope: Sean's rolling TURN-to-FOLLOW failure and Anna's immediate
+FOLLOW -> STOP/TURN -> MOVE sequence. No geometry, encoder calibration,
+PI gains, speed limits, ramps, synchronisation gains or brake-lead
+constants changed. Sean's existing caller-side settling workaround remains.
+
+Before the fix, all seven new H23/H24/H25 checks failed while the existing
+59 checks passed. Immediate TURN-to-FOLLOW produced simulated wheel speeds
+of approximately 578/80 and 80/592 mm/s, with incorrect signed odometry.
+Anna-style sequences also failed to complete correctly in the model.
+
+S2 now brakes both wheels on a requested direction reversal until both
+encoders have been quiet for the existing 100 ms stopped interval.
+Controller targets/integrals are reset during this wait. Encoder signs
+are retained while braking, then changed for the requested direction.
+Opposite-direction PID output is replaced by zero-duty braking rather
+than risking a physical reversal between encoder samples.
+
+H23 covers both rolling directions and timer rollover; H24 covers left
+and right TURN immediately followed by FOLLOW; H25 covers Anna-style
+queued STOP/TURN followed by MOVE without caller settling. H26 checks
+recent-tick/zero-speed ambiguity, E-stop during reversal, PID deceleration
+and rapidly changing steering.
+Run: `sh testing/subsystem2/run_motion_test.sh` in WSL (strip CRLF when needed).
+Result: 72/72 motion checks and 39/39 diagnostic-harness scenarios passed.
+Normal firmware and Sean's `DRIVE=1 DRIVE_SPEED=80 S3_BC_VERBOSE=1`
+profile built successfully with the existing WSL `make -j8` toolchain.
+Evidence: [direction logic host log](logs/2026-11-06_host_direction_logic.txt).
+
+These are host-model logic checks, not new hardware calibration.
+Physical transition behaviour and Sean's reported +/-28 mm/s wheel-speed
+variation still require loaded-car testing. Braking instead of powered
+reverse correction can change deceleration transients even with unchanged
+gains. Do not claim the uneven-speed issue is fixed.
+
+Anna integration contract remains: E_OK means queued; MOVE/TURN emit one
+EV_MOTION_DONE when the target triggers braking, before proven physical
+standstill. The S2 reversal interlock now protects her immediate subsequent
+direction changes, but same-direction STOP followed by MOVE/FOLLOW is not
+a guaranteed settling barrier. Her avoidance/mission timeouts remain
+necessary; low-duty stall coverage and the normal S3/S5 navigation bridge
+are outside this fix.
+
 ### Anna-style 400 mm MOVE test v37, 2026-11-05
 
 Build from `build_make` with SDK configured:
