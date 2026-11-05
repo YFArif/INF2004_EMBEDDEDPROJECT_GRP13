@@ -57,7 +57,7 @@
 /** Command types. */
 typedef enum
 {
-    S2_CMD_STOP = 0,    /* Brake now and cancel any MOVE / TURN / FOLLOW. */
+    S2_CMD_STOP = 0,    /* Brake when dequeued; cancel MOVE/TURN/FOLLOW.  */
     S2_CMD_FOLLOW,      /* Drive at speed_mms, steered by line_task.      */
     S2_CMD_MOVE,        /* Drive value mm straight; negative = reverse.   */
     S2_CMD_TURN,        /* Turn on the spot value degrees; + = left.      */
@@ -109,7 +109,7 @@ typedef struct
  *  of its own: a stall sets MF_ESTOP and ends in S2_STATE_ESTOP. */
 typedef enum
 {
-    S2_STATE_IDLE = 0,      /* IDLE_BRAKED.                                */
+    S2_STATE_IDLE = 0,      /* Brake applied, not proof of standstill.     */
     S2_STATE_FOLLOWING,     /* FOLLOWING.                                  */
     S2_STATE_MOVING,        /* MOVING_DIST.                                */
     S2_STATE_TURNING,       /* TURNING.                                    */
@@ -124,7 +124,7 @@ typedef struct
     int32_t  duty_r;
     int32_t  target_l_mms;      /* Wheel speed set-points.                 */
     int32_t  target_r_mms;
-    uint32_t done_count;        /* MOVE / TURN commands completed.         */
+    uint32_t done_count;        /* Target reached, brake applied; may roll.*/
     uint32_t estop_count;       /* Entries into ESTOP_BRAKED.              */
     uint32_t estop_brake_us;    /* 1 MHz timer when it last braked for     */
                                 /* the E-stop (S2-U05).                    */
@@ -141,6 +141,12 @@ ER   subsystem2_follow(uint16_t speed_mms);                     /* S5.    */
 ER   subsystem2_move(int16_t dist_mm, uint16_t speed_mms);      /* S5.    */
 ER   subsystem2_turn(int16_t angle_deg, uint16_t speed_mms);    /* S5.    */
 ER   subsystem2_clear(void);                                    /* S5.    */
+/* A direction reversal brakes both wheels until no encoder tick for
+ * 100 ms, then resumes the active command. Residual braking travel stays
+ * in odometry. EV_MOTION_DONE/IDLE do not certify physical standstill.
+ * E_OK from a command API means queued, not started or completed.
+ * Powered opposite-direction PID braking is replaced by zero duty to
+ * avoid a reversal that single-channel encoders cannot identify. */
 void subsystem2_estop_set(void);                    /* S4, S5.           */
 void subsystem2_estop_clear(void);                  /* S5 vehicle_ctrl.  */
 bool subsystem2_estop_is_set(void);

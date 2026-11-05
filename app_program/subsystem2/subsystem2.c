@@ -205,7 +205,8 @@ subsystem2_motion_send (subsystem2_cmd_t const * p_cmd)
 }
 
 /*!
- * @brief Brake now and cancel any MOVE / TURN / FOLLOW (IF-04).
+ * @brief Queue braking and cancellation of MOVE / TURN / FOLLOW (IF-04).
+ *        Use the E-stop latch for the independent safety-stop path.
  *
  * @return E_OK, or E_TMOUT if the command queue is full.
  */
