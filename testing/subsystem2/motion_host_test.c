@@ -909,6 +909,12 @@ main (void)
     test_move("H04", 1000, 0u, 10.0);
     test_move("H04", 300, 150u, 5.0);
     test_move("H05", -100, 0u, 5.0);
+    test_move("H22", 400, 40u, 5.0);
+    test_move("H22", -400, 40u, 5.0);
+    test_move("H22", 400, 60u, 5.0);
+    test_move("H22", -400, 60u, 5.0);
+    test_move("H22", 400, 100u, 5.0);
+    test_move("H22", -400, 100u, 5.0);
     test_turn("H06", 90, 0u);
     test_turn("H06", -90, 0u);
     test_turn("H06", 180, 0u);

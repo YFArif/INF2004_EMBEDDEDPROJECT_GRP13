@@ -115,7 +115,7 @@ subsystem5_init (void)
 ER
 subsystem5_start (void)
 {
-#if ((S3_EXPERIMENT_MODE != 0) || (S3_DRIVE_TEST != 0))
+#if ((S3_EXPERIMENT_MODE != 0) || (S3_DRIVE_TEST != 0) || S2_MOTOR_DIAG)
     tm_printf((UB *) "S5 tasks DISABLED: isolated S3 test owns motors/buttons; "
                      "no ultrasonic protection.\n");
     return E_OK;

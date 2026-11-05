@@ -95,6 +95,25 @@ endif
 # Separate profile tracking prevents stale images when changing speed.
 DRIVE ?= 0
 DRIVE_SPEED ?= 40
+MOTOR_DIAG ?= 0
+ifneq ($(filter $(MOTOR_DIAG),0 1 2 3),$(MOTOR_DIAG))
+$(error Unknown MOTOR_DIAG '$(MOTOR_DIAG)'; use 0, 1 (lifted), 2 (timed floor), 3 (MOVE))
+endif
+ifneq ($(MOTOR_DIAG),0)
+ifneq ($(TEST),1)
+$(error MOTOR_DIAG requires TEST=1)
+endif
+ifneq ($(DRIVE),0)
+$(error MOTOR_DIAG requires DRIVE=0)
+endif
+ifeq ($(MOTOR_DIAG),3)
+DIAG_SUFFIX := _anna_move
+else ifeq ($(MOTOR_DIAG),2)
+DIAG_SUFFIX := _timed_floor
+else
+DIAG_SUFFIX := _motor_diag
+endif
+endif
 ifneq ($(filter $(DRIVE),0 1),$(DRIVE))
 $(error Unknown DRIVE '$(DRIVE)'; use 0 or 1)
 endif
@@ -140,7 +159,7 @@ endif
 # a live hazard: an SMP=1 build was once flashed in place of an SMP=0 one and
 # only the banner in the log revealed it.
 #
-EXE_FILE := mtk3pico_smp$(SMP)_$(CONSOLE)$(WIFI_SUFFIX)$(NET_SUFFIX)$(MQTT_SUFFIX)$(CRASH_SUFFIX)$(TEST_SUFFIX)$(S3_BC_SUFFIX)$(DRIVE_SUFFIX)
+EXE_FILE := mtk3pico_smp$(SMP)_$(CONSOLE)$(WIFI_SUFFIX)$(NET_SUFFIX)$(MQTT_SUFFIX)$(CRASH_SUFFIX)$(TEST_SUFFIX)$(S3_BC_SUFFIX)$(DRIVE_SUFFIX)$(DIAG_SUFFIX)
 
 GCC := arm-none-eabi-gcc
 AS := arm-none-eabi-gcc
@@ -205,6 +224,7 @@ ifeq ($(DRIVE),1)
 CFLAGS  += -DS3_DRIVE_TEST=1
 endif
 CFLAGS  += -DS3_DRIVE_SPEED_MMS=$(DRIVE_SPEED)
+CFLAGS  += -DS2_MOTOR_DIAG=$(MOTOR_DIAG)
 CFLAGS  += -DTM_CONSOLE_UART=$(CRASH_REPORT)
 ifeq ($(CRASH_REPORT),0)
 CFLAGS  += -DBOARD_UART0_FREE=1
@@ -237,7 +257,7 @@ endif
 # before any recipe executes.
 ################################################################################
 
-PROFILE_ID := smp$(SMP)-$(CONSOLE)-wifi$(WIFI)-net$(NET)-mqtt$(MQTT)-crash$(CRASH_REPORT)-test$(TEST)-drive$(DRIVE)-speed$(DRIVE_SPEED)-bc$(S3_BC_VERBOSE)
+PROFILE_ID := smp$(SMP)-$(CONSOLE)-wifi$(WIFI)-net$(NET)-mqtt$(MQTT)-crash$(CRASH_REPORT)-test$(TEST)-drive$(DRIVE)-speed$(DRIVE_SPEED)-bc$(S3_BC_VERBOSE)-diag$(MOTOR_DIAG)
 PROFILE_FILE := .build_profile
 
 ifneq ($(strip $(shell cat $(PROFILE_FILE) 2>/dev/null)),$(PROFILE_ID))

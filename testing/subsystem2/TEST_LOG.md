@@ -6,6 +6,161 @@ See `testing/README.md` for how to run tests and record results.
 
 ## Test cases
 
+### Anna-style 400 mm MOVE test v37, 2026-11-05
+
+Build from `build_make` with SDK configured:
+`make -j8 TEST=1 MOTOR_DIAG=3`.
+Named image: `S2_v37_ANNA_MOVE_400MM.uf2`.
+Sequence: +400 mm at 40/60/100 mm/s, then -400 mm at 40/60/100 mm/s.
+All forward stages precede all reverse stages. Without repositioning,
+the three forward moves accumulate to 1200 mm: provide at least 1.4 m
+clear forward space, or reposition while stopped between stages.
+Each of the six stages requires a separate GP20 press/release, and waits
+for S2's incremented done_count with IDLE before continuing. S2 still
+raises EV_MOTION_DONE for Anna; this isolated test observes the count
+rather than running Anna's full mission task.
+
+Uses `subsystem2_move(distance, speed)` exactly as Anna's adapter does;
+not FOLLOW, not fixed PWM, not a timed distance approximation.
+The speed is a requested cruise limit, not a promised constant speed:
+MOVE ramps and decelerates near the endpoint. Duration therefore varies
+by speed. Gains, distance geometry, turn calibration and normal firmware
+behaviour are unchanged. S3/S5 tasks remain disabled in this image.
+
+Keep at least 600 mm clear in the intended travel direction, cable slack,
+GP20/power accessible. No ultrasonic obstacle protection.
+Mark the same axle reference before and after each move; record signed
+tape displacement and lateral drift BEFORE GP20 for the next stage.
+Reverse does not guarantee returning to exactly the initial position;
+repositioning between stopped stages is allowed and each has a new baseline.
+Never run near a table edge. GP20 while moving aborts ALL stages (sampled
+about every 100-110 ms); use power if immediate physical intervention is needed.
+Timeout 40 s, sampling gap >250 ms, E-stop, enqueue failure or invalid
+completion causes explicit abort/brake/E-stop and requires reboot.
+
+Each result prints requested distance/speed, elapsed time, final odometry
+after a 500 ms settling wait, wheel distances and encoder-derived heading
+change. Buffered samples print only after stopping. These readings cannot
+replace a tape measure or independently prove physical straightness.
+
+Evidence: [MOVE protocol host checks](logs/2026-11-05_host_anna_move.txt),
+[firmware build](logs/2026-11-05_build_anna_move.txt).
+Physical floor test: pending. No new calibration claimed.
+
+### Timed floor distance comparison v36, 2026-11-05
+
+Build: from `build_make`, with `PICO_SDK_PATH` set,
+`make -j8 TEST=1 MOTOR_DIAG=2`. Image suffix `_test_timed_floor.uf2`;
+named copy `S2_v36_TIMED_FLOOR_40_60_100.uf2`.
+Mode 1 retains the lifted-wheel v35 sequence; normal builds are unchanged.
+
+| Stage | FOLLOW speed | Nominal command duration | Ideal distance (speed x time) |
+| --- | --- | --- | --- |
+| 1 | 40 mm/s | 5 s | 200 mm |
+| 2 | 60 mm/s | 5 s | 300 mm |
+| 3 | 100 mm/s | 5 s | 500 mm |
+
+This is a fixed-time test, NOT a MOVE-to-distance test. It calls the same
+public `subsystem2_follow(speed)` and `subsystem2_stop()` APIs used by S5,
+with zero steering refreshed during each run. Floor mode never applies
+raw PWM to drive/stop a successful run. Emergency failures retain direct
+braking plus E-stop. No PI gains, wheel geometry or turn targets change.
+S3/S5 motion producers are excluded: this verifies S2's command path,
+not the complete group's mission/barcode/obstacle integration.
+
+Clear at least 1 m of flat floor, support a slack USB cable so it does not
+pull, and keep GP20/power accessible. **No ultrasonic protection.**
+Use a battery/normal motor supply, not an assumption that USB powers motors.
+Keep the same floor/load/battery condition for comparisons.
+At each READY, mark the drive-wheel AXLE position beside a tape measure,
+align straight, then press/release GP20. Run starts on release.
+GP20 during motion aborts ALL stages. Reboot after abort/end.
+When stopped, mark the same axle reference and record forward displacement
+and sideways drift. Record it before starting the next stage; repositioning
+by hand is allowed between runs because each stage records a fresh baseline.
+Never use a rotating tyre mark as the car's positional reference.
+
+The timer ends the powered command window at the first sample at/after
+5 s (about 5.01 s with the observed 30 ms sample cadence).
+STOP is queued to the 20 ms motion loop; `TIMED RESULT` reports actual
+stop-request time, observed IDLE time, odometry at request and after a
+500 ms settling wait, plus separate final wheel distances.
+Timestamp/sample gap over 120 ms aborts explicitly.
+Timing includes command latency and startup; final tape/encoder distance
+includes braking/coast. Therefore 200/300/500 mm are ideal references,
+not guaranteed distances or a newly proven accuracy tolerance.
+Compare tape with `encoder_final_mm` to check odometry; compare tape with
+speed x time to check total motion behaviour. Repeat runs before recalibrating.
+
+Evidence: [dual-mode host tests](logs/2026-11-05_host_timed_floor.txt),
+[floor build](logs/2026-11-05_build_timed_floor.txt).
+28/28 dual-mode mock checks and 53/53 motion host checks pass; normal
+integrated build also passes after restoring user-approved deleted build
+dependencies unchanged from HEAD. No calibration or gains were edited.
+Physical floor measurements: pending.
+
+### Lifted-wheel motor diagnostic v35, 2026-11-05
+
+Supersedes v34: hardware log showed 20 ms sleeps returning about every
+30 ms. The accumulated ideal-schedule check falsely aborted at about
+330 ms. v35 uses actual timer elapsed time to end each stage at roughly
+2 s, and independently aborts on an individual sampling gap over 120 ms.
+Abort output now identifies button, E-stop, sleep, sampling or command
+failure explicitly. Zero ticks during the aborted 10% duty test are not
+evidence of a failed motor; the higher-duty tests never ran.
+
+[v35 host evidence](logs/2026-11-05_host_motor_diag_v35.txt): 12/12 scenarios
+pass, including the observed 30 ms cadence (67 samples, 2.01 s),
+100 ms cadence, closed-loop cadence and timer rollover.
+[v35 diagnostic build](logs/2026-11-05_build_motor_diag_v35.txt) and
+[normal build](logs/2026-11-05_build_normal_v35.txt) pass. Hardware retest pending.
+
+Build in WSL from `build_make`:
+`PICO_SDK_PATH=/home/arif/pico/pico-sdk make -j8 TEST=1 MOTOR_DIAG=1`.
+Output: `mtk3pico_smp1_usb_cdc_wifi_test_motor_diag.uf2`, also copied as
+`S2_v35_LIFTED_MOTOR_DIAG.uf2`. Normal/test/drive images remain separate.
+No wheel gains or motor calibration are changed.
+
+**Wheels must be securely lifted, tyres clear of hands/cables/table.
+No S3 steering, S5 mission or ultrasonic protection is active.**
+Open USB serial and save the complete log. After the motion-task timing
+check, every stage waits for a new GP20 press/release. GP20 during motion
+aborts the entire sequence and latches E-stop; reboot to restart.
+Each stage runs for approximately 2 s, brakes, then prints buffered 20 ms
+samples (normally about 30 ms apart on the observed kernel; use CSV
+timestamps). No serial input commands are required. No run begins automatically.
+
+Stages 1-10 alternate LEFT/RIGHT at fixed forward PWM:
+100, 150, 200, 300, 400 permille (10, 15, 20, 30, 40%).
+Each stage starts from rest rather than ramping a running motor.
+This brackets the observed starting duty among the tested values; it does
+not measure an exact minimum. Watch physical direction and record any
+noise, binding or rubbing: single-phase encoders cannot establish direction.
+Fixed-PWM target fields remain zero because PI is deliberately IDLE.
+Measured fixed-PWM duty fields are the commanded duty, not a sensor reading.
+
+Stages 11-16 run both wheels under the existing PI controller:
+10 mm/s twice, 40 twice, 250 twice. Reports include time to first tick,
+target/measured wheel speeds, duty and encoder counts. First-tick delay
+includes encoder phase, scheduling/queue latency and motor response; it
+must not be treated as a precise motor breakaway-time measurement.
+Odometry and status are separate snapshots, potentially one cycle apart.
+End or abort leaves motors E-stopped until reboot.
+
+Interpretation: repeatable fixed-PWM asymmetry suggests motor/load/wiring,
+but encoder feedback must still be checked. Matching fixed-PWM behaviour
+with differing PI transients suggests feedback/control sensitivity.
+Serial logs alone cannot conclusively isolate a physical fault; a later
+motor/driver swap or loaded test may be needed. Do not tune from one run.
+Record battery voltage manually if available; this firmware does not measure it.
+
+- [Host diagnostic tests](logs/2026-11-05_host_motor_diag.txt):
+  8/8 mock scenarios pass under ASan/UBSan: fixed PWM, closed loop,
+  GP20 abort, late task, FOLLOW failure, STOP failure, STOP timeout,
+  pre-existing E-stop. Verifies bounded runs and CSV only after braking.
+- [Firmware build](logs/2026-11-05_build_motor_diag.txt): build evidence.
+- Hardware results: **pending**, not yet flashed/tested by the assistant.
+
 ### Low-speed estimator regression, 2026-10-29 (host only)
 
 Evidence: [speed isolation run](logs/2026-10-29_host_speed_isolation.txt).

@@ -62,6 +62,10 @@ static char const * opener_txt(uint32_t src);
 ER
 task_barcode_start (void)
 {
+#if S2_MOTOR_DIAG
+    tm_printf((UB *) "S3 disabled for isolated motor diagnostic.\n");
+    return E_OK;
+#endif
     ID tid = app_start_task((FP) barcode_task, S3_PRI_BARCODE, TP_PRC2,
                             "s3_barcode_task");
 

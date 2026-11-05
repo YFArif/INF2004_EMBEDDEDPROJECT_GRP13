@@ -1,0 +1,8 @@
+DIAG HOST PASS scenario 0
+DIAG HOST PASS scenario 1
+DIAG HOST PASS scenario 2
+DIAG HOST PASS scenario 3
+DIAG HOST PASS scenario 4
+DIAG HOST PASS scenario 5
+DIAG HOST PASS scenario 6
+DIAG HOST PASS scenario 7

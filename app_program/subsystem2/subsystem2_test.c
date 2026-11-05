@@ -2,6 +2,9 @@
  *
  * @brief On-target tests for subsystem 2. Built only with: make TEST=1.
  *        Record every run in testing/subsystem2/TEST_LOG.md.
+ *        TEST=1 MOTOR_DIAG=1 selects the lifted-wheel diagnostic;
+ *        MOTOR_DIAG=2 selects five-second timed floor runs.
+ *        Every powered stage requires GP20.
  *
  * @par Automatic (motors stay braked; safe in every test build)
  * - S2-U08: the 1 MHz timer against the kernel clock.
@@ -30,6 +33,9 @@
 #include "drv_encoder.h"
 #include "drv_motor.h"
 #include "subsystem2.h"
+#if S2_MOTOR_DIAG
+#include "../subsystem5/drv_button.h"
+#endif
 
 #if APP_TEST
 
@@ -98,6 +104,9 @@ static bool     s2_u07_estop_latch(void);
 static bool     s2_u08_timer_rate(void);
 static bool     s2_u10_resources(void);
 static bool     s2_u13_steering(void);
+#if S2_MOTOR_DIAG
+static void     motor_diag(void);
+#endif
 
 #if S2_U01_BENCH
 static bool     s2_u01_wheel(drv_encoder_t wheel, char const * p_name);
@@ -119,6 +128,18 @@ subsystem2_test (void)
     TEST_INIT();
 
     host_wait();
+#if S2_MOTOR_DIAG
+    if (!motion_alive())
+    {
+        subsystem2_estop_set();
+        tm_printf((UB *) "DIAG refused: motion task timing check failed.\n");
+        for (;;)
+        {
+            tk_dly_tsk(1000u);
+        }
+    }
+    motor_diag();
+#endif
 
     // NOTE: The cast is safe: the core is 0, 1 or UINT32_MAX, printed as
     // 0, 1 or -1.
@@ -168,6 +189,464 @@ subsystem2_test (void)
 
     TEST_SUMMARY("subsystem2");
 }
+
+#if S2_MOTOR_DIAG
+#define DIAG_PERIOD_MS (20u)
+#if (S2_MOTOR_DIAG == 3)
+#define DIAG_SAMPLES (500u)
+#define DIAG_DURATION_US (40000000u)
+#elif (S2_MOTOR_DIAG == 2)
+#define DIAG_SAMPLES (250u)
+#define DIAG_DURATION_US (5000000u)
+#else
+#define DIAG_SAMPLES (100u)
+#define DIAG_DURATION_US (2000000u)
+#endif
+#define DIAG_MAX_GAP_US (120000u)
+
+typedef struct
+{
+    uint32_t us;
+    subsystem2_odom_t odom;
+    subsystem2_status_t status;
+} diag_sample_t;
+
+static diag_sample_t g_diag_samples[DIAG_SAMPLES];
+
+static bool
+diag_wait_start (void)
+{
+    uint32_t held_ms = 0u;
+
+    while (drv_button_is_down(DRV_BUTTON_START))
+    {
+        tk_dly_tsk(POLL_MS);
+    }
+#if (S2_MOTOR_DIAG >= 2)
+    tm_printf((UB *) "DIAG READY: FLOOR, clear 1 m ahead; mark axle START. "
+                     "Press/release GP20 to run. "
+                     "GP20 during motion ABORTS ALL tests. No ultrasonic guard.\n");
+#else
+    tm_printf((UB *) "DIAG READY: wheels LIFTED. Press/release GP20 to run. "
+                     "GP20 during motion ABORTS ALL tests. Power off if unsafe.\n");
+#endif
+    while (held_ms < 60u)
+    {
+        tk_dly_tsk(POLL_MS);
+        if (subsystem2_estop_is_set())
+        {
+            tm_printf((UB *) "DIAG E-stop latched: reboot required.\n");
+            return false;
+        }
+        held_ms = drv_button_is_down(DRV_BUTTON_START) ?
+                  held_ms + POLL_MS : 0u;
+    }
+    while (drv_button_is_down(DRV_BUTTON_START))
+    {
+        tk_dly_tsk(POLL_MS);
+    }
+    return !subsystem2_estop_is_set();
+}
+
+#if (S2_MOTOR_DIAG != 3)
+static bool
+diag_run (uint32_t stage, bool b_closed, drv_motor_t motor, uint16_t value)
+{
+    drv_encoder_count_t left = {0};
+    drv_encoder_count_t right = {0};
+    subsystem2_odom_t start_odom = {0};
+    subsystem2_odom_t stop_odom = {0};
+    subsystem2_odom_t final_odom = {0};
+    uint32_t start_us;
+    uint32_t stop_request_us;
+    uint32_t stopped_us;
+    uint32_t first_l_us = 0u;
+    uint32_t first_r_us = 0u;
+    uint32_t count_l;
+    uint32_t count_r;
+    uint32_t samples = 0u;
+    uint32_t elapsed_us = 0u;
+    uint32_t previous_us = 0u;
+    uint32_t idx;
+    bool b_ok = true;
+    char const * p_reason = "complete";
+    ER er = E_OK;
+
+    tm_printf((UB *) "\nDIAG STAGE %d mode=%s motor=%s value=%d %s duration_ms=%d\n",
+              (INT) stage, b_closed ? "PI" : "FIXED_PWM",
+              b_closed ? "BOTH" : ((DRV_MOTOR_LEFT == motor) ? "LEFT" : "RIGHT"),
+              (INT) value, b_closed ? "mm/s" : "permille",
+              (INT) (DIAG_DURATION_US / 1000u));
+#if (S2_MOTOR_DIAG == 2)
+    if (!b_closed)
+    {
+        tm_printf((UB *) "TIMED refused: floor mode requires closed-loop API.\n");
+        return false;
+    }
+#endif
+    if (!diag_wait_start())
+    {
+        return false;
+    }
+    if (!state_wait(S2_STATE_IDLE, STATE_WAIT_MS))
+    {
+        tm_printf((UB *) "DIAG refused: motion task not IDLE.\n");
+        return false;
+    }
+    drv_encoder_get(DRV_ENCODER_LEFT, &left);
+    drv_encoder_get(DRV_ENCODER_RIGHT, &right);
+    count_l = left.ticks;
+    count_r = right.ticks;
+    subsystem2_odom_get(&start_odom);
+    start_us = drv_encoder_now_us();
+    if (b_closed)
+    {
+        subsystem2_steer_set(0);
+        er = subsystem2_follow(value);
+    }
+    else
+    {
+        drv_motor_set(motor, value);
+    }
+    if (E_OK != er)
+    {
+        tm_printf((UB *) "DIAG FOLLOW failed er=%d\n", (INT) er);
+        p_reason = "FOLLOW command failed";
+        b_ok = false;
+    }
+    for (idx = 0u; (idx < DIAG_SAMPLES) && b_ok &&
+                   (elapsed_us < DIAG_DURATION_US); idx++)
+    {
+        diag_sample_t * p_sample = &g_diag_samples[idx];
+
+        er = tk_dly_tsk(DIAG_PERIOD_MS);
+        if (E_OK != er)
+        {
+            p_reason = "sample sleep failed";
+            b_ok = false;
+            break;
+        }
+        if (drv_button_is_down(DRV_BUTTON_START))
+        {
+            p_reason = "GP20 pressed during motion";
+            b_ok = false;
+            break;
+        }
+        if (subsystem2_estop_is_set())
+        {
+            p_reason = "E-stop latched";
+            b_ok = false;
+            break;
+        }
+        drv_encoder_get(DRV_ENCODER_LEFT, &left);
+        drv_encoder_get(DRV_ENCODER_RIGHT, &right);
+        if ((0u == first_l_us) && (left.ticks != count_l))
+        {
+            first_l_us = left.tick_time_us - start_us;
+        }
+        if ((0u == first_r_us) && (right.ticks != count_r))
+        {
+            first_r_us = right.tick_time_us - start_us;
+        }
+        p_sample->us = drv_encoder_now_us() - start_us;
+        subsystem2_odom_get(&p_sample->odom);
+        subsystem2_status_get(&p_sample->status);
+        elapsed_us = drv_encoder_now_us() - start_us;
+        if ((elapsed_us - previous_us) > DIAG_MAX_GAP_US)
+        {
+            p_reason = "sample gap exceeded 120 ms";
+            b_ok = false;
+            break;
+        }
+        previous_us = elapsed_us;
+        if (b_closed)
+        {
+            subsystem2_steer_set(0);
+        }
+        samples++;
+    }
+    if (b_ok && (elapsed_us < DIAG_DURATION_US))
+    {
+        p_reason = "sample buffer exhausted before duration";
+        b_ok = false;
+    }
+    stop_request_us = drv_encoder_now_us() - start_us;
+    subsystem2_odom_get(&stop_odom);
+#if (S2_MOTOR_DIAG != 2)
+    drv_motor_brake();
+#endif
+    er = subsystem2_stop();
+    if (E_OK != er)
+    {
+        p_reason = "STOP command failed";
+    }
+    if ((E_OK != er) || (!b_ok))
+    {
+        subsystem2_estop_set();
+        drv_motor_brake();
+        tm_printf((UB *) "DIAG ABORT: %s, elapsed_us=%d, stop er=%d. "
+                         "Reboot required.\n", p_reason,
+                  (INT) elapsed_us, (INT) er);
+        b_ok = false;
+    }
+    if (b_ok && !state_wait(S2_STATE_IDLE, STATE_WAIT_MS))
+    {
+        subsystem2_estop_set();
+        drv_motor_brake();
+        tm_printf((UB *) "DIAG STOP timeout; E-stop latched.\n");
+        b_ok = false;
+    }
+    stopped_us = drv_encoder_now_us() - start_us;
+    tk_dly_tsk(500u);
+    subsystem2_odom_get(&final_odom);
+#if (S2_MOTOR_DIAG == 2)
+    tm_printf((UB *) "TIMED RESULT stage=%d completed=%d speed_mms=%d "
+                     "nominal_ms=5000 nominal_mm=%d stop_request_ms=%d "
+                     "idle_ms=%d encoder_at_stop_mm=%d encoder_final_mm=%d "
+                     "left_mm=%d right_mm=%d\n",
+              (INT) stage, (INT) b_ok, (INT) value, (INT) (value * 5u),
+              (INT) (stop_request_us / 1000u), (INT) (stopped_us / 1000u),
+              (INT) (stop_odom.dist_mm - start_odom.dist_mm),
+              (INT) (final_odom.dist_mm - start_odom.dist_mm),
+              (INT) (final_odom.dist_l_mm - start_odom.dist_l_mm),
+              (INT) (final_odom.dist_r_mm - start_odom.dist_r_mm));
+    tm_printf((UB *) "TIMED MEASURE: mark same axle reference at REST; "
+                     "record tape distance and sideways drift BEFORE next GP20. "
+                     "Encoder values are not an independent tape measurement.\n");
+#else
+    (void) stop_request_us;
+    (void) stopped_us;
+#endif
+    tm_printf((UB *) "DIAG RESULT stage=%d completed=%d first_tick_us_L/R=%d/%d "
+                     "(0=none; includes encoder phase and command latency)\n",
+              (INT) stage, (INT) b_ok, (INT) first_l_us, (INT) first_r_us);
+    tm_printf((UB *) "DIAG CSV stage,us,targetL,targetR,speedL,speedR,"
+                     "dutyL,dutyR,ticksL,ticksR\n");
+    for (idx = 0u; idx < samples; idx++)
+    {
+        diag_sample_t const * p = &g_diag_samples[idx];
+
+        tm_printf((UB *) "D,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+                  (INT) stage, (INT) p->us,
+                  (INT) p->status.target_l_mms, (INT) p->status.target_r_mms,
+                  (INT) p->odom.speed_l_mms, (INT) p->odom.speed_r_mms,
+                  (INT) (b_closed ? p->status.duty_l :
+                         ((DRV_MOTOR_LEFT == motor) ? value : 0)),
+                  (INT) (b_closed ? p->status.duty_r :
+                         ((DRV_MOTOR_RIGHT == motor) ? value : 0)),
+                  (INT) (p->odom.count_l - count_l),
+                  (INT) (p->odom.count_r - count_r));
+    }
+    return b_ok;
+}
+#else
+static bool
+diag_move (uint32_t stage, int16_t distance, uint16_t speed)
+{
+    subsystem2_status_t before = {0};
+    subsystem2_odom_t start = {0};
+    subsystem2_odom_t end = {0};
+    uint32_t start_us;
+    uint32_t previous_us = 0u;
+    uint32_t elapsed_us = 0u;
+    uint32_t samples = 0u;
+    uint32_t idx;
+    bool b_done = false;
+    char const * p_reason = "MOVE did not complete within 40 s";
+    ER er;
+
+    tm_printf((UB *) "\nANNA MOVE stage=%d distance_mm=%d speed_mms=%d. "
+                     "Clear at least 600 mm in travel direction; "
+                     "measure before next GP20.\n",
+              (INT) stage, (INT) distance, (INT) speed);
+    if (!diag_wait_start())
+    {
+        return false;
+    }
+    if (!state_wait(S2_STATE_IDLE, STATE_WAIT_MS))
+    {
+        subsystem2_estop_set();
+        tm_printf((UB *) "MOVE refused: S2 not IDLE; E-stop latched.\n");
+        return false;
+    }
+    subsystem2_status_get(&before);
+    subsystem2_odom_get(&start);
+    start_us = drv_encoder_now_us();
+    er = subsystem2_move(distance, speed);
+    if (E_OK != er)
+    {
+        p_reason = "MOVE enqueue failed";
+    }
+    while ((E_OK == er) && (elapsed_us < DIAG_DURATION_US) &&
+           (samples < DIAG_SAMPLES))
+    {
+        diag_sample_t * p = &g_diag_samples[samples];
+
+        er = tk_dly_tsk(100u);
+        elapsed_us = drv_encoder_now_us() - start_us;
+        if (E_OK != er)
+        {
+            p_reason = "sample sleep failed";
+            break;
+        }
+        if (drv_button_is_down(DRV_BUTTON_START))
+        {
+            p_reason = "GP20 abort";
+            break;
+        }
+        if (subsystem2_estop_is_set())
+        {
+            p_reason = "S2 E-stop/stall";
+            break;
+        }
+        if ((elapsed_us - previous_us) > 250000u)
+        {
+            p_reason = "sample gap exceeded 250 ms";
+            break;
+        }
+        previous_us = elapsed_us;
+        p->us = elapsed_us;
+        subsystem2_odom_get(&p->odom);
+        subsystem2_status_get(&p->status);
+        samples++;
+        if (p->status.done_count != before.done_count)
+        {
+            b_done = (S2_STATE_IDLE == p->status.state);
+            p_reason = "completion reported outside IDLE";
+            break;
+        }
+    }
+    if (!b_done)
+    {
+        subsystem2_estop_set();
+        drv_motor_brake();
+        tm_printf((UB *) "MOVE ABORT stage=%d: %s er=%d elapsed_ms=%d; "
+                         "reboot required.\n", (INT) stage, p_reason,
+                  (INT) er, (INT) (elapsed_us / 1000u));
+    }
+    tk_dly_tsk(500u);
+    subsystem2_odom_get(&end);
+    tm_printf((UB *) "MOVE RESULT stage=%d completed=%d requested_mm=%d "
+                     "speed_mms=%d elapsed_ms=%d encoder_mm=%d "
+                     "left_mm=%d right_mm=%d heading_change_cdeg=%d\n",
+              (INT) stage, (INT) b_done, (INT) distance, (INT) speed,
+              (INT) (elapsed_us / 1000u), (INT) (end.dist_mm - start.dist_mm),
+              (INT) (end.dist_l_mm - start.dist_l_mm),
+              (INT) (end.dist_r_mm - start.dist_r_mm),
+              (INT) (((end.heading_cdeg - start.heading_cdeg + 54000) %
+                       36000) - 18000));
+    tm_printf((UB *) "MOVE CSV stage,us,targetL,targetR,speedL,speedR,"
+                     "dutyL,dutyR,relative_left_mm,relative_right_mm\n");
+    for (idx = 0u; idx < samples; idx++)
+    {
+        diag_sample_t const * p = &g_diag_samples[idx];
+
+        tm_printf((UB *) "M,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+                  (INT) stage, (INT) p->us,
+                  (INT) p->status.target_l_mms, (INT) p->status.target_r_mms,
+                  (INT) p->odom.speed_l_mms, (INT) p->odom.speed_r_mms,
+                  (INT) p->status.duty_l, (INT) p->status.duty_r,
+                  (INT) (p->odom.dist_l_mm - start.dist_l_mm),
+                  (INT) (p->odom.dist_r_mm - start.dist_r_mm));
+    }
+    tm_printf((UB *) "MOVE MEASURE: record signed tape displacement, "
+                     "sideways drift and final angle using SAME axle reference. "
+                     "Do not assume reverse returns exactly to the start.\n");
+    return b_done;
+}
+#endif
+
+static void
+motor_diag (void)
+{
+#if (S2_MOTOR_DIAG == 3)
+    uint16_t const speeds[] = {40u, 60u, 100u};
+    uint32_t idx;
+    uint32_t stage = 0u;
+    bool b_ok = true;
+
+    drv_button_init();
+    drv_motor_brake();
+    tm_printf((UB *) "\nANNA MOVE TEST v37: +400 mm at 40/60/100 mm/s, "
+                     "then -400 mm at 40/60/100 mm/s. "
+                     "Total forward travel 1200 mm; clear space accordingly. "
+                     "Each move requires GP20.\n"
+                     "Same subsystem2_move API as Anna; waits for done_count "
+                     "(S2 also signals EV_MOTION_DONE). No FOLLOW or IR steering.\n"
+                     "S3/S5 off; NO ultrasonic protection. Clear floor/cable "
+                     "both ways. GP20 while moving aborts ALL. "
+                     "No gains, geometry or turn calibration changed.\n");
+    for (idx = 0u; (idx < 3u) && b_ok; idx++)
+    {
+        b_ok = diag_move(++stage, 400, speeds[idx]);
+    }
+    for (idx = 0u; (idx < 3u) && b_ok; idx++)
+    {
+        b_ok = diag_move(++stage, -400, speeds[idx]);
+    }
+#elif (S2_MOTOR_DIAG == 2)
+    uint16_t const speeds[] = {40u, 60u, 100u};
+    uint32_t idx;
+    bool b_ok = true;
+
+    drv_button_init();
+    drv_motor_brake();
+    tm_printf((UB *) "\nTIMED FLOOR TEST v36: 40/60/100 mm/s, 5 s EACH; "
+                     "nominal distances 200/300/500 mm.\n"
+                     "Uses subsystem2_follow(speed), zero steering, then "
+                     "subsystem2_stop(): same public API as teammates.\n"
+                     "No gains/geometry changes. S3/S5 off, NO obstacle guard. "
+                     "Startup/braking cause differences from speed x time.\n"
+                     "Allow clear floor, stop access and slack USB cable. "
+                     "Each stage waits for GP20. GP20 while moving aborts ALL.\n");
+    for (idx = 0u; (idx < 3u) && b_ok; idx++)
+    {
+        b_ok = diag_run(idx + 1u, true, DRV_MOTOR_LEFT, speeds[idx]);
+    }
+#else
+    uint16_t const duties[] = {100u, 150u, 200u, 300u, 400u};
+    uint16_t const speeds[] = {10u, 40u, 250u};
+    uint32_t idx;
+    uint32_t side;
+    uint32_t trial;
+    uint32_t stage = 0u;
+    bool b_ok = true;
+
+    drv_button_init();
+    drv_motor_brake();
+    tm_printf((UB *) "\nMOTOR DIAGNOSTIC v35: WHEELS LIFTED ONLY. "
+                     "S3/S5 off; no ultrasonic guard. No gains changed.\n"
+                     "10 fixed-PWM stages, then 6 PI stages. "
+                     "Each requires GP20. Watch forward direction by eye.\n"
+                     "Fixed-PWM targets read zero: PI is intentionally idle.\n");
+    for (idx = 0u; (idx < 5u) && b_ok; idx++)
+    {
+        for (side = 0u; (side < 2u) && b_ok; side++)
+        {
+            b_ok = diag_run(++stage, false,
+                            (0u == side) ? DRV_MOTOR_LEFT : DRV_MOTOR_RIGHT,
+                            duties[idx]);
+        }
+    }
+    for (idx = 0u; (idx < 3u) && b_ok; idx++)
+    {
+        for (trial = 0u; (trial < 2u) && b_ok; trial++)
+        {
+            b_ok = diag_run(++stage, true, DRV_MOTOR_LEFT, speeds[idx]);
+        }
+    }
+#endif
+    subsystem2_estop_set();
+    drv_motor_brake();
+    tm_printf((UB *) "DIAG END completed=%d; motors locked until reboot. "
+                     "Save full serial log and note direction/noise/binding.\n",
+              (INT) b_ok);
+    for (;;)
+    {
+        tk_dly_tsk(1000u);
+    }
+}
+#endif
 
 /*!
  * @brief S2-U13: a fresh subsystem2_steer_set() value is what motion_task
