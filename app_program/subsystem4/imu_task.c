@@ -1044,6 +1044,11 @@ imu_class (subsystem2_odom_t const * p_odom)
     {
         cand = S4_CLASS_DESCENDING_HUMP;
     }
+    else if (s4_math_abs(g_imu.turn_cdps) > CLASS_TURN_CDPS)
+    {
+        // Before STATIONARY: a spin on the spot has ~0 forward speed.
+        cand = S4_CLASS_TURNING;
+    }
     else if (s4_math_abs(p_odom->speed_mms) < CLASS_STILL_MMS)
     {
         cand = S4_CLASS_STATIONARY;
@@ -1051,10 +1056,6 @@ imu_class (subsystem2_odom_t const * p_odom)
     else if (s4_math_abs(g_imu.afwd_mms2) > CLASS_ACCEL_MMS2)
     {
         cand = S4_CLASS_ACCELERATING;
-    }
-    else if (s4_math_abs(g_imu.turn_cdps) > CLASS_TURN_CDPS)
-    {
-        cand = S4_CLASS_TURNING;
     }
     else
     {
