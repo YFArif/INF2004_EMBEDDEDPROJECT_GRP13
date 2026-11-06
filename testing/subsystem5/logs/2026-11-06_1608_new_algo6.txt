@@ -1,0 +1,2435 @@
+
+
+microT-Kernel Version 3.00
+
+
+=== micro T-Kernel on Raspberry Pi Pico W (spec 0x6300, product 0x0003) ===
+dual-core (SMP) build, usermain on core 0
+encoder: GP16/GP17 edge interrupt on core 1
+motion_task: core 1, period 20 ms
+all subsystems started
+
+[S5] EVT 0x60 a=1 b=0
+wifi: cyw43_utk_task starting (proc 1)
+S3 RUN: barcode DOUT=GP7 AOUT=ADC2, Left IR=ADC0 (GP26), Centre=ADC1 (GP27), line sensors: single edge, GP27 on the LEFT edge, GP26 guard RIGHT
+wifi: cyw43_init() ...
+wifi: cyw43_init() returned, bringing interface up ...
+S3 TIME line step max 153 us, period -1-0 us, sampler isr max 54 us
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 192-192  GP26 2416-2416
+[S5] EVT 0x60 a=2 b=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 192-196  GP26 2416-2416
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 192-201  GP26 2416-2420
+S3 LINE  GP27=BLACK 1000  GP26=EDGE   333  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 192-203  GP26 2414-2420
+S3 LINE  GP27=WHITE    0  GP26=EDGE   666  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 192-203  GP26 2408-2420
+S3 LINE  GP27=BLACK 1000  GP26=EDGE   666  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 192-203  GP26 2408-2420
+S3 LINE  GP27=BLACK 1000  GP26=EDGE   733  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-203  GP26 2405-2420
+S3 LINE  GP27=EDGE   312  GP26=EDGE   750  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-203  GP26 2404-2420
+S3 LINE  GP27=EDGE   312  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-203  GP26 2402-2420
+S3 LINE  GP27=EDGE   312  GP26=BLACK  777  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-203  GP26 2402-2420
+S3 LINE  GP27=EDGE   312  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-203  GP26 2402-2420
+S3 LINE  GP27=EDGE   277  GP26=BLACK  777  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2402-2420
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  777  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2402-2420
+S3 LINE  GP27=EDGE   277  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2402-2420
+S3 LINE  GP27=EDGE   277  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2402-2420
+
+S4 IMU: LSM303DLHC on I2C0 SDA=GP4 SCL=GP5
+S4 terrain stored in 8 B (43 bits); unpacked 14 B
+S4 ACC CTRL1=0x77 CTRL4=0xa8 PASS; MAG id=48 34 33 PASS
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2402-2420
+S4 p=-79 r=-106 f=-12 l=-16 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=5 dxy=23 run=3090 late=6070 ok=1 cal=0
+S3 LINE  GP27=EDGE   277  GP26=WHITE   90  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2398-2420
+S4 p=-39 r=-106 f=-6 l=-16 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=22 run=2678 late=938 ok=1 cal=0
+S3 LINE  GP27=EDGE   277  GP26=BLACK  818  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2398-2420
+S4 p=-65 r=-79 f=-10 l=-12 u=870 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=31 run=2730 late=1045 ok=1 cal=0
+S3 LINE  GP27=EDGE   277  GP26=WHITE   90  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2398-2420
+S4 p=-79 r=-79 f=-12 l=-12 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=36 run=2677 late=934 ok=1 cal=0
+S3 LINE  GP27=EDGE   277  GP26=BLACK  818  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2398-2420
+S4 p=-52 r=-105 f=-8 l=-16 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=51 run=2662 late=951 ok=1 cal=0
+S3 LINE  GP27=EDGE   277  GP26=WHITE   90  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2398-2420
+S4 p=-66 r=-119 f=-10 l=-18 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=57 run=2673 late=1165 ok=1 cal=0
+S3 LINE  GP27=EDGE   277  GP26=BLACK  818  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2398-2420
+S4 p=-120 r=-120 f=-18 l=-18 u=856 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=66 run=2670 late=950 ok=1 cal=0
+S3 LINE  GP27=EDGE   277  GP26=EDGE   259  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2393-2420
+S4 CAL robot moved (spread 322 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 177 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 326 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 185 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 244 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-776 r=-783 f=-120 l=-120 u=872 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=1308 run=3126 late=934 ok=1 cal=0
+S3 LINE  GP27=BLACK 1000  GP26=EDGE   285  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2392-2420
+S4 CAL robot moved (spread 60 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 72 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-106 r=-119 f=-16 l=-18 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=232 run=3033 late=1230 ok=1 cal=0
+S3 LINE  GP27=EDGE   277  GP26=BLACK  857  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2392-2420
+S4 p=-26 r=-65 f=-4 l=-10 u=870 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=34 run=2657 late=937 ok=1 cal=0
+S3 TIME line step max 500 us, period 9522-10554 us, sampler isr max 44 us
+S3 LINE  GP27=EDGE   277  GP26=BLACK  857  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2392-2420
+S4 p=-53 r=-106 f=-8 l=-16 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=31 run=2683 late=1301 ok=1 cal=0
+S3 LINE  GP27=EDGE   277  GP26=BLACK  857  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2392-2420
+S4 CAL robot moved (spread 54 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-112 r=-125 f=-17 l=-19 u=867 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=9 dxy=145 run=2823 late=922 ok=1 cal=0
+[S5] BOOT obstacle_task up: boot_wait_ms servo_settle_ms 5000 400
+S3 LINE  GP27=BLACK 1000  GP26=EDGE   685  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-205  GP26 2392-2427
+[S5] EVT 0x60 a=1 b=2
+S3 RECALIBRATE: sweep both sensors over white and black
+S4 CAL robot moved (spread 138 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-91 r=-286 f=-16 l=-50 u=998 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=255 run=2899 late=1261 ok=1 cal=0
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 192-192  GP26 2416-2416
+S4 CAL robot moved (spread 139 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=59 r=0 f=9 l=0 u=868 af=80 h=0 pk=0 hs=0 cl=0 w=818 n=7 dxy=85 run=2792 late=1285 ok=1 cal=0
+S4 CAL robot moved (spread 54 mg, speed 10 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 192-198  GP26 2412-2431
+S4 CAL robot moved (spread 64 mg, speed -3 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 78 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 55 mg, speed 3 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 58 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=66 r=93 f=10 l=14 u=856 af=-30 h=0 pk=0 hs=0 cl=0 w=3682 n=8 dxy=246 run=2930 late=1760 ok=1 cal=0
+S4 CAL robot moved (spread 54 mg, speed -4 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   312  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-203  GP26 409-2445
+S4 CAL robot moved (spread 64 mg, speed -1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 57 mg, speed -3 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 56 mg, speed -1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-222 r=-166 f=-32 l=-24 u=824 af=20 h=0 pk=0 hs=0 cl=0 w=4092 n=8 dxy=123 run=2983 late=1614 ok=1 cal=0
+S3 LINE  GP27=EDGE   421  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-203  GP26 178-2445
+S4 CAL robot moved (spread 54 mg, speed 4 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-158 r=-105 f=-24 l=-16 u=866 af=-50 h=0 pk=0 hs=0 cl=0 w=3938 n=8 dxy=216 run=2934 late=1580 ok=1 cal=0
+S4 CAL robot moved (spread 46 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-203  GP26 178-2445
+S4 CAL robot moved (spread 57 mg, speed -2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 70 mg, speed -3 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 66 mg, speed -7 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-185 r=-265 f=-28 l=-40 u=864 af=-40 h=0 pk=0 hs=0 cl=0 w=3836 n=8 dxy=202 run=2983 late=1518 ok=1 cal=0
+S4 CAL robot moved (spread 42 mg, speed -3 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   421  GP26=WHITE    6  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-203  GP26 178-2445
+S4 CAL robot moved (spread 50 mg, speed -2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 52 mg, speed 1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=251 r=-79 f=38 l=-12 u=866 af=50 h=0 pk=0 hs=0 cl=0 w=3529 n=8 dxy=163 run=2925 late=1811 ok=1 cal=0
+S4 CAL robot moved (spread 98 mg, speed -1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   421  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-203  GP26 178-2445
+S4 CAL robot moved (spread 96 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 78 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 85 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 94 mg, speed 1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-374 r=-107 f=-56 l=-16 u=856 af=0 h=0 pk=0 hs=0 cl=0 w=3273 n=8 dxy=214 run=2970 late=1643 ok=1 cal=0
+S3 LINE  GP27=EDGE   421  GP26=WHITE    6  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-203  GP26 178-2445
+S4 CAL robot moved (spread 56 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-131 r=-65 f=-20 l=-10 u=868 af=80 h=0 pk=0 hs=0 cl=0 w=818 n=8 dxy=328 run=2912 late=1301 ok=1 cal=0
+S3 LINE  GP27=EDGE   450  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 183-203  GP26 178-2445
+S4 CAL robot moved (spread 43 mg, speed -5 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-218 r=-125 f=-33 l=-19 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=-1636 n=9 dxy=65 run=3174 late=935 ok=1 cal=0
+S3 LINE  GP27=WHITE    0  GP26=WHITE    6  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 181-203  GP26 178-2445
+S4 CAL robot moved (spread 78 mg, speed -8 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed -15 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed -15 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 151 mg, speed -4 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=26 r=-73 f=4 l=-11 u=859 af=150 h=0 pk=0 hs=0 cl=0 w=-3171 n=7 dxy=465 run=2963 late=1278 ok=1 cal=0
+S3 LINE  GP27=EDGE   500  GP26=WHITE    6  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 181-203  GP26 178-2445
+S4 p=-118 r=-183 f=-18 l=-28 u=872 af=20 h=0 pk=0 hs=0 cl=0 w=-3938 n=8 dxy=101 run=2562 late=1226 ok=1 cal=0
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    6  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 181-203  GP26 178-2445
+S4 CAL robot moved (spread 48 mg, speed 1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 72 mg, speed 5 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 53 mg, speed 2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-103 r=-149 f=-16 l=-23 u=883 af=-10 h=0 pk=0 hs=0 cl=0 w=-4040 n=9 dxy=128 run=2922 late=1241 ok=1 cal=0
+S4 CAL robot moved (spread 45 mg, speed 1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 181-203  GP26 178-2445
+S4 CAL robot moved (spread 50 mg, speed 4 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 48 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 47 mg, speed -1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-190 r=-210 f=-29 l=-32 u=870 af=-40 h=0 pk=0 hs=0 cl=0 w=-4399 n=7 dxy=152 run=2935 late=1617 ok=1 cal=0
+S3 LINE  GP27=EDGE   500  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 181-203  GP26 178-2445
+S4 CAL robot moved (spread 48 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 44 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 74 mg, speed 1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 93 mg, speed 2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=12 r=-205 f=2 l=-32 u=893 af=10 h=0 pk=0 hs=0 cl=0 w=-3887 n=7 dxy=186 run=2927 late=1342 ok=1 cal=0
+S3 LINE  GP27=EDGE   500  GP26=WHITE    6  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 181-203  GP26 178-2445
+S4 CAL robot moved (spread 56 mg, speed -1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 48 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-109 r=-137 f=-16 l=-20 u=834 af=-10 h=0 pk=0 hs=0 cl=0 w=-4092 n=7 dxy=228 run=2939 late=1367 ok=1 cal=0
+S4 CAL robot moved (spread 51 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK 1000  GP26=WHITE   62  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 181-423  GP26 178-2445
+S4 CAL robot moved (spread 68 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 68 mg, speed 1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-26 r=-158 f=-4 l=-24 u=868 af=10 h=0 pk=0 hs=0 cl=0 w=-3989 n=8 dxy=537 run=3100 late=1588 ok=1 cal=0
+S3 LINE  GP27=WHITE    5  GP26=WHITE    6  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-2032  GP26 178-2445
+S4 CAL robot moved (spread 80 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-132 r=-172 f=-20 l=-26 u=864 af=-10 h=0 pk=0 hs=0 cl=0 w=-4092 n=8 dxy=225 run=2858 late=1172 ok=1 cal=0
+S3 LINE  GP27=WHITE    5  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-2032  GP26 178-2445
+S4 CAL robot moved (spread 60 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 60 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-25 r=-297 f=-4 l=-46 u=884 af=0 h=0 pk=0 hs=0 cl=0 w=-3938 n=8 dxy=155 run=2967 late=1165 ok=1 cal=0
+S4 CAL robot moved (spread 42 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-2032  GP26 178-2445
+S4 CAL robot moved (spread 54 mg, speed 2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=25 r=-204 f=4 l=-32 u=898 af=20 h=0 pk=0 hs=0 cl=0 w=-2966 n=8 dxy=114 run=2972 late=1593 ok=1 cal=0
+S3 LINE  GP27=WHITE    6  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-2032  GP26 174-2444
+S4 CAL robot moved (spread 44 mg, speed 1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-197 r=-105 f=-30 l=-16 u=868 af=-10 h=0 pk=0 hs=0 cl=0 w=-2966 n=8 dxy=103 run=2724 late=989 ok=1 cal=0
+S3 LINE  GP27=WHITE    5  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-2032  GP26 174-2444
+S4 CAL robot moved (spread 48 mg, speed -1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 46 mg, speed 3 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=0 r=-135 f=0 l=-20 u=848 af=10 h=0 pk=0 hs=0 cl=0 w=-3478 n=8 dxy=140 run=2966 late=1175 ok=1 cal=0
+S4 CAL robot moved (spread 46 mg, speed -1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE   14  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-2032  GP26 174-2444
+S4 CAL robot moved (spread 74 mg, speed 10 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 41 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-79 r=-66 f=-12 l=-10 u=865 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=9 dxy=159 run=3097 late=1511 ok=1 cal=0
+S3 TIME line step max 293 us, period 9429-10458 us, sampler isr max 50 us
+S3 LINE  GP27=WHITE   14  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-2032  GP26 174-2444
+S4 CAL robot moved (spread 54 mg, speed -1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 48 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-6 r=-105 f=-1 l=-16 u=869 af=10 h=0 pk=0 hs=0 cl=0 w=716 n=9 dxy=256 run=2969 late=1369 ok=1 cal=0
+S4 CAL robot moved (spread 106 mg, speed 3 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE    5  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-2032  GP26 174-2444
+S4 CAL robot moved (spread 79 mg, speed -2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 76 mg, speed 9 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 15 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 159 mg, speed 2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-1071 r=-421 f=-157 l=-61 u=827 af=0 h=0 pk=0 hs=0 cl=0 w=2199 n=7 dxy=487 run=2963 late=1695 ok=1 cal=0
+S3 LINE  GP27=WHITE    5  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-2032  GP26 174-2444
+S4 CAL robot moved (spread 123 mg, speed 2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 42 mg, speed 1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 59 mg, speed -3 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-25 r=-392 f=-4 l=-61 u=889 af=-80 h=0 pk=0 hs=0 cl=0 w=3887 n=7 dxy=250 run=2901 late=1378 ok=1 cal=0
+S3 LINE  GP27=WHITE    5  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2032  GP26 176-2444
+S4 CAL robot moved (spread 50 mg, speed -2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 88 mg, speed -2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 100 mg, speed -1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 54 mg, speed -2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-40 r=-121 f=-6 l=-18 u=850 af=0 h=0 pk=0 hs=0 cl=0 w=4194 n=8 dxy=288 run=2960 late=1403 ok=1 cal=0
+S4 CAL robot moved (spread 52 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE    5  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2032  GP26 176-2444
+S4 CAL robot moved (spread 118 mg, speed -1 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 47 mg, speed -2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 62 mg, speed -2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-115 r=-141 f=-18 l=-22 u=890 af=0 h=0 pk=0 hs=0 cl=0 w=3887 n=8 dxy=250 run=2980 late=1593 ok=1 cal=0
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2032  GP26 176-2444
+S4 CAL robot moved (spread 48 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 61 mg, speed -3 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 44 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=144 r=-105 f=22 l=-16 u=872 af=0 h=0 pk=0 hs=0 cl=0 w=4040 n=8 dxy=146 run=2976 late=1170 ok=1 cal=0
+S3 LINE  GP27=WHITE   14  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2032  GP26 176-2444
+S4 CAL robot moved (spread 100 mg, speed 3 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 42 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 46 mg, speed 2 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-135 r=-149 f=-20 l=-22 u=842 af=-20 h=0 pk=0 hs=0 cl=0 w=3989 n=8 dxy=583 run=2929 late=1517 ok=1 cal=0
+[S5] CAL line sensors calibrated: YES, ready for Button 1 0 0
+[S5] EVT 0x60 a=2 b=1
+S3 LINE  GP27=WHITE   60  GP26=EDGE   458  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2192  GP26 176-2444
+S4 CAL robot moved (spread 50 mg, speed -4 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=0 r=-117 f=0 l=-18 u=876 af=10 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=160 run=2871 late=1657 ok=1 cal=0
+S3 LINE  GP27=WHITE   12  GP26=BLACK  935  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2192  GP26 177-2417
+S4 p=-26 r=-80 f=-4 l=-12 u=854 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2666 late=826 ok=1 cal=0
+S3 LINE  GP27=WHITE   28  GP26=BLACK  935  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2192  GP26 177-2417
+S4 p=-53 r=-93 f=-8 l=-14 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=49 run=2727 late=967 ok=1 cal=0
+S3 LINE  GP27=WHITE   20  GP26=BLACK  935  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2192  GP26 177-2417
+S4 p=-13 r=-106 f=-2 l=-16 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=49 run=2655 late=971 ok=1 cal=0
+S3 LINE  GP27=WHITE   28  GP26=BLACK  942  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2192  GP26 177-2417
+S4 CAL robot moved (spread 65 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 52 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-13 r=-119 f=-2 l=-18 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=126 run=2880 late=953 ok=1 cal=0
+S3 LINE  GP27=WHITE   28  GP26=BLACK  949  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2192  GP26 177-2417
+S4 p=-13 r=-87 f=-2 l=-13 u=854 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=29 run=2656 late=985 ok=1 cal=0
+S3 LINE  GP27=WHITE   17  GP26=BLACK  956  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2192  GP26 177-2401
+S4 p=-26 r=-72 f=-4 l=-11 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=24 run=2642 late=933 ok=1 cal=0
+S3 LINE  GP27=WHITE   17  GP26=BLACK  956  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 137 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-26 r=-133 f=-4 l=-20 u=856 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=66 run=2735 late=932 ok=1 cal=0
+S3 LINE  GP27=WHITE   25  GP26=BLACK  941  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2192  GP26 177-2401
+[S5] EVT 0x60 a=3 b=2
+S3 TUNE kp=25 kd=25 (x100)
+S3 TUNE curve boost=250 (x100)
+S4 CAL robot moved (spread 246 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] STATE from to 0 1
+S4 CAL robot moved (spread 17 mg, speed 11 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 19 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 15 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 168 mg, speed 8 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-392 r=-230 f=-58 l=-34 u=844 af=-30 h=0 pk=0 hs=0 cl=0 w=-460 n=8 dxy=243 run=3056 late=2099 ok=1 cal=0
+S3 LINE  GP27=WHITE   97  GP26=EDGE   294  -> turn RIGHT      38 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 124 mg, speed 8 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 17 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 20 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 21 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-158 r=-198 f=-24 l=-30 u=864 af=150 h=0 pk=0 hs=0 cl=0 w=204 n=8 dxy=181 run=2920 late=1456 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CLASS MOVING t=13537 ms
+[S5] PING servo= 90 deg  range=  -- mm  echo=59461 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   624  GP26=WHITE   35  -> turn LEFT        3 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-133 r=-266 f=-20 l=-40 u=858 af=-10 h=0 pk=0 hs=0 cl=1 w=358 n=8 dxy=96 run=3169 late=1860 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   528  GP26=WHITE   35  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=0 r=-118 f=0 l=-18 u=868 af=-10 h=0 pk=0 hs=0 cl=1 w=0 n=7 dxy=110 run=3040 late=1786 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   512  GP26=WHITE   42  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-239 r=-133 f=-36 l=-20 u=859 af=30 h=0 pk=0 hs=0 cl=1 w=-255 n=7 dxy=121 run=3055 late=1676 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   489  GP26=WHITE   35  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59465 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=118 r=-144 f=18 l=-22 u=870 af=-20 h=0 pk=0 hs=0 cl=1 w=0 n=7 dxy=101 run=3146 late=1682 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   337  GP26=WHITE   49  -> turn RIGHT       4 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 44 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-65 r=-210 f=-10 l=-32 u=872 af=-40 h=0 pk=0 hs=0 cl=1 w=102 n=8 dxy=115 run=3283 late=1820 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE  249  GP26=WHITE   49  -> turn RIGHT       5 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59465 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-254 r=-80 f=-38 l=-12 u=854 af=10 h=0 pk=0 hs=0 cl=1 w=-255 n=8 dxy=160 run=3072 late=1761 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   361  GP26=WHITE   35  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-26 r=-133 f=-4 l=-20 u=860 af=10 h=0 pk=0 hs=0 cl=1 w=-102 n=8 dxy=85 run=3083 late=1421 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   497  GP26=WHITE   57  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=133 r=-133 f=20 l=-20 u=858 af=-10 h=0 pk=0 hs=0 cl=1 w=358 n=8 dxy=132 run=3085 late=1648 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 TIME line step max 423 us, period 9003-10888 us, sampler isr max 44 us
+S3 LINE  GP27=EDGE   568  GP26=WHITE   49  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59463 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-389 r=-134 f=-58 l=-20 u=852 af=-20 h=0 pk=0 hs=0 cl=1 w=306 n=8 dxy=104 run=3210 late=1740 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   600  GP26=WHITE   42  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-118 r=-144 f=-18 l=-22 u=870 af=20 h=0 pk=0 hs=0 cl=1 w=306 n=8 dxy=150 run=3082 late=1647 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   528  GP26=WHITE   49  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59465 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-158 r=-92 f=-24 l=-14 u=868 af=-30 h=0 pk=0 hs=0 cl=1 w=562 n=8 dxy=138 run=3075 late=1616 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   489  GP26=WHITE   64  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-79 r=-132 f=-12 l=-20 u=866 af=20 h=0 pk=0 hs=0 cl=1 w=-102 n=8 dxy=145 run=3066 late=1624 ok=1 cal=0
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   680  GP26=WHITE   42  -> turn LEFT        6 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 45 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-120 r=-133 f=-18 l=-20 u=858 af=50 h=0 pk=0 hs=0 cl=1 w=-51 n=8 dxy=439 run=3082 late=2128 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   688  GP26=WHITE   28  -> turn LEFT        9 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=105 r=-119 f=16 l=-18 u=866 af=-20 h=0 pk=0 hs=0 cl=1 w=358 n=7 dxy=149 run=3059 late=1724 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   457  GP26=WHITE   49  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 44 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-92 r=-198 f=-14 l=-30 u=864 af=0 h=0 pk=0 hs=0 cl=1 w=204 n=8 dxy=92 run=3041 late=1650 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   608  GP26=WHITE   35  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59467 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-198 r=-46 f=-30 l=-7 u=865 af=10 h=0 pk=0 hs=0 cl=1 w=-51 n=9 dxy=149 run=3126 late=1705 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   473  GP26=WHITE   42  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 TIME barcode decode 852 us (both paths)
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-120 r=-26 f=-18 l=-4 u=858 af=0 h=0 pk=0 hs=0 cl=1 w=102 n=8 dxy=83 run=3049 late=1646 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59467 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   672  GP26=WHITE   35  -> turn LEFT        6 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=26 r=-159 f=4 l=-24 u=862 af=20 h=0 pk=0 hs=0 cl=1 w=255 n=8 dxy=140 run=3233 late=1811 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   520  GP26=WHITE   42  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 TIME barcode decode 910 us (both paths)
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59467 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-186 r=-80 f=-28 l=-12 u=858 af=20 h=0 pk=0 hs=0 cl=1 w=-204 n=8 dxy=101 run=3070 late=1451 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   393  GP26=WHITE   35  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-185 r=-79 f=-28 l=-12 u=866 af=-10 h=0 pk=0 hs=0 cl=1 w=409 n=8 dxy=108 run=3050 late=1658 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   616  GP26=WHITE   28  -> turn LEFT        3 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59469 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-120 r=13 f=-18 l=2 u=858 af=-40 h=0 pk=0 hs=0 cl=1 w=767 n=8 dxy=111 run=3076 late=1828 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   369  GP26=WHITE   42  -> turn LEFT        3 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-133 r=-146 f=-20 l=-22 u=858 af=40 h=0 pk=0 hs=0 cl=1 w=1892 n=8 dxy=134 run=3068 late=1508 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE   33  GP26=EDGE   675  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59461 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 44 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 46 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=225 r=66 f=34 l=10 u=862 af=130 h=0 pk=0 hs=0 cl=1 w=0 n=8 dxy=140 run=3087 late=1788 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 50 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   672  GP26=WHITE   21  -> turn LEFT        4 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 51 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 50 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 51 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 46 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 46 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 44 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 44 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-158 r=-172 f=-24 l=-26 u=864 af=-30 h=0 pk=0 hs=0 cl=1 w=306 n=8 dxy=119 run=2960 late=1830 ok=1 cal=0
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE  161  GP26=WHITE  200  -> turn RIGHT      24 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-39 r=-105 f=-6 l=-16 u=868 af=0 h=0 pk=0 hs=0 cl=1 w=0 n=7 dxy=75 run=3256 late=1737 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   369  GP26=WHITE   42  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59461 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-192 r=-59 f=-29 l=-9 u=861 af=30 h=0 pk=0 hs=0 cl=1 w=306 n=7 dxy=126 run=3085 late=1612 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   369  GP26=WHITE   49  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-198 r=-119 f=-30 l=-18 u=864 af=10 h=0 pk=0 hs=0 cl=1 w=-51 n=8 dxy=101 run=3084 late=1774 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 44 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   305  GP26=WHITE   71  -> turn RIGHT       3 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-40 r=-147 f=-6 l=-22 u=856 af=10 h=0 pk=0 hs=0 cl=1 w=-102 n=8 dxy=100 run=3050 late=1517 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   297  GP26=WHITE   49  -> turn RIGHT       3 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-214 r=-26 f=-32 l=-4 u=854 af=20 h=0 pk=0 hs=0 cl=1 w=-102 n=8 dxy=132 run=2920 late=1807 ok=1 cal=0
+[S5] PING servo= 90 deg  range=  -- mm  echo=59466 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   504  GP26=WHITE   35  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-159 r=-173 f=-24 l=-26 u=860 af=-40 h=0 pk=0 hs=0 cl=1 w=306 n=8 dxy=121 run=3079 late=2133 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   544  GP26=WHITE   35  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59466 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=0 r=-52 f=0 l=-8 u=870 af=10 h=0 pk=0 hs=0 cl=1 w=102 n=8 dxy=115 run=3078 late=1596 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   377  GP26=WHITE   42  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-147 r=-200 f=-22 l=-30 u=856 af=20 h=0 pk=0 hs=0 cl=1 w=102 n=8 dxy=88 run=3092 late=1640 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   465  GP26=WHITE   42  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-107 r=-94 f=-16 l=-14 u=852 af=-50 h=0 pk=0 hs=0 cl=1 w=-255 n=8 dxy=128 run=3087 late=1582 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 TIME line step max 314 us, period 9616-10319 us, sampler isr max 44 us
+S3 LINE  GP27=EDGE   568  GP26=WHITE   35  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-158 r=-118 f=-24 l=-18 u=868 af=10 h=0 pk=0 hs=0 cl=1 w=51 n=8 dxy=81 run=3117 late=1614 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   536  GP26=WHITE   35  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59466 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=13 r=-66 f=2 l=-10 u=864 af=-40 h=0 pk=0 hs=0 cl=1 w=51 n=8 dxy=97 run=3082 late=1640 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   584  GP26=WHITE   35  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-184 r=-145 f=-28 l=-22 u=868 af=-30 h=0 pk=0 hs=0 cl=1 w=-51 n=8 dxy=113 run=3081 late=1606 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59463 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   497  GP26=WHITE   42  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-106 r=-60 f=-16 l=-9 u=859 af=20 h=0 pk=0 hs=0 cl=1 w=0 n=7 dxy=141 run=3208 late=1708 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   497  GP26=WHITE   42  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59463 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-13 r=-92 f=-2 l=-14 u=864 af=-10 h=0 pk=0 hs=0 cl=1 w=-51 n=8 dxy=100 run=3120 late=1619 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   369  GP26=WHITE   42  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-26 r=-253 f=-4 l=-38 u=857 af=-20 h=0 pk=0 hs=0 cl=1 w=153 n=7 dxy=114 run=3083 late=1641 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   297  GP26=WHITE   28  -> turn RIGHT       4 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-40 r=-66 f=-6 l=-10 u=856 af=10 h=0 pk=0 hs=0 cl=1 w=-102 n=8 dxy=79 run=3097 late=1640 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   672  GP26=WHITE   21  -> turn LEFT        4 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-262 r=-52 f=-40 l=-8 u=872 af=40 h=0 pk=0 hs=0 cl=1 w=-153 n=8 dxy=140 run=3072 late=1679 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   361  GP26=WHITE  186  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=160 r=-173 f=24 l=-26 u=856 af=20 h=0 pk=0 hs=0 cl=1 w=204 n=8 dxy=139 run=3072 late=1576 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   441  GP26=WHITE  129  -> turn RIGHT       1 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-26 r=-26 f=-4 l=-4 u=860 af=10 h=0 pk=0 hs=0 cl=1 w=102 n=8 dxy=207 run=2902 late=1576 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59463 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   329  GP26=WHITE  215  -> turn RIGHT       4 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 45 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-295 r=-107 f=-44 l=-16 u=852 af=-20 h=0 pk=0 hs=0 cl=1 w=-51 n=8 dxy=325 run=3178 late=1995 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   632  GP26=WHITE   42  -> turn LEFT        4 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59467 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-46 r=-152 f=-7 l=-23 u=862 af=-30 h=0 pk=0 hs=0 cl=1 w=0 n=9 dxy=96 run=3308 late=1748 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   552  GP26=WHITE   57  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=66 r=-39 f=10 l=-6 u=862 af=-20 h=0 pk=0 hs=0 cl=1 w=-51 n=8 dxy=126 run=3072 late=1536 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   616  GP26=WHITE   42  -> turn LEFT        3 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 44 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-13 r=-159 f=-2 l=-24 u=864 af=-20 h=0 pk=0 hs=0 cl=1 w=102 n=8 dxy=367 run=3061 late=1942 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   544  GP26=WHITE   49  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=26 r=-39 f=4 l=-6 u=862 af=-30 h=0 pk=0 hs=0 cl=1 w=-51 n=8 dxy=65 run=3066 late=1649 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   616  GP26=WHITE   42  -> turn LEFT        3 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59468 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=72 r=-59 f=11 l=-9 u=864 af=-30 h=0 pk=0 hs=0 cl=1 w=255 n=7 dxy=94 run=3134 late=1417 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   504  GP26=WHITE   49  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=106 r=-133 f=16 l=-20 u=857 af=10 h=0 pk=0 hs=0 cl=1 w=-51 n=7 dxy=114 run=3057 late=1845 ok=1 cal=0
+[S5] PING servo= 90 deg  range=  -- mm  echo=59468 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   497  GP26=WHITE   64  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-227 r=-274 f=-34 l=-41 u=854 af=-30 h=0 pk=0 hs=0 cl=1 w=153 n=7 dxy=95 run=3350 late=1981 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   512  GP26=WHITE   42  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59471 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=72 r=-13 f=11 l=-2 u=866 af=30 h=0 pk=0 hs=0 cl=1 w=-204 n=7 dxy=149 run=3097 late=1592 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   672  GP26=WHITE   28  -> turn LEFT        5 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-66 r=-320 f=-10 l=-48 u=858 af=0 h=0 pk=0 hs=0 cl=1 w=460 n=8 dxy=99 run=3214 late=1801 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE  201  GP26=EDGE   301  -> turn RIGHT      17 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59468 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-52 r=-157 f=-8 l=-24 u=870 af=-20 h=0 pk=0 hs=0 cl=1 w=716 n=8 dxy=174 run=3059 late=1641 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   640  GP26=WHITE   35  -> turn LEFT       21 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-66 r=-160 f=-10 l=-24 u=858 af=0 h=0 pk=0 hs=0 cl=1 w=613 n=8 dxy=128 run=2903 late=1519 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  824  GP26=WHITE   28  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=158 r=-26 f=24 l=-4 u=868 af=40 h=0 pk=0 hs=0 cl=1 w=51 n=8 dxy=130 run=3073 late=1741 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  792  GP26=WHITE   35  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-93 r=-80 f=-14 l=-12 u=854 af=20 h=0 pk=0 hs=0 cl=1 w=-102 n=8 dxy=156 run=3134 late=1622 ok=1 cal=0
+[S5] PING servo= 90 deg  range=  -- mm  echo=59468 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  968  GP26=WHITE   28  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 22 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 20 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 20 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-364 r=39 f=-56 l=6 u=878 af=120 h=0 pk=0 hs=0 cl=1 w=-1227 n=8 dxy=534 run=3128 late=1817 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 TIME line step max 332 us, period 9607-10304 us, sampler isr max 52 us
+S3 LINE  GP27=BLACK  784  GP26=WHITE  236  -> turn LEFT       28 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59460 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=369 r=26 f=56 l=4 u=868 af=0 h=0 pk=0 hs=0 cl=1 w=1125 n=8 dxy=519 run=3162 late=2022 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   568  GP26=EDGE   647  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2192  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-212 r=-173 f=-32 l=-26 u=860 af=-70 h=0 pk=0 hs=0 cl=1 w=1790 n=8 dxy=314 run=3062 late=1606 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  910  GP26=EDGE   431  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2231  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59475 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-251 r=-305 f=-38 l=-46 u=862 af=-20 h=0 pk=0 hs=0 cl=1 w=1329 n=8 dxy=472 run=3065 late=1769 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  986  GP26=WHITE   85  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-39 r=-79 f=-6 l=-12 u=868 af=60 h=0 pk=0 hs=0 cl=1 w=716 n=8 dxy=291 run=3026 late=1783 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  986  GP26=WHITE   64  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59471 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-26 r=-73 f=-4 l=-11 u=861 af=50 h=0 pk=0 hs=0 cl=1 w=460 n=7 dxy=466 run=3054 late=1623 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK 1000  GP26=WHITE   57  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59470 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=105 r=-276 f=16 l=-42 u=868 af=30 h=0 pk=0 hs=0 cl=1 w=1023 n=8 dxy=421 run=3081 late=1482 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  985  GP26=WHITE  229  -> turn LEFT       34 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2384  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=156 r=0 f=24 l=0 u=880 af=-50 h=0 pk=0 hs=0 cl=1 w=2148 n=8 dxy=273 run=3131 late=1729 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  954  GP26=EDGE   553  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2404  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59469 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-120 r=-120 f=-18 l=-18 u=856 af=-80 h=0 pk=0 hs=0 cl=1 w=1585 n=8 dxy=509 run=3072 late=1598 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  990  GP26=WHITE   35  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2453  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=147 r=-44 f=20 l=-6 u=774 af=-10 h=0 pk=0 hs=0 cl=1 w=1892 n=8 dxy=735 run=3272 late=1501 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  962  GP26=WHITE   78  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2453  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59465 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-425 r=-79 f=-64 l=-12 u=860 af=60 h=0 pk=0 hs=0 cl=1 w=1534 n=8 dxy=788 run=3065 late=1835 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  962  GP26=WHITE   35  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2453  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 26 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-456 r=110 f=-66 l=16 u=826 af=-100 h=0 pk=0 hs=0 cl=1 w=2250 n=8 dxy=692 run=3099 late=1701 ok=1 cal=0
+[S5] PING servo= 90 deg  range=  -- mm  echo=59463 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK 1000  GP26=EDGE   438  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2457  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-36 r=-372 f=-6 l=-62 u=952 af=-40 h=0 pk=0 hs=0 cl=1 w=2455 n=8 dxy=718 run=3063 late=1829 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  992  GP26=WHITE   28  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59467 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=119 r=-399 f=18 l=-60 u=858 af=100 h=0 pk=0 hs=0 cl=1 w=716 n=8 dxy=496 run=3142 late=1810 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   726  GP26=WHITE   57  -> turn LEFT       21 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=38 r=-76 f=6 l=-12 u=894 af=-10 h=0 pk=0 hs=0 cl=1 w=1381 n=8 dxy=710 run=2982 late=1831 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  899  GP26=WHITE    6  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59469 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 26 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=265 r=79 f=40 l=12 u=862 af=40 h=0 pk=0 hs=0 cl=1 w=1534 n=9 dxy=704 run=3124 late=1602 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  879  GP26=WHITE   21  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 26 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 26 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=445 r=-135 f=66 l=-20 u=846 af=-10 h=0 pk=0 hs=0 cl=1 w=1688 n=8 dxy=636 run=3101 late=1722 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59467 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=BLACK  925  GP26=WHITE   28  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 26 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-254 r=-241 f=-38 l=-36 u=854 af=30 h=0 pk=0 hs=0 cl=1 w=2659 n=8 dxy=1022 run=3104 late=1873 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 26 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  852  GP26=BLACK  812  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59469 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-26 r=-377 f=-4 l=-57 u=864 af=-10 h=0 pk=0 hs=0 cl=1 w=2301 n=7 dxy=329 run=3061 late=1758 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=BLACK  812  GP26=WHITE   13  -> turn LEFT       40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-53 r=-292 f=-8 l=-44 u=860 af=10 h=0 pk=0 hs=0 cl=1 w=1943 n=8 dxy=152 run=3071 late=1790 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   619  GP26=WHITE    6  -> turn LEFT       22 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=1288 mm  echo= 7508 us
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-13 r=-79 f=-2 l=-12 u=864 af=-70 h=0 pk=0 hs=0 cl=1 w=-920 n=8 dxy=148 run=3194 late=1983 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE    8  GP26=WHITE    0  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 22 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 22 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=61 r=-109 f=9 l=-16 u=836 af=-30 h=0 pk=0 hs=0 cl=1 w=-1994 n=7 dxy=248 run=3079 late=1508 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 20 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=1275 mm  echo= 7433 us
+S3 LINE  GP27=WHITE    1  GP26=WHITE    0  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 18 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 16 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 19 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 19 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 22 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 20 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=0 r=-173 f=0 l=-27 u=891 af=-110 h=0 pk=0 hs=0 cl=1 w=-1636 n=7 dxy=634 run=3041 late=1963 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 23 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 184-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 18 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 22 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 23 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 26 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 24 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 23 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=152 r=-166 f=22 l=-24 u=826 af=-10 h=0 pk=0 hs=0 cl=1 w=-2404 n=8 dxy=682 run=3321 late=1634 ok=1 cal=0
+[S5] PING servo= 90 deg  range=  -- mm  echo=59469 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE    0  GP26=WHITE    6  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 26 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 46 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-26 r=-107 f=-4 l=-16 u=854 af=170 h=0 pk=0 hs=0 cl=1 w=-1329 n=8 dxy=716 run=3218 late=1671 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 48 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE    4  GP26=BLACK  769  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 182-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59468 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-66 r=-119 f=-10 l=-18 u=864 af=-40 h=0 pk=0 hs=0 cl=1 w=-1688 n=8 dxy=199 run=3061 late=1827 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 TIME line step max 387 us, period 9590-10344 us, sampler isr max 55 us
+S3 LINE  GP27=WHITE    4  GP26=BLACK  898  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 182-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-405 r=-121 f=-60 l=-18 u=846 af=-20 h=0 pk=0 hs=0 cl=1 w=-2046 n=8 dxy=214 run=3081 late=1944 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE   30  GP26=BLACK  884  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 182-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-27 r=-175 f=-4 l=-26 u=848 af=60 h=0 pk=0 hs=0 cl=1 w=-306 n=8 dxy=337 run=3096 late=1513 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   388  GP26=WHITE   28  -> turn RIGHT       1 mm/s  FOLLOW   cal GP27 182-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=250 r=-79 f=38 l=-12 u=868 af=-10 h=0 pk=0 hs=0 cl=1 w=-255 n=8 dxy=175 run=3054 late=1847 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   382  GP26=WHITE    6  -> turn RIGHT       1 mm/s  FOLLOW   cal GP27 182-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59460 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-78 r=-210 f=-12 l=-32 u=872 af=-10 h=0 pk=0 hs=0 cl=1 w=0 n=8 dxy=125 run=3115 late=1769 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   355  GP26=WHITE    6  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 182-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 39 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 41 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 38 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=26 r=-133 f=4 l=-20 u=860 af=30 h=0 pk=0 hs=0 cl=1 w=-255 n=8 dxy=116 run=3084 late=1437 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   355  GP26=WHITE   13  -> turn RIGHT       3 mm/s  FOLLOW   cal GP27 182-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 40 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 43 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 42 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59460 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 44 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 37 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 36 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-92 r=-251 f=-14 l=-38 u=864 af=-140 h=0 pk=0 hs=0 cl=1 w=-1534 n=8 dxy=298 run=3119 late=1744 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE   10  GP26=WHITE   13  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 182-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 27 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 26 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 23 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 25 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-585 r=-433 f=-106 l=-78 u=1030 af=70 h=0 pk=0 hs=0 cl=1 w=-920 n=8 dxy=812 run=2969 late=1703 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE   17  GP26=WHITE   13  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 182-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 31 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+[S5] PING servo= 90 deg  range=  -- mm  echo=59464 us  clear: no echo heard back within 4 m
+S4 CAL robot moved (spread 0 mg, speed 29 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 34 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 32 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 35 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-198 r=-106 f=-30 l=-16 u=864 af=-10 h=0 pk=0 hs=0 cl=1 w=-1841 n=8 dxy=1052 run=3106 late=1547 ok=1 cal=0
+S4 CAL robot moved (spread 0 mg, speed 30 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE   10  GP26=WHITE    6  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 182-2595  GP26 177-2401
+S4 CAL robot moved (spread 0 mg, speed 33 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 0 mg, speed 28 mm/s), starting again

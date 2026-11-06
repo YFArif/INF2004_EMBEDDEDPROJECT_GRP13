@@ -1,0 +1,1831 @@
+
+
+microT-Kernel Version 3.00
+
+
+=== micro T-Kernel on Raspberry Pi Pico W (spec 0x6300, product 0x0003) ===
+dual-core (SMP) build, usermain on core 0
+encoder: GP16/GP17 edge interrupt on core 1
+motion_task: core 1, period 20 ms
+all subsystems started
+
+[S5] EVT 0x60 a=1 b=0
+wifi: cyw43_utk_task starting (proc 1)
+S3 RUN: barcode DOUT=GP7 AOUT=ADC2, Left IR=ADC0 (GP26), Centre=ADC1 (GP27), line sensors: single edge, GP27 on the LEFT edge, GP26 guard RIGHT
+wifi: cyw43_init() ...
+wifi: cyw43_init() returned, bringing interface up ...
+S3 TIME line step max 145 us, period -1-0 us, sampler isr max 53 us
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 192-192  GP26 2656-2656
+[S5] EVT 0x60 a=2 b=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 188-195  GP26 2652-2656
+S3 LINE  GP27=EDGE   454  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-198  GP26 2652-2656
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-198  GP26 2651-2656
+S3 LINE  GP27=EDGE   454  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-198  GP26 2651-2656
+S3 LINE  GP27=WHITE    0  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-198  GP26 2651-2671
+S3 LINE  GP27=EDGE   571  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-198  GP26 2651-2671
+S3 LINE  GP27=WHITE    0  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-198  GP26 2651-2671
+S3 LINE  GP27=EDGE   571  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-198  GP26 2651-2675
+S3 LINE  GP27=EDGE   571  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-198  GP26 2651-2675
+S3 LINE  GP27=EDGE   470  GP26=WHITE  208  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-201  GP26 2651-2675
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-201  GP26 2651-2675
+S3 LINE  GP27=EDGE   470  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-201  GP26 2651-2675
+S3 LINE  GP27=WHITE    0  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-201  GP26 2651-2675
+S3 LINE  GP27=EDGE   470  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-201  GP26 2651-2675
+
+S4 IMU: LSM303DLHC on I2C0 SDA=GP4 SCL=GP5
+S4 terrain stored in 8 B (43 bits); unpacked 14 B
+S4 ACC CTRL1=0x77 CTRL4=0xa8 PASS; MAG id=48 34 33 PASS
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 CAL robot moved (spread 117 mg, speed 0 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-131 r=-79 f=-20 l=-12 u=870 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2797 late=775 ok=1 cal=0
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-157 r=-78 f=-24 l=-12 u=872 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=31 run=2733 late=1085 ok=1 cal=0
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-158 r=-119 f=-24 l=-18 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=33 run=2714 late=1150 ok=1 cal=0
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-117 r=-84 f=-18 l=-13 u=880 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=29 run=2676 late=918 ok=1 cal=0
+S3 LINE  GP27=WHITE    0  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-106 r=-86 f=-16 l=-13 u=861 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=20 run=2643 late=1124 ok=1 cal=0
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-119 r=-105 f=-18 l=-16 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=19 run=2632 late=1325 ok=1 cal=0
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-156 r=-52 f=-24 l=-8 u=876 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=20 run=2627 late=1115 ok=1 cal=0
+S3 LINE  GP27=WHITE    0  GP26=WHITE  208  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-106 r=-119 f=-16 l=-18 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=28 run=2631 late=1122 ok=1 cal=0
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-131 r=-92 f=-20 l=-14 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=32 run=2631 late=1077 ok=1 cal=0
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-132 r=-79 f=-20 l=-12 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=20 run=2693 late=924 ok=1 cal=0
+S3 TIME line step max 540 us, period 9548-10441 us, sampler isr max 43 us
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 CAL done: g=(-13,20,867) mg, up=+z fwd=-y, pitch0=-132 roll0=-85 cdeg
+S4 p=-10 r=-1 f=-20 l=-12 u=870 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=19 run=2945 late=1315 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=1 r=-1 f=-22 l=-14 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=17 run=2680 late=1135 ok=1 cal=1
+[S5] BOOT obstacle_task up: boot_wait_ms servo_settle_ms 5000 400
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=9 r=8 f=-16 l=-6 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=19 run=2758 late=1243 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-8 r=15 f=-22 l=-12 u=874 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=18 run=2694 late=1143 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=3 r=6 f=-26 l=-10 u=874 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=19 run=2759 late=928 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=3 r=5 f=-20 l=-13 u=859 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=29 run=2689 late=1147 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=11 r=0 f=-14 l=-16 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=28 run=2693 late=1143 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=1 r=-2 f=-16 l=-16 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=31 run=2678 late=1107 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=12 r=8 f=-18 l=-14 u=858 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=20 run=2673 late=1115 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-2 r=5 f=-18 l=-10 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2682 late=1172 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-8 r=24 f=-16 l=-8 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=18 run=2686 late=1113 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-5 r=13 f=-24 l=-12 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=18 run=2677 late=1122 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=2 r=5 f=-26 l=-16 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=20 run=2910 late=1131 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=10 r=1 f=-14 l=-10 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=31 run=2692 late=1131 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=0 r=-2 f=-22 l=-12 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=21 run=2788 late=1183 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-2 r=-13 f=-16 l=-16 u=861 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=23 run=2688 late=1109 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=8 r=-8 f=-18 l=-13 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=22 run=2685 late=1135 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=0 r=5 f=-18 l=-8 u=858 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=31 run=2922 late=1159 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=1 r=2 f=-22 l=-12 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=23 run=2881 late=1124 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=17 r=3 f=-16 l=-16 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2674 late=1106 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=19 r=2 f=-16 l=-14 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=21 run=2673 late=1172 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=17 r=-2 f=-20 l=-14 u=854 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2695 late=1137 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=13 r=9 f=-16 l=-10 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=21 run=2759 late=918 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-5 r=-12 f=-26 l=-16 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2680 late=1187 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-3 r=7 f=-20 l=-14 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2876 late=1113 ok=1 cal=1
+S3 TIME line step max 314 us, period 9677-10327 us, sampler isr max 39 us
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-1 r=8 f=-18 l=-12 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=31 run=2704 late=1275 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-8 r=7 f=-22 l=-10 u=858 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=20 run=2721 late=1361 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=16 r=14 f=-18 l=-4 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=21 run=2757 late=1134 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-13 r=3 f=-29 l=-16 u=861 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=22 run=2670 late=1096 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=16 r=8 f=-18 l=-14 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2751 late=1123 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=9 r=10 f=-16 l=-12 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2696 late=1166 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=13 r=5 f=-16 l=-12 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=34 run=2671 late=1123 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=0 r=-12 f=-24 l=-16 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=24 run=2707 late=1162 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=11 r=-10 f=-22 l=-14 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2770 late=1117 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-2 r=7 f=-22 l=-12 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2684 late=1136 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-9 r=18 f=-24 l=-2 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2711 late=1116 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=26 r=1 f=-16 l=-14 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=21 run=2785 late=1170 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=7 r=-1 f=-20 l=-14 u=852 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=21 run=2730 late=1108 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=5 r=-1 f=-20 l=-11 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=21 run=2903 late=1150 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=8 r=11 f=-16 l=-11 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=22 run=2689 late=1119 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=17 r=12 f=-14 l=-16 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=21 run=2777 late=1154 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-17 r=-90 f=-20 l=-28 u=872 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=799 run=2677 late=1149 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-25 r=11 f=-30 l=-8 u=850 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=34 run=2894 late=1122 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-30 r=22 f=-20 l=-10 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=50 run=2681 late=1118 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  875  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2675
+S4 p=-70 r=-33 f=-34 l=-10 u=870 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=265 run=2685 late=1054 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  777  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2678
+S4 p=-10 r=-3 f=-22 l=-10 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=82 run=2896 late=1130 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  777  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2678
+S4 p=-42 r=-3 f=-36 l=-8 u=870 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=47 run=2703 late=1098 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  777  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2678
+S4 p=-26 r=14 f=-30 l=-6 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=31 run=2736 late=1145 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=BLACK  777  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2678
+S4 p=-11 r=15 f=-18 l=-8 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=23 run=2691 late=1128 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=WHITE  185  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2678
+S4 p=-19 r=-4 f=-20 l=-13 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=34 run=2689 late=1107 ok=1 cal=1
+S3 TIME line step max 313 us, period 9709-10299 us, sampler isr max 40 us
+S3 LINE  GP27=WHITE    0  GP26=BLACK  777  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2678
+S4 p=-2 r=10 f=-20 l=-6 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=79 run=2731 late=1280 ok=1 cal=1
+S3 LINE  GP27=EDGE   380  GP26=WHITE  185  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 184-205  GP26 2651-2678
+S4 p=3 r=113 f=-16 l=36 u=816 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=200 run=2797 late=1141 ok=1 cal=1
+[S5] EVT 0x60 a=1 b=2
+S3 RECALIBRATE: sweep both sensors over white and black
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 192-192  GP26 2656-2656
+S4 p=-135 r=-3 f=-46 l=-18 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=141 run=2678 late=1434 ok=1 cal=1
+S3 LINE  GP27=BLACK  833  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-193  GP26 2656-2671
+S4 p=-83 r=3 f=-36 l=8 u=860 af=70 h=0 pk=0 hs=0 cl=0 w=716 n=8 dxy=91 run=2599 late=1247 ok=1 cal=1
+S3 LINE  GP27=EDGE   500  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 187-197  GP26 2656-2671
+S4 p=-9 r=-92 f=32 l=-24 u=896 af=-130 h=0 pk=0 hs=0 cl=0 w=3631 n=8 dxy=167 run=2602 late=1253 ok=1 cal=1
+S3 LINE  GP27=EDGE   583  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 185-197  GP26 873-2684
+S4 p=11 r=-25 f=4 l=-4 u=866 af=60 h=0 pk=0 hs=0 cl=0 w=4757 n=8 dxy=122 run=2622 late=1227 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 183-197  GP26 178-2684
+S4 p=129 r=-31 f=24 l=-6 u=858 af=-50 h=0 pk=0 hs=0 cl=0 w=4296 n=8 dxy=135 run=2614 late=1261 ok=1 cal=1
+S3 LINE  GP27=EDGE   642  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 183-197  GP26 178-2684
+S4 p=28 r=-15 f=-12 l=-16 u=854 af=-20 h=0 pk=0 hs=0 cl=0 w=4296 n=8 dxy=111 run=2629 late=1467 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 183-198  GP26 174-2684
+S4 p=34 r=-47 f=0 l=-18 u=876 af=-30 h=0 pk=0 hs=0 cl=0 w=3785 n=8 dxy=119 run=2671 late=1226 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 183-200  GP26 174-2684
+S4 p=37 r=-30 f=-48 l=-44 u=858 af=0 h=0 pk=0 hs=0 cl=0 w=869 n=8 dxy=150 run=2738 late=1083 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 183-200  GP26 174-2684
+S4 p=151 r=12 f=50 l=-16 u=882 af=-40 h=0 pk=0 hs=0 cl=0 w=-3171 n=7 dxy=169 run=2611 late=1192 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 183-200  GP26 174-2684
+S4 p=31 r=39 f=0 l=27 u=875 af=80 h=0 pk=0 hs=0 cl=0 w=-1688 n=7 dxy=246 run=2634 late=1236 ok=1 cal=1
+S3 LINE  GP27=EDGE   529  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 183-200  GP26 174-2684
+S4 p=36 r=-7 f=-32 l=-24 u=852 af=10 h=0 pk=0 hs=0 cl=0 w=-3222 n=8 dxy=166 run=2784 late=1059 ok=1 cal=1
+S3 LINE  GP27=EDGE   529  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 183-200  GP26 174-2684
+S4 p=95 r=-42 f=30 l=-38 u=936 af=40 h=0 pk=0 hs=0 cl=0 w=-3580 n=8 dxy=188 run=2617 late=1143 ok=1 cal=1
+S3 LINE  GP27=EDGE   529  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 183-200  GP26 174-2684
+S4 p=13 r=2 f=-22 l=-4 u=864 af=10 h=0 pk=0 hs=0 cl=0 w=-3836 n=8 dxy=93 run=2645 late=1260 ok=1 cal=1
+S3 LINE  GP27=EDGE   529  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 183-200  GP26 174-2684
+S4 p=5 r=-11 f=-68 l=-14 u=854 af=40 h=0 pk=0 hs=0 cl=0 w=-4910 n=8 dxy=115 run=2627 late=1213 ok=1 cal=1
+S3 LINE  GP27=EDGE   529  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 183-200  GP26 174-2684
+S4 p=-99 r=-38 f=-60 l=-6 u=860 af=-60 h=0 pk=0 hs=0 cl=0 w=-3222 n=8 dxy=107 run=2814 late=1193 ok=1 cal=1
+S3 LINE  GP27=EDGE   555  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 182-200  GP26 169-2684
+S4 p=-48 r=-38 f=-40 l=-32 u=868 af=10 h=0 pk=0 hs=0 cl=0 w=-4399 n=8 dxy=99 run=2597 late=1235 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  887  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 182-214  GP26 169-2684
+S4 p=39 r=16 f=-4 l=12 u=858 af=-30 h=0 pk=0 hs=0 cl=0 w=-2966 n=8 dxy=164 run=2600 late=1243 ok=1 cal=1
+S3 LINE  GP27=EDGE   375  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2342  GP26 169-2684
+S4 p=-35 r=-40 f=-76 l=-4 u=864 af=-90 h=0 pk=0 hs=0 cl=0 w=-4654 n=8 dxy=150 run=2641 late=1112 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2342  GP26 169-2683
+S4 p=-9 r=-62 f=0 l=-18 u=888 af=20 h=0 pk=0 hs=0 cl=0 w=-4705 n=8 dxy=138 run=2612 late=1098 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2342  GP26 169-2683
+S4 p=-26 r=-32 f=-26 l=-22 u=858 af=40 h=0 pk=0 hs=0 cl=0 w=-4040 n=8 dxy=125 run=2653 late=1106 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    9  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2342  GP26 169-2683
+S4 p=55 r=-55 f=-10 l=-22 u=858 af=10 h=0 pk=0 hs=0 cl=0 w=-4194 n=8 dxy=88 run=2636 late=1105 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2342  GP26 169-2683
+S4 p=74 r=-42 f=-4 l=-13 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=181 run=2689 late=1207 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2342  GP26 169-2683
+S4 CLASS MOVING t=20035 ms
+S4 p=-13 r=-28 f=-77 l=-41 u=845 af=-150 h=0 pk=0 hs=0 cl=1 w=255 n=7 dxy=188 run=2812 late=1144 ok=1 cal=1
+S3 TIME line step max 298 us, period 9602-10330 us, sampler isr max 36 us
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2342  GP26 169-2683
+S4 p=-61 r=-29 f=-45 l=0 u=866 af=80 h=0 pk=0 hs=0 cl=1 w=1023 n=7 dxy=227 run=2786 late=1335 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2342  GP26 169-2683
+S4 CLASS STATIONARY t=20415 ms
+S4 p=89 r=-63 f=22 l=-44 u=878 af=0 h=0 pk=0 hs=0 cl=0 w=2608 n=8 dxy=256 run=2786 late=1168 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    9  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2342  GP26 169-2683
+S4 p=26 r=-67 f=-26 l=-10 u=868 af=10 h=0 pk=0 hs=0 cl=0 w=3836 n=8 dxy=154 run=2654 late=1139 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2342  GP26 169-2683
+S4 p=-24 r=-9 f=-36 l=10 u=874 af=20 h=0 pk=0 hs=0 cl=0 w=4092 n=8 dxy=87 run=2657 late=1181 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    9  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2342  GP26 169-2683
+S4 p=27 r=-35 f=-2 l=-6 u=864 af=-80 h=0 pk=0 hs=0 cl=0 w=4245 n=8 dxy=155 run=2634 late=1141 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2342  GP26 169-2683
+S4 p=73 r=7 f=-32 l=10 u=852 af=-10 h=0 pk=0 hs=0 cl=0 w=4245 n=8 dxy=185 run=2641 late=1115 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2342  GP26 169-2683
+[S5] CAL line sensors calibrated: YES, ready for Button 1 0 0
+[S5] EVT 0x60 a=2 b=1
+S4 p=-68 r=-11 f=26 l=-46 u=876 af=20 h=0 pk=0 hs=0 cl=0 w=409 n=8 dxy=242 run=2696 late=1133 ok=1 cal=1
+S3 LINE  GP27=WHITE   11  GP26=BLACK  989  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2342  GP26 169-2683
+S4 p=-4 r=20 f=-16 l=-4 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=54 run=2743 late=1040 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=BLACK  989  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2342  GP26 169-2683
+S4 p=3 r=1 f=-20 l=-16 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=25 run=2683 late=1040 ok=1 cal=1
+S3 LINE  GP27=WHITE   11  GP26=BLACK  989  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2342  GP26 169-2683
+S4 p=7 r=-3 f=-14 l=-6 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=49 run=2839 late=1163 ok=1 cal=1
+S3 LINE  GP27=WHITE   11  GP26=BLACK  989  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2342  GP26 169-2683
+S4 p=3 r=4 f=-18 l=-4 u=859 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=34 run=2702 late=1219 ok=1 cal=1
+S3 LINE  GP27=WHITE   10  GP26=BLACK  991  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 186-2332  GP26 171-2678
+S4 p=11 r=8 f=-20 l=-13 u=859 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=50 run=2767 late=1020 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=BLACK  991  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 186-2332  GP26 171-2678
+S4 p=3 r=5 f=-20 l=-16 u=852 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=36 run=2762 late=1138 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=BLACK  991  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 186-2332  GP26 171-2678
+S4 p=18 r=-9 f=-12 l=-18 u=858 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=47 run=2674 late=1253 ok=1 cal=1
+S3 LINE  GP27=WHITE   10  GP26=BLACK  991  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 186-2332  GP26 171-2678
+S4 p=12 r=-4 f=-18 l=-16 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=35 run=2697 late=1046 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=BLACK  991  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 186-2332  GP26 171-2678
+S4 p=19 r=8 f=-14 l=-16 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2683 late=1148 ok=1 cal=1
+S3 LINE  GP27=WHITE    9  GP26=BLACK  992  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2332  GP26 171-2674
+S4 p=8 r=10 f=-20 l=-12 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2669 late=1047 ok=1 cal=1
+S3 LINE  GP27=WHITE    1  GP26=BLACK  992  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2332  GP26 171-2674
+S4 p=0 r=12 f=-26 l=-8 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2691 late=1039 ok=1 cal=1
+S3 LINE  GP27=WHITE    9  GP26=BLACK  992  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2332  GP26 171-2674
+S4 p=8 r=20 f=-20 l=-4 u=858 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=21 run=2903 late=1191 ok=1 cal=1
+S3 LINE  GP27=WHITE    1  GP26=BLACK  992  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2332  GP26 171-2674
+S4 p=-4 r=8 f=-16 l=-14 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=21 run=2682 late=1046 ok=1 cal=1
+S3 LINE  GP27=WHITE    1  GP26=BLACK  992  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2332  GP26 171-2674
+S4 p=-4 r=4 f=-20 l=-12 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2680 late=972 ok=1 cal=1
+S3 LINE  GP27=WHITE    9  GP26=BLACK  992  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 190-2332  GP26 171-2670
+S4 p=17 r=0 f=-16 l=-16 u=857 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=17 run=2676 late=1166 ok=1 cal=1
+S3 LINE  GP27=WHITE   15  GP26=BLACK  994  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 190-2332  GP26 171-2670
+S4 p=1 r=1 f=-18 l=-22 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=78 run=2790 late=1049 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  994  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 190-2332  GP26 171-2670
+S4 p=18 r=2 f=-18 l=-13 u=859 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=31 run=2668 late=1042 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  994  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 190-2332  GP26 171-2670
+S4 p=21 r=4 f=-16 l=-14 u=870 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=21 run=2803 late=1169 ok=1 cal=1
+S3 TIME line step max 308 us, period 9086-10764 us, sampler isr max 35 us
+S3 LINE  GP27=WHITE    0  GP26=BLACK  994  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 190-2332  GP26 171-2670
+S4 p=-55 r=-32 f=-58 l=-20 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=165 run=2668 late=1409 ok=1 cal=1
+S3 LINE  GP27=WHITE    8  GP26=BLACK  994  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 190-2332  GP26 171-2670
+S4 p=2 r=-12 f=-14 l=-10 u=852 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=32 run=2678 late=1054 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  995  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 190-2332  GP26 171-2667
+S4 p=31 r=14 f=-14 l=-14 u=874 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=21 run=2964 late=1219 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  989  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 190-2332  GP26 171-2667
+S4 p=11 r=6 f=-18 l=-12 u=858 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=31 run=2693 late=1077 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  995  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 190-2332  GP26 171-2667
+S4 p=15 r=12 f=-14 l=-14 u=856 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=31 run=2676 late=1029 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  989  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 190-2332  GP26 171-2667
+S4 p=22 r=26 f=-16 l=-6 u=854 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=31 run=2663 late=1150 ok=1 cal=1
+S3 LINE  GP27=WHITE    8  GP26=BLACK  995  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 190-2332  GP26 171-2667
+S4 p=28 r=-9 f=-18 l=-16 u=870 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=21 run=2675 late=1052 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  996  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 192-2332  GP26 171-2664
+S4 p=38 r=6 f=-10 l=-14 u=858 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2901 late=878 ok=1 cal=1
+S3 LINE  GP27=WHITE    7  GP26=BLACK  996  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 192-2332  GP26 171-2664
+S4 p=7 r=10 f=-22 l=-16 u=854 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=34 run=2763 late=1102 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  990  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 192-2332  GP26 171-2664
+S4 p=5 r=3 f=-20 l=-20 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=49 run=2680 late=1065 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  996  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 192-2332  GP26 171-2664
+S4 p=0 r=9 f=-16 l=-9 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=31 run=2676 late=1022 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  996  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 192-2332  GP26 171-2664
+S4 p=11 r=3 f=-22 l=-13 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=21 run=2680 late=1155 ok=1 cal=1
+S3 LINE  GP27=WHITE    7  GP26=BLACK  997  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 193-2332  GP26 171-2662
+S4 p=23 r=11 f=-20 l=-6 u=861 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=22 run=2761 late=1017 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  991  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 193-2332  GP26 171-2662
+S4 p=11 r=1 f=-20 l=-14 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=33 run=2786 late=1050 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  991  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 193-2332  GP26 171-2662
+S4 p=9 r=-8 f=-22 l=-16 u=870 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=33 run=2678 late=1153 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  997  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 193-2332  GP26 171-2662
+S4 p=4 r=-11 f=-14 l=-20 u=868 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=81 run=2904 late=1019 ok=1 cal=1
+S3 LINE  GP27=WHITE    7  GP26=BLACK  991  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 193-2332  GP26 171-2662
+S4 p=19 r=-4 f=-4 l=-12 u=858 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=31 run=2681 late=1079 ok=1 cal=1
+S3 LINE  GP27=WHITE    7  GP26=BLACK  997  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 193-2332  GP26 171-2662
+S4 p=17 r=14 f=-24 l=-8 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=37 run=2749 late=1115 ok=1 cal=1
+S3 LINE  GP27=WHITE    6  GP26=BLACK  998  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 194-2332  GP26 171-2660
+S4 p=4 r=-12 f=-14 l=-16 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=22 run=2760 late=1019 ok=1 cal=1
+S3 LINE  GP27=WHITE    6  GP26=BLACK  998  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 194-2332  GP26 171-2660
+S4 p=-7 r=11 f=-14 l=-14 u=856 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=44 run=2678 late=1227 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  998  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 194-2332  GP26 171-2660
+S4 p=18 r=23 f=0 l=-8 u=872 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=66 run=2708 late=1156 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  985  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 194-2332  GP26 171-2660
+S4 p=-14 r=-34 f=-22 l=-30 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=113 run=2680 late=1008 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  985  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2332  GP26 171-2660
+[S5] EVT 0x60 a=3 b=2
+S3 TUNE kp=25 kd=25 (x100)
+S3 TUNE curve boost=250 (x100)
+[S5] STATE from to 0 1
+S4 p=-122 r=106 f=-32 l=25 u=852 af=150 h=0 pk=0 hs=0 cl=0 w=-1585 n=7 dxy=219 run=2680 late=1056 ok=1 cal=1
+S3 LINE  GP27=WHITE    9  GP26=BLACK  985  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2660
+S4 p=-29 r=0 f=-2 l=-18 u=868 af=-50 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=276 run=2652 late=1329 ok=1 cal=1
+S3 LINE  GP27=WHITE    9  GP26=BLACK  979  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2660
+[S5] PING servo= 90 deg  range= 798 mm  echo= 4651 us
+S4 p=2 r=12 f=-22 l=-13 u=857 af=140 h=0 pk=0 hs=0 cl=0 w=-1483 n=7 dxy=87 run=2798 late=1184 ok=1 cal=1
+S3 TIME line step max 392 us, period 9183-10885 us, sampler isr max 34 us
+S3 LINE  GP27=WHITE   76  GP26=EDGE   580  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2660
+S4 CLASS ACCELERATING t=30215 ms
+S4 CLASS MOVING t=30315 ms
+S4 p=-93 r=-78 f=-2 l=-54 u=858 af=110 h=0 pk=0 hs=0 cl=1 w=-153 n=8 dxy=331 run=2830 late=1481 ok=1 cal=1
+S3 LINE  GP27=WHITE  158  GP26=EDGE   477  -> turn RIGHT      23 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2660
+[S5] PING servo= 90 deg  range=  -- mm  echo=59490 us  clear: no echo heard back within 4 m
+S4 p=93 r=-37 f=-56 l=-24 u=846 af=40 h=0 pk=0 hs=0 cl=1 w=51 n=8 dxy=339 run=2697 late=1377 ok=1 cal=1
+S3 LINE  GP27=WHITE   91  GP26=EDGE   676  -> turn RIGHT      39 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2660
+S4 p=84 r=-46 f=82 l=-36 u=872 af=-90 h=0 pk=0 hs=0 cl=1 w=51 n=8 dxy=202 run=2675 late=1231 ok=1 cal=1
+S3 LINE  GP27=EDGE   263  GP26=EDGE   561  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-2660
+[S5] PING servo= 90 deg  range=  -- mm  echo=41559 us  clear: no echo heard back within 4 m
+S4 p=-6 r=-40 f=-30 l=-16 u=864 af=-20 h=0 pk=0 hs=0 cl=1 w=-409 n=8 dxy=247 run=2727 late=1214 ok=1 cal=1
+S3 LINE  GP27=WHITE  203  GP26=EDGE   657  -> turn RIGHT      15 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2660
+[S5] PING servo= 90 deg  range=  -- mm  echo=32127 us  clear: no echo heard back within 4 m
+S4 p=59 r=-30 f=6 l=-6 u=860 af=20 h=0 pk=0 hs=0 cl=1 w=-460 n=8 dxy=106 run=2671 late=1388 ok=1 cal=1
+S3 LINE  GP27=WHITE  180  GP26=EDGE   747  -> turn RIGHT      19 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2660
+S4 p=-24 r=-44 f=-22 l=-28 u=874 af=0 h=0 pk=0 hs=0 cl=1 w=-1074 n=8 dxy=122 run=2698 late=1329 ok=1 cal=1
+S3 LINE  GP27=EDGE   494  GP26=EDGE   619  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-2660
+[S5] PING servo= 90 deg  range=3699 mm  echo=21569 us
+S4 p=-86 r=-71 f=-44 l=-42 u=868 af=-40 h=0 pk=0 hs=0 cl=1 w=-1432 n=8 dxy=138 run=2709 late=1047 ok=1 cal=1
+S3 LINE  GP27=WHITE  233  GP26=BLACK  779  -> turn RIGHT      11 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2660
+S4 p=53 r=-83 f=6 l=-42 u=868 af=0 h=0 pk=0 hs=0 cl=1 w=-409 n=8 dxy=150 run=2679 late=1417 ok=1 cal=1
+S3 LINE  GP27=WHITE   76  GP26=BLACK  901  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2660
+[S5] PING servo= 90 deg  range=2082 mm  echo=12141 us
+S4 p=-38 r=-44 f=-28 l=-20 u=866 af=50 h=0 pk=0 hs=0 cl=1 w=-562 n=8 dxy=121 run=2706 late=1205 ok=1 cal=1
+S3 LINE  GP27=WHITE  151  GP26=BLACK  895  -> turn RIGHT      31 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2660
+S4 p=-59 r=-16 f=-30 l=-20 u=850 af=20 h=0 pk=0 hs=0 cl=1 w=-1688 n=8 dxy=111 run=2678 late=1192 ok=1 cal=1
+S3 LINE  GP27=EDGE   531  GP26=BLACK  824  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-2660
+[S5] PING servo= 90 deg  range=  -- mm  echo=59489 us  clear: no echo heard back within 4 m
+S3 EVENT JUNCTION
+S4 p=-125 r=-82 f=-80 l=-2 u=870 af=-70 h=0 pk=0 hs=0 cl=1 w=-1432 n=7 dxy=163 run=2765 late=1267 ok=1 cal=1
+S3 LINE  GP27=EDGE   345  GP26=BLACK  946  -> turn RIGHT      15 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-2660
+S4 p=139 r=-93 f=52 l=-43 u=877 af=-70 h=0 pk=0 hs=0 cl=1 w=-1483 n=7 dxy=150 run=2887 late=1247 ok=1 cal=1
+S3 LINE  GP27=EDGE   419  GP26=BLACK  966  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-2677
+[S5] PING servo= 90 deg  range=  -- mm  echo=59487 us  clear: no echo heard back within 4 m
+S4 p=-38 r=-126 f=-66 l=-50 u=854 af=-10 h=0 pk=0 hs=0 cl=1 w=-1739 n=7 dxy=146 run=2808 late=1167 ok=1 cal=1
+S3 LINE  GP27=WHITE  225  GP26=BLACK 1000  -> turn RIGHT      36 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2774
+[S5] PING servo= 90 deg  range=  -- mm  echo=59493 us  clear: no echo heard back within 4 m
+S4 p=58 r=-143 f=-34 l=-22 u=880 af=40 h=0 pk=0 hs=0 cl=1 w=-511 n=8 dxy=206 run=2807 late=1423 ok=1 cal=1
+S3 LINE  GP27=WHITE   61  GP26=BLACK 1000  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2842
+S4 p=55 r=-99 f=22 l=-16 u=866 af=80 h=0 pk=0 hs=0 cl=1 w=-818 n=8 dxy=226 run=2714 late=1237 ok=1 cal=1
+S3 LINE  GP27=WHITE   61  GP26=BLACK 1000  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-2971
+[S5] PING servo= 90 deg  range=2040 mm  echo=11896 us
+S4 p=-359 r=-140 f=-130 l=-16 u=802 af=30 h=0 pk=0 hs=0 cl=1 w=-818 n=8 dxy=878 run=2697 late=1172 ok=1 cal=1
+S3 LINE  GP27=WHITE   61  GP26=BLACK 1000  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3026
+S4 p=-72 r=-68 f=-62 l=-10 u=852 af=60 h=0 pk=0 hs=0 cl=1 w=-818 n=8 dxy=421 run=2909 late=1369 ok=1 cal=1
+[S5] PING servo= 90 deg  range=2431 mm  echo=14175 us
+S3 LINE  GP27=WHITE   46  GP26=BLACK 1000  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3098
+S4 p=21 r=-59 f=-16 l=-18 u=858 af=-30 h=0 pk=0 hs=0 cl=1 w=-1636 n=8 dxy=66 run=2898 late=1303 ok=1 cal=1
+S3 LINE  GP27=WHITE  166  GP26=BLACK  983  -> turn RIGHT      39 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3103
+[S5] PING servo= 90 deg  range=2067 mm  echo=12052 us
+S4 p=22 r=-75 f=-16 l=-38 u=868 af=-40 h=0 pk=0 hs=0 cl=1 w=-1994 n=8 dxy=134 run=2681 late=1148 ok=1 cal=1
+S3 LINE  GP27=WHITE   39  GP26=BLACK  994  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3103
+S4 p=138 r=-19 f=-4 l=18 u=862 af=140 h=0 pk=0 hs=0 cl=1 w=-358 n=8 dxy=164 run=2688 late=1344 ok=1 cal=1
+S3 LINE  GP27=WHITE   39  GP26=BLACK  967  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3103
+[S5] PING servo= 90 deg  range=2421 mm  echo=14114 us
+S4 p=121 r=-42 f=46 l=-16 u=880 af=60 h=0 pk=0 hs=0 cl=1 w=-1227 n=8 dxy=141 run=2739 late=1306 ok=1 cal=1
+S3 LINE  GP27=WHITE   91  GP26=BLACK  945  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3103
+S4 p=10 r=-21 f=-52 l=-2 u=857 af=30 h=0 pk=0 hs=0 cl=1 w=-1585 n=7 dxy=122 run=2667 late=1191 ok=1 cal=1
+S3 LINE  GP27=WHITE  218  GP26=BLACK  853  -> turn RIGHT      19 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3103
+[S5] PING servo= 90 deg  range=  -- mm  echo=59493 us  clear: no echo heard back within 4 m
+S4 p=84 r=-25 f=-13 l=-11 u=864 af=-60 h=0 pk=0 hs=0 cl=1 w=-1534 n=7 dxy=142 run=2946 late=1403 ok=1 cal=1
+S3 LINE  GP27=WHITE   69  GP26=EDGE   738  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3103
+S4 p=-13 r=-48 f=-80 l=0 u=854 af=20 h=0 pk=0 hs=0 cl=1 w=-358 n=7 dxy=153 run=2811 late=1257 ok=1 cal=1
+S3 LINE  GP27=WHITE   69  GP26=EDGE   612  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3103
+[S5] PING servo= 90 deg  range=  -- mm  echo=59495 us  clear: no echo heard back within 4 m
+S4 p=-4 r=0 f=-4 l=20 u=872 af=110 h=0 pk=0 hs=0 cl=1 w=-664 n=8 dxy=185 run=2822 late=1186 ok=1 cal=1
+S3 TIME line step max 356 us, period 9511-10583 us, sampler isr max 38 us
+S3 LINE  GP27=WHITE   98  GP26=EDGE   541  -> turn RIGHT      37 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3103
+S4 p=17 r=-46 f=6 l=-24 u=868 af=20 h=0 pk=0 hs=0 cl=1 w=-1329 n=8 dxy=173 run=2695 late=2038 ok=1 cal=1
+S3 LINE  GP27=EDGE   360  GP26=EDGE   454  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-3103
+[S5] PING servo= 90 deg  range=  -- mm  echo=59492 us  clear: no echo heard back within 4 m
+S4 p=64 r=-61 f=12 l=-30 u=856 af=-30 h=0 pk=0 hs=0 cl=1 w=-1329 n=8 dxy=100 run=2694 late=1248 ok=1 cal=1
+S3 LINE  GP27=EDGE   285  GP26=EDGE   481  -> turn RIGHT       5 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-3103
+[S5] PING servo= 90 deg  range= 298 mm  echo= 1737 us
+S4 p=-11 r=-47 f=-36 l=-24 u=854 af=-20 h=0 pk=0 hs=0 cl=1 w=-716 n=8 dxy=99 run=2703 late=1029 ok=1 cal=1
+[S5] STATE from to 1 2
+[S5] EVT 0x50 d=28cm a=90deg
+S3 TUNE kp=25 kd=25 (x100)
+S3 TUNE curve boost=250 (x100)
+S3 LINE  GP27=WHITE   98  GP26=EDGE   601  -> turn RIGHT      38 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3103
+S4 p=165 r=-44 f=48 l=-14 u=874 af=120 h=0 pk=0 hs=0 cl=1 w=-358 n=8 dxy=159 run=2788 late=1556 ok=1 cal=1
+S3 LINE  GP27=WHITE  106  GP26=EDGE   580  -> turn RIGHT      35 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3103
+[S5] PING servo= 90 deg  range= 277 mm  echo= 1616 us
+S4 p=76 r=-29 f=-14 l=-10 u=860 af=20 h=0 pk=0 hs=0 cl=1 w=-971 n=8 dxy=94 run=2848 late=1187 ok=1 cal=1
+S3 LINE  GP27=EDGE   352  GP26=EDGE   427  -> turn RIGHT       1 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-3103
+S4 p=35 r=-34 f=-14 l=-12 u=862 af=-30 h=0 pk=0 hs=0 cl=1 w=-1227 n=8 dxy=126 run=2928 late=1258 ok=1 cal=1
+S3 LINE  GP27=EDGE   412  GP26=EDGE   350  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-3103
+[S5] PING servo= 90 deg  range= 269 mm  echo= 1566 us
+S4 p=49 r=-46 f=-12 l=-12 u=850 af=-10 h=0 pk=0 hs=0 cl=1 w=-1636 n=8 dxy=141 run=2824 late=1215 ok=1 cal=1
+S3 LINE  GP27=EDGE   472  GP26=EDGE   263  -> turn RIGHT       1 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-3103
+[S5] PING servo= 90 deg  range= 255 mm  echo= 1485 us
+S4 p=73 r=-76 f=-32 l=-19 u=849 af=10 h=0 pk=0 hs=0 cl=1 w=-562 n=9 dxy=142 run=2823 late=1016 ok=1 cal=1
+S3 LINE  GP27=WHITE  195  GP26=EDGE   487  -> turn RIGHT      15 mm/s  FOLLOW (one sensor off line)   cal GP27 188-2332  GP26 171-3103
+S4 p=13 r=-84 f=-48 l=-22 u=862 af=-90 h=0 pk=0 hs=0 cl=1 w=-1023 n=8 dxy=138 run=2690 late=1403 ok=1 cal=1
+S3 LINE  GP27=EDGE   449  GP26=EDGE   252  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-3103
+[S5] PING servo= 90 deg  range= 240 mm  echo= 1401 us
+S4 p=60 r=-124 f=-6 l=-54 u=859 af=-10 h=0 pk=0 hs=0 cl=1 w=-1329 n=7 dxy=137 run=2797 late=1238 ok=1 cal=1
+S3 LINE  GP27=EDGE   337  GP26=EDGE   334  -> turn RIGHT       4 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-3103
+S4 p=39 r=-70 f=-54 l=-32 u=845 af=-40 h=0 pk=0 hs=0 cl=1 w=-358 n=7 dxy=133 run=2801 late=1057 ok=1 cal=1
+S3 LINE  GP27=EDGE   419  GP26=EDGE   301  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 188-2332  GP26 171-3103
+[S5] EVT 0x52 d=21cm a=90deg
+[S5] EVT 0x62 a=1 b=0
+[S5] EVT 0x60 a=8 b=3
+[S5] STATE from to 2 0
+[S5] STATE from to 0 3
+[S5] EVT 0x53 d=0cm a=90deg
+S4 CLASS STATIONARY t=37495 ms
+S4 p=110 r=-76 f=-8 l=-30 u=856 af=-80 h=0 pk=0 hs=0 cl=0 w=153 n=8 dxy=299 run=2822 late=1237 ok=1 cal=1
+S3 LINE  GP27=EDGE   337  GP26=EDGE   405  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2332  GP26 171-3103
+S4 p=108 r=-44 f=-2 l=-22 u=854 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=305 run=2560 late=1031 ok=1 cal=1
+S3 LINE  GP27=EDGE   322  GP26=EDGE   421  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2332  GP26 171-3103
+[S5] PING servo= 30 deg  range=  -- mm  echo=59508 us  clear: no echo heard back within 4 m
+S4 p=107 r=-61 f=4 l=-20 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=294 run=2568 late=1013 ok=1 cal=1
+S3 LINE  GP27=EDGE   337  GP26=EDGE   405  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2332  GP26 171-3103
+[S5] PING servo= 60 deg  range= 210 mm  echo= 1225 us
+S4 p=76 r=-47 f=-12 l=-16 u=858 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=56 run=2556 late=1110 ok=1 cal=1
+[S5] PING servo= 90 deg  range= 214 mm  echo= 1249 us
+S3 LINE  GP27=EDGE   354  GP26=EDGE   394  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2273  GP26 197-3102
+S4 p=105 r=-56 f=-2 l=-24 u=856 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=40 run=2785 late=1234 ok=1 cal=1
+S3 LINE  GP27=EDGE   354  GP26=EDGE   394  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2273  GP26 197-3102
+[S5] PING servo=120 deg  range=  -- mm  echo=59497 us  clear: no echo heard back within 4 m
+S4 p=-74 r=-5 f=-17 l=-26 u=871 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=9 dxy=371 run=2786 late=1029 ok=1 cal=1
+S3 LINE  GP27=EDGE   347  GP26=EDGE   405  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2273  GP26 197-3102
+[S5] PING servo=150 deg  range=  -- mm  echo=59509 us  clear: no echo heard back within 4 m
+S4 p=101 r=-64 f=16 l=-17 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=9 dxy=154 run=2772 late=992 ok=1 cal=1
+S3 LINE  GP27=EDGE   354  GP26=EDGE   383  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2273  GP26 197-3102
+S4 p=76 r=-66 f=-8 l=-18 u=850 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=142 run=2566 late=979 ok=1 cal=1
+S3 LINE  GP27=EDGE   362  GP26=EDGE   394  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2273  GP26 197-3102
+[S5] PING servo= 55 deg  range= 227 mm  echo= 1325 us
+S4 p=104 r=-37 f=-8 l=-24 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=47 run=2561 late=1005 ok=1 cal=1
+S3 LINE  GP27=EDGE   354  GP26=EDGE   394  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 188-2273  GP26 197-3102
+[S5] PING servo= 50 deg  range= 961 mm  echo= 5605 us
+[S5] PING servo= 53 deg  range= 978 mm  echo= 5705 us
+S4 p=93 r=-57 f=-14 l=-24 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=50 run=2682 late=1037 ok=1 cal=1
+S3 LINE  GP27=EDGE   364  GP26=EDGE   388  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 278-2105  GP26 338-2885
+[S5] PING servo= 95 deg  range= 227 mm  echo= 1325 us
+S4 p=99 r=-36 f=-8 l=-16 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=47 run=2691 late=951 ok=1 cal=1
+S3 LINE  GP27=EDGE   355  GP26=EDGE   388  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 278-2105  GP26 338-2885
+[S5] PING servo=100 deg  range=  -- mm  echo=59487 us  clear: no echo heard back within 4 m
+S4 p=100 r=-38 f=-4 l=-20 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=18 run=2585 late=948 ok=1 cal=1
+[S5] PING servo= 97 deg  range= 227 mm  echo= 1325 us
+[S5] EVT 0x54 d=11cm a=60deg
+[S5] PROFILE closest_mm width_mm 210 117
+[S5] PROFILE clear_left_mm clear_right_mm 1000 1000
+[S5] PROFILE shift_left_mm shift_right_mm 148 250
+S3 LINE  GP27=EDGE   364  GP26=EDGE   388  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 278-2105  GP26 338-2885
+[S5] STATE from to 3 0
+[S5] AVOID squaring up: turn_deg closest_deg -30 60
+[S5] EVT 0x62 a=3 b=0
+S4 p=-69 r=-105 f=-146 l=-96 u=829 af=-110 h=0 pk=0 hs=0 cl=0 w=-4552 n=7 dxy=225 run=3088 late=1680 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 278-2296  GP26 338-2885
+S4 p=59 r=-37 f=-8 l=2 u=854 af=20 h=0 pk=0 hs=0 cl=0 w=-4961 n=8 dxy=168 run=2765 late=1172 ok=1 cal=1
+S3 TIME line step max 427 us, period 9459-10545 us, sampler isr max 29 us
+S3 LINE  GP27=WHITE    0  GP26=WHITE    5  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 265-2415  GP26 178-2885
+S4 p=119 r=-58 f=6 l=-18 u=866 af=0 h=0 pk=0 hs=0 cl=0 w=-6291 n=8 dxy=127 run=2655 late=1502 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 178-2691
+[S5] EVT 0x62 a=1 b=0
+[S5] STATE from to 0 3
+[S5] EVT 0x53 d=0cm a=90deg
+S4 p=112 r=-120 f=-12 l=-30 u=748 af=10 h=0 pk=0 hs=0 cl=0 w=-613 n=8 dxy=194 run=2925 late=1161 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2414  GP26 174-2691
+S4 p=126 r=-21 f=0 l=-12 u=862 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=508 run=2910 late=1037 ok=1 cal=1
+[S5] PING servo= 30 deg  range=  -- mm  echo=30495 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=WHITE    4  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2414  GP26 174-2691
+S4 p=110 r=13 f=-2 l=-6 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=260 run=2744 late=1469 ok=1 cal=1
+[S5] PING servo= 60 deg  range= 938 mm  echo= 5469 us
+S3 LINE  GP27=WHITE    4  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2414  GP26 174-2691
+[S5] PING servo= 90 deg  range= 214 mm  echo= 1250 us
+S4 p=112 r=1 f=-4 l=-16 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=48 run=2673 late=1195 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2414  GP26 174-2691
+[S5] PING servo=120 deg  range= 219 mm  echo= 1275 us
+S4 p=116 r=5 f=-2 l=-12 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=52 run=2692 late=1041 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 174-2691
+S4 p=117 r=7 f=0 l=-14 u=856 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=475 run=2677 late=1396 ok=1 cal=1
+[S5] PING servo=150 deg  range=  -- mm  echo=59506 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 174-2691
+S4 p=82 r=-49 f=-4 l=-26 u=856 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=123 run=2720 late=1324 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 174-2691
+[S5] PING servo= 85 deg  range= 219 mm  echo= 1275 us
+S4 p=111 r=11 f=-6 l=-12 u=860 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=26 run=2765 late=1078 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 174-2691
+[S5] PING servo= 80 deg  range=  -- mm  echo=59490 us  clear: no echo heard back within 4 m
+[S5] PING servo= 83 deg  range= 227 mm  echo= 1325 us
+S4 p=119 r=-2 f=0 l=-11 u=859 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=24 run=2726 late=1168 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 174-2691
+S4 p=113 r=-6 f=-2 l=-16 u=861 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=40 run=2766 late=996 ok=1 cal=1
+[S5] PING servo=125 deg  range= 214 mm  echo= 1250 us
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 174-2691
+[S5] PING servo=130 deg  range= 227 mm  echo= 1325 us
+S4 p=125 r=-2 f=-2 l=-13 u=857 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=42 run=2783 late=1107 ok=1 cal=1
+[S5] PING servo=135 deg  range=  -- mm  echo=59494 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 171-2691
+[S5] PING servo=132 deg  range= 934 mm  echo= 5448 us
+[S5] EVT 0x54 d=13cm a=90deg
+[S5] PROFILE closest_mm width_mm 214 136
+[S5] PROFILE clear_left_mm clear_right_mm 1000 1000
+[S5] PROFILE shift_left_mm shift_right_mm 266 148
+S4 p=100 r=-4 f=-16 l=-13 u=864 af=0 h=0 pk=0 hs=0 cl=0 w=0 n=7 dxy=92 run=2990 late=1422 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 171-2691
+[S5] STATE from to 3 0
+[S5] EVT 0x61 a=2 b=100
+[S5] PLAN action out_mm 2 315
+[S5] PLAN turn_deg tail_mm -28 135
+[S5] PLAN back_mm reverse_first_mm 315 0
+[S5] EVT 0x62 a=5 b=0
+S4 p=-20 r=-20 f=-92 l=-32 u=840 af=-160 h=0 pk=0 hs=0 cl=0 w=-1636 n=8 dxy=131 run=2806 late=1415 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 171-2691
+S4 p=86 r=10 f=-14 l=-6 u=858 af=-10 h=0 pk=0 hs=0 cl=0 w=-4757 n=8 dxy=300 run=2606 late=1182 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 171-2691
+S4 p=76 r=19 f=-16 l=2 u=846 af=-10 h=0 pk=0 hs=0 cl=0 w=-6803 n=8 dxy=127 run=2660 late=1155 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 171-2691
+S4 p=116 r=-71 f=-52 l=-14 u=852 af=-30 h=0 pk=0 hs=0 cl=0 w=-613 n=8 dxy=165 run=2725 late=1125 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    8  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 171-2691
+[S5] EVT 0x62 a=6 b=0
+S3 TIME barcode decode 1355 us (both paths)
+S4 p=322 r=46 f=176 l=24 u=882 af=240 h=0 pk=0 hs=0 cl=0 w=2506 n=8 dxy=320 run=2670 late=1140 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 171-2691
+S4 CLASS ACCELERATING t=43915 ms
+S4 p=128 r=-29 f=78 l=-38 u=884 af=270 h=0 pk=0 hs=0 cl=2 w=-409 n=8 dxy=266 run=2796 late=1160 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 171-2691
+S4 CLASS MOVING t=44035 ms
+S4 p=43 r=-70 f=-48 l=-50 u=846 af=30 h=0 pk=0 hs=0 cl=1 w=153 n=8 dxy=168 run=2781 late=1161 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 171-2691
+S4 p=57 r=2 f=-26 l=-18 u=864 af=-20 h=0 pk=0 hs=0 cl=1 w=-51 n=8 dxy=144 run=2590 late=1208 ok=1 cal=1
+S3 LINE  GP27=WHITE   10  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 171-2691
+S4 p=90 r=-63 f=-2 l=-48 u=852 af=10 h=0 pk=0 hs=0 cl=1 w=102 n=8 dxy=96 run=2801 late=1150 ok=1 cal=1
+S3 LINE  GP27=WHITE   10  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2414  GP26 171-2691
+S4 p=33 r=24 f=-30 l=2 u=858 af=20 h=0 pk=0 hs=0 cl=1 w=153 n=8 dxy=104 run=2584 late=1163 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=WHITE   27  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2457  GP26 171-2691
+S3 TIME barcode decode 897 us (both paths)
+S4 p=223 r=2 f=34 l=6 u=858 af=20 h=0 pk=0 hs=0 cl=1 w=0 n=8 dxy=111 run=2639 late=1181 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=BLACK  897  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 171-2691
+S4 p=74 r=30 f=24 l=0 u=862 af=-80 h=0 pk=0 hs=0 cl=1 w=-664 n=8 dxy=118 run=2662 late=1155 ok=1 cal=1
+S3 TIME line step max 320 us, period 9572-10436 us, sampler isr max 41 us
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 171-2691
+S4 p=98 r=-48 f=20 l=-26 u=854 af=40 h=0 pk=0 hs=0 cl=1 w=102 n=8 dxy=153 run=2790 late=1260 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2546  GP26 171-2691
+S4 p=82 r=-52 f=34 l=-29 u=870 af=0 h=0 pk=0 hs=0 cl=1 w=-204 n=7 dxy=166 run=2684 late=1130 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2546  GP26 168-2669
+S4 p=77 r=-72 f=11 l=-43 u=861 af=0 h=0 pk=0 hs=0 cl=1 w=-409 n=7 dxy=122 run=2651 late=1156 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2546  GP26 168-2669
+S4 p=90 r=-34 f=-2 l=-4 u=856 af=-10 h=0 pk=0 hs=0 cl=1 w=153 n=8 dxy=109 run=2778 late=1174 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2546  GP26 168-2669
+S4 p=64 r=-27 f=-12 l=-10 u=860 af=10 h=0 pk=0 hs=0 cl=1 w=51 n=8 dxy=129 run=2615 late=1122 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2546  GP26 168-2669
+S4 p=107 r=-54 f=6 l=-28 u=860 af=10 h=0 pk=0 hs=0 cl=1 w=-204 n=8 dxy=118 run=2637 late=1149 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2546  GP26 168-2669
+S4 p=94 r=-44 f=-24 l=-18 u=858 af=30 h=0 pk=0 hs=0 cl=1 w=102 n=8 dxy=144 run=2584 late=1155 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2546  GP26 168-2669
+S4 p=110 r=-43 f=-14 l=6 u=858 af=30 h=0 pk=0 hs=0 cl=1 w=102 n=8 dxy=91 run=2805 late=1158 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-2669
+S4 p=67 r=-15 f=-40 l=-4 u=852 af=-20 h=0 pk=0 hs=0 cl=1 w=153 n=8 dxy=104 run=2632 late=1145 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-2669
+S4 p=20 r=4 f=-14 l=-40 u=854 af=40 h=0 pk=0 hs=0 cl=1 w=0 n=8 dxy=120 run=2600 late=1184 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-2669
+S4 p=29 r=32 f=-24 l=18 u=850 af=-30 h=0 pk=0 hs=0 cl=1 w=0 n=8 dxy=126 run=2631 late=1125 ok=1 cal=1
+S3 LINE  GP27=WHITE   23  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-2669
+S4 p=55 r=-12 f=-2 l=-22 u=860 af=20 h=0 pk=0 hs=0 cl=1 w=-51 n=8 dxy=113 run=2814 late=1110 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-2669
+S4 p=93 r=-3 f=22 l=-16 u=858 af=20 h=0 pk=0 hs=0 cl=1 w=102 n=8 dxy=113 run=2603 late=1332 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-2669
+S4 p=134 r=-38 f=44 l=-16 u=876 af=-20 h=0 pk=0 hs=0 cl=1 w=409 n=8 dxy=157 run=2749 late=948 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-2669
+S4 p=165 r=-58 f=61 l=-48 u=882 af=0 h=0 pk=0 hs=0 cl=1 w=-51 n=7 dxy=162 run=2600 late=1087 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-2669
+S4 p=-59 r=-38 f=-22 l=-11 u=859 af=-640 h=0 pk=0 hs=0 cl=1 w=51 n=7 dxy=264 run=2702 late=1176 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-2669
+[S5] EVT 0x62 a=7 b=0
+S4 CLASS STATIONARY t=48375 ms
+S4 p=74 r=-26 f=-13 l=27 u=873 af=110 h=0 pk=0 hs=0 cl=0 w=2506 n=7 dxy=352 run=2706 late=1022 ok=1 cal=1
+S3 LINE  GP27=WHITE   10  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-2669
+[S5] STATE from to 0 4
+[S5] PING servo=180 deg  range=  -- mm  echo=59505 us  clear: no echo heard back within 4 m
+S4 p=-25 r=-93 f=-34 l=-44 u=858 af=-20 h=0 pk=0 hs=0 cl=0 w=3580 n=8 dxy=173 run=2787 late=1147 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    9  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-2669
+[S5] PING servo=165 deg  range=  -- mm  echo=59500 us  clear: no echo heard back within 4 m
+S4 p=154 r=-45 f=18 l=16 u=848 af=60 h=0 pk=0 hs=0 cl=0 w=6496 n=8 dxy=147 run=2750 late=1119 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    9  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-2669
+[S5] PING servo=150 deg  range=  -- mm  echo=59497 us  clear: no echo heard back within 4 m
+S4 p=127 r=30 f=-20 l=-6 u=854 af=0 h=0 pk=0 hs=0 cl=0 w=409 n=8 dxy=156 run=2698 late=1141 ok=1 cal=1
+S3 LINE  GP27=WHITE   10  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-3140
+[S5] EVT 0x62 a=8 b=0
+[S5] PING servo=180 deg  range=  -- mm  echo=59504 us  clear: no echo heard back within 4 m
+S4 p=159 r=2 f=-66 l=24 u=888 af=190 h=0 pk=0 hs=0 cl=0 w=358 n=8 dxy=407 run=2611 late=1069 ok=1 cal=1
+S3 LINE  GP27=WHITE   10  GP26=BLACK  876  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-3151
+S4 CLASS MOVING t=49435 ms
+[S5] PING servo=165 deg  range=  -- mm  echo=59505 us  clear: no echo heard back within 4 m
+S4 p=35 r=-41 f=-24 l=-30 u=844 af=130 h=0 pk=0 hs=0 cl=1 w=358 n=8 dxy=195 run=2808 late=1202 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    8  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-3151
+[S5] PING servo=150 deg  range=  -- mm  echo=59505 us  clear: no echo heard back within 4 m
+S4 p=40 r=-60 f=-42 l=-24 u=858 af=10 h=0 pk=0 hs=0 cl=1 w=358 n=8 dxy=214 run=2804 late=1114 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2546  GP26 168-3151
+[S5] PING servo=180 deg  range=  -- mm  echo=59509 us  clear: no echo heard back within 4 m
+S4 p=-71 r=-35 f=-74 l=0 u=854 af=-10 h=0 pk=0 hs=0 cl=1 w=102 n=8 dxy=153 run=2598 late=1142 ok=1 cal=1
+S3 LINE  GP27=WHITE   10  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2518  GP26 170-3150
+[S5] PING servo=165 deg  range=  -- mm  echo=59507 us  clear: no echo heard back within 4 m
+S4 p=61 r=-79 f=-32 l=-50 u=854 af=30 h=0 pk=0 hs=0 cl=1 w=-460 n=8 dxy=125 run=2652 late=1172 ok=1 cal=1
+S3 TIME line step max 294 us, period 9513-10483 us, sampler isr max 34 us
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2518  GP26 170-3150
+[S5] PING servo=150 deg  range=  -- mm  echo=59506 us  clear: no echo heard back within 4 m
+S4 p=-15 r=-37 f=-56 l=-8 u=846 af=-40 h=0 pk=0 hs=0 cl=1 w=-562 n=8 dxy=113 run=2755 late=1350 ok=1 cal=1
+S3 LINE  GP27=WHITE   10  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2518  GP26 170-3150
+[S5] PING servo=180 deg  range=  -- mm  echo=59504 us  clear: no echo heard back within 4 m
+S4 p=131 r=-82 f=36 l=0 u=854 af=-20 h=0 pk=0 hs=0 cl=1 w=-255 n=8 dxy=208 run=2812 late=1187 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2518  GP26 170-3150
+[S5] PING servo=165 deg  range=  -- mm  echo=59507 us  clear: no echo heard back within 4 m
+S4 p=-21 r=-16 f=-48 l=12 u=852 af=40 h=0 pk=0 hs=0 cl=1 w=767 n=8 dxy=109 run=2802 late=1144 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2518  GP26 170-3150
+[S5] PING servo=150 deg  range=  -- mm  echo=59505 us  clear: no echo heard back within 4 m
+S4 p=56 r=-18 f=18 l=36 u=870 af=-40 h=0 pk=0 hs=0 cl=1 w=255 n=7 dxy=152 run=2626 late=1114 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    6  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2518  GP26 172-3150
+[S5] PING servo=180 deg  range=  -- mm  echo=59502 us  clear: no echo heard back within 4 m
+S4 p=30 r=18 f=-9 l=-4 u=843 af=-20 h=0 pk=0 hs=0 cl=1 w=-664 n=7 dxy=135 run=2809 late=980 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2518  GP26 172-3150
+[S5] PING servo=165 deg  range=  -- mm  echo=59506 us  clear: no echo heard back within 4 m
+S4 p=84 r=-66 f=0 l=-46 u=866 af=10 h=0 pk=0 hs=0 cl=1 w=-460 n=8 dxy=116 run=2827 late=1171 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    6  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2518  GP26 172-3150
+[S5] PING servo=150 deg  range=  -- mm  echo=59506 us  clear: no echo heard back within 4 m
+S4 p=-14 r=12 f=-48 l=8 u=852 af=-20 h=0 pk=0 hs=0 cl=1 w=-102 n=8 dxy=112 run=2620 late=1186 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2518  GP26 172-3150
+[S5] PING servo=180 deg  range=  -- mm  echo=59510 us  clear: no echo heard back within 4 m
+S4 p=48 r=-41 f=10 l=-22 u=874 af=10 h=0 pk=0 hs=0 cl=1 w=-204 n=8 dxy=129 run=2620 late=1176 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-2518  GP26 172-3150
+[S5] PING servo=165 deg  range=  -- mm  echo=59507 us  clear: no echo heard back within 4 m
+S4 p=35 r=-19 f=-32 l=-14 u=852 af=40 h=0 pk=0 hs=0 cl=1 w=-255 n=8 dxy=139 run=2736 late=1156 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2518  GP26 172-3150
+[S5] PING servo=150 deg  range=  -- mm  echo=59508 us  clear: no echo heard back within 4 m
+[S5] WATCH passed: unseen_mm seen 190 0
+[S5] EVT 0x57 d=0cm a=180deg
+S4 p=6 r=-64 f=-48 l=4 u=854 af=40 h=0 pk=0 hs=0 cl=1 w=-409 n=8 dxy=232 run=2635 late=1245 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2518  GP26 171-3150
+[S5] STATE from to 4 0
+S4 p=58 r=-145 f=-32 l=-96 u=870 af=-10 h=0 pk=0 hs=0 cl=1 w=358 n=8 dxy=161 run=2615 late=1072 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2518  GP26 171-3150
+[S5] EVT 0x62 a=9 b=0
+S4 CLASS STATIONARY t=52475 ms
+S4 p=117 r=-55 f=8 l=-28 u=860 af=50 h=0 pk=0 hs=0 cl=0 w=818 n=8 dxy=231 run=2708 late=1035 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2518  GP26 171-3150
+S4 CLASS ACCELERATING t=52615 ms
+S4 p=76 r=-54 f=36 l=-24 u=864 af=130 h=0 pk=0 hs=0 cl=2 w=255 n=8 dxy=366 run=3010 late=1110 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2518  GP26 171-3150
+S4 CLASS MOVING t=52795 ms
+S4 p=-49 r=-7 f=-42 l=2 u=852 af=20 h=0 pk=0 hs=0 cl=1 w=-306 n=8 dxy=204 run=2645 late=1144 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2518  GP26 171-3150
+S4 p=25 r=-46 f=-14 l=-26 u=860 af=10 h=0 pk=0 hs=0 cl=1 w=-460 n=8 dxy=92 run=2599 late=1143 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2518  GP26 171-3150
+S4 p=61 r=-28 f=6 l=-13 u=864 af=30 h=0 pk=0 hs=0 cl=1 w=-358 n=7 dxy=106 run=2791 late=1244 ok=1 cal=1
+S3 LINE  GP27=WHITE   10  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2518  GP26 171-3150
+S4 p=3 r=-64 f=12 l=-34 u=866 af=30 h=0 pk=0 hs=0 cl=1 w=-204 n=8 dxy=143 run=2781 late=1075 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2518  GP26 171-3150
+S4 p=23 r=-88 f=-36 l=-60 u=856 af=30 h=0 pk=0 hs=0 cl=1 w=153 n=8 dxy=146 run=2611 late=1119 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2518  GP26 171-3150
+S4 p=53 r=-114 f=34 l=-64 u=872 af=10 h=0 pk=0 hs=0 cl=1 w=-153 n=8 dxy=165 run=2604 late=1351 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2518  GP26 171-3150
+S4 p=20 r=-87 f=-32 l=-52 u=842 af=0 h=0 pk=0 hs=0 cl=1 w=51 n=8 dxy=114 run=2604 late=1129 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2518  GP26 171-3150
+S4 p=66 r=-79 f=2 l=-50 u=866 af=20 h=0 pk=0 hs=0 cl=1 w=-102 n=8 dxy=158 run=2594 late=1166 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2518  GP26 171-3150
+S4 p=154 r=-45 f=16 l=-20 u=870 af=-190 h=0 pk=0 hs=0 cl=1 w=-204 n=8 dxy=148 run=2705 late=1098 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2518  GP26 171-3150
+[S5] EVT 0x62 a=10 b=0
+S4 CLASS STATIONARY t=54655 ms
+S4 p=15 r=-78 f=-76 l=-34 u=832 af=-30 h=0 pk=0 hs=0 cl=0 w=1534 n=8 dxy=303 run=2759 late=1026 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2518  GP26 171-3150
+S4 p=87 r=-112 f=84 l=-28 u=876 af=-60 h=0 pk=0 hs=0 cl=0 w=3478 n=8 dxy=324 run=2633 late=1150 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-2518  GP26 171-3150
+S4 p=81 r=-32 f=-4 l=0 u=846 af=50 h=0 pk=0 hs=0 cl=0 w=5575 n=8 dxy=146 run=2629 late=1150 ok=1 cal=1
+S3 TIME line step max 290 us, period 9532-10358 us, sampler isr max 32 us
+S3 LINE  GP27=BLACK 1000  GP26=EDGE   646  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-2881  GP26 171-3150
+S3 EVENT LINE FOUND
+S4 p=92 r=42 f=29 l=9 u=884 af=-20 h=0 pk=0 hs=0 cl=0 w=5217 n=7 dxy=142 run=2707 late=1383 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE   33  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3150
+[S5] EVT 0x62 a=11 b=0
+[S5] AVOID line found: S3 takes over, state 11 0
+[S5] EVT 0x62 a=13 b=0
+S4 p=186 r=57 f=91 l=20 u=866 af=310 h=0 pk=0 hs=0 cl=0 w=-869 n=7 dxy=197 run=2697 late=1123 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE   17  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3150
+S4 p=39 r=7 f=-32 l=-8 u=860 af=-30 h=0 pk=0 hs=0 cl=0 w=0 n=8 dxy=478 run=2784 late=1096 ok=1 cal=1
+[S5] EVT 0x60 a=3 b=8
+S3 TUNE kp=25 kd=25 (x100)
+S3 TUNE curve boost=250 (x100)
+S3 LINE  GP27=WHITE    3  GP26=WHITE   17  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3150
+[S5] STATE from to 0 1
+S4 p=171 r=-40 f=38 l=-50 u=866 af=70 h=0 pk=0 hs=0 cl=0 w=-767 n=8 dxy=130 run=2627 late=1304 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE   23  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3150
+S4 CLASS MOVING t=56095 ms
+S4 p=40 r=-2 f=-10 l=-28 u=862 af=100 h=0 pk=0 hs=0 cl=1 w=-2097 n=8 dxy=163 run=2802 late=1179 ok=1 cal=1
+[S5] PING servo= 90 deg  range=  -- mm  echo=59496 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=WHITE    3  GP26=WHITE  130  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3150
+S4 p=131 r=-47 f=46 l=-30 u=876 af=20 h=0 pk=0 hs=0 cl=1 w=-2659 n=8 dxy=99 run=2627 late=1542 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=EDGE   673  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3150
+[S5] PING servo= 90 deg  range=  -- mm  echo=59495 us  clear: no echo heard back within 4 m
+S4 p=19 r=-14 f=-30 l=-6 u=852 af=100 h=0 pk=0 hs=0 cl=1 w=-1534 n=8 dxy=81 run=2830 late=1217 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=BLACK  957  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3150
+S4 p=16 r=-14 f=-10 l=-18 u=852 af=10 h=0 pk=0 hs=0 cl=1 w=-2046 n=8 dxy=194 run=2692 late=1241 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=EDGE   490  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3150
+[S5] PING servo= 90 deg  range=  -- mm  echo=59487 us  clear: no echo heard back within 4 m
+S4 p=69 r=-38 f=-2 l=-22 u=860 af=-90 h=0 pk=0 hs=0 cl=1 w=-2301 n=8 dxy=108 run=2673 late=1213 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=EDGE   528  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3150
+S4 p=62 r=-17 f=-22 l=-18 u=854 af=-10 h=0 pk=0 hs=0 cl=1 w=-2404 n=8 dxy=91 run=2618 late=1183 ok=1 cal=1
+S3 LINE  GP27=WHITE    9  GP26=BLACK  957  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3150
+[S5] PING servo= 90 deg  range=  -- mm  echo=59489 us  clear: no echo heard back within 4 m
+S4 p=227 r=4 f=138 l=8 u=882 af=190 h=0 pk=0 hs=0 cl=1 w=-664 n=8 dxy=187 run=2654 late=1184 ok=1 cal=1
+S3 LINE  GP27=WHITE    9  GP26=BLACK  907  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 p=112 r=11 f=-24 l=8 u=860 af=-30 h=0 pk=0 hs=0 cl=1 w=-1636 n=8 dxy=202 run=2623 late=1222 ok=1 cal=1
+[S5] PING servo= 90 deg  range=  -- mm  echo=59486 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=WHITE    3  GP26=EDGE   323  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 p=10 r=-13 f=-36 l=-13 u=857 af=-20 h=0 pk=0 hs=0 cl=1 w=-2250 n=7 dxy=118 run=2788 late=1467 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE   65  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+[S5] PING servo= 90 deg  range=1199 mm  echo= 6994 us
+S4 p=94 r=-62 f=-36 l=-66 u=861 af=30 h=0 pk=0 hs=0 cl=1 w=-1994 n=7 dxy=173 run=2683 late=1189 ok=1 cal=1
+S3 LINE  GP27=WHITE    9  GP26=WHITE   60  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 p=81 r=-16 f=0 l=-24 u=866 af=0 h=0 pk=0 hs=0 cl=1 w=-2557 n=8 dxy=135 run=2775 late=1161 ok=1 cal=1
+S3 LINE  GP27=WHITE   26  GP26=EDGE   366  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+[S5] PING servo= 90 deg  range=1171 mm  echo= 6829 us
+S4 p=138 r=-14 f=44 l=-12 u=858 af=100 h=0 pk=0 hs=0 cl=1 w=-1739 n=8 dxy=81 run=2738 late=1127 ok=1 cal=1
+S3 LINE  GP27=WHITE   44  GP26=WHITE   49  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 p=-47 r=-34 f=-30 l=-8 u=856 af=-50 h=0 pk=0 hs=0 cl=1 w=-2608 n=8 dxy=143 run=2642 late=1172 ok=1 cal=1
+[S5] PING servo= 90 deg  range=1169 mm  echo= 6818 us
+S3 LINE  GP27=WHITE   56  GP26=WHITE   71  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 p=43 r=-20 f=-90 l=-18 u=846 af=0 h=0 pk=0 hs=0 cl=1 w=-2711 n=8 dxy=133 run=2624 late=1383 ok=1 cal=1
+S3 LINE  GP27=WHITE   32  GP26=WHITE   39  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+[S5] PING servo= 90 deg  range= 759 mm  echo= 4426 us
+S4 p=37 r=0 f=-10 l=-18 u=852 af=60 h=0 pk=0 hs=0 cl=1 w=-1994 n=8 dxy=143 run=2612 late=1175 ok=1 cal=1
+S3 LINE  GP27=WHITE   38  GP26=WHITE   33  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 p=-63 r=10 f=-114 l=0 u=820 af=30 h=0 pk=0 hs=0 cl=1 w=-2864 n=8 dxy=206 run=2687 late=1189 ok=1 cal=1
+S3 LINE  GP27=WHITE   32  GP26=WHITE   28  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+[S5] PING servo= 90 deg  range= 451 mm  echo= 2629 us
+S4 p=-5 r=8 f=-50 l=-24 u=864 af=-20 h=0 pk=0 hs=0 cl=1 w=-1023 n=8 dxy=247 run=2613 late=1221 ok=1 cal=1
+S3 LINE  GP27=WHITE   26  GP26=WHITE   17  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 p=-1074 r=21 f=-138 l=12 u=883 af=170 h=-5 pk=0 hs=0 cl=1 w=255 n=9 dxy=2135 run=2846 late=1284 ok=1 cal=1
+S4 HUMP climbing (nose down)
+S3 LINE  GP27=WHITE   26  GP26=BLACK  826  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 CLASS CLIMBING_HUMP t=59615 ms
+[S5] PING servo= 90 deg  range= 442 mm  echo= 2579 us
+S4 p=-646 r=46 f=-112 l=2 u=856 af=-180 h=-10 pk=0 hs=1 cl=4 w=102 n=8 dxy=252 run=2837 late=1303 ok=1 cal=1
+S3 LINE  GP27=WHITE   26  GP26=BLACK  794  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 p=-721 r=38 f=-130 l=-4 u=852 af=-10 h=-10 pk=0 hs=1 cl=4 w=0 n=7 dxy=76 run=2600 late=1224 ok=1 cal=1
+S3 LINE  GP27=WHITE   21  GP26=BLACK  816  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+[S5] PING servo= 90 deg  range= 710 mm  echo= 4140 us
+S3 TIME barcode decode 1226 us (both paths)
+S4 p=-793 r=33 f=-12 l=12 u=894 af=450 h=-15 pk=0 hs=1 cl=4 w=-1841 n=8 dxy=299 run=2816 late=1468 ok=1 cal=1
+S3 TIME line step max 385 us, period 9519-10434 us, sampler isr max 41 us
+S3 LINE  GP27=WHITE   21  GP26=BLACK  816  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 p=-934 r=29 f=-206 l=-2 u=828 af=-150 h=-30 pk=0 hs=1 cl=4 w=-1585 n=8 dxy=324 run=2646 late=1591 ok=1 cal=1
+[S5] PING servo= 90 deg  range= 731 mm  echo= 4260 us
+[S5] LINE confirmed: followed_mm 0 120 0
+S3 LINE  GP27=WHITE   15  GP26=EDGE   607  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 p=-673 r=133 f=-22 l=54 u=920 af=-80 h=-39 pk=0 hs=1 cl=4 w=-1892 n=8 dxy=277 run=2817 late=1340 ok=1 cal=1
+S3 LINE  GP27=WHITE    9  GP26=EDGE   301  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+[S5] PING servo= 90 deg  range= 403 mm  echo= 2348 us
+S4 p=-851 r=183 f=-190 l=40 u=836 af=10 h=-47 pk=0 hs=1 cl=4 w=-1381 n=8 dxy=306 run=2642 late=1170 ok=1 cal=1
+S3 LINE  GP27=WHITE    9  GP26=WHITE   23  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+[S5] STATE from to 1 2
+[S5] EVT 0x50 d=41cm a=90deg
+S3 TUNE kp=25 kd=25 (x100)
+S3 TUNE curve boost=250 (x100)
+S4 p=-687 r=115 f=-98 l=-18 u=832 af=130 h=-59 pk=0 hs=1 cl=4 w=-3273 n=8 dxy=529 run=2702 late=1142 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE   12  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+[S5] PING servo= 90 deg  range= 691 mm  echo= 4029 us
+[S5] STATE from to 2 1
+[S5] EVT 0x51 d=69cm a=90deg
+S3 TUNE kp=25 kd=25 (x100)
+S3 TUNE curve boost=250 (x100)
+S4 p=-587 r=250 f=-108 l=14 u=844 af=-50 h=-72 pk=0 hs=1 cl=4 w=-1790 n=8 dxy=480 run=2678 late=1518 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    7  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 HUMP one wheel up (left side)
+S4 p=-377 r=721 f=-70 l=124 u=838 af=-130 h=-80 pk=0 hs=1 cl=4 w=-3631 n=8 dxy=1178 run=2742 late=1211 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    7  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+[S5] PING servo= 90 deg  range= 665 mm  echo= 3879 us
+S3 TIME barcode decode 1310 us (both paths)
+S4 p=-593 r=607 f=-184 l=102 u=808 af=20 h=-84 pk=0 hs=1 cl=4 w=-3785 n=8 dxy=1013 run=2804 late=1119 ok=1 cal=1
+S3 LINE  GP27=WHITE    9  GP26=WHITE    1  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-2889  GP26 171-3157
+S4 p=-196 r=31 f=-130 l=-108 u=892 af=-50 h=-93 pk=0 hs=1 cl=4 w=-3069 n=8 dxy=424 run=2623 late=1127 ok=1 cal=1
+[S5] PING servo= 90 deg  range= 669 mm  echo= 3899 us
+S3 LINE  GP27=EDGE   712  GP26=EDGE   558  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 183-2889  GP26 171-3157
+S4 HUMP #1 peak=16 mm theta_max=1165 cdeg L.sin=16 mm integrated=9 mm (run peak 16 mm)
+S4 CLASS MOVING t=61835 ms
+S3 EVENT JUNCTION
+S4 HUMP climbing (nose up)
+S4 p=981 r=108 f=100 l=-162 u=994 af=80 h=10 pk=16 hs=1 cl=1 w=-562 n=7 dxy=250 run=2933 late=1333 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3435  GP26 171-3264
+S4 CLASS CLIMBING_HUMP t=61955 ms
+[S5] PING servo= 90 deg  range= 746 mm  echo= 4350 us
+S4 p=598 r=-510 f=54 l=-98 u=846 af=-30 h=21 pk=16 hs=1 cl=4 w=-204 n=8 dxy=204 run=2824 late=1052 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3694
+S4 p=465 r=-799 f=42 l=-174 u=816 af=-10 h=27 pk=16 hs=1 cl=4 w=-102 n=8 dxy=123 run=2667 late=1053 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  995  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range= 948 mm  echo= 5529 us
+S4 p=584 r=-631 f=68 l=-134 u=842 af=-10 h=34 pk=16 hs=1 cl=4 w=-153 n=8 dxy=123 run=2606 late=1039 ok=1 cal=1
+S3 LINE  GP27=BLACK  995  GP26=BLACK  972  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+S4 p=416 r=-522 f=18 l=-42 u=840 af=0 h=41 pk=16 hs=1 cl=4 w=-102 n=8 dxy=103 run=2670 late=1039 ok=1 cal=1
+S3 LINE  GP27=BLACK  990  GP26=BLACK  967  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=1124 mm  echo= 6553 us
+S4 p=348 r=-422 f=-17 l=-56 u=787 af=0 h=48 pk=16 hs=1 cl=4 w=-51 n=9 dxy=109 run=2893 late=1062 ok=1 cal=1
+S3 LINE  GP27=BLACK  926  GP26=BLACK  913  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+S4 HUMP #2 peak=15 mm theta_max=1138 cdeg L.sin=15 mm integrated=4 mm (run peak 16 mm)
+S4 CLASS MOVING t=63115 ms
+S4 p=461 r=-442 f=24 l=-120 u=898 af=-10 h=2 pk=16 hs=0 cl=1 w=51 n=8 dxy=130 run=2972 late=1225 ok=1 cal=1
+S3 LINE  GP27=EDGE   589  GP26=BLACK  804  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59490 us  clear: no echo heard back within 4 m
+S4 p=314 r=-202 f=60 l=-42 u=883 af=-70 h=0 pk=16 hs=0 cl=1 w=-2250 n=9 dxy=131 run=2856 late=1246 ok=1 cal=1
+S3 LINE  GP27=EDGE   485  GP26=BLACK  877  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S3 EVENT JUNCTION
+S4 p=167 r=-159 f=22 l=-36 u=838 af=-30 h=0 pk=16 hs=0 cl=1 w=204 n=8 dxy=78 run=2687 late=1060 ok=1 cal=1
+S3 LINE  GP27=EDGE   416  GP26=BLACK  872  -> turn RIGHT       4 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59491 us  clear: no echo heard back within 4 m
+S4 p=157 r=-118 f=-6 l=-20 u=862 af=-120 h=0 pk=16 hs=0 cl=1 w=-2199 n=8 dxy=34 run=2657 late=1072 ok=1 cal=1
+S3 LINE  GP27=EDGE   457  GP26=BLACK  859  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 HUMP #3 (one wheel) peak=17 mm roll_max=890 cdeg over 103 mm (run peak 17 mm)
+S3 EVENT JUNCTION
+S4 p=363 r=54 f=34 l=-2 u=844 af=-20 h=4 pk=17 hs=0 cl=1 w=204 n=8 dxy=60 run=2903 late=1048 ok=1 cal=1
+S3 LINE  GP27=EDGE   626  GP26=BLACK  818  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59492 us  clear: no echo heard back within 4 m
+S4 p=338 r=7 f=38 l=-6 u=857 af=0 h=8 pk=17 hs=0 cl=1 w=0 n=7 dxy=50 run=2612 late=1057 ok=1 cal=1
+S3 LINE  GP27=EDGE   612  GP26=BLACK  790  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59492 us  clear: no echo heard back within 4 m
+S4 p=387 r=60 f=12 l=0 u=840 af=0 h=14 pk=17 hs=0 cl=1 w=-51 n=8 dxy=85 run=2795 late=1084 ok=1 cal=1
+S3 LINE  GP27=EDGE   712  GP26=EDGE   496  -> turn LEFT        3 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=422 r=47 f=38 l=-4 u=858 af=0 h=20 pk=17 hs=0 cl=1 w=204 n=8 dxy=59 run=2799 late=1050 ok=1 cal=1
+S3 LINE  GP27=EDGE   426  GP26=WHITE  151  -> turn RIGHT       1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59487 us  clear: no echo heard back within 4 m
+S4 HUMP climbing (nose up)
+S4 p=747 r=11 f=36 l=-12 u=826 af=-90 h=27 pk=17 hs=1 cl=1 w=-358 n=8 dxy=109 run=2616 late=1075 ok=1 cal=1
+S4 CLASS CLIMBING_HUMP t=64736 ms
+S3 LINE  GP27=EDGE   357  GP26=WHITE   92  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=728 r=-56 f=80 l=-16 u=832 af=0 h=35 pk=17 hs=1 cl=4 w=-460 n=8 dxy=77 run=2728 late=1214 ok=1 cal=1
+S3 LINE  GP27=EDGE   348  GP26=WHITE  223  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59492 us  clear: no echo heard back within 4 m
+S4 p=1002 r=-52 f=138 l=-2 u=894 af=40 h=45 pk=17 hs=1 cl=4 w=102 n=8 dxy=88 run=2670 late=1054 ok=1 cal=1
+S3 TIME line step max 573 us, period 9533-10510 us, sampler isr max 35 us
+S3 LINE  GP27=EDGE   576  GP26=EDGE   409  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=484 r=-322 f=38 l=-64 u=840 af=-40 h=60 pk=17 hs=1 cl=4 w=-153 n=8 dxy=114 run=2787 late=1404 ok=1 cal=1
+[S5] PING servo= 90 deg  range=  -- mm  echo=59490 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   271  GP26=EDGE   541  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 HUMP one wheel up (right side)
+S4 p=482 r=-171 f=52 l=-40 u=848 af=-20 h=68 pk=17 hs=1 cl=4 w=-1023 n=8 dxy=54 run=2774 late=1409 ok=1 cal=1
+S3 LINE  GP27=EDGE   334  GP26=EDGE   482  -> turn RIGHT       1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59483 us  clear: no echo heard back within 4 m
+S4 p=421 r=-215 f=40 l=-48 u=842 af=-30 h=75 pk=17 hs=1 cl=4 w=-613 n=8 dxy=31 run=2613 late=1347 ok=1 cal=1
+S3 LINE  GP27=WHITE  111  GP26=EDGE   518  -> turn RIGHT      17 mm/s  FOLLOW (one sensor off line)   cal GP27 183-3697  GP26 171-3697
+S4 p=418 r=-166 f=48 l=-32 u=862 af=10 h=80 pk=17 hs=1 cl=4 w=-1074 n=8 dxy=40 run=2625 late=1168 ok=1 cal=1
+S3 LINE  GP27=WHITE  202  GP26=EDGE   627  -> turn RIGHT       7 mm/s  FOLLOW (one sensor off line)   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59486 us  clear: no echo heard back within 4 m
+S4 p=424 r=-153 f=30 l=-42 u=848 af=0 h=86 pk=17 hs=1 cl=4 w=-51 n=8 dxy=37 run=2812 late=1224 ok=1 cal=1
+S3 LINE  GP27=EDGE   485  GP26=EDGE   673  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=383 r=-155 f=50 l=-36 u=844 af=0 h=92 pk=17 hs=1 cl=4 w=-51 n=8 dxy=31 run=2603 late=1347 ok=1 cal=1
+S3 EVENT JUNCTION
+S3 LINE  GP27=EDGE   658  GP26=EDGE   700  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59485 us  clear: no echo heard back within 4 m
+S4 p=412 r=-122 f=45 l=-29 u=866 af=10 h=97 pk=17 hs=1 cl=4 w=0 n=7 dxy=48 run=2628 late=1168 ok=1 cal=1
+S3 LINE  GP27=EDGE   621  GP26=EDGE   673  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+S4 HUMP #4 (one wheel) peak=7 mm roll_max=352 cdeg over 50 mm (run peak 17 mm)
+S4 p=408 r=-161 f=52 l=-45 u=861 af=10 h=103 pk=17 hs=1 cl=4 w=51 n=7 dxy=53 run=2801 late=1051 ok=1 cal=1
+S3 LINE  GP27=EDGE   535  GP26=EDGE   668  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59486 us  clear: no echo heard back within 4 m
+S4 p=375 r=-117 f=36 l=-34 u=850 af=0 h=108 pk=17 hs=1 cl=4 w=102 n=8 dxy=34 run=2820 late=1048 ok=1 cal=1
+S3 LINE  GP27=EDGE   599  GP26=EDGE   650  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S3 EVENT JUNCTION
+S4 p=340 r=-160 f=16 l=-48 u=856 af=0 h=114 pk=17 hs=1 cl=4 w=102 n=8 dxy=31 run=2664 late=1082 ok=1 cal=1
+[S5] PING servo= 90 deg  range=  -- mm  echo=59485 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   662  GP26=EDGE   609  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+S4 p=369 r=-152 f=40 l=-44 u=864 af=10 h=118 pk=17 hs=1 cl=4 w=102 n=8 dxy=35 run=2763 late=1359 ok=1 cal=1
+S3 LINE  GP27=EDGE   662  GP26=EDGE   600  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59485 us  clear: no echo heard back within 4 m
+S4 p=340 r=-141 f=14 l=-30 u=862 af=0 h=123 pk=17 hs=1 cl=4 w=51 n=9 dxy=34 run=2826 late=1026 ok=1 cal=1
+S3 LINE  GP27=EDGE   649  GP26=EDGE   609  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+S4 p=364 r=-125 f=34 l=-38 u=872 af=0 h=129 pk=17 hs=1 cl=4 w=-51 n=8 dxy=35 run=2622 late=1028 ok=1 cal=1
+S3 LINE  GP27=EDGE   649  GP26=EDGE   600  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59487 us  clear: no echo heard back within 4 m
+S4 p=340 r=-113 f=52 l=-34 u=880 af=10 h=134 pk=17 hs=1 cl=4 w=0 n=8 dxy=48 run=2611 late=1052 ok=1 cal=1
+S3 LINE  GP27=EDGE   658  GP26=EDGE   595  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S3 EVENT JUNCTION
+S4 p=327 r=-138 f=26 l=-34 u=858 af=-10 h=138 pk=17 hs=1 cl=4 w=-51 n=8 dxy=33 run=2631 late=1039 ok=1 cal=1
+[S5] PING servo= 90 deg  range=  -- mm  echo=59485 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   658  GP26=EDGE   591  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+S3 TIME barcode decode 5769 us (both paths)
+S4 p=297 r=-116 f=18 l=-27 u=854 af=0 h=143 pk=17 hs=1 cl=4 w=-102 n=7 dxy=36 run=2760 late=1368 ok=1 cal=1
+S3 LINE  GP27=EDGE   653  GP26=EDGE   591  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59482 us  clear: no echo heard back within 4 m
+S4 p=293 r=-149 f=17 l=-39 u=860 af=0 h=148 pk=17 hs=1 cl=4 w=51 n=9 dxy=34 run=2810 late=1053 ok=1 cal=1
+S3 LINE  GP27=EDGE   658  GP26=EDGE   564  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=309 r=-145 f=27 l=-32 u=870 af=10 h=151 pk=17 hs=1 cl=4 w=51 n=7 dxy=34 run=2612 late=1075 ok=1 cal=1
+S3 LINE  GP27=EDGE   649  GP26=EDGE   555  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59489 us  clear: no echo heard back within 4 m
+S3 TIME barcode decode 280 us (both paths)
+S4 p=300 r=-134 f=20 l=-36 u=848 af=10 h=156 pk=17 hs=1 cl=4 w=51 n=7 dxy=23 run=2814 late=1034 ok=1 cal=1
+S3 LINE  GP27=EDGE   644  GP26=EDGE   555  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=285 r=-112 f=28 l=-34 u=874 af=10 h=160 pk=17 hs=1 cl=4 w=0 n=8 dxy=34 run=2823 late=1101 ok=1 cal=1
+S3 LINE  GP27=EDGE   653  GP26=EDGE   505  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59490 us  clear: no echo heard back within 4 m
+S4 p=269 r=-77 f=22 l=-18 u=858 af=0 h=164 pk=17 hs=1 cl=4 w=51 n=8 dxy=33 run=2660 late=1059 ok=1 cal=1
+S3 LINE  GP27=EDGE   626  GP26=EDGE   514  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=256 r=-114 f=16 l=-36 u=864 af=-10 h=167 pk=17 hs=1 cl=4 w=51 n=8 dxy=32 run=2676 late=1045 ok=1 cal=1
+[S5] PING servo= 90 deg  range=  -- mm  echo=59493 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   621  GP26=EDGE   459  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S3 TIME barcode decode 291 us (both paths)
+S4 p=264 r=-112 f=16 l=-34 u=854 af=20 h=171 pk=17 hs=1 cl=4 w=0 n=8 dxy=30 run=2779 late=1528 ok=1 cal=1
+S3 LINE  GP27=EDGE   594  GP26=EDGE   455  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59492 us  clear: no echo heard back within 4 m
+S4 p=288 r=-76 f=34 l=-24 u=878 af=-10 h=175 pk=17 hs=1 cl=4 w=-51 n=8 dxy=44 run=2824 late=1061 ok=1 cal=1
+S3 LINE  GP27=EDGE   594  GP26=EDGE   418  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=263 r=-129 f=16 l=-22 u=848 af=10 h=179 pk=17 hs=1 cl=4 w=0 n=8 dxy=79 run=2596 late=1016 ok=1 cal=1
+S3 TIME line step max 299 us, period 9652-10348 us, sampler isr max 43 us
+S3 LINE  GP27=EDGE   617  GP26=EDGE   468  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59486 us  clear: no echo heard back within 4 m
+S4 p=305 r=-126 f=34 l=-28 u=862 af=-10 h=183 pk=17 hs=1 cl=4 w=0 n=8 dxy=32 run=2833 late=1389 ok=1 cal=1
+S3 LINE  GP27=EDGE   617  GP26=EDGE   450  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S3 TIME barcode decode 671 us (both paths)
+S4 p=316 r=-144 f=30 l=-36 u=862 af=-10 h=187 pk=17 hs=1 cl=4 w=153 n=8 dxy=34 run=2631 late=1053 ok=1 cal=1
+S3 LINE  GP27=EDGE   617  GP26=EDGE   450  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59489 us  clear: no echo heard back within 4 m
+S4 p=336 r=-130 f=35 l=-37 u=851 af=0 h=192 pk=17 hs=1 cl=4 w=-51 n=9 dxy=31 run=2825 late=1039 ok=1 cal=1
+S3 LINE  GP27=EDGE   626  GP26=EDGE   473  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=405 r=-115 f=54 l=-25 u=861 af=10 h=197 pk=17 hs=1 cl=4 w=-102 n=7 dxy=41 run=2754 late=1058 ok=1 cal=1
+[S5] PING servo= 90 deg  range=  -- mm  echo=59488 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   621  GP26=EDGE   505  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=380 r=-130 f=41 l=-38 u=848 af=0 h=202 pk=17 hs=1 cl=4 w=-153 n=7 dxy=34 run=2805 late=1571 ok=1 cal=1
+S3 LINE  GP27=EDGE   621  GP26=EDGE   509  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=55014 us  clear: no echo heard back within 4 m
+S4 p=376 r=-113 f=36 l=-34 u=861 af=0 h=207 pk=17 hs=1 cl=4 w=0 n=7 dxy=47 run=2821 late=1106 ok=1 cal=1
+S3 LINE  GP27=EDGE   612  GP26=EDGE   500  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=352 r=-98 f=36 l=-24 u=862 af=10 h=213 pk=17 hs=1 cl=4 w=-51 n=8 dxy=42 run=2798 late=1074 ok=1 cal=1
+S3 LINE  GP27=EDGE   612  GP26=EDGE   509  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59488 us  clear: no echo heard back within 4 m
+S3 TIME barcode decode 275 us (both paths)
+S4 p=353 r=-123 f=36 l=-36 u=864 af=-10 h=218 pk=17 hs=1 cl=4 w=-51 n=8 dxy=34 run=2617 late=1060 ok=1 cal=1
+S3 LINE  GP27=EDGE   608  GP26=EDGE   505  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=339 r=-105 f=36 l=-20 u=856 af=10 h=223 pk=17 hs=1 cl=4 w=0 n=8 dxy=24 run=2674 late=1254 ok=1 cal=1
+S3 LINE  GP27=EDGE   580  GP26=EDGE   450  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59489 us  clear: no echo heard back within 4 m
+S4 p=304 r=-115 f=24 l=-28 u=854 af=0 h=227 pk=17 hs=1 cl=4 w=-51 n=8 dxy=34 run=2664 late=1096 ok=1 cal=1
+S3 LINE  GP27=EDGE   562  GP26=EDGE   346  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=341 r=-115 f=34 l=-38 u=862 af=-10 h=232 pk=17 hs=1 cl=4 w=51 n=8 dxy=34 run=2672 late=1103 ok=1 cal=1
+S3 LINE  GP27=EDGE   571  GP26=EDGE   382  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59491 us  clear: no echo heard back within 4 m
+S4 p=330 r=-86 f=36 l=-28 u=856 af=0 h=236 pk=17 hs=1 cl=4 w=0 n=8 dxy=34 run=2610 late=1363 ok=1 cal=1
+S3 LINE  GP27=EDGE   585  GP26=EDGE   423  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=280 r=-89 f=14 l=-28 u=868 af=0 h=241 pk=17 hs=1 cl=4 w=102 n=8 dxy=31 run=2659 late=1040 ok=1 cal=1
+[S5] PING servo= 90 deg  range=  -- mm  echo=59492 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   589  GP26=EDGE   441  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=291 r=-50 f=20 l=-18 u=858 af=10 h=245 pk=17 hs=1 cl=4 w=0 n=8 dxy=32 run=2763 late=1329 ok=1 cal=1
+S3 LINE  GP27=EDGE   612  GP26=EDGE   496  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59493 us  clear: no echo heard back within 4 m
+S4 p=309 r=-64 f=25 l=-20 u=852 af=0 h=249 pk=17 hs=1 cl=4 w=0 n=7 dxy=24 run=2653 late=1048 ok=1 cal=1
+S3 LINE  GP27=EDGE   630  GP26=EDGE   536  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=328 r=-43 f=27 l=-20 u=854 af=0 h=255 pk=17 hs=1 cl=4 w=-51 n=7 dxy=37 run=2769 late=1085 ok=1 cal=1
+S3 LINE  GP27=EDGE   608  GP26=EDGE   509  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59488 us  clear: no echo heard back within 4 m
+S4 p=309 r=-52 f=29 l=-18 u=861 af=10 h=259 pk=17 hs=1 cl=4 w=0 n=7 dxy=34 run=2820 late=1066 ok=1 cal=1
+S3 LINE  GP27=EDGE   585  GP26=EDGE   423  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=312 r=-54 f=34 l=-20 u=856 af=10 h=263 pk=17 hs=1 cl=4 w=102 n=8 dxy=31 run=2820 late=1057 ok=1 cal=1
+S3 LINE  GP27=EDGE   599  GP26=EDGE   491  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59485 us  clear: no echo heard back within 4 m
+S4 p=309 r=-39 f=24 l=-26 u=854 af=20 h=268 pk=17 hs=1 cl=4 w=51 n=8 dxy=34 run=2686 late=1047 ok=1 cal=1
+S3 LINE  GP27=EDGE   589  GP26=EDGE   505  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=352 r=-25 f=34 l=-18 u=858 af=0 h=273 pk=17 hs=1 cl=4 w=-51 n=8 dxy=35 run=2657 late=1061 ok=1 cal=1
+S3 LINE  GP27=EDGE   603  GP26=EDGE   500  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59486 us  clear: no echo heard back within 4 m
+S4 p=374 r=-1 f=30 l=-4 u=854 af=10 h=278 pk=17 hs=1 cl=4 w=0 n=8 dxy=31 run=2665 late=1075 ok=1 cal=1
+S3 LINE  GP27=EDGE   599  GP26=EDGE   477  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=328 r=-19 f=34 l=-18 u=864 af=0 h=283 pk=17 hs=1 cl=4 w=0 n=8 dxy=36 run=2660 late=1061 ok=1 cal=1
+[S5] PING servo= 90 deg  range=  -- mm  echo=59490 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   649  GP26=EDGE   555  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=330 r=-8 f=26 l=-16 u=854 af=10 h=288 pk=17 hs=1 cl=4 w=0 n=8 dxy=31 run=2610 late=1579 ok=1 cal=1
+S3 LINE  GP27=EDGE   658  GP26=EDGE   573  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=356 r=6 f=32 l=-18 u=860 af=10 h=293 pk=17 hs=1 cl=4 w=102 n=8 dxy=34 run=2659 late=1069 ok=1 cal=1
+[S5] PING servo= 90 deg  range=  -- mm  echo=59482 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   635  GP26=EDGE   527  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=407 r=-7 f=34 l=-14 u=846 af=0 h=299 pk=17 hs=1 cl=4 w=102 n=8 dxy=35 run=2747 late=1285 ok=1 cal=1
+S3 TIME line step max 389 us, period 9581-10360 us, sampler isr max 49 us
+S3 LINE  GP27=EDGE   658  GP26=EDGE   564  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59489 us  clear: no echo heard back within 4 m
+S4 p=381 r=0 f=45 l=-11 u=843 af=-10 h=305 pk=17 hs=1 cl=4 w=-51 n=7 dxy=31 run=2665 late=1341 ok=1 cal=1
+S3 LINE  GP27=EDGE   635  GP26=EDGE   527  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=345 r=-15 f=36 l=-22 u=858 af=0 h=310 pk=17 hs=1 cl=4 w=0 n=8 dxy=33 run=2676 late=1070 ok=1 cal=1
+S3 LINE  GP27=EDGE   617  GP26=EDGE   496  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=1181 mm  echo= 6888 us
+S4 p=373 r=4 f=38 l=-13 u=848 af=0 h=315 pk=17 hs=1 cl=4 w=51 n=7 dxy=31 run=2719 late=1051 ok=1 cal=1
+S3 LINE  GP27=EDGE   594  GP26=EDGE   459  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=356 r=-6 f=41 l=-16 u=864 af=0 h=320 pk=17 hs=1 cl=4 w=-51 n=7 dxy=33 run=2809 late=1043 ok=1 cal=1
+[S5] PING servo= 90 deg  range=1199 mm  echo= 6989 us
+S3 LINE  GP27=EDGE   594  GP26=EDGE   450  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=379 r=-15 f=34 l=-16 u=860 af=0 h=325 pk=17 hs=1 cl=4 w=0 n=8 dxy=33 run=2826 late=1263 ok=1 cal=1
+S3 LINE  GP27=EDGE   594  GP26=EDGE   459  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=1198 mm  echo= 6988 us
+S4 p=352 r=-13 f=38 l=-14 u=860 af=0 h=330 pk=17 hs=1 cl=4 w=-51 n=8 dxy=31 run=2732 late=1049 ok=1 cal=1
+S3 LINE  GP27=EDGE   608  GP26=EDGE   500  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=306 r=5 f=20 l=-10 u=860 af=10 h=334 pk=17 hs=1 cl=4 w=0 n=8 dxy=36 run=2696 late=1051 ok=1 cal=1
+S3 LINE  GP27=EDGE   612  GP26=EDGE   509  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=  -- mm  echo=59489 us  clear: no echo heard back within 4 m
+S4 p=359 r=-6 f=38 l=-16 u=854 af=0 h=339 pk=17 hs=1 cl=4 w=-51 n=7 dxy=31 run=2833 late=1301 ok=1 cal=1
+S3 LINE  GP27=EDGE   626  GP26=EDGE   541  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=317 r=8 f=22 l=-6 u=848 af=10 h=344 pk=17 hs=1 cl=4 w=0 n=8 dxy=23 run=2667 late=1045 ok=1 cal=1
+S3 LINE  GP27=EDGE   653  GP26=EDGE   577  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=1194 mm  echo= 6963 us
+S4 p=386 r=2 f=46 l=-14 u=866 af=-20 h=349 pk=17 hs=1 cl=4 w=153 n=8 dxy=31 run=2960 late=1058 ok=1 cal=1
+S3 LINE  GP27=EDGE   635  GP26=EDGE   550  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=361 r=-2 f=36 l=-10 u=862 af=-20 h=354 pk=17 hs=1 cl=4 w=51 n=8 dxy=35 run=2631 late=1086 ok=1 cal=1
+[S5] PING servo= 90 deg  range=1195 mm  echo= 6968 us
+S3 LINE  GP27=EDGE   644  GP26=EDGE   559  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=331 r=10 f=38 l=-14 u=854 af=10 h=358 pk=17 hs=1 cl=4 w=-102 n=8 dxy=100 run=2592 late=1353 ok=1 cal=1
+S3 LINE  GP27=EDGE   621  GP26=EDGE   523  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S4 p=409 r=41 f=59 l=-4 u=845 af=-10 h=364 pk=17 hs=1 cl=4 w=-102 n=7 dxy=49 run=2699 late=1072 ok=1 cal=1
+[S5] PING servo= 90 deg  range=  -- mm  echo=59487 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   676  GP26=EDGE   609  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3697
+S3 EVENT JUNCTION
+S4 p=709 r=58 f=80 l=2 u=868 af=10 h=372 pk=17 hs=1 cl=4 w=0 n=7 dxy=83 run=2800 late=1323 ok=1 cal=1
+S3 LINE  GP27=EDGE   749  GP26=EDGE   695  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+[S5] PING servo= 90 deg  range=1176 mm  echo= 6858 us
+S4 p=833 r=-107 f=38 l=-20 u=904 af=20 h=387 pk=17 hs=1 cl=4 w=0 n=8 dxy=161 run=2804 late=1257 ok=1 cal=1
+S3 LINE  GP27=BLACK  767  GP26=EDGE   695  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+S4 p=-175 r=13 f=-170 l=-26 u=716 af=0 h=395 pk=17 hs=1 cl=4 w=-51 n=8 dxy=157 run=2642 late=1090 ok=1 cal=1
+S3 LINE  GP27=BLACK  963  GP26=BLACK  927  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+S4 HUMP descending
+[S5] PING servo= 90 deg  range=1031 mm  echo= 6011 us
+S4 HUMP one wheel up (left side)
+S4 CLASS DESCENDING_HUMP t=78456 ms
+S4 p=-659 r=-349 f=-68 l=-268 u=838 af=0 h=387 pk=17 hs=2 cl=5 w=-51 n=8 dxy=471 run=2985 late=1041 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3697
+S4 p=628 r=-362 f=24 l=-90 u=756 af=20 h=394 pk=17 hs=2 cl=5 w=51 n=8 dxy=276 run=2634 late=1321 ok=1 cal=1
+S3 LINE  GP27=BLACK  976  GP26=BLACK  949  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=1027 mm  echo= 5991 us
+S4 p=499 r=-392 f=48 l=-58 u=910 af=0 h=401 pk=17 hs=2 cl=5 w=-51 n=8 dxy=118 run=2712 late=1064 ok=1 cal=1
+S3 LINE  GP27=BLACK  917  GP26=BLACK  872  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=530 r=-303 f=86 l=-78 u=852 af=10 h=408 pk=17 hs=2 cl=5 w=51 n=8 dxy=69 run=2599 late=1062 ok=1 cal=1
+[S5] PING servo= 90 deg  range=1041 mm  echo= 6071 us
+S3 LINE  GP27=BLACK  949  GP26=BLACK  913  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=516 r=-385 f=50 l=-80 u=840 af=10 h=417 pk=17 hs=2 cl=5 w=102 n=8 dxy=62 run=2650 late=1189 ok=1 cal=1
+S3 LINE  GP27=BLACK  940  GP26=BLACK  899  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=1035 mm  echo= 6036 us
+S4 p=564 r=-344 f=66 l=-59 u=836 af=0 h=424 pk=17 hs=2 cl=5 w=0 n=7 dxy=45 run=2596 late=1058 ok=1 cal=1
+S3 LINE  GP27=BLACK  931  GP26=BLACK  886  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=455 r=-220 f=48 l=-32 u=854 af=0 h=431 pk=17 hs=2 cl=5 w=0 n=8 dxy=52 run=2599 late=1028 ok=1 cal=1
+S3 LINE  GP27=BLACK  890  GP26=BLACK  840  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=1036 mm  echo= 6041 us
+S4 p=321 r=-237 f=9 l=-43 u=893 af=10 h=437 pk=17 hs=2 cl=5 w=0 n=7 dxy=45 run=2656 late=1070 ok=1 cal=1
+S3 LINE  GP27=BLACK  858  GP26=BLACK  795  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 HUMP #5 (one wheel) peak=12 mm roll_max=614 cdeg over 67 mm (run peak 17 mm)
+S4 p=224 r=-63 f=14 l=-12 u=838 af=0 h=441 pk=17 hs=2 cl=5 w=-51 n=8 dxy=38 run=2927 late=1054 ok=1 cal=1
+S3 TIME line step max 412 us, period 9603-10403 us, sampler isr max 45 us
+S3 LINE  GP27=BLACK  908  GP26=BLACK  854  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=1049 mm  echo= 6117 us
+S4 p=464 r=-35 f=43 l=-9 u=848 af=10 h=446 pk=17 hs=2 cl=5 w=51 n=7 dxy=49 run=2715 late=1300 ok=1 cal=1
+S3 LINE  GP27=BLACK  922  GP26=BLACK  876  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=155 r=1 f=-2 l=-2 u=904 af=10 h=450 pk=17 hs=2 cl=5 w=0 n=8 dxy=57 run=2808 late=1012 ok=1 cal=1
+S4 HUMP #6 peak=20 mm theta_max=1458 cdeg L.sin=20 mm integrated=45 mm (run peak 20 mm)
+[S5] PING servo= 90 deg  range=1055 mm  echo= 6151 us
+S3 LINE  GP27=BLACK  890  GP26=BLACK  831  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 CLASS MOVING t=80615 ms
+S4 p=164 r=53 f=-2 l=-8 u=832 af=0 h=0 pk=20 hs=0 cl=1 w=-51 n=8 dxy=43 run=2936 late=1628 ok=1 cal=1
+S3 LINE  GP27=BLACK  899  GP26=BLACK  845  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=1089 mm  echo= 6347 us
+S4 p=265 r=81 f=18 l=0 u=850 af=0 h=2 pk=20 hs=0 cl=1 w=51 n=8 dxy=33 run=2733 late=1045 ok=1 cal=1
+S3 LINE  GP27=BLACK  917  GP26=BLACK  867  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=180 r=59 f=-4 l=-2 u=852 af=10 h=0 pk=20 hs=0 cl=1 w=102 n=8 dxy=32 run=2839 late=1061 ok=1 cal=1
+S3 LINE  GP27=BLACK  913  GP26=BLACK  863  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=1687 mm  echo= 9839 us
+S4 p=250 r=90 f=32 l=0 u=876 af=0 h=1 pk=20 hs=0 cl=1 w=51 n=8 dxy=113 run=2827 late=1053 ok=1 cal=1
+S3 LINE  GP27=BLACK  908  GP26=BLACK  854  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=233 r=94 f=8 l=4 u=850 af=0 h=4 pk=20 hs=0 cl=1 w=51 n=8 dxy=23 run=2712 late=1096 ok=1 cal=1
+S3 LINE  GP27=BLACK  899  GP26=BLACK  845  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=1679 mm  echo= 9788 us
+S4 p=220 r=83 f=14 l=0 u=858 af=-10 h=8 pk=20 hs=0 cl=1 w=-102 n=8 dxy=23 run=2705 late=1049 ok=1 cal=1
+S3 LINE  GP27=BLACK  894  GP26=BLACK  836  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=209 r=93 f=18 l=4 u=868 af=10 h=0 pk=20 hs=0 cl=1 w=0 n=8 dxy=22 run=2637 late=1047 ok=1 cal=1
+S3 LINE  GP27=BLACK  881  GP26=BLACK  822  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=1680 mm  echo= 9797 us
+S4 p=214 r=88 f=14 l=0 u=864 af=-10 h=1 pk=20 hs=0 cl=1 w=51 n=8 dxy=31 run=2609 late=1042 ok=1 cal=1
+S3 LINE  GP27=BLACK  885  GP26=BLACK  827  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=192 r=93 f=14 l=-2 u=860 af=10 h=0 pk=20 hs=0 cl=1 w=102 n=8 dxy=30 run=2657 late=1062 ok=1 cal=1
+[S5] PING servo= 90 deg  range=1078 mm  echo= 6287 us
+S3 LINE  GP27=BLACK  881  GP26=BLACK  822  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=161 r=53 f=4 l=-6 u=862 af=0 h=0 pk=20 hs=0 cl=1 w=0 n=8 dxy=33 run=2653 late=1231 ok=1 cal=1
+S3 LINE  GP27=BLACK  881  GP26=BLACK  817  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range= 963 mm  echo= 5614 us
+S4 p=168 r=63 f=4 l=-2 u=858 af=-10 h=0 pk=20 hs=0 cl=1 w=0 n=8 dxy=18 run=2787 late=1052 ok=1 cal=1
+S3 LINE  GP27=BLACK  876  GP26=BLACK  817  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=187 r=49 f=2 l=-6 u=870 af=0 h=0 pk=20 hs=0 cl=1 w=0 n=7 dxy=24 run=2656 late=1039 ok=1 cal=1
+S3 LINE  GP27=BLACK  872  GP26=BLACK  808  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=  -- mm  echo=59484 us  clear: no echo heard back within 4 m
+S4 p=178 r=33 f=-2 l=-6 u=848 af=-10 h=0 pk=20 hs=0 cl=1 w=-51 n=8 dxy=31 run=2808 late=1031 ok=1 cal=1
+S3 LINE  GP27=BLACK  872  GP26=BLACK  813  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=189 r=51 f=4 l=-6 u=860 af=-10 h=0 pk=20 hs=0 cl=1 w=51 n=8 dxy=30 run=2606 late=1059 ok=1 cal=1
+S3 LINE  GP27=BLACK  858  GP26=BLACK  790  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=1091 mm  echo= 6361 us
+S4 p=189 r=70 f=14 l=2 u=856 af=0 h=0 pk=20 hs=0 cl=1 w=0 n=8 dxy=22 run=2631 late=1059 ok=1 cal=1
+S3 LINE  GP27=BLACK  844  GP26=BLACK  777  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=173 r=46 f=6 l=-8 u=844 af=0 h=0 pk=20 hs=0 cl=1 w=-51 n=8 dxy=49 run=2612 late=1048 ok=1 cal=1
+[S5] PING servo= 90 deg  range=1080 mm  echo= 6295 us
+S3 LINE  GP27=BLACK  840  GP26=BLACK  772  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=232 r=88 f=20 l=0 u=860 af=-10 h=2 pk=20 hs=0 cl=1 w=-51 n=8 dxy=38 run=2700 late=1226 ok=1 cal=1
+S3 LINE  GP27=BLACK  794  GP26=EDGE   718  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=166 r=65 f=2 l=-10 u=872 af=0 h=0 pk=20 hs=0 cl=1 w=0 n=8 dxy=31 run=2614 late=1076 ok=1 cal=1
+[S5] PING servo= 90 deg  range=1704 mm  echo= 9934 us
+S3 LINE  GP27=BLACK  799  GP26=EDGE   722  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=812 r=536 f=276 l=140 u=1026 af=-10 h=3 pk=20 hs=0 cl=1 w=102 n=8 dxy=188 run=2604 late=1611 ok=1 cal=1
+S3 LINE  GP27=BLACK  908  GP26=BLACK  845  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 HUMP one wheel up (left side)
+S4 HUMP climbing (nose up)
+S4 CLASS CLIMBING_HUMP t=84455 ms
+[S5] PING servo= 90 deg  range=1014 mm  echo= 5915 us
+S4 p=29 r=1550 f=-48 l=250 u=788 af=0 h=9 pk=20 hs=1 cl=4 w=51 n=8 dxy=432 run=2799 late=1019 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 HUMP #7 peak=8 mm theta_max=606 cdeg L.sin=8 mm integrated=1 mm (run peak 20 mm)
+S4 CLASS MOVING t=84655 ms
+S4 HUMP climbing (nose up)
+S4 p=1192 r=2370 f=230 l=316 u=708 af=10 h=6 pk=20 hs=1 cl=1 w=-51 n=8 dxy=205 run=2942 late=999 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 CLASS CLIMBING_HUMP t=84795 ms
+[S5] PING servo= 90 deg  range= 927 mm  echo= 5408 us
+S4 p=1316 r=1839 f=137 l=221 u=834 af=0 h=24 pk=20 hs=1 cl=4 w=-51 n=7 dxy=108 run=2794 late=1314 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 HUMP descending
+S4 p=-510 r=1608 f=-185 l=269 u=1049 af=-10 h=30 pk=20 hs=2 cl=4 w=0 n=7 dxy=238 run=2813 late=1017 ok=1 cal=1
+S3 TIME line step max 305 us, period 9597-10403 us, sampler isr max 46 us
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range= 937 mm  echo= 5464 us
+S4 CLASS DESCENDING_HUMP t=85195 ms
+S4 p=1021 r=905 f=170 l=18 u=726 af=10 h=31 pk=20 hs=2 cl=5 w=-51 n=8 dxy=209 run=2875 late=1357 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=-655 r=518 f=-88 l=24 u=700 af=-10 h=32 pk=20 hs=2 cl=5 w=-51 n=8 dxy=144 run=2616 late=1024 ok=1 cal=1
+[S5] PING servo= 90 deg  range=1038 mm  echo= 6050 us
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=1094 r=1139 f=368 l=124 u=1036 af=-10 h=35 pk=20 hs=2 cl=5 w=0 n=8 dxy=227 run=2611 late=1249 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=  -- mm  echo=59489 us  clear: no echo heard back within 4 m
+S4 p=341 r=443 f=-64 l=72 u=1016 af=20 h=48 pk=20 hs=2 cl=5 w=-51 n=8 dxy=137 run=2595 late=1029 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=2347 r=538 f=262 l=38 u=346 af=-10 h=58 pk=20 hs=2 cl=5 w=-51 n=8 dxy=240 run=2632 late=1044 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=  -- mm  echo=59483 us  clear: no echo heard back within 4 m
+S4 p=1342 r=-536 f=10 l=-10 u=532 af=10 h=95 pk=20 hs=2 cl=5 w=0 n=8 dxy=251 run=2599 late=1033 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=719 r=1187 f=100 l=206 u=792 af=0 h=107 pk=20 hs=2 cl=5 w=51 n=8 dxy=192 run=2653 late=988 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range=3578 mm  echo=20864 us
+S4 p=417 r=710 f=4 l=154 u=1242 af=0 h=117 pk=20 hs=2 cl=5 w=102 n=8 dxy=318 run=2686 late=1035 ok=1 cal=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  994  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 p=-100 r=-89 f=-68 l=-78 u=914 af=10 h=120 pk=20 hs=2 cl=5 w=51 n=8 dxy=304 run=2617 late=1017 ok=1 cal=1
+[S5] PING servo= 90 deg  range= 348 mm  echo= 2027 us
+S3 LINE  GP27=BLACK  940  GP26=BLACK  935  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+[S5] STATE from to 1 2
+[S5] EVT 0x50 d=32cm a=90deg
+S3 TUNE kp=25 kd=25 (x100)
+S3 TUNE curve boost=250 (x100)
+S4 p=200 r=-295 f=26 l=-50 u=950 af=30 h=117 pk=20 hs=2 cl=5 w=0 n=8 dxy=185 run=2819 late=1342 ok=1 cal=1
+S3 LINE  GP27=BLACK  799  GP26=BLACK  886  -> turn STRAIGHT    0 mm/s  JUNCTION   cal GP27 183-3697  GP26 171-3698
+S4 HUMP #8 (one wheel) peak=47 mm roll_max=2461 cdeg over 118 mm (run peak 47 mm)
+S4 HUMP #9 peak=44 mm theta_max=3478 cdeg L.sin=44 mm integrated=12 mm (run peak 47 mm)
+[S5] PING servo= 90 deg  range= 288 mm  echo= 1681 us
+S4 p=-39 r=26 f=0 l=-43 u=880 af=10 h=0 pk=47 hs=0 cl=5 w=460 n=7 dxy=153 run=3232 late=1693 ok=1 cal=1
+S3 LINE  GP27=EDGE   740  GP26=WHITE    5  -> turn LEFT       25 mm/s  FOLLOW (one sensor off line)   cal GP27 183-3697  GP26 171-3698
+S4 p=-119 r=147 f=-41 l=6 u=768 af=210 h=0 pk=47 hs=0 cl=5 w=409 n=7 dxy=305 run=2648 late=1419 ok=1 cal=1
+S3 LINE  GP27=EDGE   649  GP26=EDGE   536  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3698
+S4 CLASS MOVING t=87615 ms
+[S5] PING servo= 90 deg  range= 286 mm  echo= 1666 us
+S4 HUMP one wheel up (left side)
+S4 p=-183 r=305 f=-153 l=29 u=836 af=-140 h=0 pk=47 hs=0 cl=1 w=-2659 n=7 dxy=716 run=2825 late=1258 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=BLACK  854  -> turn RIGHT      40 mm/s  FOLLOW (one sensor off line)   cal GP27 183-3697  GP26 171-3698
+S4 p=21 r=-26 f=-24 l=-34 u=874 af=160 h=0 pk=47 hs=0 cl=1 w=-2506 n=8 dxy=439 run=2816 late=1210 ok=1 cal=1
+S3 LINE  GP27=EDGE   580  GP26=WHITE   24  -> turn LEFT        3 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3698
+S4 HUMP #10 (one wheel) peak=8 mm roll_max=384 cdeg over 6 mm (run peak 47 mm)
+[S5] PING servo= 90 deg  range= 289 mm  echo= 1686 us
+S4 p=70 r=-59 f=-22 l=-28 u=856 af=-50 h=0 pk=47 hs=0 cl=1 w=-613 n=8 dxy=164 run=2903 late=1277 ok=1 cal=1
+S3 LINE  GP27=EDGE   266  GP26=EDGE   269  -> turn RIGHT       2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3698
+S4 p=113 r=-36 f=22 l=-18 u=870 af=-90 h=0 pk=47 hs=0 cl=1 w=664 n=8 dxy=194 run=2706 late=1339 ok=1 cal=1
+S3 LINE  GP27=EDGE   630  GP26=WHITE   19  -> turn LEFT        3 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range= 277 mm  echo= 1616 us
+S4 p=20 r=-25 f=-14 l=-14 u=864 af=30 h=0 pk=47 hs=0 cl=1 w=511 n=8 dxy=82 run=2701 late=1047 ok=1 cal=1
+S3 LINE  GP27=EDGE   626  GP26=WHITE   19  -> turn LEFT        3 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3698
+S4 p=13 r=-16 f=-26 l=-12 u=858 af=0 h=0 pk=47 hs=0 cl=1 w=-51 n=8 dxy=83 run=2670 late=1324 ok=1 cal=1
+[S5] PING servo= 90 deg  range= 270 mm  echo= 1576 us
+S3 LINE  GP27=EDGE   599  GP26=WHITE   19  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3698
+S4 p=36 r=6 f=-10 l=4 u=860 af=0 h=0 pk=47 hs=0 cl=1 w=153 n=8 dxy=88 run=2725 late=1273 ok=1 cal=1
+S3 LINE  GP27=EDGE   617  GP26=WHITE   19  -> turn LEFT        3 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range= 244 mm  echo= 1420 us
+S4 p=33 r=-18 f=22 l=-4 u=870 af=0 h=0 pk=47 hs=0 cl=1 w=0 n=8 dxy=107 run=2742 late=1075 ok=1 cal=1
+S3 LINE  GP27=EDGE   571  GP26=WHITE   24  -> turn LEFT        2 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3698
+S3 TIME barcode decode 7593 us (both paths)
+S4 p=26 r=-17 f=-26 l=-12 u=862 af=0 h=0 pk=47 hs=0 cl=1 w=0 n=8 dxy=85 run=2687 late=1286 ok=1 cal=1
+S3 LINE  GP27=EDGE   512  GP26=WHITE   28  -> turn STRAIGHT    0 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 90 deg  range= 229 mm  echo= 1335 us
+S4 p=2 r=-19 f=-10 l=-38 u=864 af=20 h=0 pk=47 hs=0 cl=1 w=-153 n=8 dxy=85 run=2749 late=1232 ok=1 cal=1
+S3 LINE  GP27=EDGE   553  GP26=WHITE   24  -> turn LEFT        1 mm/s  FOLLOW   cal GP27 183-3697  GP26 171-3698
+[S5] EVT 0x52 d=22cm a=90deg
+[S5] EVT 0x62 a=1 b=0
+[S5] EVT 0x60 a=8 b=3
+S4 p=-108 r=4 f=-118 l=-4 u=870 af=-20 h=0 pk=47 hs=0 cl=1 w=204 n=7 dxy=271 run=2694 late=1033 ok=1 cal=1
+[S5] STATE from to 2 0
+[S5] STATE from to 0 3
+[S5] EVT 0x53 d=0cm a=90deg
+S3 LINE  GP27=EDGE   503  GP26=WHITE   33  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3697  GP26 171-3698
+S4 CLASS STATIONARY t=89815 ms
+S4 p=73 r=-43 f=-22 l=-16 u=861 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=7 dxy=292 run=2876 late=1312 ok=1 cal=1
+S3 LINE  GP27=EDGE   553  GP26=WHITE   24  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3697  GP26 171-3698
+[S5] PING servo= 30 deg  range=  -- mm  echo=59497 us  clear: no echo heard back within 4 m
+S4 p=3 r=11 f=-64 l=-9 u=829 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=7 dxy=321 run=2660 late=971 ok=1 cal=1
+S3 TIME line step max 418 us, period 9528-10592 us, sampler isr max 53 us
+S3 LINE  GP27=EDGE   548  GP26=WHITE   28  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3697  GP26 173-3698
+[S5] PING servo= 60 deg  range=  -- mm  echo=59484 us  clear: no echo heard back within 4 m
+S4 p=61 r=8 f=-8 l=-12 u=858 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=8 dxy=112 run=2777 late=1373 ok=1 cal=1
+S3 LINE  GP27=EDGE   567  GP26=WHITE   23  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3697  GP26 173-3698
+[S5] PING servo= 90 deg  range= 219 mm  echo= 1275 us
+S4 p=70 r=9 f=-6 l=-10 u=862 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=8 dxy=45 run=2668 late=1215 ok=1 cal=1
+S3 LINE  GP27=EDGE   567  GP26=WHITE   23  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3697  GP26 173-3698
+[S5] PING servo=120 deg  range= 258 mm  echo= 1506 us
+S4 p=65 r=-8 f=-6 l=-14 u=866 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=8 dxy=24 run=2682 late=1025 ok=1 cal=1
+S3 LINE  GP27=EDGE   567  GP26=WHITE   23  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3697  GP26 173-3698
+S4 p=54 r=13 f=-2 l=-18 u=856 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=8 dxy=626 run=2686 late=1037 ok=1 cal=1
+[S5] PING servo=150 deg  range=  -- mm  echo=59496 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   557  GP26=WHITE   23  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3697  GP26 173-3698
+S4 p=14 r=-21 f=-22 l=-12 u=864 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=8 dxy=168 run=2679 late=1305 ok=1 cal=1
+S3 LINE  GP27=EDGE   563  GP26=WHITE   20  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 426-3505  GP26 183-3698
+[S5] PING servo= 85 deg  range= 227 mm  echo= 1325 us
+S4 p=49 r=10 f=-18 l=-10 u=862 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=8 dxy=22 run=2850 late=1028 ok=1 cal=1
+[S5] PING servo= 80 deg  range= 227 mm  echo= 1325 us
+S3 LINE  GP27=EDGE   563  GP26=WHITE   20  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 426-3505  GP26 183-3698
+[S5] PING servo= 75 deg  range= 228 mm  echo= 1330 us
+S4 p=81 r=-9 f=-4 l=-12 u=860 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=8 dxy=36 run=2608 late=1300 ok=1 cal=1
+[S5] PING servo= 70 deg  range= 241 mm  echo= 1405 us
+S3 LINE  GP27=EDGE   563  GP26=WHITE   20  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 426-3505  GP26 183-3698
+[S5] PING servo= 65 deg  range=  -- mm  echo=59485 us  clear: no echo heard back within 4 m
+S4 p=57 r=-4 f=-14 l=-12 u=862 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=8 dxy=33 run=2767 late=1225 ok=1 cal=1
+S3 LINE  GP27=EDGE   563  GP26=WHITE   20  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 426-3505  GP26 183-3698
+[S5] PING servo= 68 deg  range=  -- mm  echo=59484 us  clear: no echo heard back within 4 m
+S4 p=24 r=-4 f=-32 l=-18 u=862 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=8 dxy=48 run=2770 late=1009 ok=1 cal=1
+S3 LINE  GP27=EDGE   568  GP26=WHITE   20  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 426-3505  GP26 183-3698
+S4 p=55 r=11 f=-9 l=-16 u=864 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=7 dxy=46 run=2633 late=1198 ok=1 cal=1
+[S5] PING servo=125 deg  range=  -- mm  echo=59481 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   568  GP26=WHITE   20  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 426-3505  GP26 183-3698
+[S5] PING servo=122 deg  range=  -- mm  echo=59483 us  clear: no echo heard back within 4 m
+[S5] EVT 0x54 d=16cm a=90deg
+[S5] PROFILE closest_mm width_mm 219 163
+[S5] PROFILE clear_left_mm clear_right_mm 1000 1000
+[S5] PROFILE shift_left_mm shift_right_mm 249 202
+S4 p=61 r=16 f=-9 l=-9 u=870 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=7 dxy=22 run=2836 late=1460 ok=1 cal=1
+S3 LINE  GP27=EDGE   568  GP26=WHITE   18  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 644-3337  GP26 192-3698
+[S5] STATE from to 3 0
+[S5] EVT 0x61 a=2 b=100
+[S5] PLAN action out_mm 2 343
+[S5] PLAN turn_deg tail_mm -36 135
+[S5] PLAN back_mm reverse_first_mm 343 0
+[S5] EVT 0x62 a=5 b=0
+S4 p=104 r=42 f=-12 l=10 u=872 af=-140 h=0 pk=47 hs=0 cl=0 w=-1483 n=8 dxy=97 run=2868 late=1349 ok=1 cal=1
+S3 LINE  GP27=BLACK  830  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 644-3337  GP26 192-3698
+S4 p=74 r=-50 f=40 l=-28 u=872 af=30 h=0 pk=47 hs=0 cl=0 w=-4501 n=8 dxy=252 run=2599 late=1106 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 412-3337  GP26 174-3698
+S4 p=28 r=-2 f=-4 l=-12 u=860 af=0 h=0 pk=47 hs=0 cl=0 w=-6445 n=8 dxy=119 run=2627 late=1159 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 194-3337  GP26 174-3698
+S4 p=40 r=-28 f=2 l=-4 u=860 af=-10 h=0 pk=47 hs=0 cl=0 w=-7161 n=8 dxy=122 run=2605 late=1177 ok=1 cal=1
+S3 LINE  GP27=WHITE    1  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 187-3337  GP26 174-3698
+[S5] EVT 0x62 a=6 b=0
+S4 p=33 r=-43 f=-18 l=-8 u=870 af=0 h=0 pk=47 hs=0 cl=0 w=0 n=8 dxy=131 run=2574 late=1206 ok=1 cal=1
+S3 LINE  GP27=WHITE    1  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 187-3268  GP26 174-3698
+S4 p=9 r=11 f=-12 l=6 u=850 af=230 h=0 pk=47 hs=0 cl=0 w=-102 n=8 dxy=313 run=2805 late=1176 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    1  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 171-3698
+S4 CLASS MOVING t=93615 ms
+S4 p=16 r=-16 f=-6 l=-14 u=864 af=30 h=0 pk=47 hs=0 cl=1 w=-358 n=8 dxy=199 run=2765 late=963 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    4  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 161-3698
+S4 p=42 r=-50 f=18 l=-24 u=878 af=0 h=0 pk=47 hs=0 cl=1 w=-51 n=8 dxy=113 run=2622 late=1216 ok=1 cal=1
+S3 LINE  GP27=WHITE    7  GP26=WHITE    4  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 161-3698
+S4 p=32 r=-15 f=4 l=18 u=864 af=0 h=0 pk=47 hs=0 cl=1 w=0 n=7 dxy=145 run=2626 late=1135 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    8  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 161-3698
+S4 p=30 r=20 f=-20 l=34 u=861 af=10 h=0 pk=47 hs=0 cl=1 w=-51 n=7 dxy=114 run=2783 late=1184 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 162-3698
+S4 p=28 r=31 f=-12 l=28 u=864 af=-10 h=0 pk=47 hs=0 cl=1 w=-613 n=8 dxy=135 run=2776 late=1136 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 162-3698
+S3 TIME barcode decode 1439 us (both paths)
+S4 p=59 r=-27 f=20 l=0 u=872 af=40 h=0 pk=47 hs=0 cl=1 w=-102 n=8 dxy=146 run=2656 late=1175 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 162-3698
+S4 p=142 r=-12 f=24 l=14 u=860 af=20 h=0 pk=47 hs=0 cl=1 w=0 n=8 dxy=124 run=2601 late=1161 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 162-3698
+S4 p=20 r=-45 f=-8 l=-52 u=860 af=-70 h=0 pk=47 hs=0 cl=1 w=-153 n=8 dxy=120 run=2802 late=1145 ok=1 cal=1
+S3 TIME line step max 392 us, period 9521-10353 us, sampler isr max 49 us
+S3 LINE  GP27=WHITE    2  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 162-3698
+S4 p=1 r=-47 f=-24 l=-40 u=864 af=40 h=0 pk=47 hs=0 cl=1 w=102 n=8 dxy=136 run=2846 late=1268 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3268  GP26 163-3698
+S4 p=44 r=-60 f=-48 l=-8 u=850 af=-20 h=0 pk=47 hs=0 cl=1 w=255 n=8 dxy=161 run=2834 late=981 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3268  GP26 163-3698
+S4 p=130 r=-34 f=-12 l=-20 u=852 af=-30 h=0 pk=47 hs=0 cl=1 w=-102 n=8 dxy=149 run=2613 late=1114 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3268  GP26 163-3698
+S4 p=0 r=-60 f=-26 l=-36 u=856 af=50 h=0 pk=47 hs=0 cl=1 w=562 n=8 dxy=154 run=2617 late=1134 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3268  GP26 163-3698
+S4 p=73 r=-32 f=-30 l=-20 u=852 af=0 h=0 pk=47 hs=0 cl=1 w=-153 n=8 dxy=117 run=2613 late=1188 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    8  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3268  GP26 163-3698
+S4 p=46 r=-102 f=-6 l=-54 u=864 af=10 h=0 pk=47 hs=0 cl=1 w=51 n=7 dxy=134 run=2613 late=1151 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3268  GP26 163-3698
+S4 p=81 r=-129 f=18 l=-50 u=880 af=-10 h=0 pk=47 hs=0 cl=1 w=102 n=7 dxy=157 run=2638 late=1131 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 164-3698
+S4 p=8 r=-15 f=-34 l=34 u=857 af=-10 h=0 pk=47 hs=0 cl=1 w=153 n=7 dxy=131 run=2811 late=1203 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 164-3698
+S4 p=55 r=-31 f=4 l=-2 u=862 af=-50 h=0 pk=47 hs=0 cl=1 w=-153 n=8 dxy=140 run=2792 late=1199 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3268  GP26 164-3698
+S4 p=87 r=-102 f=34 l=-62 u=864 af=-20 h=0 pk=47 hs=0 cl=1 w=-409 n=8 dxy=189 run=2803 late=1135 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3268  GP26 164-3698
+S4 p=82 r=-54 f=24 l=-2 u=862 af=20 h=0 pk=47 hs=0 cl=1 w=-102 n=8 dxy=177 run=2809 late=1346 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3268  GP26 164-3698
+S4 p=84 r=-78 f=26 l=-24 u=858 af=-10 h=0 pk=47 hs=0 cl=1 w=102 n=8 dxy=101 run=2736 late=1112 ok=1 cal=1
+S3 LINE  GP27=WHITE    8  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3268  GP26 167-3698
+S4 p=31 r=49 f=-22 l=2 u=850 af=50 h=0 pk=47 hs=0 cl=1 w=-204 n=8 dxy=127 run=2701 late=1145 ok=1 cal=1
+S3 LINE  GP27=WHITE   18  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3268  GP26 167-3698
+S4 p=-7 r=-92 f=-58 l=-8 u=858 af=-60 h=0 pk=47 hs=0 cl=1 w=51 n=8 dxy=171 run=2695 late=1195 ok=1 cal=1
+S3 LINE  GP27=WHITE    8  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3268  GP26 167-3698
+S4 p=67 r=-18 f=-34 l=-26 u=860 af=-30 h=0 pk=47 hs=0 cl=1 w=255 n=8 dxy=128 run=2600 late=1150 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3268  GP26 167-3698
+S4 p=-422 r=-5 f=-198 l=-30 u=854 af=-470 h=0 pk=47 hs=0 cl=1 w=-1023 n=8 dxy=304 run=2688 late=1135 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3268  GP26 167-3698
+S4 CLASS STATIONARY t=98415 ms
+[S5] EVT 0x62 a=7 b=0
+S4 p=281 r=13 f=48 l=16 u=890 af=-50 h=0 pk=47 hs=0 cl=0 w=2864 n=8 dxy=555 run=2904 late=1059 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 168-3698
+[S5] STATE from to 0 4
+S4 p=49 r=30 f=16 l=50 u=877 af=10 h=0 pk=47 hs=0 cl=0 w=3376 n=7 dxy=402 run=2610 late=1266 ok=1 cal=1
+[S5] PING servo=180 deg  range=  -- mm  echo=59497 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=EDGE   718  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 168-3698
+[S5] PING servo=165 deg  range= 717 mm  echo= 4180 us
+S4 p=97 r=-25 f=9 l=0 u=857 af=-20 h=0 pk=47 hs=0 cl=0 w=5319 n=7 dxy=121 run=2776 late=1397 ok=1 cal=1
+S3 LINE  GP27=WHITE    7  GP26=EDGE   419  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 168-3698
+[S5] PING servo=150 deg  range=  -- mm  echo=59497 us  clear: no echo heard back within 4 m
+S4 p=104 r=-55 f=32 l=-16 u=854 af=20 h=0 pk=47 hs=0 cl=0 w=7314 n=8 dxy=137 run=2792 late=1117 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 168-3698
+[S5] PING servo=180 deg  range=  -- mm  echo=59497 us  clear: no echo heard back within 4 m
+S4 p=22 r=0 f=-74 l=4 u=858 af=-40 h=0 pk=47 hs=0 cl=0 w=255 n=8 dxy=241 run=2813 late=1311 ok=1 cal=1
+S3 LINE  GP27=WHITE    7  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3268  GP26 168-3698
+[S5] EVT 0x62 a=8 b=0
+[S5] PING servo=165 deg  range=  -- mm  echo=59489 us  clear: no echo heard back within 4 m
+S4 p=-48 r=-97 f=-44 l=-66 u=854 af=260 h=0 pk=47 hs=0 cl=0 w=51 n=8 dxy=439 run=2796 late=1425 ok=1 cal=1
+S3 LINE  GP27=WHITE    7  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3188  GP26 168-3596
+S4 CLASS MOVING t=99635 ms
+[S5] PING servo=150 deg  range=  -- mm  echo=59495 us  clear: no echo heard back within 4 m
+S4 p=-22 r=-50 f=-62 l=-18 u=842 af=70 h=0 pk=47 hs=0 cl=1 w=255 n=8 dxy=179 run=2845 late=1185 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3188  GP26 168-3596
+[S5] PING servo=180 deg  range=  -- mm  echo=59497 us  clear: no echo heard back within 4 m
+S4 p=109 r=-37 f=4 l=-16 u=872 af=20 h=0 pk=47 hs=0 cl=1 w=358 n=8 dxy=155 run=2802 late=1157 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3188  GP26 168-3596
+[S5] PING servo=165 deg  range=  -- mm  echo=59494 us  clear: no echo heard back within 4 m
+S4 p=79 r=-33 f=-12 l=-42 u=858 af=40 h=0 pk=47 hs=0 cl=1 w=102 n=8 dxy=123 run=2793 late=1317 ok=1 cal=1
+S3 TIME line step max 371 us, period 9487-10500 us, sampler isr max 46 us
+S3 LINE  GP27=WHITE    2  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3188  GP26 168-3596
+[S5] PING servo=150 deg  range=  -- mm  echo=59495 us  clear: no echo heard back within 4 m
+S4 p=12 r=6 f=-44 l=20 u=848 af=0 h=0 pk=47 hs=0 cl=1 w=102 n=8 dxy=212 run=2743 late=1303 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3188  GP26 168-3596
+[S5] PING servo=180 deg  range=  -- mm  echo=59495 us  clear: no echo heard back within 4 m
+S4 p=-3 r=0 f=-34 l=20 u=850 af=0 h=0 pk=47 hs=0 cl=1 w=306 n=8 dxy=117 run=2618 late=1175 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3188  GP26 168-3596
+[S5] PING servo=165 deg  range=  -- mm  echo=59496 us  clear: no echo heard back within 4 m
+S4 p=95 r=-45 f=-12 l=-38 u=848 af=30 h=0 pk=47 hs=0 cl=1 w=51 n=8 dxy=141 run=2793 late=1244 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3188  GP26 168-3596
+[S5] PING servo=150 deg  range=  -- mm  echo=59500 us  clear: no echo heard back within 4 m
+S4 p=88 r=-45 f=-18 l=-27 u=845 af=20 h=0 pk=47 hs=0 cl=1 w=-460 n=7 dxy=154 run=2666 late=1178 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3188  GP26 168-3596
+[S5] PING servo=180 deg  range=  -- mm  echo=59497 us  clear: no echo heard back within 4 m
+S4 p=95 r=-21 f=18 l=-18 u=868 af=-10 h=0 pk=47 hs=0 cl=1 w=-153 n=7 dxy=132 run=2794 late=1155 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3188  GP26 168-3596
+[S5] PING servo=165 deg  range=  -- mm  echo=59496 us  clear: no echo heard back within 4 m
+S4 p=23 r=-51 f=-46 l=-66 u=856 af=30 h=0 pk=47 hs=0 cl=1 w=153 n=8 dxy=111 run=2801 late=1293 ok=1 cal=1
+S3 LINE  GP27=WHITE    8  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3188  GP26 168-3596
+[S5] PING servo=150 deg  range=  -- mm  echo=59497 us  clear: no echo heard back within 4 m
+S4 p=102 r=-51 f=36 l=-44 u=852 af=-30 h=0 pk=47 hs=0 cl=1 w=153 n=8 dxy=145 run=2710 late=1154 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3188  GP26 168-3596
+[S5] PING servo=180 deg  range=  -- mm  echo=59494 us  clear: no echo heard back within 4 m
+S4 p=112 r=6 f=14 l=-2 u=868 af=20 h=0 pk=47 hs=0 cl=1 w=51 n=8 dxy=160 run=2643 late=1169 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE  119  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3188  GP26 168-3596
+[S5] PING servo=165 deg  range= 881 mm  echo= 5139 us
+S4 p=82 r=-15 f=24 l=-20 u=878 af=30 h=0 pk=47 hs=0 cl=1 w=255 n=8 dxy=148 run=2643 late=1273 ok=1 cal=1
+[S5] PING servo=150 deg  range=  -- mm  echo=59497 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=BLACK  940  GP26=BLACK  809  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3188  GP26 168-3596
+S4 p=136 r=-24 f=34 l=-10 u=868 af=40 h=0 pk=47 hs=0 cl=1 w=102 n=8 dxy=135 run=2750 late=1397 ok=1 cal=1
+S3 LINE  GP27=WHITE    7  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3188  GP26 168-3596
+[S5] PING servo=180 deg  range=  -- mm  echo=59501 us  clear: no echo heard back within 4 m
+S4 p=11 r=-6 f=-46 l=14 u=850 af=10 h=0 pk=47 hs=0 cl=1 w=0 n=8 dxy=104 run=2774 late=1175 ok=1 cal=1
+[S5] PING servo=165 deg  range=  -- mm  echo=59498 us  clear: no echo heard back within 4 m
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3188  GP26 168-3596
+[S5] PING servo=150 deg  range=  -- mm  echo=59496 us  clear: no echo heard back within 4 m
+[S5] WATCH passed: unseen_mm seen 213 0
+[S5] EVT 0x57 d=0cm a=180deg
+S4 p=34 r=-12 f=-8 l=-2 u=860 af=-20 h=0 pk=47 hs=0 cl=1 w=-153 n=8 dxy=159 run=2620 late=1661 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3188  GP26 168-3596
+S4 p=49 r=-34 f=-52 l=-22 u=862 af=-30 h=0 pk=47 hs=0 cl=1 w=204 n=8 dxy=214 run=2680 late=1138 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    7  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3156  GP26 168-3533
+[S5] STATE from to 4 0
+S4 p=-120 r=-49 f=-22 l=-32 u=862 af=-640 h=0 pk=47 hs=0 cl=1 w=-306 n=8 dxy=300 run=2687 late=1198 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3156  GP26 168-3533
+S4 CLASS STATIONARY t=102975 ms
+[S5] EVT 0x62 a=9 b=0
+S4 p=291 r=-16 f=82 l=-80 u=876 af=280 h=0 pk=47 hs=0 cl=0 w=-306 n=8 dxy=292 run=2759 late=1059 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3156  GP26 168-3533
+S4 CLASS ACCELERATING t=103175 ms
+S4 CLASS MOVING t=103315 ms
+S4 p=-109 r=-21 f=-68 l=-27 u=854 af=150 h=0 pk=47 hs=0 cl=1 w=-51 n=7 dxy=277 run=2807 late=1183 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3156  GP26 168-3533
+S4 p=-17 r=-6 f=-20 l=6 u=850 af=40 h=0 pk=47 hs=0 cl=1 w=-306 n=7 dxy=137 run=2773 late=1319 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3156  GP26 168-3533
+S4 p=46 r=-8 f=28 l=20 u=862 af=20 h=0 pk=47 hs=0 cl=1 w=-306 n=8 dxy=119 run=2773 late=1156 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3156  GP26 168-3533
+S4 p=62 r=-38 f=4 l=-26 u=856 af=-20 h=0 pk=47 hs=0 cl=1 w=-204 n=8 dxy=113 run=2628 late=1149 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3156  GP26 168-3533
+S4 p=65 r=-55 f=6 l=-46 u=856 af=20 h=0 pk=47 hs=0 cl=1 w=-204 n=8 dxy=118 run=2597 late=1157 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3156  GP26 168-3533
+S3 TIME barcode decode 1607 us (both paths)
+S4 p=50 r=-22 f=-18 l=-20 u=854 af=20 h=0 pk=47 hs=0 cl=1 w=0 n=8 dxy=157 run=2607 late=1114 ok=1 cal=1
+S3 LINE  GP27=WHITE    8  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3156  GP26 168-3533
+S4 p=-2 r=-40 f=-38 l=-38 u=854 af=0 h=0 pk=47 hs=0 cl=1 w=102 n=8 dxy=133 run=2608 late=1125 ok=1 cal=1
+S3 LINE  GP27=WHITE    8  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3156  GP26 168-3533
+S4 p=17 r=-88 f=2 l=-66 u=868 af=30 h=0 pk=47 hs=0 cl=1 w=51 n=8 dxy=145 run=2662 late=1111 ok=1 cal=1
+S3 LINE  GP27=WHITE   24  GP26=WHITE   26  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3156  GP26 168-3533
+S4 p=-25 r=-49 f=-48 l=-30 u=848 af=30 h=0 pk=47 hs=0 cl=1 w=102 n=8 dxy=125 run=2623 late=1134 ok=1 cal=1
+S3 LINE  GP27=WHITE   56  GP26=WHITE   64  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3156  GP26 168-3533
+S4 p=-190 r=-30 f=-84 l=-14 u=848 af=-650 h=0 pk=47 hs=0 cl=1 w=153 n=8 dxy=281 run=2738 late=966 ok=1 cal=1
+S3 TIME line step max 323 us, period 9548-10365 us, sampler isr max 48 us
+S3 LINE  GP27=WHITE   67  GP26=WHITE   73  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3156  GP26 168-3533
+S4 CLASS STATIONARY t=105175 ms
+[S5] EVT 0x62 a=10 b=0
+S4 p=73 r=-144 f=12 l=-94 u=848 af=160 h=0 pk=47 hs=0 cl=0 w=1688 n=8 dxy=273 run=2719 late=1270 ok=1 cal=1
+S3 LINE  GP27=WHITE   56  GP26=WHITE   73  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3156  GP26 168-3533
+S4 p=-90 r=-59 f=-102 l=-38 u=852 af=-60 h=0 pk=47 hs=0 cl=0 w=5064 n=8 dxy=408 run=2619 late=1142 ok=1 cal=1
+S3 LINE  GP27=WHITE   40  GP26=WHITE   40  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3156  GP26 168-3533
+S4 p=-94 r=-9 f=-61 l=13 u=866 af=-60 h=0 pk=47 hs=0 cl=0 w=4603 n=7 dxy=126 run=2614 late=1149 ok=1 cal=1
+S3 LINE  GP27=WHITE   51  GP26=WHITE   54  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3156  GP26 168-3533
+S4 CLASS TURNING t=105895 ms
+S4 p=97 r=-119 f=2 l=-60 u=870 af=-60 h=0 pk=47 hs=0 cl=3 w=8030 n=8 dxy=183 run=2805 late=967 ok=1 cal=1
+S3 LINE  GP27=WHITE   41  GP26=WHITE   69  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 198-3156  GP26 184-3533
+S4 p=-2 r=24 f=22 l=-14 u=856 af=70 h=0 pk=47 hs=0 cl=3 w=153 n=8 dxy=281 run=2701 late=1001 ok=1 cal=1
+S4 CLASS STATIONARY t=106136 ms
+S3 LINE  GP27=WHITE   30  GP26=WHITE   35  -> turn STRAIGHT    0 mm/s  SEARCH   cal GP27 198-3156  GP26 184-3533
+[S5] EVT 0x62 a=11 b=0
+S4 p=-33 r=42 f=-116 l=72 u=838 af=160 h=0 pk=47 hs=0 cl=0 w=204 n=8 dxy=404 run=2754 late=1573 ok=1 cal=1
+S3 LINE  GP27=WHITE   25  GP26=WHITE   45  -> turn STRAIGHT    0 mm/s  SEARCH   cal GP27 198-3156  GP26 184-3533
+S4 CLASS MOVING t=106435 ms
+S4 p=-59 r=7 f=-38 l=-6 u=854 af=90 h=0 pk=47 hs=0 cl=1 w=153 n=8 dxy=164 run=2881 late=1087 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE   64  -> turn STRAIGHT    0 mm/s  SEARCH   cal GP27 198-3156  GP26 184-3533
+S4 p=-26 r=-22 f=-46 l=-16 u=854 af=20 h=0 pk=47 hs=0 cl=1 w=562 n=8 dxy=111 run=2694 late=1000 ok=1 cal=1
+S3 LINE  GP27=WHITE   14  GP26=WHITE   26  -> turn STRAIGHT    0 mm/s  SEARCH   cal GP27 198-3156  GP26 184-3533
+[S5] EVT 0x63 a=1 b=0
+S4 IMPACT dxy=3696 mg (threshold 2500) -> MF_ESTOP, EV_IMPACT
+[S5] EVT 0x60 a=9 b=8
+S4 CLASS IMPACT t=106855 ms
+S4 IMPACT braked 9698 us after the sample
+S4 p=-1522 r=-64 f=-1002 l=212 u=646 af=-420 h=4 pk=47 hs=0 cl=6 w=358 n=8 dxy=3696 run=3417 late=1199 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 198-3156  GP26 184-3533
+S4 p=-534 r=-38 f=-136 l=-36 u=866 af=0 h=4 pk=47 hs=0 cl=6 w=0 n=8 dxy=661 run=2753 late=990 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 197-3156  GP26 181-3533
+S3 TIME barcode decode 1059 us (both paths)
+S4 HUMP climbing (nose down)
+S4 p=-771 r=-318 f=-12 l=-16 u=858 af=0 h=4 pk=47 hs=1 cl=6 w=0 n=8 dxy=264 run=2736 late=1119 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE   51  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 197-3156  GP26 180-3533
+S4 HUMP descending
+S4 p=758 r=605 f=278 l=144 u=882 af=0 h=4 pk=47 hs=2 cl=6 w=0 n=8 dxy=363 run=2755 late=943 ok=1 cal=1
+S3 LINE  GP27=BLACK  917  GP26=EDGE   747  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 197-3156  GP26 180-3533
+S4 HUMP one wheel up (left side)
+S4 p=387 r=17 f=-24 l=-16 u=766 af=0 h=4 pk=47 hs=2 cl=6 w=0 n=8 dxy=370 run=2611 late=1006 ok=1 cal=1
+S3 LINE  GP27=BLACK  858  GP26=EDGE   662  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 197-3156  GP26 180-3533
+S4 HUMP #11 (one wheel) peak=13 mm roll_max=674 cdeg over 0 mm (run peak 47 mm)
+S4 p=487 r=-520 f=60 l=-188 u=828 af=0 h=4 pk=47 hs=2 cl=6 w=0 n=8 dxy=135 run=2859 late=1147 ok=1 cal=1
+S3 LINE  GP27=WHITE   52  GP26=EDGE   590  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 197-3156  GP26 180-3533
+S4 HUMP one wheel up (right side)
+S4 p=422 r=-522 f=654 l=-180 u=1472 af=0 h=4 pk=47 hs=2 cl=6 w=0 n=8 dxy=1204 run=2585 late=1006 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 198-3138  GP26 181-3490
+S4 HUMP #12 peak=23 mm theta_max=1696 cdeg L.sin=23 mm integrated=0 mm (run peak 47 mm)
+S4 HUMP #13 (one wheel) peak=18 mm roll_max=912 cdeg over 0 mm (run peak 47 mm)
+S4 p=12 r=-47 f=-44 l=-10 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=529 run=3116 late=1027 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=50 r=14 f=-4 l=-9 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=61 run=2596 late=1159 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=69 r=-18 f=-5 l=-17 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=9 dxy=52 run=2794 late=1027 ok=1 cal=1
+S3 TIME barcode decode 1726 us (both paths)
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=86 r=9 f=-2 l=-16 u=860 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=55 run=2591 late=1066 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=58 r=0 f=-12 l=-16 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=64 run=2594 late=1122 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=62 r=-5 f=-8 l=-10 u=878 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=34 run=2748 late=1058 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=84 r=3 f=-6 l=-14 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2593 late=1000 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=51 r=-8 f=-6 l=-14 u=870 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2647 late=1357 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=88 r=2 f=-4 l=-14 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2720 late=1009 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=85 r=6 f=-4 l=-16 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2813 late=1027 ok=1 cal=1
+S3 TIME line step max 378 us, period 9477-10435 us, sampler isr max 49 us
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=82 r=0 f=-12 l=-12 u=874 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2714 late=1331 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=82 r=3 f=-11 l=-13 u=870 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2619 late=985 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=99 r=-13 f=0 l=-16 u=875 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2658 late=987 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=69 r=-5 f=-14 l=-16 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2891 late=1164 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=68 r=-6 f=-14 l=-12 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2594 late=1042 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=79 r=1 f=-10 l=-12 u=870 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2786 late=1022 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=82 r=-1 f=-10 l=-14 u=874 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2744 late=965 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=87 r=3 f=-10 l=-20 u=874 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2740 late=971 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=71 r=8 f=-10 l=-10 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2586 late=962 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=90 r=5 f=-8 l=-16 u=886 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2637 late=1160 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=62 r=6 f=-8 l=-8 u=874 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2597 late=1022 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=59 r=1 f=-9 l=-9 u=880 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=21 run=2732 late=1007 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=86 r=23 f=-2 l=-11 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=21 run=2593 late=1156 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=87 r=4 f=-4 l=-12 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=23 run=2811 late=991 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 167-3490
+S4 p=59 r=-4 f=-18 l=-14 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2692 late=835 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 167-3490
+S4 p=31 r=31 f=-26 l=-2 u=856 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=87 run=2668 late=1170 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=46 r=-2 f=-10 l=-18 u=876 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=93 run=2581 late=1007 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=37 r=-5 f=-20 l=-4 u=874 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=84 run=2721 late=1036 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=40 r=-18 f=-46 l=-8 u=876 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=150 run=2652 late=1166 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=83 r=-11 f=-6 l=-18 u=874 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2730 late=1023 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=84 r=13 f=-12 l=-10 u=876 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2644 late=1021 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=69 r=6 f=-12 l=-8 u=878 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2639 late=1165 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=96 r=-15 f=-6 l=-16 u=875 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2720 late=990 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=68 r=-21 f=-4 l=-16 u=870 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=23 run=2748 late=1052 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=71 r=-10 f=-8 l=-16 u=874 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2876 late=1144 ok=1 cal=1
+S3 TIME line step max 382 us, period 9711-10362 us, sampler isr max 51 us
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=80 r=3 f=-8 l=-12 u=876 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2779 late=1244 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=75 r=1 f=-4 l=-14 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2719 late=989 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=78 r=-3 f=-6 l=-16 u=870 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2792 late=1112 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=83 r=6 f=-6 l=-12 u=874 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2727 late=1270 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=76 r=23 f=-8 l=-14 u=870 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=24 run=2719 late=958 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=75 r=10 f=-10 l=-10 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2736 late=976 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=68 r=15 f=-16 l=-8 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2616 late=951 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=92 r=6 f=-8 l=-14 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2646 late=959 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=78 r=5 f=-2 l=-13 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2599 late=1166 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=70 r=12 f=-9 l=-9 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2769 late=1002 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=79 r=-3 f=-8 l=-12 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2787 late=848 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=68 r=-8 f=-14 l=-16 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2650 late=1143 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=89 r=-2 f=-8 l=-14 u=878 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2722 late=1014 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=73 r=3 f=-10 l=-12 u=870 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2727 late=1045 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=80 r=1 f=-6 l=-12 u=874 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2829 late=1155 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=84 r=-6 f=-8 l=-16 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2749 late=962 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=66 r=-1 f=-12 l=-10 u=878 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2656 late=961 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=56 r=-9 f=-14 l=-16 u=876 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2725 late=1186 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=-20 r=-41 f=-38 l=-16 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=647 run=2739 late=984 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=44 r=-1 f=-18 l=-16 u=873 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=105 run=2726 late=984 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=78 r=-4 f=-12 l=-12 u=876 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=36 run=2613 late=1148 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=38 r=-71 f=-10 l=-40 u=916 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=115 run=2738 late=983 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=40 r=-12 f=-8 l=-18 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=84 run=2714 late=989 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=74 r=5 f=-16 l=-6 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=31 run=2714 late=1153 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=74 r=-4 f=4 l=-8 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=35 run=2606 late=946 ok=1 cal=1
+S3 TIME line step max 373 us, period 9709-10285 us, sampler isr max 53 us
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=73 r=14 f=0 l=-10 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=64 run=2728 late=1204 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=87 r=6 f=-2 l=-12 u=876 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=31 run=2630 late=1156 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=66 r=0 f=-18 l=-16 u=876 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2771 late=941 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=94 r=9 f=-10 l=-12 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2588 late=939 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=91 r=-11 f=-2 l=-16 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2702 late=1137 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=94 r=-9 f=-6 l=-16 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2696 late=976 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=97 r=14 f=-2 l=-6 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2799 late=1052 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=98 r=8 f=-8 l=-10 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2944 late=1159 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=116 r=-15 f=-4 l=-16 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=51 run=2792 late=948 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=88 r=17 f=-4 l=-12 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2720 late=1252 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=86 r=-5 f=-10 l=-16 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=29 run=2711 late=1165 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=118 r=21 f=0 l=-10 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=32 run=2588 late=960 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=100 r=11 f=-2 l=-12 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=28 run=2641 late=999 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=105 r=-8 f=0 l=-14 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=31 run=2725 late=1171 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=111 r=2 f=0 l=-16 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=29 run=2717 late=953 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=99 r=5 f=-6 l=-16 u=870 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=20 run=2630 late=954 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=96 r=15 f=-2 l=-9 u=877 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=19 run=2593 late=1121 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=110 r=7 f=-2 l=-16 u=878 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=28 run=2796 late=1035 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=99 r=11 f=0 l=-10 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=18 run=2643 late=944 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=71 r=-3 f=-20 l=-14 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2739 late=1141 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=101 r=-2 f=-2 l=-12 u=860 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2705 late=1028 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=87 r=10 f=-6 l=-8 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2661 late=1048 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=115 r=8 f=-2 l=-10 u=878 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2834 late=1111 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=107 r=4 f=-4 l=-10 u=874 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=19 run=2585 late=1060 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=92 r=-11 f=-12 l=-16 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2808 late=841 ok=1 cal=1
+S3 TIME line step max 380 us, period 9714-10279 us, sampler isr max 49 us
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=105 r=10 f=-2 l=-11 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2753 late=1350 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=111 r=-5 f=-6 l=-16 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2803 late=1005 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=109 r=-9 f=-6 l=-16 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2832 late=975 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=110 r=-9 f=0 l=-16 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=20 run=2745 late=965 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=116 r=6 f=-6 l=-10 u=870 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=33 run=2718 late=1004 ok=1 cal=1
+S3 LINE  GP27=WHITE    8  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=107 r=-5 f=0 l=-14 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=29 run=2613 late=992 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=92 r=-2 f=-4 l=-14 u=870 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=20 run=2752 late=972 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=96 r=12 f=-8 l=-6 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=19 run=2729 late=935 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=88 r=-1 f=-10 l=-16 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=19 run=2612 late=961 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=105 r=-2 f=0 l=-6 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=32 run=2650 late=1137 ok=1 cal=1
+S3 LINE  GP27=WHITE    2  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 184-3138  GP26 168-3490
+S4 p=98 r=2 f=0 l=-9 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=35 run=2605 late=1007 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=94 r=5 f=-2 l=-13 u=861 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=21 run=2712 late=989 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=108 r=-15 f=0 l=-18 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2802 late=1076 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=104 r=-2 f=-10 l=-14 u=860 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2796 late=949 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=95 r=6 f=-4 l=-8 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2683 late=1013 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=110 r=-1 f=0 l=-16 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2717 late=1336 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=101 r=6 f=-2 l=-14 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2721 late=1011 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=96 r=-3 f=-10 l=-14 u=860 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2593 late=1063 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=105 r=-7 f=0 l=-12 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2727 late=1152 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=86 r=-1 f=-10 l=-16 u=854 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=36 run=2803 late=957 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=94 r=0 f=-4 l=-12 u=856 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2642 late=966 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=74 r=-24 f=-11 l=-20 u=854 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=47 run=2605 late=1130 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=95 r=-21 f=0 l=-13 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=180 run=2596 late=1031 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=93 r=6 f=-8 l=-8 u=858 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=17 run=2794 late=827 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=83 r=-25 f=-18 l=-26 u=886 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=50 run=2613 late=1143 ok=1 cal=1
+S3 TIME line step max 375 us, period 9729-10287 us, sampler isr max 59 us
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=82 r=8 f=-4 l=-12 u=858 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=35 run=2837 late=1106 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=93 r=-7 f=-6 l=-12 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=19 run=2673 late=996 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=64 r=9 f=-16 l=-4 u=846 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=49 run=2758 late=963 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=58 r=3 f=-2 l=-12 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=37 run=2584 late=980 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=91 r=-13 f=-6 l=-22 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=23 run=2589 late=1041 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=92 r=-2 f=-6 l=-16 u=858 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2658 late=1126 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=106 r=-2 f=-6 l=-11 u=852 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2732 late=942 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=106 r=-5 f=0 l=-16 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2649 late=992 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=119 r=1 f=0 l=-10 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2801 late=1138 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=8 r=-73 f=-70 l=-20 u=852 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=590 run=2705 late=991 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=71 r=-12 f=-14 l=-12 u=856 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=63 run=2741 late=944 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    3  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 166-3490
+S4 p=93 r=-7 f=0 l=-18 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2968 late=1127 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 167-3490
+S4 p=97 r=5 f=-6 l=-14 u=854 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2592 late=991 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 167-3490
+S4 p=82 r=-1 f=-8 l=-14 u=852 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2721 late=939 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 167-3490
+S4 p=90 r=-9 f=-10 l=-14 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2813 late=1103 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 167-3490
+S4 p=89 r=1 f=-12 l=-12 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=20 run=2766 late=1035 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 167-3490
+S4 p=96 r=3 f=-6 l=-16 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2596 late=1000 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=100 r=3 f=-4 l=-16 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=20 run=2748 late=965 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=101 r=2 f=-2 l=-11 u=861 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2804 late=1138 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=100 r=4 f=-9 l=-11 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=20 run=2731 late=839 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=110 r=14 f=-4 l=-10 u=872 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=20 run=2886 late=1188 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=82 r=1 f=-10 l=-14 u=856 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=20 run=2731 late=1221 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=93 r=10 f=-4 l=-12 u=854 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=20 run=2729 late=841 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=81 r=0 f=-12 l=-12 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=20 run=2589 late=1138 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=100 r=3 f=-6 l=-16 u=854 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=20 run=2595 late=1005 ok=1 cal=1
+S3 TIME line step max 373 us, period 9681-10279 us, sampler isr max 57 us
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=106 r=-10 f=-6 l=-16 u=858 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=20 run=2709 late=1204 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=100 r=1 f=-2 l=-16 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=20 run=2730 late=1138 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=82 r=-2 f=-8 l=-14 u=858 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2743 late=964 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=103 r=21 f=-4 l=-4 u=860 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=20 run=2606 late=1007 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=92 r=2 f=-6 l=-12 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2704 late=1178 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=95 r=-8 f=-2 l=-16 u=859 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=21 run=2723 late=988 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=109 r=13 f=-2 l=-14 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2597 late=989 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=101 r=2 f=-6 l=-14 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2716 late=1193 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=112 r=2 f=-4 l=-12 u=860 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2607 late=1015 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 180-3138  GP26 168-3490
+S4 p=97 r=20 f=0 l=-14 u=858 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2737 late=819 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 180-3138  GP26 168-3490
+S4 p=117 r=-9 f=-4 l=-14 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2727 late=1139 ok=1 cal=1
+S3 LINE  GP27=WHITE    4  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 180-3138  GP26 168-3490
+S4 p=99 r=3 f=-4 l=-16 u=860 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2722 late=944 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 180-3138  GP26 168-3490
+S4 p=92 r=8 f=-10 l=-12 u=864 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2817 late=957 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=82 r=22 f=-6 l=-6 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2718 late=1145 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=89 r=-1 f=-10 l=-14 u=858 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2623 late=1020 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=104 r=15 f=-2 l=-9 u=854 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2736 late=1047 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=108 r=-2 f=-2 l=-13 u=859 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2613 late=1114 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=100 r=4 f=0 l=-16 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2694 late=924 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=97 r=0 f=-2 l=-18 u=854 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2811 late=853 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=98 r=13 f=-10 l=-8 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2797 late=1153 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=93 r=-2 f=-8 l=-18 u=854 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2697 late=1035 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=88 r=8 f=-8 l=-16 u=858 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2747 late=854 ok=1 cal=1
+S3 LINE  GP27=WHITE    8  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=110 r=4 f=-4 l=-10 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2812 late=928 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=98 r=3 f=-8 l=-16 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2741 late=935 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=100 r=12 f=-4 l=-10 u=868 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2577 late=1113 ok=1 cal=1
+S3 TIME line step max 389 us, period 9729-10280 us, sampler isr max 47 us
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 183-3138  GP26 168-3490
+S4 p=91 r=19 f=-6 l=-8 u=862 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=22 run=2593 late=1515 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=113 r=11 f=-2 l=-8 u=860 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2758 late=945 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=117 r=-8 f=0 l=-18 u=854 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=22 run=2720 late=1084 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 181-3138  GP26 168-3490
+S4 p=99 r=1 f=-4 l=-11 u=857 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=7 dxy=21 run=2607 late=1169 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=98 r=12 f=-6 l=-14 u=856 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2780 late=966 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
+S4 p=97 r=-11 f=-8 l=-16 u=866 af=0 h=0 pk=47 hs=0 cl=6 w=0 n=8 dxy=21 run=2708 late=859 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 182-3138  GP26 168-3490
