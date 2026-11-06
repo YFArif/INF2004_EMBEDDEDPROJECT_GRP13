@@ -30,3 +30,5 @@ Add a new row for every run. Never edit or delete old rows.
 | Date | Test ID | Commit | Tester | Result | Log / evidence | Notes |
 |---|---|---|---|---|---|---|
 | 2026-11-04 | S4-U01 | `bd59c6d` | Kessler | PASS | `logs/2026-11-04_s4_u01_tilt.txt` | Phone on the car read −2° flat, so phone 5/10/15° = 7/12/17° from flat. IMU 7.6 / 12.0 / 17.7°, max error 0.7°. Flat noise ±0.2°. Nose up = +, roll stayed 0°. |
+| 2026-11-06 | S4-U02 | `c6375eb` | Kessler | FAIL | `logs/2026-11-06_s4_u02_hump.txt` | 10 mm strip under right wheel. Height from largest roll read 18 / 22 mm (jolt at strip edge adds to roll). |
+| 2026-11-06 | S4-U02 | `c6375eb` + avg roll fix | Kessler | PASS | `logs/2026-11-06_s4_u02_hump.txt` | Height from average roll: 9 / 10 / 10 mm on the 10 mm strip, all within ±5 mm. Hump detected 3/3. |

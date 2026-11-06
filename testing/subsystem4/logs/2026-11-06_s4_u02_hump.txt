@@ -1,0 +1,12 @@
+S4-U02 one-wheel hump, 2026-11-06, tester Kessler
+Strip: 10 mm (ruler), under the RIGHT wheel only, drive test 150 mm/s, 800 mm.
+
+Before fix (height from largest roll):
+S4 HUMP #2 (one wheel) peak=18 mm roll_max=917 cdeg over 135 mm (run peak 18 mm)
+S4 HUMP #1 (one wheel) peak=22 mm roll_max=1108 cdeg over 144 mm (run peak 22 mm)
+
+After fix (height from average roll on the hump):
+S4 HUMP #1 (one wheel) peak=9 mm roll_avg=467 roll_max=893 cdeg over 160 mm (run peak 9 mm)
+S4 HUMP #2 (one wheel) peak=13 mm roll_avg=662 roll_max=967 cdeg over 4 mm (run peak 13 mm)   <- stop jolt at 799 mm, now dropped (SIDE_MIN_MM 30)
+S4 HUMP #1 (one wheel) peak=10 mm roll_avg=510 roll_max=942 cdeg over 156 mm (run peak 10 mm)
+S4 HUMP #1 (one wheel) peak=10 mm roll_avg=508 roll_max=942 cdeg over 162 mm (run peak 10 mm)
