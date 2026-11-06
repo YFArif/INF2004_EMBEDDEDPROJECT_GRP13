@@ -1,0 +1,15 @@
+S4-U04 turn rate, 2026-11-06, tester Kessler
+Build: 13e3101 + hd= (heading summed every 20 ms from w=).
+Hand pivot, left wheel held, only the right wheel rolls (90 deg = ~176 mm).
+
+Try 1: 90 deg  hd 6 -> 40 (34 deg); 180 deg hd 40 -> -62 (-102 deg, wrong sign)
+Try 2: 90 deg left hd 0 -> 17 (17 deg); 180 deg hd 17 -> 37 -> 23 (~6 deg net)
+Slow hand spins on the spot: w=0 the whole time.
+
+Result: FAIL. Right encoder undercounts (~1/5) and has no direction.
+
+Retest with S2 TURN command (car turns itself, motors on):
+90 deg:  hd 0 -> 94   (+4.4 %)
+180 deg: hd 1 -> 192  (191 deg, +6 %)
+w during turn ~11000-15000 cdps (110-150 deg/s).
+Result: PASS. Earlier hand test invalid (no encoder direction with motors off).

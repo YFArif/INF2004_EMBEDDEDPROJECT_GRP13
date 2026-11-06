@@ -18,6 +18,11 @@
  * 4. A side's clearance is the free sideways gap between that edge and
  *    the nearest other echo beside it, looking S5_CLEAR_DEPTH_MM past
  *    the edge. With nothing seen it is S5_CLEAR_OPEN_MM.
+ * 5. A side's shift (how far the rear axle moves sideways to pass) is
+ *    the found edge, untrimmed, plus half the robot and
+ *    S5_PATH_MARGIN_MM. The spread beam makes every obstacle look a few
+ *    cm wider per side, so the robot errs wide, never narrow (logs
+ *    2026-11-05_0124 and _0224: trimmed edges let the robot's side hit).
  */
 
 #include <stdbool.h>
@@ -125,11 +130,16 @@ s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
     int32_t            left_y   = 0;
     int32_t            right_x  = 0;
     int32_t            right_y  = 0;
+    int32_t            raw_lx   = 0;    // Found edges, for the sideways
+    int32_t            raw_rx   = 0;    // shifts (method step 5).
+    int32_t            raw_y    = 0;
 
     // Step 1: Move each found edge inward by half the beam width.
     correct_edges(p_left, p_right, &left_pt, &right_pt);
     s5_profile_to_xy(&left_pt, &left_x, &left_y);
     s5_profile_to_xy(&right_pt, &right_x, &right_y);
+    s5_profile_to_xy(&p_left->last_hit, &raw_lx, &raw_y);
+    s5_profile_to_xy(&p_right->last_hit, &raw_rx, &raw_y);
 
     // Step 2: Width is the distance between the two edge points.
     int32_t  dx_mm   = left_x - right_x;
@@ -161,7 +171,7 @@ s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
                                               true);
 
         // The robot's right side must end up left of the left edge.
-        p_out->shift_left_mm = clamp_mm(HALF_PATH_MM - left_x, MM_MAX);
+        p_out->shift_left_mm = clamp_mm(HALF_PATH_MM - raw_lx, MM_MAX);
     }
 
     if (p_right->b_found)
@@ -171,7 +181,7 @@ s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
                                                false);
 
         // The robot's left side must end up right of the right edge.
-        p_out->shift_right_mm = clamp_mm(HALF_PATH_MM + right_x, MM_MAX);
+        p_out->shift_right_mm = clamp_mm(HALF_PATH_MM + raw_rx, MM_MAX);
     }
 
     p_out->depth_mm = 0u;

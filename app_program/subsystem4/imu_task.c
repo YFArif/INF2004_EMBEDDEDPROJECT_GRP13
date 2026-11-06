@@ -70,6 +70,7 @@
 #define HUMP_HOLD_CYCLES    (5u)
 #define SIDE_ENTER_CDEG     (300)       /* One-wheel hump: 3 deg roll     */
 #define SIDE_FLAT_CDEG      (150)       /* (a ~5 deg course hump).        */
+#define SIDE_MIN_MM         (30)        /* Shorter = stop jolt, not hump. */
 #define WHEELBASE_MM        (78)        /* Axle to ball, 77.5 mm (ruler). */
 #define HUMP_ABANDON_CYCLES (100u)      /* 2 s level and still: not a hump.*/
 #define ANGLE_LP_DIV        (4)         /* Pitch / roll low-pass.         */
@@ -80,11 +81,11 @@
 #define IMPACT_ENABLE       (0 == DRIVE_TEST)   /* Off in the hump drive  */
                                                 /* test: hitting a strip  */
                                                 /* edge read 2.1 g.       */
-#define IMPACT_MG           (2500)      /* Was 1000 (A18). 2026-11-01: a   */
-                                        /* hand tap read 1.2 g, a wheel   */
-                                        /* hitting a 2 cm strip edge      */
-                                        /* 2.1 g. Raised so hump edges    */
-                                        /* do not E-stop; tune in S4-U03. */
+#define IMPACT_MG           (2000)      /* Was 2500. 2026-11-06 (S4-U03): */
+                                        /* wall hits at 150 mm/s read     */
+                                        /* 2.07-2.50 g and 2.17/2.43 g    */
+                                        /* were missed at 2.5 g. Hump     */
+                                        /* runs peaked ~1.7 g.            */
 #define IMPACT_LP_DIV       (16)        /* Low-pass: 1/16 per sample.     */
 #define LATENCY_CYCLES      (10u)       /* Look for S2's brake time.      */
 
@@ -165,6 +166,7 @@ typedef struct
     int32_t  prev_dist_mm;
     int32_t  afwd_mms2;
     int32_t  turn_cdps;
+    int32_t  head_cdeg_ms;          /* Sum of turn rate x ms (U04).     */
 
     /* Pitch and hump. */
     body_t   mean;
@@ -188,6 +190,8 @@ typedef struct
     bool     b_side;
     uint32_t side_hold;
     int32_t  side_roll_max_cdeg;    /* Largest |roll| on this hump.      */
+    int32_t  side_roll_sum_cdeg;    /* Sum of |roll| on this hump.       */
+    uint32_t side_n;                /* Cycles summed.                    */
     int32_t  side_start_mm;
 
     /* Motion class. */
@@ -610,6 +614,7 @@ imu_motion (subsystem2_odom_t const * p_odom)
     // omega = (v_right - v_left) / track; + = left.
     g_imu.turn_cdps = ((p_odom->speed_r_mms - p_odom->speed_l_mms)
                        * (CDPS_PER_DIFF / TRACK_SCALE)) / S2_TRACK_MM;
+    g_imu.head_cdeg_ms += g_imu.turn_cdps * (int32_t) S4_IMU_PERIOD_MS;
 }
 
 /*!
@@ -932,7 +937,9 @@ imu_hump (subsystem2_odom_t const * p_odom)
  * @brief One-wheel hump: one wheel rides over the hump, so the robot
  *        rolls instead of pitching (2026-11-01 drive test: roll -19 deg
  *        over ~140 mm, pitch stayed near 0). Height = track x
- *        sin(largest |roll|). Reported like a pitch hump.
+ *        sin(average |roll| on the hump). The largest |roll| read ~2x
+ *        high (18-22 mm on a 10 mm strip, 2026-11-06) because the jolt
+ *        at the strip edge adds to the roll, so the average is used.
  *
  * @param[in] p_odom This cycle's odometry.
  */
@@ -941,6 +948,7 @@ imu_side_hump (subsystem2_odom_t const * p_odom)
 {
     int32_t roll   = s4_math_abs(g_imu.roll_cdeg);
     int32_t height = 0;
+    int32_t avg    = 0;
 
     if (!g_imu.b_side)
     {
@@ -951,6 +959,8 @@ imu_side_hump (subsystem2_odom_t const * p_odom)
             g_imu.b_side             = true;
             g_imu.side_hold          = 0u;
             g_imu.side_roll_max_cdeg = roll;
+            g_imu.side_roll_sum_cdeg = roll;
+            g_imu.side_n             = 1u;
             g_imu.side_start_mm      = p_odom->dist_mm;
             tm_printf((UB *) "S4 HUMP one wheel up (%s side)\n",
                       (g_imu.roll_cdeg > 0) ? "left" : "right");
@@ -962,14 +972,29 @@ imu_side_hump (subsystem2_odom_t const * p_odom)
         {
             g_imu.side_roll_max_cdeg = roll;
         }
+        if (roll >= SIDE_FLAT_CDEG)
+        {
+            g_imu.side_roll_sum_cdeg += roll;
+            g_imu.side_n++;
+        }
 
         g_imu.side_hold = (roll < SIDE_FLAT_CDEG) ? (g_imu.side_hold + 1u)
                                                   : 0u;
-        if (g_imu.side_hold >= HUMP_HOLD_CYCLES)
+        if ((g_imu.side_hold >= HUMP_HOLD_CYCLES)
+            && ((p_odom->dist_mm - g_imu.side_start_mm) < SIDE_MIN_MM))
+        {
+            /* Too short to be a hump (2026-11-06: the stop at the end of
+             * the drive read as a 4 mm long "hump"). Drop it.
+             */
+            g_imu.b_side    = false;
+            g_imu.side_hold = 0u;
+        }
+        else if (g_imu.side_hold >= HUMP_HOLD_CYCLES)
         {
             // NOTE: The cast is safe: |height| <= 112 mm.
+            avg = g_imu.side_roll_sum_cdeg / (int32_t) g_imu.side_n;
             height = (int32_t) (((float) S2_TRACK_MM
-                                 * s4_math_sin_cdeg(g_imu.side_roll_max_cdeg))
+                                 * s4_math_sin_cdeg(avg))
                                 + ROUND_HALF);
             g_imu.hump_count++;
             if (height > g_imu.run_peak_mm)
@@ -977,9 +1002,9 @@ imu_side_hump (subsystem2_odom_t const * p_odom)
                 g_imu.run_peak_mm = height;
             }
 
-            tm_printf((UB *) "S4 HUMP #%d (one wheel) peak=%d mm roll_max=%d"
-                      " cdeg over %d mm (run peak %d mm)\n",
-                      (INT) g_imu.hump_count, (INT) height,
+            tm_printf((UB *) "S4 HUMP #%d (one wheel) peak=%d mm roll_avg=%d"
+                      " roll_max=%d cdeg over %d mm (run peak %d mm)\n",
+                      (INT) g_imu.hump_count, (INT) height, (INT) avg,
                       (INT) g_imu.side_roll_max_cdeg,
                       (INT) (p_odom->dist_mm - g_imu.side_start_mm),
                       (INT) g_imu.run_peak_mm);
@@ -1019,6 +1044,11 @@ imu_class (subsystem2_odom_t const * p_odom)
     {
         cand = S4_CLASS_DESCENDING_HUMP;
     }
+    else if (s4_math_abs(g_imu.turn_cdps) > CLASS_TURN_CDPS)
+    {
+        // Before STATIONARY: a spin on the spot has ~0 forward speed.
+        cand = S4_CLASS_TURNING;
+    }
     else if (s4_math_abs(p_odom->speed_mms) < CLASS_STILL_MMS)
     {
         cand = S4_CLASS_STATIONARY;
@@ -1026,10 +1056,6 @@ imu_class (subsystem2_odom_t const * p_odom)
     else if (s4_math_abs(g_imu.afwd_mms2) > CLASS_ACCEL_MMS2)
     {
         cand = S4_CLASS_ACCELERATING;
-    }
-    else if (s4_math_abs(g_imu.turn_cdps) > CLASS_TURN_CDPS)
-    {
-        cand = S4_CLASS_TURNING;
     }
     else
     {
@@ -1175,12 +1201,13 @@ imu_log (void)
 {
     // NOTE: The casts are safe: every value is far inside INT's range.
     tm_printf((UB *) "S4 p=%d r=%d f=%d l=%d u=%d af=%d h=%d pk=%d hs=%d"
-              " cl=%d w=%d n=%d dxy=%d run=%d late=%d ok=%d cal=%d\n",
+              " cl=%d w=%d hd=%d n=%d dxy=%d run=%d late=%d ok=%d cal=%d\n",
               (INT) g_imu.pitch_cdeg, (INT) g_imu.roll_cdeg,
               (INT) g_imu.mean.fwd, (INT) g_imu.mean.left,
               (INT) g_imu.mean.up, (INT) g_imu.afwd_mms2,
               (INT) (g_imu.h_mm * TENTHS), (INT) g_imu.run_peak_mm,
               (INT) g_imu.hump, (INT) g_imu.cls, (INT) g_imu.turn_cdps,
+              (INT) (g_imu.head_cdeg_ms / 100000),
               (INT) g_imu.last_samples,
               (INT) s4_math_sqrt((float) g_imu.dxy2_max),
               (INT) g_imu.run_period_max_us, (INT) g_imu.late_period_max_us,

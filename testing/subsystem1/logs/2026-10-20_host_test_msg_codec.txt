@@ -1,0 +1,38 @@
+S1-U05 run_codec_test.sh, 2026-10-20 00:29:31 +08
+commit: 1858c7d
+cc: Apple clang version 17.0.0 (clang-1700.6.4.2)
+python: Python 3.13.7
+== stage 1: build (strict warnings as errors, UBSan/ASan)
+stage 1: ok, no warnings
+== stage 2: run
+S1-U05 msg_codec host test (layout version 1)
+group golden vectors: 35 checks, 0 failed
+group rounding: 35 checks, 0 failed
+group min and max: 42 checks, 0 failed
+group wrap: 22 checks, 0 failed
+group reconstruction: 4 checks, 0 failed
+group clamps: 44 checks, 0 failed
+group rejects: 66 checks, 0 failed
+RESULT: all passed (248 checks)
+stage 2: ok
+== stage 3: golden.py --check
+golden.py --check: 18/18 vectors agree (golden.py, document 10.2, codec_vectors.c)
+stage 3: ok
+== stage 4: mutations
+C1 MSG_TEL_ROLL_POS 115 -> 116: caught by a compile-time check
+C2 MSG_TEL_BYTES 25 -> 26: caught by a compile-time check
+C3 MSG_EVENT_ARG_BYTES 2 -> 3: caught by a compile-time check
+C4 MSG_TEL_TURN_BITS 10 -> 17: caught by a compile-time check
+R1 bit order reversed in put_field: caught by the test (RESULT: 149 FAILED)
+R2 put_modulo clamps instead of wrapping: caught by the test (RESULT: 51 FAILED)
+R3 put_unsigned clamp removed: caught by the test (RESULT: 28 FAILED)
+R4 put_signed offset 2^bits instead of 2^(bits-1): caught by the test (RESULT: 75 FAILED)
+R5 rounding half step 25 -> 24: caught by the test (RESULT: 56 FAILED)
+R6 header_ok length check always true: caught by the test (AddressSanitizer: heap-buffer-overflow)
+stage 4: 10/10 mutations caught
+== stage 5: target compile
+arm-none-eabi-gcc (Arm GNU Toolchain 15.3.Rel1 (Build arm-15.149)) 15.3.1 20260627
+   text	   data	    bss	    dec	    hex	filename
+   4124	      0	      0	   4124	   101c	msg_codec.o
+stage 5: ok, no warnings
+S1-U05: PASS (248 checks, 18/18 vectors agree, 10/10 mutations caught, target compile ok)

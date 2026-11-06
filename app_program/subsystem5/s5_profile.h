@@ -21,9 +21,25 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* Chassis geometry. TODO: measure the robot and update (S5-U04). */
-#define S5_ROBOT_WIDTH_MM       (150)   /* Outside of tyre to tyre.      */
+/* Chassis geometry, from the team's measurements (2026-11-05):
+ * - Width: S2's track, tyre centre to centre, 112 mm (subsystem2.h),
+ *   plus one tyre width (~26 mm, not measured): about 140 mm.
+ * - Axle to front: drive axle (rear) to the front ball caster 77.5 mm,
+ *   ruler (S4, imu_task.c WHEELBASE_MM), plus the ball and the bumper.
+ * - Setback: from log 2026-11-04_s5_stop_2 (sensor read 121 mm with the
+ *   front 30 mm from the box).
+ * The margin was raised to 100 mm while the width was guessed at 180 mm
+ * (log 2026-11-04_s5_avoid_3); with the measured width it is 50 mm
+ * again, and the side gap check (s5_avoid.c) eases out if too close.
+ * TODO: ruler check of the outside width and the setback (S5-U04).
+ */
+#define S5_ROBOT_WIDTH_MM       (140)   /* Widest point, wheels included.*/
 #define S5_ROBOT_LENGTH_MM      (200)   /* Front bumper to rear.         */
+#define S5_AXLE_TO_FRONT_MM     (160)   /* Rear wheel centre to the front*/
+                                        /* tip, measured 15-17 cm        */
+                                        /* (2026-11-06).                 */
+#define S5_SENSOR_SETBACK_MM    (75)    /* Sensor face behind the front, */
+                                        /* measured 7-8 cm (2026-11-05). */
 #define S5_PATH_MARGIN_MM       (50)    /* Gap kept from the obstacle.   */
 
 /* Scan thresholds (Week 6 report 6.4, preliminary until S5-U04). */

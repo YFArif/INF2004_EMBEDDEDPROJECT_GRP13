@@ -1,0 +1,11 @@
+S4-U03 impact, 2026-11-06, tester Kessler
+Drive test 150 mm/s into a solid wall, impact enabled.
+
+IMPACT_MG 2500 (FAIL):
+peak 2172 mg, no trigger, car kept pushing ~2 s
+peak 2428 mg, no trigger, car kept pushing ~2 s
+
+IMPACT_MG 2000 (PASS):
+S4 IMPACT dxy=2499 mg (threshold 2000)  braked 13707 us
+S4 IMPACT dxy=2444 mg (threshold 2000)  braked 18551 us
+S4 IMPACT dxy=2069 mg (threshold 2000)  braked 9270 us

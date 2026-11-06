@@ -1,0 +1,15 @@
+S4-U05 motion class, 2026-11-06, tester Kessler
+
+Before fix (90 deg S2 TURN): w up to 15089 cdps, cl=0 (STATIONARY) the whole turn.
+After fix (TURNING checked before STATIONARY):
+S4 CLASS TURNING t=15343 ms
+S4 CLASS STATIONARY t=16082 ms   (TURNING 739 ms, hd 0 -> 94)
+
+From today's drive / hand runs:
+S4 CLASS ACCELERATING t=82775 ms
+S4 CLASS MOVING t=82875 ms
+S4 CLASS CLIMBING_HUMP t=83075 ms
+S4 CLASS STATIONARY t=85375 ms
+S4 CLASS IMPACT t=17783 ms
+Shortest class seen: 100 ms (limit: not shorter than 100 ms).
+Result: PASS after fix.
