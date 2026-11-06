@@ -628,6 +628,10 @@ drive_run (void)
             }
             last_mm  = s3_odom_mm() - start_mm;
             still_ms = 0u;
+            s3_status_set_junction((S3_CMD_LEFT == nav)  ? S3_JUNC_LEFT :
+                                   (S3_CMD_RIGHT == nav) ? S3_JUNC_RIGHT :
+                                   (S3_CMD_UTURN == nav) ? S3_JUNC_UTURN :
+                                                           S3_JUNC_STRAIGHT);
             if (S3_CMD_NONE != nav)
             {
                 if (!junction_turn(nav, p_set->speed_mms))

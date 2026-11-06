@@ -31,6 +31,8 @@
 #define SP_VALID_BIT    (1u << 18)
 
 #define U8_MASK         (0xFFu)
+#define REJECTS_MASK    (0x0Fu)     /* 4-bit field.                    */
+#define JUNC_TURN_MASK  (0x03u)     /* 2-bit field.                    */
 #define U16_MASK        (0xFFFFu)
 #define PERMILLE        (1000)
 #define U8_FULL         (255)
@@ -463,6 +465,29 @@ s3_status_set_barcode (uint8_t ch_idx, uint8_t cmd, uint8_t rev)
     g_status.last_cmd = cmd;
     g_status.last_rev = rev;
     g_status.barcodes = (g_status.barcodes + 1u) & U8_MASK;
+    (void) tk_unl_mtx(mtx_s3);
+}
+
+/*!
+ * @brief task_barcode only: a pass that looked like a code was rejected.
+ */
+void
+s3_status_barcode_reject (void)
+{
+    (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
+    g_status.rejects = (g_status.rejects + 1u) & REJECTS_MASK;
+    (void) tk_unl_mtx(mtx_s3);
+}
+
+/*!
+ * @brief Drive test only: what the car did at the last junction
+ *        (S3_JUNC_xxx).
+ */
+void
+s3_status_set_junction (uint32_t turn)
+{
+    (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
+    g_status.junc_turn = turn & JUNC_TURN_MASK;
     (void) tk_unl_mtx(mtx_s3);
 }
 

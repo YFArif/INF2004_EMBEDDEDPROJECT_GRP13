@@ -123,6 +123,12 @@ typedef enum
     S3_LINE_UNCAL    = 5    /* Sensors not calibrated yet: do not drive. */
 } s3_line_state_t;
 
+/** Last junction decision (s3_line_status_t.junc_turn). */
+#define S3_JUNC_STRAIGHT    (0u)
+#define S3_JUNC_LEFT        (1u)
+#define S3_JUNC_RIGHT       (2u)
+#define S3_JUNC_UTURN       (3u)
+
 /** Telemetry: 4 x 32 bits = 16 bytes (was 36). */
 typedef struct
 {
@@ -133,14 +139,16 @@ typedef struct
     UW         last_cmd  : 3;   /* s3_cmd_t of the last barcode.         */
     UW         last_rev  : 1;   /* It was read backwards.                */
     UW         overshoot : 1;   /* OUTER rule on (outer not white).      */
-    UW         pad0      : 4;
+    UW         rejects   : 4;   /* Rejected barcode passes, wraps at 16: */
+                                /* use differences.                      */
     /* Word 1 */
     UW         n_outer   : 8;   /* Left IR, 0 = white .. 255 = black.    */
     UW         n_centre  : 8;   /* Centre, 0 = white .. 255 = black.     */
     UW         last_ch   : 6;   /* Code 39 index of the last letter,     */
                                 /* 63 = none.                            */
     UW         seq       : 8;   /* +1 every line step (10 ms).           */
-    UW         pad1      : 2;
+    UW         junc_turn : 2;   /* S3_JUNC_xxx: what the drive test did  */
+                                /* at the last junction (junctions + 1). */
     /* Word 2 */
     UW         map_left  : 6;   /* Today's letters (Code 39 indices).    */
     UW         map_right : 6;

@@ -30,6 +30,9 @@
 #include "s3_config.h"
 #include "s3_private.h"
 
+#define REJECT_MIN_STRIPES  (9u)  /* A rejected pass counts only with at  */
+                                  /* least one symbol's stripes; shorter  */
+                                  /* passes are line-edge noise.          */
 #define US_PER_MS       (1000u)
 #define NAV_SEQ_MASK    (0xFu)
 #define NAV_SRC_MASK    (0x3u)
@@ -257,6 +260,11 @@ pass_decode (char * p_ch, uint8_t * p_rev, uint8_t * p_src)
     else
     {
         BC_LOG((UB *) "S3 RESULT REJECT (neither decoded)\n");
+    }
+    if ((!b_ok) && ((n_dig >= REJECT_MIN_STRIPES) ||
+                    (n_an >= REJECT_MIN_STRIPES)))
+    {
+        s3_status_barcode_reject();     /* Looked like a code: count it. */
     }
     return b_ok;
 }

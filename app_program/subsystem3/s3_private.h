@@ -73,6 +73,8 @@ void         s3_cal_levels_get(s3_cal_levels_t * p_cal);
 /* task_barcode. */
 s3_nav_cmd_t s3_nav_lookup(char ch);
 void         s3_status_set_barcode(uint8_t ch_idx, uint8_t cmd, uint8_t rev);
+void         s3_status_barcode_reject(void);
+void         s3_status_set_junction(uint32_t turn);
 
 /* Console text. */
 char const * s3_state_txt(uint32_t state, uint8_t overshoot);
