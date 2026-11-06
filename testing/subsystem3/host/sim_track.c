@@ -15,8 +15,10 @@
  *	  corner_speed() in motion_task.c) and set-point ramp 30 mm/s per
  *	  20 ms. Optional wheel lag (first order). No slip, no stall.
  *	  S3 steps every 10 ms, S2 reads every 20 ms.
- *	- Sensors: two, SPACING mm apart centre to centre, the pair centred on
- *	  the car, LOOKAHEAD mm in front of the axle. Each reads the fraction
+ *	- Sensors (v30 single edge, car centred on the line): GP27 9 mm off
+ *	  the centreline, on the line's near edge; GP26 the guard SPACING mm
+ *	  further out on the other side, on white.
+ *	  LOOKAHEAD mm in front of the axle. Each reads the fraction
  *	  of its spot (5 mm, or 8 mm in the realism runs) over the 18 mm line. Optional uniform noise
  *	  (fixed-seed LCG), 4-sample averaging and 8-bit readings, as
  *	  drv_adc.c.
@@ -40,13 +42,14 @@
 #define MAX_PTS     (4000)
 #define PI          (3.14159265358979)
 #define KICK_MS     (300.0)      /* Disturbance spread over this. */
-#define S3_IR_SPACING_TEST_MM (18.0)   /* Our car, centre to centre.   */
+#define S3_IR_SPACING_TEST_MM (28.0)   /* Our car: edge to guard.      */
 
-static int32_t  g_kp = S3_LN_KP_X100;   /* gains used by drive()        */
-static int32_t  g_kd = S3_LN_KD_X100;
+static int32_t  g_kp = 25;              /* gains used by drive(): the   */
+static int32_t  g_kd = 25;              /* car's drive-test preset,     */
+static int32_t  g_boost = 250;          /* boost; steer_max = 1x speed   */
 static int32_t  g_noise = 0;            /* +- raw counts on each read    */
 static uint32_t g_seed  = 12345u;
-static double   g_half  = 9.0;          /* half the sensor spacing, mm   */
+static double   g_half  = 28.0;         /* edge sensor to guard, mm      */
 static double   g_spot  = 5.0;          /* sensor spot width, mm         */
 static int32_t  g_l_side = S3_LN_L_ON_RIGHT;   /* GP26 mounting side     */
 static double   g_lag_ms     = 0.0;     /* 0 = wheels follow at once     */
@@ -154,6 +157,7 @@ static run_t drive (double base, int32_t steer_max, double lookahead, double off
 
     s3_line_init(&ln, g_l_side);
     s3_line_set_gains(&ln, g_kp, g_kd);
+    s3_line_set_shape(&ln, g_boost);
     g_seed = 12345u;
     for (i = 0; i < 20; i++) { s3_line_step(&ln, 200U, 200U, 0U, 10000U, &o); }
     for (i = 0; i < 20; i++) { s3_line_step(&ln, 3000U, 3000U, 0U, 10000U, &o); }
@@ -164,10 +168,10 @@ static run_t drive (double base, int32_t steer_max, double lookahead, double off
         {
             double   sx = x + lookahead * cos(h), sy = y + lookahead * sin(h);
             double   nx = -sin(h), ny = cos(h);       /* left normal */
-            uint16_t r_left  = ir_read(sx + g_half * nx, sy + g_half * ny);
-            uint16_t r_right = ir_read(sx - g_half * nx, sy - g_half * ny);
-            uint16_t r_gp26  = (S3_LN_L_ON_RIGHT == g_l_side) ? r_right : r_left;
-            uint16_t r_gp27  = (S3_LN_L_ON_RIGHT == g_l_side) ? r_left : r_right;
+            double   gs     = (S3_LN_L_ON_RIGHT == g_l_side) ? -g_half : g_half;
+            double   es     = (S3_LN_L_ON_RIGHT == g_l_side) ? LINE_HALF : -LINE_HALF;
+            uint16_t r_gp27 = ir_read(sx + es * nx, sy + es * ny);              /* edge  */
+            uint16_t r_gp26 = ir_read(sx + (es + gs) * nx, sy + (es + gs) * ny); /* guard */
 
             s3_line_step(&ln, r_gp26, r_gp27, (uint32_t)(((vl + vr) / 2.0) * 10.0), 10000U, &o);
             dv = s3_line_dv(&o, steer_max);           /* same as task_line */
@@ -275,7 +279,7 @@ static void all_tracks (char const * p_tag)
 
 static void layout_set (char const * p_name, double spacing, int32_t l_side)
 {
-    g_half   = spacing / 2.0;
+    g_half   = spacing;
     g_l_side = l_side;
     printf("== layout: %s\n", p_name);
 }
@@ -454,17 +458,17 @@ int main (int argc, char ** argv)
 
     /* OUR CAR (v29): one sensor on each edge, 18 mm apart, GP26 on the
      * robot's RIGHT (S3_IR_L_SIDE in s3_config.h). */
-    layout_set("OUR CAR: 18 mm edge pair, GP26 RIGHT", S3_IR_SPACING_TEST_MM,
+    layout_set("OUR CAR: single edge, guard 28 mm RIGHT", S3_IR_SPACING_TEST_MM,
                S3_LN_L_ON_RIGHT);
     all_tracks("S0");
     /* The same mounted the other way round, with S3_IR_L_SIDE set to
      * match: the result must be the same. */
     layout_set("mirror mount, GP26 LEFT", S3_IR_SPACING_TEST_MM, S3_LN_L_ON_LEFT);
     all_tracks("S1");
-    /* Mounting tolerance: 16 and 20 mm instead of 18. */
-    layout_set("16 mm", 16.0, S3_LN_L_ON_RIGHT);
+    /* Mounting tolerance: guard 24 and 34 mm out instead of 28. */
+    layout_set("24 mm", 24.0, S3_LN_L_ON_RIGHT);
     all_tracks("S2");
-    layout_set("20 mm", 20.0, S3_LN_L_ON_RIGHT);
+    layout_set("34 mm", 34.0, S3_LN_L_ON_RIGHT);
     all_tracks("S3");
 
     layout_set("OUR CAR: start off the line", S3_IR_SPACING_TEST_MM, S3_LN_L_ON_RIGHT);

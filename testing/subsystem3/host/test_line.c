@@ -1,7 +1,7 @@
 /*
- *	test_line.c -- host (laptop) unit test for s3_line.c (v29, one sensor
- *	on each edge) and the nav map in s3_code39.c. Normally run by
- *	../run_host_tests.sh, or:
+ *	test_line.c -- host (laptop) unit test for s3_line.c (v30, single
+ *	edge mapped onto the edge-pair rules) and the nav map in s3_code39.c.
+ *	Normally run by ../run_host_tests.sh, or:
  *
  *	  gcc -std=c99 -Wall -Wextra -I../../../app_program/subsystem3 test_line.c \
  *	      ../../../app_program/subsystem3/s3_line.c \
@@ -11,8 +11,7 @@
  *	Raw levels below are like the robot: white ~200, black ~3000 counts.
  *	Layout as on our car: GP26 on the robot's RIGHT (S3_LN_L_ON_RIGHT),
  *	GP27 on its LEFT. lr() feeds (left, right) and maps them to the
- *	channels, so each case reads in physical terms. Centred on the line,
- *	each sensor sits on an edge and reads MID (500 permille).
+ *	channels, so each case reads in physical terms.
  */
 #include <stdio.h>
 #include "s3_line.h"
@@ -26,6 +25,8 @@
 #define STEP  3000U          /* 3 mm per step = 0.30 m/s at 10 ms       */
 #define DT    10000U         /* 10 ms                                    */
 #define KP    S3_LN_KP_X100
+#define E_DARK (-607)       /* DARK (750) stretched to 857 (EDGE_FULL), */
+                             /* guard LIGHT 250: e = 250 - 857          */
 
 static int g_fail = 0;
 
@@ -91,7 +92,7 @@ int main (void)
     /* L03 / L04: drift: one sensor darker, the other lighter -> steer back */
     fresh(&ln, &o);
     (void)lr(&ln, DARK, LIGHT, STEP, 1, &o);
-    check("S3-L03", (o.steer < 0) && near(o.steer, -(KP * 500) / 100),
+    check("S3-L03", (o.steer < 0) && near(o.steer, (KP * E_DARK) / 100),
           "car drifted right (left darker, right lighter) -> steer LEFT, Kp x e");
     fresh(&ln, &o);
     (void)lr(&ln, LIGHT, DARK, STEP, 1, &o);
@@ -115,7 +116,7 @@ int main (void)
     (void)lr(&ln, B, W, STEP, 1, &o);
     printf("  half drift -> steer %d, black/white -> steer %d (Kp %d)\n", (int)s_p,
            (int)o.steer, (int)KP);
-    check("S3-L06", near(s_p, -(KP * 500) / 100) &&
+    check("S3-L06", near(s_p, (KP * E_DARK) / 100) &&
           near(o.steer, (KP >= 100) ? -1000 : -(KP * 1000) / 100) &&
           (1U == o.overshoot),
           "steer proportional to the difference; one sensor white -> flagged");
@@ -147,18 +148,16 @@ int main (void)
     check("S3-L08", ok && (S3_LN_FOLLOW == o.state) && (0U == o.off_line) && (o.steer < 0),
           "40 mm both white -> 1 LOST event, keeps LEFT; line back -> FOLLOW");
 
-    /* L08b: CENTRED: the left sensor fades grey -> white, never black (the
-             line went in between the spots, car log 30 Oct 15:42): keep
-             the last PD steer, no ramp, not OFF LINE, LOST after 160 mm */
+    /* L08b: single edge: the edge sensor fades grey -> white, never deep
+             black (car drifted towards the edge side, line now on the guard
+             side): steer RIGHT firmly, stays FOLLOW (no LOST this side) */
     fresh(&ln, &o);
     (void)lr(&ln, MID, W, STEP, 3, &o);
     s_p = o.steer;
     ev = lr(&ln, W, W, STEP, 30, &o);
-    ok = (0 == ev) && (s_p < 0) && (o.steer == s_p) && (0U == o.off_line) &&
-         (S3_LN_FOLLOW == o.state);
-    ev = lr(&ln, W, W, STEP, 25, &o);
-    check("S3-L08b", ok && (100 == ev) && (S3_LN_LOST == o.state) && (o.steer == s_p),
-          "grey fades to white (centred): last PD steer, no ramp, LOST after 160 mm");
+    check("S3-L08b", (0 == ev) && (s_p > -20) && (s_p < 20) && (o.steer >= 500) &&
+          (S3_LN_FOLLOW == o.state),
+          "edge grey -> straight; edge fades to white -> firm RIGHT, no LOST");
 
     /* L09: a 30 mm white gap is not LOST */
     fresh(&ln, &o);
@@ -230,10 +229,8 @@ int main (void)
     (void)lr(&ln, DARK, DARK, STEP, 1, &o);  /* e = 0: side from the search */
     ok = ok && (1U == o.line_found_event) && (S3_LN_FOLLOW == o.state);
     s3_line_request_mode(&ln, S3_LN_MODE_SEARCH_FROM_LEFT);   /* flag still set */
-    (void)lr(&ln, W, W, STEP, 1, &o);
-    ok = ok && (0 == o.steer);
-    (void)lr(&ln, W, W, STEP, 14, &o);
-    check("S3-L16", ok && (1000 == o.steer),
+    (void)lr(&ln, W, W, STEP, 15, &o);
+    check("S3-L16", ok && (o.steer > 0),
           "search from LEFT: steer 0, found -> FOLLOW (not restarted), off line -> RIGHT");
     fresh(&ln, &o);
     s3_line_request_mode(&ln, S3_LN_MODE_SEARCH_FROM_RIGHT);
@@ -249,9 +246,10 @@ int main (void)
     (void)lr(&ln, MID, MID, STEP, 3, &o);
     (void)lr(&ln, DARK, LIGHT, STEP, 1, &o);
     s_pd = o.steer;
-    (void)lr(&ln, W, W, STEP, 20, &o);              /* LOST            */
-    (void)lr(&ln, MID, W, STEP, 1, &o);             /* line back       */
-    check("S3-L18", (s_pd < -550) && (o.steer >= -505) && (o.steer <= -495),
+    (void)lr(&ln, B, W, STEP, 1, &o);               /* deep black ...  */
+    (void)lr(&ln, W, W, STEP, 20, &o);              /* ... then LOST   */
+    (void)lr(&ln, 2280U, W, STEP, 1, &o);           /* back: edge side kept */
+    check("S3-L18", (s_pd < -550) && near(o.steer, -845),   /* 742 stretched */
           "D adds on a sudden change; first step after LOST is P only");
 
     /* L19: late wake-up (dt 1 us) with the largest Kd: no overflow, the D
@@ -288,7 +286,7 @@ int main (void)
     fresh(&ln, &o);
     s3_line_set_gains(&ln, 100, 0);
     s3_line_set_shape(&ln, 300);
-    (void)lr(&ln, DARK, LIGHT, STEP, 1, &o);
+    (void)lr(&ln, 2090U, LIGHT, STEP, 1, &o);       /* 675 -> 750: e = -500 */
     s_p = o.steer;                                  /* |e| = 500: no boost */
     (void)lr(&ln, B, 1040U, STEP, 1, &o);           /* e = -700           */
     check("S3-L22", (s_p >= -510) && (s_p <= -490) && (o.steer <= -1000 + 10),
@@ -303,7 +301,7 @@ int main (void)
         (void)lr(&ln, MID, (uint16_t)(MID - ((i % 2) * 150U)), STEP, 1, &o);   /* |e| ~ 50 */
     }
     (void)lr(&ln, W, W, STEP, 15, &o);
-    check("S3-L23", (1U == o.off_line) && (1000 == o.steer), "noise (|e| < 60) keeps the side -> RIGHT");
+    check("S3-L23", o.steer > 0, "edge sensor white -> RIGHT (guard side), whatever the noise");
 
     /* L42: log 28 Oct 224 mm: left sensor white, right sensor 200 / 1000
             (a weak reading of the line): the side is RIGHT, not the older LEFT */
@@ -311,7 +309,7 @@ int main (void)
     (void)lr(&ln, DARK, LIGHT, STEP, 2, &o);        /* line LEFT (e < 0)   */
     (void)lr(&ln, 150U, 560U, STEP, 1, &o);         /* L ~ 0, R ~ 130      */
     (void)lr(&ln, W, W, STEP, 15, &o);
-    check("S3-L42", (1U == o.off_line) && (o.steer > 0), "weak reading names the side");
+    check("S3-L42", o.steer > 0, "edge sensor white -> guard side (RIGHT)");
 
     /* L41: car lifted during the sweep (4050, no floor) is not learned:
             the tape (2700) still reads BLACK, not ~60 % grey (log 28 Oct) */

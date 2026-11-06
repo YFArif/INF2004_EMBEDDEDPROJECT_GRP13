@@ -4,12 +4,12 @@
  *        GP7 and analogue output (AOUT) on GP28 (ADC channel 2).
  *
  * @par Two independent paths
- * DIGITAL: the module's comparator output. A GPIO edge interrupt stores
- * the time between edges in a ring of 16-bit gaps (16 us units). Edges
- * closer than DRV_BARCODE_GLITCH_US are chatter: that edge and the one
- * before it are both dropped (counted), so bar / space order holds.
+ * DIGITAL: the module's comparator output. The sampler interrupt reads
+ * the pin every 0.5 ms; a level held 3 ms is an edge, and the time
+ * between edges goes into a ring of 16-bit gaps (16 us units). The GPIO
+ * edge interrupt only counts raw flips (chatter).
  * ANALOGUE: the sampler interrupt (drv_adc.c) stores every AOUT sample
- * as 8 bits in a 2 s ring. A move of DRV_BARCODE_ACT_STEP away from the
+ * as 8 bits in an 8.2 s ring. A move of DRV_BARCODE_ACT_STEP away from the
  * level at the last activity, or any DOUT edge, opens an "activity
  * window".
  * A pass is finished when both paths have been quiet for
@@ -38,8 +38,6 @@
 #define DRV_BARCODE_DOUT_PIN    (7u)    /* Rewired 28 Oct (was GP6).    */
 #define DRV_BARCODE_ADC_CH      (2u)    /* AOUT on GP28 (was GP26).     */
 
-#define DRV_BARCODE_GLITCH_US   (2000u)     /* Measured chatter: 0.5 ... */
-                                            /* 0.85 ms.                  */
 #define DRV_BARCODE_QUIET_US    (300000u)   /* Whole code at 0.30 m/s =  */
                                             /* 470 ms.                   */
 #define DRV_BARCODE_ACT_STEP    (6)         /* 8-bit units (= 96 of      */

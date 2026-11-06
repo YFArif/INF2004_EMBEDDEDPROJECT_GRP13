@@ -6,6 +6,43 @@ See `testing/README.md` for how to run tests and record results.
 
 ## Test cases
 
+### Rolling reversal logic regression, 2026-11-06
+
+Fixes Sean's rolling TURN-to-FOLLOW failure and protects Anna's immediate
+FOLLOW -> STOP/TURN -> MOVE sequence. Geometry, encoder calibration,
+PI gains, speed limits, ramps, synchronisation gains and brake-lead
+constants are unchanged. Sean's caller-side settling workaround remains.
+
+Both wheels brake before a requested reversal until both encoders have
+been quiet for the existing 100 ms stopped interval. Controller targets
+and integrals reset during this wait. Encoder signs remain unchanged
+while braking, then change for the requested direction. Opposite-direction
+PID output uses zero-duty braking rather than risking an unobserved reversal.
+
+H23 covers both rolling directions and timer rollover; H24 covers left
+and right TURN immediately followed by FOLLOW; H25 covers Anna-style
+queued STOP/TURN followed by MOVE without caller settling. H26 checks
+recent-tick/zero-speed ambiguity, the exact 100 ms boundary, E-stop during
+reversal, PID deceleration and rapidly changing steering.
+Run: `sh testing/subsystem2/run_motion_test.sh` in WSL (strip CRLF if needed).
+See [main-only regression evidence](logs/2026-11-06_host_direction_logic.txt).
+On latest-main baseline 3b8fa42: 66/66 host checks passed with strict
+warnings and address/undefined-behaviour sanitizers; `make -j8` passed.
+The 72-check Arif run also included six older diagnostic MOVE cases that
+are intentionally excluded from this main-only commit.
+
+These are model logic checks, not hardware certification or recalibration.
+Sean's reported +/-28 mm/s variation still needs loaded-car investigation.
+Braking instead of powered reverse correction can change deceleration
+transients despite unchanged gains; physical transition tests remain pending.
+
+E_OK means queued, not started. EV_MOTION_DONE/IDLE mean target-triggered
+braking, not proven physical standstill. The reversal interlock protects
+subsequent direction changes; same-direction STOP then MOVE/FOLLOW is not
+a guaranteed settling barrier. Anna's manoeuvre timeouts remain necessary.
+Low-duty stall coverage and the normal S3/S5 navigation bridge are outside
+this focused fix. Older Arif diagnostic modes are not included.
+
 ### Low-speed estimator regression, 2026-10-29 (host only)
 
 Evidence: [speed isolation run](logs/2026-10-29_host_speed_isolation.txt).
