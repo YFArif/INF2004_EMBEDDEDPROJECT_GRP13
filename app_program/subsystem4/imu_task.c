@@ -81,11 +81,11 @@
 #define IMPACT_ENABLE       (0 == DRIVE_TEST)   /* Off in the hump drive  */
                                                 /* test: hitting a strip  */
                                                 /* edge read 2.1 g.       */
-#define IMPACT_MG           (2500)      /* Was 1000 (A18). 2026-11-01: a   */
-                                        /* hand tap read 1.2 g, a wheel   */
-                                        /* hitting a 2 cm strip edge      */
-                                        /* 2.1 g. Raised so hump edges    */
-                                        /* do not E-stop; tune in S4-U03. */
+#define IMPACT_MG           (2000)      /* Was 2500. 2026-11-06 (S4-U03): */
+                                        /* wall hits at 150 mm/s read     */
+                                        /* 2.07-2.50 g and 2.17/2.43 g    */
+                                        /* were missed at 2.5 g. Hump     */
+                                        /* runs peaked ~1.7 g.            */
 #define IMPACT_LP_DIV       (16)        /* Low-pass: 1/16 per sample.     */
 #define LATENCY_CYCLES      (10u)       /* Look for S2's brake time.      */
 
