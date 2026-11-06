@@ -166,6 +166,7 @@ typedef struct
     int32_t  prev_dist_mm;
     int32_t  afwd_mms2;
     int32_t  turn_cdps;
+    int32_t  head_cdeg_ms;          /* Sum of turn rate x ms (U04).     */
 
     /* Pitch and hump. */
     body_t   mean;
@@ -613,6 +614,7 @@ imu_motion (subsystem2_odom_t const * p_odom)
     // omega = (v_right - v_left) / track; + = left.
     g_imu.turn_cdps = ((p_odom->speed_r_mms - p_odom->speed_l_mms)
                        * (CDPS_PER_DIFF / TRACK_SCALE)) / S2_TRACK_MM;
+    g_imu.head_cdeg_ms += g_imu.turn_cdps * (int32_t) S4_IMU_PERIOD_MS;
 }
 
 /*!
@@ -1198,12 +1200,13 @@ imu_log (void)
 {
     // NOTE: The casts are safe: every value is far inside INT's range.
     tm_printf((UB *) "S4 p=%d r=%d f=%d l=%d u=%d af=%d h=%d pk=%d hs=%d"
-              " cl=%d w=%d n=%d dxy=%d run=%d late=%d ok=%d cal=%d\n",
+              " cl=%d w=%d hd=%d n=%d dxy=%d run=%d late=%d ok=%d cal=%d\n",
               (INT) g_imu.pitch_cdeg, (INT) g_imu.roll_cdeg,
               (INT) g_imu.mean.fwd, (INT) g_imu.mean.left,
               (INT) g_imu.mean.up, (INT) g_imu.afwd_mms2,
               (INT) (g_imu.h_mm * TENTHS), (INT) g_imu.run_peak_mm,
               (INT) g_imu.hump, (INT) g_imu.cls, (INT) g_imu.turn_cdps,
+              (INT) (g_imu.head_cdeg_ms / 100000),
               (INT) g_imu.last_samples,
               (INT) s4_math_sqrt((float) g_imu.dxy2_max),
               (INT) g_imu.run_period_max_us, (INT) g_imu.late_period_max_us,

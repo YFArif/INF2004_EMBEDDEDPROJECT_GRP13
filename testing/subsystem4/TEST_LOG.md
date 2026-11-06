@@ -34,3 +34,4 @@ Add a new row for every run. Never edit or delete old rows.
 | 2026-11-06 | S4-U02 | `c6375eb` + avg roll fix | Kessler | PASS | `logs/2026-11-06_s4_u02_hump.txt` | Height from average roll: 9 / 10 / 10 mm on the 10 mm strip, all within ±5 mm. Hump detected 3/3. |
 | 2026-11-06 | S4-U03 | `d2187f1` | Kessler | FAIL | `logs/2026-11-06_s4_u03_impact.txt` | Wall hit at 150 mm/s, IMPACT_MG 2500. Hits read 2172 / 2428 mg, no trigger, car kept pushing ~2 s. |
 | 2026-11-06 | S4-U03 | `d2187f1` + IMPACT_MG 2000 | Kessler | PASS | `logs/2026-11-06_s4_u03_impact.txt` | 3/3 triggered: 2499 / 2444 / 2069 mg, braked 13.7 / 18.6 / 9.3 ms. Soft push (~1.8 g) does not trigger. |
+| 2026-11-06 | S4-U04 | `13e3101` + hd= heading | Kessler | FAIL | `logs/2026-11-06_s4_u04_turn.txt` | Hand pivot on the left wheel. 90° read 17° / 34°, 180° read ~6° / −102°. Right encoder reads ~1/5 of the distance and no direction. Blocked on S2 (Arif). |
