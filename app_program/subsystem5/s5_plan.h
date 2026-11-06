@@ -5,19 +5,20 @@
  *        work out the legs of the bypass (FR11, Week 6 report 6.4 PLAN).
  *
  * @par The bypass (seen from above, bypassing on the left)
- *   0. MOVE -room_mm, only if the obstacle is too close for steps 1
- *      and 2 to miss it.
- *   1. TURN +turn_deg (away from the obstacle).
- *   2. MOVE out_mm: the robot ends shift_mm to the side.
+ *   0. MOVE -room_mm, only if the obstacle is too close to turn out by
+ *      at most S5_PLAN_OUT_MAX_DEG and still miss it.
+ *   1. TURN +turn_deg (away from the obstacle; worked out from its width).
+ *   2. MOVE out_mm: the whole robot is then S5_PATH_MARGIN_MM clear.
  *   3. TURN -turn_deg: parallel to the line again.
- *      (s5_avoid.c then measures the real gap beside the obstacle and,
- *      if too close, moves further out; back_mm grows to match.)
  *   4. MOVE alongside while obstacle_task watches the obstacle's side,
- *      until it has been passed (the obstacle's depth is measured here).
- *   5. MOVE tail_mm, so turning in clears the obstacle's back corner.
- *   6. TURN -turn_deg (toward the line).
- *   7. MOVE back_mm toward the line, looking for it.
- *   8. TURN +turn_deg: along the line, then line following resumes.
+ *      until it has been passed.
+ *   5. MOVE tail_mm: the obstacle is then behind the rear axle.
+ *   6. TURN -in_deg (towards the line: the same angle as step 1).
+ *   7. MOVE back_mm towards the line, S3 searching: the same distance
+ *      as step 2, so on a straight track the robot ends on the line.
+ *      As soon as S3 has the line (also during step 6), S3's line
+ *      following takes over.
+ *   8. Floor tests without S3 only: TURN +in_deg, along the line.
  * For the right side every angle has the opposite sign.
  *
  * @par
@@ -32,7 +33,8 @@
 
 #include "s5_profile.h"
 
-#define S5_PLAN_TURN_DEG        (45)    /* Week 6 report 6.4.            */
+#define S5_PLAN_OUT_MIN_DEG     (20)    /* Gentlest turn out.            */
+#define S5_PLAN_OUT_MAX_DEG     (60)    /* Steeper: reverse first.       */
 
 /** What to do about the obstacle. */
 typedef enum
@@ -48,6 +50,7 @@ typedef struct
 {
     s5_plan_action_t    action;
     int16_t             turn_deg;       /* Step 1; + = left, - = right.  */
+    int16_t             in_deg;         /* Step 8; equals turn_deg.      */
     uint16_t            out_mm;         /* Step 2.                       */
     uint16_t            tail_mm;        /* Step 5.                       */
     uint16_t            back_mm;        /* Step 7, before any search.    */

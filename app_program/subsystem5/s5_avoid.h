@@ -24,24 +24,16 @@ typedef enum
     S5_AVOID_IDLE = 0,
     S5_AVOID_SCANNING,          /* Waiting for the obstacle profile.     */
     S5_AVOID_REVERSING,         /* Backing off before a rescan.          */
+    S5_AVOID_SQUARING,          /* Turning to face the obstacle squarely.*/
     S5_AVOID_MAKE_ROOM,         /* Bypass step 0: room to turn out.      */
     S5_AVOID_TURN_OUT,          /* Bypass step 1.                        */
-    S5_AVOID_STEER_OUT,         /* Step 1a: corner close, turn out more. */
     S5_AVOID_MOVE_OUT,          /* Step 2.                               */
-    S5_AVOID_HALF_PARALLEL,     /* Step 3, first half of the turn back.  */
-    S5_AVOID_WHEEL_CHECK,       /* Step 3w: gap at the rear wheels.      */
-    S5_AVOID_WHEEL_OUT,         /* Too close: turn out again, move out.  */
-    S5_AVOID_TURN_PARALLEL,     /* Step 3, second half of the turn back. */
-    S5_AVOID_SIDE_CHECK,        /* Step 3a: measure the gap beside.      */
-    S5_AVOID_JOG_OUT,           /* Step 3b: too close, turn out again,   */
-    S5_AVOID_JOG_MOVE,          /* move further out,                     */
-    S5_AVOID_JOG_BACK,          /* and turn parallel; then check again.  */
+    S5_AVOID_TURN_PARALLEL,     /* Step 3.                               */
     S5_AVOID_PASSING,           /* Step 4: alongside, watching.          */
     S5_AVOID_TAIL,              /* Step 5.                               */
     S5_AVOID_TURN_IN,           /* Step 6.                               */
     S5_AVOID_RETURN,            /* Step 7: back to the line, searching.  */
-    S5_AVOID_ONTO_LINE,         /* Step 7a: turning centre onto the line.*/
-    S5_AVOID_REALIGN,           /* Step 8.                               */
+    S5_AVOID_REALIGN,           /* Step 8, floor tests only (no S3).     */
     S5_AVOID_DONE,
     S5_AVOID_FAILED
 } s5_avoid_state_t;

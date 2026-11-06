@@ -18,13 +18,11 @@
  * 4. A side's clearance is the free sideways gap between that edge and
  *    the nearest other echo beside it, looking S5_CLEAR_DEPTH_MM past
  *    the edge. With nothing seen it is S5_CLEAR_OPEN_MM.
- * 5. A side's shift (how far the robot moves sideways to pass) uses the
- *    found edge trimmed by S5_PASS_TRIM_DEG, never past the middle of the
- *    obstacle, and keeps S5_PASS_MARGIN_MM. The spread beam makes every
- *    obstacle look about 6 cm wider per side at 22 cm, whatever its size
- *    (logs 2026-11-05_0137/0138: a 6 cm object read 119 to 148 mm). A
- *    pass that ends too close is corrected by the side checks in
- *    s5_avoid.c, which measure the real gap.
+ * 5. A side's shift (how far the rear axle moves sideways to pass) is
+ *    the found edge, untrimmed, plus half the robot and
+ *    S5_PATH_MARGIN_MM. The spread beam makes every obstacle look a few
+ *    cm wider per side, so the robot errs wide, never narrow (logs
+ *    2026-11-05_0124 and _0224: trimmed edges let the robot's side hit).
  */
 
 #include <stdbool.h>
@@ -34,13 +32,11 @@
 #include "s5_profile.h"
 
 #define HALF_PATH_MM    ((S5_ROBOT_WIDTH_MM / 2) + S5_PATH_MARGIN_MM)
-#define HALF_PASS_MM    ((S5_ROBOT_WIDTH_MM / 2) + S5_PASS_MARGIN_MM)
 #define MM_MAX          (0xFFFE)    /* Largest storable range in mm.      */
 #define AHEAD_DEG       (90)
 
 static bool     point_has_echo(s5_profile_point_t const * p_point);
 static uint16_t clamp_mm(int32_t value_mm, int32_t max_mm);
-static int16_t  pass_angle(int32_t edge_deg, int32_t mid_deg, bool b_left);
 static void     correct_edges(s5_profile_edge_t const * p_left,
                               s5_profile_edge_t const * p_right,
                               s5_profile_point_t * p_left_pt,
@@ -134,26 +130,16 @@ s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
     int32_t            left_y   = 0;
     int32_t            right_x  = 0;
     int32_t            right_y  = 0;
-    s5_profile_point_t pass_left  = p_left->last_hit;
-    s5_profile_point_t pass_right = p_right->last_hit;
-    int32_t            pass_lx    = 0;  // Edges for the sideways
-    int32_t            pass_rx    = 0;  // shifts (see Step 4).
-    int32_t            pass_y     = 0;
-    int32_t            mid_deg    = (p_left->last_hit.angle_deg
-                                     + p_right->last_hit.angle_deg) / 2;
+    int32_t            raw_lx   = 0;    // Found edges, for the sideways
+    int32_t            raw_rx   = 0;    // shifts (method step 5).
+    int32_t            raw_y    = 0;
 
     // Step 1: Move each found edge inward by half the beam width.
     correct_edges(p_left, p_right, &left_pt, &right_pt);
     s5_profile_to_xy(&left_pt, &left_x, &left_y);
     s5_profile_to_xy(&right_pt, &right_x, &right_y);
-
-    // Edges for passing: trimmed by S5_PASS_TRIM_DEG (method step 5).
-    pass_left.angle_deg  = pass_angle(p_left->last_hit.angle_deg, mid_deg,
-                                      true);
-    pass_right.angle_deg = pass_angle(p_right->last_hit.angle_deg, mid_deg,
-                                      false);
-    s5_profile_to_xy(&pass_left, &pass_lx, &pass_y);
-    s5_profile_to_xy(&pass_right, &pass_rx, &pass_y);
+    s5_profile_to_xy(&p_left->last_hit, &raw_lx, &raw_y);
+    s5_profile_to_xy(&p_right->last_hit, &raw_rx, &raw_y);
 
     // Step 2: Width is the distance between the two edge points.
     int32_t  dx_mm   = left_x - right_x;
@@ -185,7 +171,7 @@ s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
                                               true);
 
         // The robot's right side must end up left of the left edge.
-        p_out->shift_left_mm = clamp_mm(HALF_PASS_MM - pass_lx, MM_MAX);
+        p_out->shift_left_mm = clamp_mm(HALF_PATH_MM - raw_lx, MM_MAX);
     }
 
     if (p_right->b_found)
@@ -195,7 +181,7 @@ s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
                                                false);
 
         // The robot's left side must end up right of the right edge.
-        p_out->shift_right_mm = clamp_mm(HALF_PASS_MM + pass_rx, MM_MAX);
+        p_out->shift_right_mm = clamp_mm(HALF_PATH_MM + raw_rx, MM_MAX);
     }
 
     p_out->depth_mm = 0u;
@@ -266,40 +252,6 @@ clamp_mm (int32_t value_mm, int32_t max_mm)
 
     // NOTE: limited is 0 ... MM_MAX here, so it fits in uint16_t.
     return ((uint16_t) limited);
-}
-
-/*!
- * @brief Edge angle for the sideways shift: the found edge moved inward
- *        by S5_PASS_TRIM_DEG, but never past the middle of the obstacle.
- *
- * @param[in] edge_deg Found edge angle (last hit).
- * @param[in] mid_deg  Middle of the two found edges.
- * @param[in] b_left   True for the left edge (inward is a smaller angle).
- *
- * @return The trimmed angle.
- */
-static int16_t
-pass_angle (int32_t edge_deg, int32_t mid_deg, bool b_left)
-{
-    int32_t deg = b_left ? (edge_deg - S5_PASS_TRIM_DEG)
-                         : (edge_deg + S5_PASS_TRIM_DEG);
-
-    if (b_left && (deg < mid_deg))
-    {
-        deg = mid_deg;
-    }
-    else if ((!b_left) && (deg > mid_deg))
-    {
-        deg = mid_deg;
-    }
-    else
-    {
-        // Still on its own half of the obstacle.
-    }
-
-    // NOTE: The cast is safe: the angle stays within the 0 to 180 degree
-    // servo range.
-    return ((int16_t) deg);
 }
 
 /*!

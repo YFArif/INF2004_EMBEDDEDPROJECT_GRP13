@@ -55,7 +55,7 @@ Each test image also runs everyone's automatic checks first (including your S2 u
 - **What happens, and what you do:**
   1. **S5-U01:** the sensor pings for 2 s. The script asks for the **ruler distance** from the front of the sensor (the two silver cans) to the box, in mm.
   2. **S5-U04:** the servo sweeps right to left, then small steps at each edge of the box. The script asks for the **real width** of the box's front face, in mm.
-  3. **S5-U03:** the servo stops at 5 angles (30, 60, 90, 120, 150 degrees) for 2 s each. **Film this from above.** Afterwards the script asks:
+  3. **S5-U03:** the servo stops at 7 angles (0, 30, 60, 90, 120, 150, 180 degrees) for 2 s each, and the log prints `CAL angle_deg range_mm` at each. **Film this from above.** To check the side looks used while passing an obstacle, put a second box **about 12 cm beside the robot's right side** before this step starts: the 0 degree stop should read about 120 mm. Then run the test again with the box beside the **left** side for the 180 degree stop. Afterwards the script asks:
      - did the first stop point to the robot's **right** and the last to its **left**?
      - did the middle one point straight ahead?
      - what was the **largest angle error** you saw? (From the video: compare each stop with 30/60/90/120/150; 90 = straight ahead, 0 = straight right.)

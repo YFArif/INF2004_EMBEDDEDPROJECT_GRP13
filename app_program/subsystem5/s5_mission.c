@@ -16,6 +16,20 @@
  *   a pending barcode command is then dropped (and logged).
  * - Line loss: stop and sweep, first towards the side S3 last steered
  *   to, while S3 searches; FAULT if the line is not found (FR15).
+ * - A line found by a search or after a bypass counts only once S3 has
+ *   followed it for CONFIRM_MM (see "Line or barcode bar" below).
+ *
+ * @par Line or barcode bar
+ * A barcode lies 20 mm beside the 18 mm line and is 141 mm long (Barcode
+ * & Line Specification); its bars are short stripes across the track.
+ * Searching, S3 may lock onto a bar. The line runs on for metres, a bar
+ * ends after its own length, and S3 reports LOST 40 mm after losing it.
+ * So a line found by a search is confirmed only after S3 has followed it
+ * for CONFIRM_MM (bar length plus those 40 mm, with room to spare). LOST
+ * sooner: it was not the line; the search goes on from there, at most
+ * REJECTS_MAX times, then LINE_NOT_FOUND.
+ * TODO: Measure the longest bar (across the track) and keep CONFIRM_MM
+ * at least that plus 60 mm.
  *
  * @par Calibrating S3's line sensors (FR2)
  * Button 2 in READY, with the robot on the line: S3 forgets its levels
@@ -37,7 +51,6 @@
 #include "s5_links.h"
 #include "s5_math.h"
 #include "s5_mission.h"
-#include "s5_profile.h"
 #include "subsystem5.h"
 
 #define SLOW_NEAR_MMS       (60u)       /* Under 35 cm (FR9).            */
@@ -47,10 +60,11 @@
 #define REACQUIRE_MM        (300)       /* NFR10.                        */
 #define TURN_MS_PER_DEG     (20u)
 #define MOTION_SLACK_MS     (2000u)
-#define SPOT_STEPS          (9u)        /* g_search_spot below (FR15).   */
-#define SEARCH_SPOTS        (5u)        /* g_search_spot_mm below.       */
-#define DIAG_MM             (150)       /* Drive at 45 degrees: about    */
-                                        /* 106 mm sideways.              */
+#define SEARCH_STEPS        (7u)        /* g_search below (FR15).        */
+#define SEARCH_MOVE_MM      (100)       /* On between the two sweeps.    */
+#define CONFIRM_MM          (120)       /* Followed this far: the line.  */
+#define REJECTS_MAX         (2u)        /* Not-the-line finds per search.*/
+#define LOST_CHECK_MM       (20)        /* Then S3's LOST state counts.  */
 #define BLACK_STEADY_MM     (10)        /* Black this far = the line, not*/
                                         /* a barcode bar or thin cross.  */
 #define BACK_MARGIN_MM      (20)        /* Added to the measured reverse.*/
@@ -67,14 +81,6 @@
 #define FAULTS_LATCHED      (S5_FAULT_STALL | S5_FAULT_ENCODER \
                              | S5_FAULT_IMU | S5_FAULT_NO_ECHO)
 
-/** Line-recovery phases. */
-typedef enum
-{
-    RECOVERY_SEARCH,        /* Sweeping and searching.                   */
-    RECOVERY_ONTO,          /* Found at an angle: wheels onto the line.  */
-    RECOVERY_REALIGN        /* Turning back square to the line.          */
-} recovery_phase_t;
-
 /** One line-search step: a slow turn, or a slow move at the heading. */
 typedef struct
 {
@@ -83,41 +89,23 @@ typedef struct
 } recovery_step_t;
 
 /* Line search (FR15), the same for a line lost while following and for
- * a line not found on the way back from a bypass; nothing depends on the
- * track's shape. Turns positive = towards the side the line most likely
- * is: the side S3 last steered to, or after a bypass the obstacle's side.
- * At each spot along the track:
- * 1. Sweep on the spot: face 90 that way, then 90 the other way. S3's IR
- *    sits only S5_AXLE_TO_LINE_IR_MM ahead of the turning centre, so this
- *    reaches about 80 mm to each side.
- * 2. Face 45 that way and drive DIAG_MM, then back: the IR also moves
- *    sideways, about 106 mm, so a line just out of the sweep's reach is
- *    crossed (Anna, 2026-11-05: the sweep stopped about 2 cm short, then
- *    faced straight and drove past parallel to the line).
- * 3. The same at 45 the other way, then face along the track again.
- * Each step ends as soon as S3 finds the line. Found while driving at
- * 45: the wheels go onto the line, then the robot turns back square to
- * it, as after a bypass (s5_avoid.c). After a line lost while following,
- * the robot first reverses as far as it drove since a sensor last saw
- * the line (log 2026-11-05_0018_track: a fixed 60 mm reverse did not
- * reach back).
+ * a line not found on the way back from a bypass. Turns positive =
+ * towards the side the line most likely is: the side S3 last steered to,
+ * or after a bypass the obstacle's side. Sweep on the spot (face 90 that
+ * way, 90 the other way, then the start heading again: S3's IR sits
+ * about 80 mm ahead of the turning centre, so this reaches about 80 mm
+ * to each side), drive SEARCH_MOVE_MM on, sweep again, then
+ * LINE_NOT_FOUND. After a bypass the heading is still the steep way back
+ * towards the line, so "on" goes on towards it; after a line lost while
+ * following, the robot first reverses as far as it drove since a sensor
+ * last saw the line (log 2026-11-05_0018_track). Each step ends as soon
+ * as S3 finds the line.
  */
-static const recovery_step_t g_search_spot[SPOT_STEPS] =
+static const recovery_step_t g_search[SEARCH_STEPS] =
 {
-    {false, 90}, {false, -180}, {false, 135},
-    {true, DIAG_MM}, {true, -DIAG_MM},
-    {false, -90},
-    {true, DIAG_MM}, {true, -DIAG_MM},
-    {false, 45}
-};
-
-/* Spots along the track, from where the search began: here, then 150 mm
- * behind and ahead, then 300 mm (REACQUIRE_MM, NFR10). Never further, so
- * the robot cannot wander off the map; then LINE_NOT_FOUND.
- */
-static const int16_t g_search_spot_mm[SEARCH_SPOTS] =
-{
-    0, -150, 150, -300, 300
+    {false, 90}, {false, -180}, {false, 90},
+    {true, SEARCH_MOVE_MM},
+    {false, 90}, {false, -180}, {false, 90}
 };
 
 /* Calibration sweep: left, right past the start, back to the start. 30
@@ -136,13 +124,14 @@ typedef struct
     bool                    b_nav_pending;
     uint8_t                 nav_cmd;        /* subsystem5_nav_cmd_t.     */
     int32_t                 mark_mm;        /* Odometry at a reference.  */
-    recovery_phase_t        recovery_phase;
-    uint32_t                recovery_spot;  /* g_search_spot_mm index.   */
-    uint32_t                recovery_step;  /* Next g_search_spot step.  */
+    uint32_t                recovery_step;  /* Next g_search step.       */
     int32_t                 recovery_dir;   /* +1 left first, -1 right.  */
     int32_t                 recovery_back_mm;   /* Reverse still to do.  */
-    int32_t                 recovery_deg;   /* Heading off the track.    */
-    bool                    b_recovery_diag;    /* Moving at 45 degrees. */
+    s5_links_side_t         search_side;    /* Robot's side of the line. */
+    bool                    b_confirming;   /* Found line not yet sure.  */
+    int32_t                 confirm_mm;     /* Odometry where it was.    */
+    uint32_t                rejects;        /* Not-the-line finds.       */
+    int32_t                 follow_mm;      /* Odometry when FOLLOW began*/
     int32_t                 line_mark_mm;   /* Odometry: line last seen. */
     int32_t                 black_from_mm;  /* Odometry: black began.    */
     bool                    b_black;        /* A sensor sees black now.  */
@@ -153,8 +142,8 @@ typedef struct
 } mission_t;
 
 static mission_t g_mission = {S5_CTRL_INIT, 0u, 0u, 0u, false,
-                              0u, 0, RECOVERY_SEARCH, 0u, 0u, 1, 0, 0,
-                              false, 0, 0, false, 0u, 0u, 0u};
+                              0u, 0, 0u, 1, 0, S5_LINKS_SIDE_NONE, false,
+                              0, 0u, 0, 0, 0, false, 0u, 0u, 0u};
 
 /* In test images the controller ignores events until a test arms it, so
  * the S2 tests that run first are never disturbed.
@@ -180,7 +169,12 @@ static void execute_command(uint32_t now_ms);
 static void step_turning(uint32_t events, uint32_t now_ms);
 static void start_reacquire(void);
 static void step_reacquire(uint32_t events, uint32_t now_ms);
-static void start_recovery(uint32_t now_ms, bool b_after_bypass);
+static void start_recovery(uint32_t now_ms, bool b_reverse_first,
+                           s5_links_side_t side);
+static void line_lost(uint32_t now_ms);
+static void begin_confirm(void);
+static void check_confirm(void);
+static bool line_is_lost(uint32_t events);
 static void step_recovery(uint32_t events, uint32_t now_ms);
 static void step_avoidance(uint32_t events, uint32_t now_ms);
 static void start_turn(int32_t angle_deg, uint32_t now_ms);
@@ -511,14 +505,15 @@ step_route (uint32_t events, uint32_t now_ms)
         case S5_CTRL_LINE_FOLLOWING:
             adjust_speed(events);
             update_line_mark();
+            check_confirm();
 
             if (0u != (events & EV_BARCODE))
             {
                 take_barcodes();
             }
-            else if (0u != (events & EV_LINE_LOST))
+            else if (line_is_lost(events))
             {
-                start_recovery(now_ms, false);
+                line_lost(now_ms);
             }
             else
             {
@@ -529,6 +524,7 @@ step_route (uint32_t events, uint32_t now_ms)
         case S5_CTRL_APPROACH_JUNCTION:
             adjust_speed(events);
             update_line_mark();
+            check_confirm();
 
             if (0u != (events & EV_BARCODE))
             {
@@ -539,9 +535,9 @@ step_route (uint32_t events, uint32_t now_ms)
             {
                 execute_command(now_ms);
             }
-            else if (0u != (events & EV_LINE_LOST))
+            else if (line_is_lost(events))
             {
-                start_recovery(now_ms, false);
+                line_lost(now_ms);
             }
             else
             {
@@ -800,7 +796,7 @@ step_reacquire (uint32_t events, uint32_t now_ms)
     }
     else if (travelled >= REACQUIRE_MM)
     {
-        start_recovery(now_ms, false);
+        line_lost(now_ms);
     }
     else
     {
@@ -809,28 +805,103 @@ step_reacquire (uint32_t events, uint32_t now_ms)
 }
 
 /*!
+ * @brief The line was lost while following. While a newly found line is
+ *        still being confirmed, that was not the line (a barcode bar or
+ *        a mark): search on from here. Otherwise reverse to where it was
+ *        last seen, then search.
+ *
+ * @param[in] now_ms Current time.
+ */
+static void
+line_lost (uint32_t now_ms)
+{
+    if (g_mission.b_confirming)
+    {
+        g_mission.b_confirming = false;
+        g_mission.rejects++;
+
+        // NOTE: The cast is safe: the count is at most REJECTS_MAX + 1.
+        s5_event_trace("LINE rejected, not the line: followed_mm rejects",
+                       s5_links_odom_dist_mm() - g_mission.confirm_mm,
+                       (int32_t) g_mission.rejects);
+
+        if (g_mission.rejects > REJECTS_MAX)
+        {
+            enter_fault(S5_CTRL_FAULT_LINE_NOT_FOUND);
+        }
+        else
+        {
+            start_recovery(now_ms, false, g_mission.search_side);
+        }
+    }
+    else
+    {
+        // Read S3's last steering before anything changes it.
+        start_recovery(now_ms, true, s5_links_line_side());
+    }
+}
+
+/*!
+ * @brief While following: has the line been lost? Either S3's LOST event,
+ *        or S3 still in LOST once the robot has driven LOST_CHECK_MM
+ *        since FOLLOW began (S3 then holds its last steering, so the
+ *        robot would circle for ever).
+ *
+ * @param[in] events Mission events.
+ *
+ * @return true if the line is lost.
+ */
+static bool
+line_is_lost (uint32_t events)
+{
+    int32_t driven = s5_links_odom_dist_mm() - g_mission.follow_mm;
+
+    return ((0u != (events & EV_LINE_LOST))
+            || ((driven >= LOST_CHECK_MM) && s5_links_line_is_lost()));
+}
+
+/*!
+ * @brief A search or a bypass found a line: follow it, and confirm it
+ *        over CONFIRM_MM (see "Line or barcode bar" above).
+ */
+static void
+begin_confirm (void)
+{
+    g_mission.b_confirming = true;
+    g_mission.confirm_mm   = s5_links_odom_dist_mm();
+}
+
+/*!
+ * @brief While following: the found line has been followed CONFIRM_MM,
+ *        so it is the line.
+ */
+static void
+check_confirm (void)
+{
+    int32_t followed = s5_links_odom_dist_mm() - g_mission.confirm_mm;
+
+    if (g_mission.b_confirming && (followed >= CONFIRM_MM))
+    {
+        g_mission.b_confirming = false;
+        g_mission.rejects      = 0u;
+        s5_event_trace("LINE confirmed: followed_mm 0", followed, 0);
+    }
+}
+
+/*!
  * @brief LINE_RECOVERY: stop and sweep left and right looking for the
  *        line (Week 6 report 6.1 SEARCHING).
  *
- * @param[in] now_ms         Current time.
- * @param[in] b_after_bypass true: the line was not found on the way back
- *                           from a bypass (search from here); false: lost
- *                           while following (reverse first).
+ * @param[in] now_ms          Current time.
+ * @param[in] b_reverse_first true: lost while following, so first back
+ *                            to where it was last seen; false: search
+ *                            from here (after a bypass or a rejected
+ *                            find).
+ * @param[in] side            The robot's side of the line, if known.
  */
 static void
-start_recovery (uint32_t now_ms, bool b_after_bypass)
+start_recovery (uint32_t now_ms, bool b_reverse_first, s5_links_side_t side)
 {
-    // Which side of the line the robot is. After a bypass it is on the
-    // side it went round, and the line on the obstacle's side; otherwise
-    // read S3's last steering before anything changes it.
-    s5_links_side_t side = s5_links_line_side();
-
-    if (b_after_bypass)
-    {
-        side = s5_avoid_passed_left() ? S5_LINKS_SIDE_LEFT
-                                      : S5_LINKS_SIDE_RIGHT;
-    }
-
     // Back to where the line was last seen, with a margin, capped.
     int32_t back = (s5_links_odom_dist_mm() - g_mission.line_mark_mm)
                    + BACK_MARGIN_MM;
@@ -848,26 +919,22 @@ start_recovery (uint32_t now_ms, bool b_after_bypass)
         // Already inside the range.
     }
 
-    if (b_after_bypass)
-    {
-        // Already where the line should be: search from here.
-        back = 0;
-        s5_event_trace("RECOVERY after bypass: search from here 0 0", 0, 0);
-    }
-    else
+    if (b_reverse_first)
     {
         s5_event_trace("RECOVERY reverse_mm (driven since line seen + 20)"
                        " 0", back, 0);
     }
+    else
+    {
+        back = 0;
+        s5_event_trace("RECOVERY search from here 0 0", 0, 0);
+    }
 
     // A robot left of the line turns right (negative) first.
     g_mission.recovery_dir     = (S5_LINKS_SIDE_LEFT == side) ? -1 : 1;
-    g_mission.recovery_phase   = RECOVERY_SEARCH;
-    g_mission.recovery_spot    = 0u;
     g_mission.recovery_step    = 0u;
     g_mission.recovery_back_mm = back;
-    g_mission.recovery_deg     = 0;
-    g_mission.b_recovery_diag  = false;
+    g_mission.search_side      = side;
     s5_links_motion_settle();
     s5_links_line_search(side);
     set_state(S5_CTRL_LINE_RECOVERY);
@@ -876,54 +943,33 @@ start_recovery (uint32_t now_ms, bool b_after_bypass)
 
 /*!
  * @brief Start the next line-search step: the measured reverse, then
- *        g_search_spot at each spot of g_search_spot_mm; LINE_NOT_FOUND
- *        after the last spot.
+ *        g_search; LINE_NOT_FOUND after the last step.
  *
  * @param[in] now_ms Current time.
  */
 static void
 start_recovery_step (uint32_t now_ms)
 {
-    g_mission.b_recovery_diag = false;
-
     if (0 != g_mission.recovery_back_mm)
     {
         // Line lost while following: back to where it was last seen.
         start_slow_move(-g_mission.recovery_back_mm, now_ms);
         g_mission.recovery_back_mm = 0;
     }
-    else if (g_mission.recovery_step < SPOT_STEPS)
+    else if (g_mission.recovery_step < SEARCH_STEPS)
     {
-        recovery_step_t const * p_step =
-            &g_search_spot[g_mission.recovery_step];
+        recovery_step_t const * p_step = &g_search[g_mission.recovery_step];
 
         g_mission.recovery_step++;
 
         if (p_step->b_move)
         {
-            // Every move in g_search_spot is at 45 degrees.
-            g_mission.b_recovery_diag = true;
             start_slow_move(p_step->value, now_ms);
         }
         else
         {
-            int32_t turn_deg = g_mission.recovery_dir * p_step->value;
-
-            g_mission.recovery_deg += turn_deg;
-            start_slow_turn(turn_deg, now_ms);
+            start_slow_turn(g_mission.recovery_dir * p_step->value, now_ms);
         }
-    }
-    else if ((g_mission.recovery_spot + 1u) < SEARCH_SPOTS)
-    {
-        // Facing along the track again: on to the next spot.
-        int32_t move_mm = g_search_spot_mm[g_mission.recovery_spot + 1u]
-                          - g_search_spot_mm[g_mission.recovery_spot];
-
-        g_mission.recovery_spot++;
-        g_mission.recovery_step = 0u;
-        s5_event_trace("RECOVERY next spot: along_mm 0",
-                       g_search_spot_mm[g_mission.recovery_spot], 0);
-        start_slow_move(move_mm, now_ms);
     }
     else
     {
@@ -932,8 +978,8 @@ start_recovery_step (uint32_t now_ms)
 }
 
 /*!
- * @brief LINE_RECOVERY: search step by step until S3 finds the line;
- *        found while driving at 45 degrees, square up to it first.
+ * @brief LINE_RECOVERY: search step by step until S3 finds the line,
+ *        then follow it and confirm it.
  *
  * @param[in] events Mission events.
  * @param[in] now_ms Current time.
@@ -941,35 +987,16 @@ start_recovery_step (uint32_t now_ms)
 static void
 step_recovery (uint32_t events, uint32_t now_ms)
 {
-    bool b_found = (0u != (events & EV_LINE_FOUND));
-    bool b_done  = (0u != (events & EV_MOTION_DONE));
-
-    if ((RECOVERY_SEARCH == g_mission.recovery_phase) && b_found
-        && g_mission.b_recovery_diag && (0 != g_mission.recovery_deg))
+    // Found: S3's event, or S3 already following (the event came before
+    // the search began, or mid-swing).
+    if ((0u != (events & EV_LINE_FOUND)) || s5_links_line_is_locked())
     {
-        // S3's IR is on the line, ahead of the turning centre: drive the
-        // wheels onto it, then turn back square (as s5_avoid.c's return).
-        s5_event_trace("RECOVERY line found at an angle: deg 0",
-                       g_mission.recovery_deg, 0);
+        // Stop the sweep; resume_following() lets the wheels settle.
         s5_links_motion_stop();
-        start_slow_move(S5_AXLE_TO_LINE_IR_MM, now_ms);
-        g_mission.recovery_phase = RECOVERY_ONTO;
-    }
-    else if ((RECOVERY_SEARCH == g_mission.recovery_phase) && b_found)
-    {
-        // resume_following() lets the wheels settle first.
         resume_following();
+        begin_confirm();
     }
-    else if (b_done && (RECOVERY_ONTO == g_mission.recovery_phase))
-    {
-        start_slow_turn(-g_mission.recovery_deg, now_ms);
-        g_mission.recovery_phase = RECOVERY_REALIGN;
-    }
-    else if (b_done && (RECOVERY_REALIGN == g_mission.recovery_phase))
-    {
-        resume_following();
-    }
-    else if (b_done)
+    else if (0u != (events & EV_MOTION_DONE))
     {
         start_recovery_step(now_ms);
     }
@@ -1013,6 +1040,7 @@ step_avoidance (uint32_t events, uint32_t now_ms)
     {
         case S5_AVOID_RESUME:
             resume_following();
+            begin_confirm();
         break;
 
         case S5_AVOID_PLAN_ONLY:
@@ -1024,8 +1052,10 @@ step_avoidance (uint32_t events, uint32_t now_ms)
         break;
 
         case S5_AVOID_SEARCH:
-            // Search from here, ahead and behind (g_search_spot).
-            start_recovery(now_ms, true);
+            // Search from here, towards the obstacle's side (g_search).
+            start_recovery(now_ms, false,
+                           s5_avoid_passed_left() ? S5_LINKS_SIDE_LEFT
+                                                  : S5_LINKS_SIDE_RIGHT);
         break;
 
         default:
@@ -1085,6 +1115,8 @@ start_run (uint32_t now_ms)
     g_mission.run_start_ms  = now_ms;
     g_mission.barcodes      = 0u;
     g_mission.b_nav_pending = false;
+    g_mission.b_confirming  = false;
+    g_mission.rejects       = 0u;
 
     if (!s5_links_line_is_ready())
     {
@@ -1114,6 +1146,7 @@ resume_following (void)
     s5_links_motion_follow(cruise_mms());
     subsystem5_obst_request(OB_RESUME);
     set_line_mark();
+    g_mission.follow_mm = s5_links_odom_dist_mm();
     set_state(S5_CTRL_LINE_FOLLOWING);
 }
 

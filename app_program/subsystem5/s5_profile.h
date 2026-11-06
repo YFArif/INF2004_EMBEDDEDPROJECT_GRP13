@@ -35,25 +35,17 @@
  */
 #define S5_ROBOT_WIDTH_MM       (140)   /* Widest point, wheels included.*/
 #define S5_ROBOT_LENGTH_MM      (200)   /* Front bumper to rear.         */
-#define S5_AXLE_TO_FRONT_MM     (100)   /* Turning centre to the front.  */
+#define S5_AXLE_TO_FRONT_MM     (160)   /* Rear wheel centre to the front*/
+                                        /* tip, measured 15-17 cm        */
+                                        /* (2026-11-06).                 */
 #define S5_SENSOR_SETBACK_MM    (75)    /* Sensor face behind the front, */
                                         /* measured 7-8 cm (2026-11-05). */
-#define S5_AXLE_TO_LINE_IR_MM   (80)    /* Turning centre to S3's IR.    */
 #define S5_PATH_MARGIN_MM       (50)    /* Gap kept from the obstacle.   */
-#define S5_PASS_MARGIN_MM       (50)    /* Gap aimed for when passing.   */
-                                        /* 30 needed side-check jogs,    */
-                                        /* which swing the tail into the */
-                                        /* obstacle (2026-11-05_0224).   */
 
 /* Scan thresholds (Week 6 report 6.4, preliminary until S5-U04). */
 #define S5_HIT_RANGE_MM         (400)   /* Closer than this is a hit.    */
 #define S5_EDGE_JUMP_MM         (100)   /* Larger range step is an edge. */
 #define S5_EDGE_CORR_DEG        (6)     /* Edge correction, A16.         */
-#define S5_PASS_TRIM_DEG        (0)     /* Edge trim for the sideways    */
-                                        /* move. 0 until the servo's     */
-                                        /* right-side angles are checked:*/
-                                        /* with 10 the robot passed too  */
-                                        /* close (2026-11-05_0224).      */
 #define S5_CLEAR_DEPTH_MM       (300)   /* Look this far past the edge.  */
 #define S5_CLEAR_OPEN_MM        (1000)  /* Clearance with nothing seen.  */
 

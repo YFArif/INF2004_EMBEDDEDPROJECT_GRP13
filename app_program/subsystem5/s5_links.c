@@ -31,16 +31,20 @@
 #define STILL_POLL_MS       (20u)       /* motion_task's period.         */
 
 /* Line following tuning: S3's drive-test default preset, the settings S3
- * proved on the car (task_drive_test.c g_presets[0], 30 Oct). With S3's
- * built-in defaults at 300 mm/s the robot ran off the curves; at S3's
- * 40 mm/s it crawled. LINE_SPEED_MMS is between: S3's drive test used
- * 100 mm/s as its default until 29 Oct. Tune it here (60 ... 120).
+ * proved on the car for the single-edge layout (task_drive_test.c
+ * g_presets[0], 5 Nov): Kp 25, Kd 25, curve boost 250, full lock 1 x the
+ * speed, at S3_DRIVE_SPEED_MMS (40 mm/s). At 60 mm/s the robot wobbled
+ * (Anna, 2026-11-06).
  */
-#define LINE_SPEED_MMS      (60u)
+#define LINE_SPEED_MMS      (40u)
 #define LINE_KP_X100        (25)
 #define LINE_KD_X100        (25)
 #define LINE_BOOST_X100     (250)       /* Curve authority.              */
-#define LINE_STEER_PER_MMS  (2u)        /* Full lock = 2 x the speed.    */
+#define LINE_STEER_PER_MMS  (1u)        /* Full lock = 1 x the speed, as */
+                                        /* S3's car test (5 Nov): at 2 x */
+                                        /* the inner wheel reversed and  */
+                                        /* the robot jerked left-right   */
+                                        /* (log 2026-11-06_1436).        */
 #define FLOOR_TEST_MMS      (150u)      /* No line to follow: faster.    */
 #define LINE_BLACK_U8       (128u)      /* Half way, white 0 to black    */
                                         /* 255: S3_LN_FOUND (500/1000).  */
@@ -327,6 +331,52 @@ s5_links_line_side (void)
     }
 
     return (side);
+}
+
+/*!
+ * @brief Tell whether S3 has lost the line right now (IF-S3b; it only
+ *        reads S3's status). S3 raises FLG_S3_LOST once, on entering
+ *        LOST; this catches a LOST entered while the event was not being
+ *        acted on (log 2026-11-06_1436: lost during a bypass turn, then
+ *        S3 held full lock and the robot circled).
+ *
+ * @return true while S3 is in S3_LINE_LOST.
+ */
+bool
+s5_links_line_is_lost (void)
+{
+    s3_line_status_t status = {0};
+    bool             b_lost = false;
+
+    if (g_b_line_used && (E_OK == s3_get_line_status(&status)))
+    {
+        b_lost = (S3_LINE_LOST == status.state);
+    }
+
+    return (b_lost);
+}
+
+/*!
+ * @brief Tell whether S3 is following a line right now (IF-S3b; it only
+ *        reads S3's status). S3 raises FLG_S3_LINE_FOUND once, when it
+ *        locks on; a search that starts after that would wait for ever
+ *        (log 2026-11-06_1456_new_algo2: found while turning in, then
+ *        swept across the line it was following and gave up).
+ *
+ * @return true while S3 is in S3_LINE_FOLLOW.
+ */
+bool
+s5_links_line_is_locked (void)
+{
+    s3_line_status_t status   = {0};
+    bool             b_locked = false;
+
+    if (g_b_line_used && (E_OK == s3_get_line_status(&status)))
+    {
+        b_locked = (S3_LINE_FOLLOW == status.state);
+    }
+
+    return (b_locked);
 }
 
 /*!
