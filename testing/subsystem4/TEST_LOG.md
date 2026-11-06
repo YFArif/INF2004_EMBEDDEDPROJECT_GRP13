@@ -38,3 +38,7 @@ Add a new row for every run. Never edit or delete old rows.
 | 2026-11-06 | S4-U04 | `6340b47` + S2 TURN test | Kessler | PASS | `logs/2026-11-06_s4_u04_turn.txt` | Motor turn with S2 TURN cmd (150 mm/s). 90° read hd 94 (+4.4 %), 180° read hd 191 (+6 %). Hand test above was invalid: encoders have no direction, S2 takes the sign from the motor cmd. |
 | 2026-11-06 | S4-U05 | `2aea0b1` | Kessler | FAIL | `logs/2026-11-06_s4_u05_class.txt` | 90° spin on the spot stayed STATIONARY (forward speed ~0 was checked before turn rate). |
 | 2026-11-06 | S4-U05 | `2aea0b1` + TURNING before STATIONARY | Kessler | PASS | `logs/2026-11-06_s4_u05_class.txt` | 90° spin: TURNING for 739 ms then STATIONARY. Drives today showed STATIONARY / ACCELERATING / MOVING / CLIMBING_HUMP / IMPACT correctly; shortest class 100 ms. |
+| 2026-11-06 | S4-U06 | `4f96fb3` | Kessler | PASS | `logs/2026-11-06_s4_auto.txt` | `make TEST=1`: accelerometer CTRL1/CTRL4 read back (0x19). |
+| 2026-11-06 | S4-U07 | `4f96fb3` | Kessler | PASS | `logs/2026-11-06_s4_auto.txt` | `make TEST=1`: magnetometer identity H43 (0x1E). |
+| 2026-11-06 | S4-U08 | `4f96fb3` | Kessler | PASS | `logs/2026-11-06_s4_auto.txt` | `make TEST=1`: packed fields clamp at their limits. |
+| 2026-11-06 | S4-U09 | `4f96fb3` | Kessler | PASS | `logs/2026-11-06_s4_auto.txt` | `make TEST=1`: packed terrain round trip. |

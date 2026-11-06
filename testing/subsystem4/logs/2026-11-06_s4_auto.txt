@@ -1,0 +1,9 @@
+S4 auto tests, make TEST=1 at 4f96fb3, 2026-11-06, tester Kessler
+
+[TEST] S4-U06 PASS  accelerometer CTRL1/CTRL4 read back (0x19)
+[TEST] S4-U07 PASS  magnetometer identity H43 (0x1E)
+[TEST] S4-U08 PASS  packed fields clamp at their limits
+[TEST] S4-U09 PASS  packed terrain round trip
+[TEST] subsystem4 SUMMARY 4 passed, 0 failed
+
+Same run, other subsystems: S1 2/0, S2 6/0, S3 2/0, S5 7/0 (passed/failed).
