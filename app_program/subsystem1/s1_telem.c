@@ -4,9 +4,9 @@
 
 /** @file s1_telem.c
  *
- * @brief Command to ack, heartbeat packing, schedules, the queue room rule
- *        and message filling for telemetry_task (see s1_telem.h). No kernel
- *        or driver calls.
+ * @brief Command to ack, heartbeat packing, schedules, the queue room rule,
+ *        the WiFi fault rule and message filling for telemetry_task (see
+ *        s1_telem.h). No kernel or driver calls.
  */
 
 #include "s1_telem.h"
@@ -273,6 +273,55 @@ s1_telem_queue_allows (uint32_t free_slots, uint32_t max_queued)
     }
 
     return (queued <= max_queued);
+}
+
+/*!
+ * @brief Apply the WiFi fault rule: set or clear fault bit 4 when it changes.
+ *
+ * The bit means "dashboard link lost": the radio is not CYW43_LINK_UP or the
+ * MQTT session is down (docs/S1_binary_frame.md section 3.1). The session
+ * test is the one that gates the heartbeat, s1_telem_hb_should_publish(), so
+ * a stale driver status counts as down. Nothing happens before the first
+ * successful connection: connect_count is 0 until then and is never reset, so
+ * once armed the rule stays armed. An inconsistent status read leaves the
+ * level as it is; the next pass reads it again.
+ *
+ * @param[in]     p_status     The radio and driver status just read.
+ * @param[in]     p_set        Sets fault bits (subsystem5_fault_set()).
+ * @param[in]     p_clear      Clears fault bits (subsystem5_fault_clear()).
+ * @param[in,out] pb_fault_set The level last applied; written on a change.
+ *
+ * @return True if the level changed, so exactly one of p_set and p_clear was
+ *         called; false otherwise, and for a NULL argument.
+ */
+bool
+s1_telem_wifi_update (const s1_telem_wifi_status_t * p_status,
+                      s1_telem_fault_function_t p_set,
+                      s1_telem_fault_function_t p_clear, bool * pb_fault_set)
+{
+    s1_telem_fault_function_t p_change = NULL;
+    bool                      b_fault_wanted = false;
+    bool                      b_changed = false;
+
+    if ((NULL != p_status) && (NULL != p_set) && (NULL != p_clear)
+        && (NULL != pb_fault_set) && (p_status->b_status_read)
+        && (0U != p_status->connect_count))
+    {
+        b_fault_wanted = (!p_status->b_link_up)
+                         || (!s1_telem_hb_should_publish(p_status->state,
+                                                         p_status->b_stale));
+
+        if (b_fault_wanted != *pb_fault_set)
+        {
+            p_change = b_fault_wanted ? p_set : p_clear;
+            p_change(MSG_FAULT_WIFI);
+
+            *pb_fault_set = b_fault_wanted;
+            b_changed     = true;
+        }
+    }
+
+    return (b_changed);
 }
 
 /*!

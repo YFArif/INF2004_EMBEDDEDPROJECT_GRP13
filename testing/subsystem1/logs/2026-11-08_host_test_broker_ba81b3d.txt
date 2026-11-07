@@ -1,0 +1,30 @@
+S1-U12 broker_test.py, 2026-11-08 06:44:21 +08
+commit: ba81b3d
+python: Python 3.13.7
+mosquitto_sub: mosquitto_sub version 2.1.2 running on libmosquitto 2.1.0.
+mosquitto_pub: mosquitto_pub version 2.1.2 running on libmosquitto 2.1.0.
+== stage 1: broker
+configuration: listener 1883 127.0.0.1, allow_anonymous true, persistence false, log_type all
+broker listens on: 127.0.0.1:1883
+stage 1: ok
+== stage 2: stream
+subscriber: mosquitto_sub -h 127.0.0.1 -p 1883 -q 1 -t 's1test/stream' -F '%x' | python3 app_program/subsystem1/dashboard/s1_decode.py --describe --session
+publisher, once per vector: mosquitto_pub -h 127.0.0.1 -p 1883 -q 1 -t 's1test/stream' -s (payload in binary on stdin)
+published 21; broker: Received PUBLISH 21, Sending PUBLISH 42, Received PUBACK 42
+exit status: subscriber 0, decoder 0, raw subscriber 0
+lines: stream 21, direct 21; error lines in the stream: 0
+diff direct stream: no differences
+raw -F '%x' output: 621 bytes, 21 newlines, 0 carriage returns; the 21 payloads in lowercase hex, one per line
+stage 2: ok
+== stage 3: STOP
+subscriber: mosquitto_sub -h 127.0.0.1 -p 1883 -q 1 -t 'robocar/car1/cmd/#' -C 2 -F '%x' | python3 app_program/subsystem1/dashboard/s1_decode.py --describe
+publisher: printf '\024\205' | mosquitto_pub -h 127.0.0.1 -p 1883 -q 1 -t 'robocar/car1/cmd' -s
+publisher: printf '\024\205' | mosquitto_pub -h 127.0.0.1 -p 1883 -q 1 -t 'robocar/car1/cmd/ui' -s
+exit status: subscriber 0, decoder 0
+decoded: {"cmd_id": 5, "msg_type": 4, "opcode": 2, "opcode_name": "STOP", "type": "COMMAND", "valid": true, "version": 1}
+decoded: {"cmd_id": 5, "msg_type": 4, "opcode": 2, "opcode_name": "STOP", "type": "COMMAND", "valid": true, "version": 1}
+broker received: 'robocar/car1/cmd' at QoS 1, 'robocar/car1/cmd/ui' at QoS 1
+broker sent on: 'robocar/car1/cmd' at QoS 1, 'robocar/car1/cmd/ui' at QoS 1
+stage 3: ok
+== stage 4: broker stopped, exit status 0; 127.0.0.1:1883 free
+S1-U12: PASS (21/21 vectors decoded through the broker as directly, 0 error lines; STOP id 5 from robocar/car1/cmd and robocar/car1/cmd/ui received on robocar/car1/cmd/# at QoS 1; broker on 127.0.0.1:1883 only, stopped)

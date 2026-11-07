@@ -25,10 +25,17 @@
  * S1_TELEM_HB_QUEUED_MAX. A message held back is counted, not retried. Acks
  * are never held back.
  *
+ * @par WiFi fault bit
+ * On each pass this task reads the radio link and the driver status and
+ * applies s1_telem_wifi_update(). S1 sets and clears S5_FAULT_WIFI itself, as
+ * a level bit, and prints one console line per change. It raises no EV_FAULT:
+ * S5 does not act on this bit (docs/S1_binary_frame.md section 3.1).
+ *
  * @par Kernel and driver calls
  * This file makes them all; the logic that needs none is in s1_telem.c,
- * which the host test S1-U14 runs with a stub in place of
- * subsystem5_command_post().
+ * which the host test S1-U14 runs with stubs in place of
+ * subsystem5_command_post(), subsystem5_fault_set() and
+ * subsystem5_fault_clear().
  */
 
 #include "telemetry_task.h"
@@ -47,6 +54,7 @@
 #include "msg_codec.h"
 #include "msg_layout.h"
 #include "mqtt_link.h"
+#include "s1_radio.h"
 #include "s1_telem.h"
 
 /* S1_TELEM_STACK_REPORT=1 prints the stack high-water mark once a minute,
@@ -99,6 +107,16 @@ typedef uint8_t telemetry_task_check_map_t[((MSG_FAULT_STALL == S5_FAULT_STALL)
  * of all three apart.
  */
 
+/* One console line for a change of the WiFi fault bit. tm_sprintf() does not
+ * limit its output, so the buffer is sized for the widest line with room to
+ * spare. The widest line, in characters:
+ *   "S1: wifi fault " 15 + "clear" 5 + " link=" 6 + "-2147483648" 11
+ *   + " mqtt=" 6 + state 1 (0 to 4) + " stale=" 7 + 1 (0 or 1)
+ *   + " mask=0x" 8 + 2 (at most 1f) + "\n" 1 = 63,
+ * plus the NUL tm_sprintf() writes = 64 bytes. 80 leaves 16 bytes spare.
+ */
+#define WIFI_LINE_BYTES             80U
+
 #if S1_TELEM_STACK_REPORT
 #define REPORT_PERIOD_MSEC          60000U
 #define REPORT_HALF_RANGE_MSEC      0x80000000U
@@ -113,6 +131,7 @@ static s1_telem_stats_t g_stats;
 static uint8_t          g_hb_seq = 0U;
 static uint8_t          g_tel_seq = 0U;
 static uint8_t          g_live_seq = 0U;
+static bool             gb_wifi_fault_set = false;
 
 /* The subsystem values and the two messages being filled. They are here,
  * not on the task's 2048-byte stack, because only telemetry_task uses them.
@@ -124,6 +143,9 @@ static msg_codec_live_t      g_live;
 static void     telemetry_task(INT stacd, void * p_exinf);
 static int32_t  post_to_s5(uint8_t opcode, uint8_t cmd_id);
 static void     handle_command(const mqtt_link_command_t * p_cmd);
+static void     update_wifi_fault(void);
+static void     print_wifi_change(int32_t link_status,
+                                  const mqtt_link_status_t * p_status);
 static void     send_heartbeat(void);
 static void     publish_heartbeat(const mqtt_link_status_t * p_status);
 static void     collect_sources(s1_telem_src_t * p_src);
@@ -274,6 +296,8 @@ telemetry_task (INT stacd, void * p_exinf)
             (void)tk_dly_tsk((TMO)TELEMETRY_TASK_RX_WAIT_MSEC);
         }
 
+        update_wifi_fault();
+
         if (s1_telem_hb_due(now_msec(), &next_hb_msec))
         {
             send_heartbeat();
@@ -345,6 +369,73 @@ handle_command (const mqtt_link_command_t * p_cmd)
                 s1_telem_sat_add(g_stats.ack_publish_failed, 1U);
         }
     }
+}
+
+/*!
+ * @brief Apply the WiFi fault rule once; print one line if the bit changed.
+ *
+ * Called once per pass, so a change is seen within about one command wait.
+ * The flag changes before the line is built, so the console cannot delay it.
+ *
+ * NOTE: subsystem5_fault_clear() is in the private block of subsystem5.h. S1
+ * calls it for this bit only: Tribunal 1 (Version B) makes WiFi loss a level
+ * bit that S1 sets and clears itself.
+ */
+static void
+update_wifi_fault (void)
+{
+    mqtt_link_status_t     status;
+    s1_telem_wifi_status_t wifi_status = {false, false, false,
+                                          MQTT_LINK_STATE_IDLE, 0U};
+    int32_t                link_status = 0;
+
+    wifi_status.b_link_up     = s1_radio_link_read(&link_status);
+    wifi_status.b_status_read = mqtt_link_get_status(&status);
+
+    /* After a failed read the copy may be torn (mqtt_link_get_status()), so
+     * nothing is taken from it and the rule holds the level. For the same
+     * reason print_wifi_change() is reached only after a good read.
+     */
+    if (wifi_status.b_status_read)
+    {
+        wifi_status.b_stale       = status.b_stale;
+        wifi_status.state         = status.state;
+        wifi_status.connect_count = status.connect_count;
+    }
+
+    if (s1_telem_wifi_update(&wifi_status, subsystem5_fault_set,
+                             subsystem5_fault_clear, &gb_wifi_fault_set))
+    {
+        print_wifi_change(link_status, &status);
+    }
+}
+
+/*!
+ * @brief Print one console line for a change of the WiFi fault bit.
+ *
+ * mask is read back from S5's flag, so the line shows the flag itself, not
+ * what this task believes it set.
+ *
+ * @param[in] link_status The radio link status just read (CYW43_LINK_xxx).
+ * @param[in] p_status    The driver status just read.
+ */
+static void
+print_wifi_change (int32_t link_status, const mqtt_link_status_t * p_status)
+{
+    UB line[WIFI_LINE_BYTES];
+
+    /* The casts are safe: the format string is ASCII; an int is 32 bits on
+     * this port, so it holds link_status; the state is a small enum value;
+     * the mask is at most 0x1F. The length tm_sprintf() returns is not needed.
+     */
+    (void)tm_sprintf(line,
+                     (const UB *)"S1: wifi fault %s link=%d mqtt=%d stale=%d "
+                                 "mask=0x%02x\n",
+                     gb_wifi_fault_set ? "set" : "clear", (int)link_status,
+                     (int)p_status->state, p_status->b_stale ? 1 : 0,
+                     (unsigned int)(subsystem5_fault_get()
+                                    & MSG_FAULT_MASK_ALL));
+    tm_printf(line);
 }
 
 /*!

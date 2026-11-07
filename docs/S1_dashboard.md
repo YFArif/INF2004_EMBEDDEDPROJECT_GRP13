@@ -416,6 +416,7 @@ values are made up; only the formats and rates are real.
 - S5's verdict and events: not sent yet (the event channel is the next
   step); the S5 panel shows the state only.
 - RSSI: not measured yet.
+- A frame built just after the radio drops can carry 0x10 and arrive after the reconnect.
 - S3 rejected barcodes are one total, not per letter (section 8.1).
 - A restart can leave one wrong S3 timeline entry in a rare case (section
   8.1).

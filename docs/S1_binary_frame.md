@@ -137,7 +137,7 @@ wire (offset 23) and integer bit 0 is the last (offset 27).
 | 1 | 0x02 | encoder fault | 26 | S2 (reserved, not set yet) | vehicle_ctrl_task only | latched | from code (`S5_FAULT_ENCODER`, `FAULTS_LATCHED`) |
 | 2 | 0x04 | IMU fault | 25 | S4 | vehicle_ctrl_task only | latched | from Version B |
 | 3 | 0x08 | no echo | 24 | S5 | vehicle_ctrl_task only | latched | from code (`S5_FAULT_NO_ECHO`, `FAULTS_LATCHED`). Week 6 said "not a fault"; S5's code sets it when the ultrasonic fails. |
-| 4 | 0x10 | WiFi loss | 23 | S1 | S1 | level | from Version B |
+| 4 | 0x10 | dashboard link lost (radio or MQTT session) | 23 | S1, with `subsystem5_fault_set()` | S1, with `subsystem5_fault_clear()` | level | from code (`S5_FAULT_WIFI`, `s1_telem_wifi_update()`) |
 
 The numbering is the 19 Oct ruling. Version B gives Buddy 5 the
 `flg_fault` bit positions, so B5 needs to define `flg_fault` with this
@@ -149,9 +149,23 @@ TEL-F0 to TEL-F4 in 10.2 check this: an encoder or decoder that reverses
 the order fails four of the five (only the middle bit, IMU, is the same
 either way round).
 
-Telemetry is only published while connected, so the WiFi-loss bit is
-almost always 0 on the wire. It is there for `vehicle_ctrl_task`, and is
-sent so the dashboard sees the same mask the robot uses.
+`telemetry_task` sets bit 4 when the radio is not `CYW43_LINK_UP` or the
+MQTT session is down, and clears it when both are good
+(`s1_telem_wifi_update()`). The session test is the heartbeat's,
+`s1_telem_hb_should_publish()`, so a stale driver status counts as down and
+a broker outage with healthy WiFi sets the bit too. The rule is armed only
+after the first successful MQTT connection, acts only on a change, prints
+one console line per change (MQTT.md section 1.1) and raises no `EV_FAULT`.
+The vectors in 10.2 and `golden.py` keep the shorter name "WiFi loss".
+
+On `main` the only readers of `flg_fault` are `telemetry_task` and
+`fault_from_flags()` in `s5_mission.c`, both through
+`subsystem5_fault_get()`, and nothing waits on the flag. `fault_from_flags()`
+ignores bit 4, so no firmware acts on it.
+
+Frames are built only while the session is up, so bit 4 is almost always 0
+on the wire. A frame built just after the radio drops can carry 0x10 and
+arrive after the reconnect.
 
 ### 3.2 Why 16-bit modulo encoder counts
 

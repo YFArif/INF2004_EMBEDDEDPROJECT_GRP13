@@ -1,0 +1,52 @@
+S1-U14 run_telemetry_test.sh, 2026-11-08 06:44:04 +08
+commit: ba81b3d
+cc: Apple clang version 17.0.0 (clang-1700.6.4.2)
+== stage 1: build (strict warnings as errors, UBSan/ASan)
+stage 1: ok, no warnings
+== stage 2: run
+S1-U14 s1_telem host test (layout version 1)
+commands
+  ok
+heartbeat
+  ok
+schedule
+  ok
+fill
+  ok
+wifi fault
+  ok
+RESULT: all passed (330 checks)
+stage 2: ok
+== stage 3: mutations
+C1 payload room cut to the ack's size: caught by a compile-time check
+M1 a queued command acked as rejected: caught by the test (RESULT: 9 FAILED)
+M2 codec rejects posted to S5: caught by the test (RESULT: 19 FAILED)
+M3 command_dropped left out of cmd_reject: caught by the test (RESULT: 2 FAILED)
+M4 relative heartbeat deadline instead of absolute: caught by the test (RESULT: 4 FAILED)
+M5 ack published on the event topic: caught by the test (RESULT: 9 FAILED)
+M6 heartbeat published while the snapshot is stale: caught by the test (RESULT: 6 FAILED)
+M7 heartbeat sent at QoS 1: caught by the test (RESULT: 1 FAILED)
+M8 commanded speed uses the difference of the set-points: caught by the test (RESULT: 2 FAILED)
+M9 latched impact not shown as class IMPACT: caught by the test (RESULT: 1 FAILED)
+M10 line state FOLLOW when S3 is unreadable: caught by the test (RESULT: 1 FAILED)
+M11 skipped messages left out of tel_drop: caught by the test (RESULT: 3 FAILED)
+M12 refused heartbeats left out of tel_drop: caught by the test (RESULT: 2 FAILED)
+M13 telemetry allowed with 2 records queued: caught by the test (RESULT: 1 FAILED)
+M16 live allowed with 2 records queued: caught by the test (RESULT: 1 FAILED)
+M14 heartbeat allowed with 4 records queued: caught by the test (RESULT: 1 FAILED)
+M15 queue rule off by one: caught by the test (RESULT: 3 FAILED)
+M17 both schedule offsets 0: caught by the test (RESULT: 1 FAILED)
+M18 WiFi fault armed before the first connection: caught by the test (RESULT: 17 FAILED)
+M19 WiFi fault needs the radio and the session both down: caught by the test (RESULT: 28 FAILED)
+M20 WiFi fault set and clear swapped: caught by the test (RESULT: 26 FAILED)
+M21 WiFi fault acted on every pass, not on a change: caught by the test (RESULT: 33 FAILED)
+M22 WiFi fault ignores a stale driver status: caught by the test (RESULT: 5 FAILED)
+M23 WiFi fault acts on an inconsistent status read: caught by the test (RESULT: 3 FAILED)
+M24 WiFi fault changes the IMU bit: caught by the test (RESULT: 9 FAILED)
+stage 3: 25/25 mutations caught
+== stage 4: target compile
+arm-none-eabi-gcc (Arm GNU Toolchain 15.3.Rel1 (Build arm-15.149)) 15.3.1 20260627
+   text	   data	    bss	    dec	    hex	filename
+    944	      0	      0	    944	    3b0	s1_telem.o
+stage 4: ok, no warnings
+S1-U14: PASS (330 checks, 25/25 mutations caught, target compile ok)

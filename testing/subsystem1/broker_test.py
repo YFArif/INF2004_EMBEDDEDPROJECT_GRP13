@@ -9,11 +9,11 @@ Stages; the run stops at the first stage that fails:
      127.0.0.1 only, anonymous, no persistence, full log); lsof must show
      that every socket it listens on is 127.0.0.1:PORT.
   2  Stream: mosquitto_sub -q 1 -t s1test/stream -F '%x' (no -C) piped
-     into s1_decode.py --describe --session, while the 18 golden vectors
+     into s1_decode.py --describe --session, while the 21 golden vectors
      from golden.py are published in document order, one
      mosquitto_pub -q 1 -s each; the subscriber is stopped with SIGINT
-     once it has acknowledged all 18. Its output must equal decoding the
-     same 18 hex lines directly with the same options: 18 lines, 0 error
+     once it has acknowledged all 21. Its output must equal decoding the
+     same 21 hex lines directly with the same options: 21 lines, 0 error
      lines, subscriber and decoder exit status 0. A second subscriber with
      the same options records the raw output, to report how messages are
      separated (reported, not checked).
@@ -73,7 +73,7 @@ PREFIX = "robocar/car1"
 STREAM_TOPIC = "s1test/stream"
 STOP_BYTES = b"\x14\x85"            # golden vector CMD-1: STOP, id 5
 STOP_TOPICS = (PREFIX + "/cmd", PREFIX + "/cmd/ui")
-GOLDEN_COUNT = 18
+GOLDEN_COUNT = 21
 WAIT_SECONDS = 10
 SETTLE_SECONDS = 0.5
 
@@ -161,7 +161,7 @@ def header(tools):
 
 
 def golden_vectors():
-    """The 18 golden vectors from golden.py, as (name, hex) pairs."""
+    """The 21 golden vectors from golden.py, as (name, hex) pairs."""
     r = subprocess.run([sys.executable, "-I", "-B", str(ROOT / GOLDEN_REL),
                         str(ROOT / DOC_REL)], capture_output=True, text=True)
     if 0 != r.returncode:
@@ -220,7 +220,7 @@ def stop_subscriber(proc, name):
 
 
 def stage_stream(tools, work, vectors, procs):
-    """Stage 2: the 18 vectors through the broker, against a direct decode."""
+    """Stage 2: the 21 vectors through the broker, against a direct decode."""
     print("== stage 2: stream")
     sub = [tools["mosquitto_sub"], "-h", HOST, "-p", PORT, "-q", "1", "-t",
            STREAM_TOPIC, "-F", "%x"]
@@ -295,8 +295,8 @@ def stage_stream(tools, work, vectors, procs):
     want = "".join(h.replace(" ", "").lower() + "\n" for _, h in vectors)
     print("raw -F '%%x' output: %d bytes, %d newlines, %d carriage "
           "returns; %s" % (len(raw), raw.count(b"\n"), raw.count(b"\r"),
-                           "the 18 payloads in lowercase hex, one per line"
-                           if raw == want.encode() else
+                           "the %d payloads in lowercase hex, one per line"
+                           % len(vectors) if raw == want.encode() else
                            "NOT one payload per line"))
 
     if ((0 != rc_a) or (0 != dec.returncode) or (0 != direct.returncode)
