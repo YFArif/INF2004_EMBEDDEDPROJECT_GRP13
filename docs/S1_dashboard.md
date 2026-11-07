@@ -20,9 +20,9 @@ standard library only. Test: S1-U16 in `testing/subsystem1/TEST_LOG.md`.
   S5, which decides on its own. S5's verdict is on the robot's USB
   console only (`[S5] EVT 0x65 a=<opcode> b=<1 or 0>`) until the event
   channel is built. The S5 panel does show the state change.
-- Telemetry (section 8.1) is shown, read-only. Events (EVT codes) and
-  RSSI are not sent yet, so the event log shows none and RSSI reads
-  "not measured".
+- Telemetry (section 8.1) is shown, read-only. Events (EVT codes) are
+  not sent yet, so the event log shows none. The heartbeat's rssi and
+  evt_drop are always 0 for now; rssi 0 reads "not measured".
 - The page, the log and the console never show the broker address, the
   WiFi details or a login.
 - The page loads nothing from anywhere else. Its Content-Security-Policy
@@ -35,7 +35,7 @@ standard library only. Test: S1-U16 in `testing/subsystem1/TEST_LOG.md`.
 |---|---|---|
 | Python | 3.8 or later | Tested with 3.13. No packages to install. Windows: use `py -3` (section 15) |
 | mosquitto (broker and clients) | 2.0 or later | Tested with 2.1.2. macOS: `brew install mosquitto`. Windows: section 15. Check with `mosquitto_sub --help \| head -2` |
-| This repository | branch `buddy1-integration` | It must contain `app_program/subsystem1/telemetry_task.c` (Stage 4a). Ask Caleb if your clone does not have the branch |
+| This repository | branch `main` | It must contain `app_program/subsystem1/telemetry_task.c` (Stage 4a). Pull `main` if your clone does not have it |
 | Pico SDK and ARM compiler | as in `README.md` section 1 | Only to build the robot image (section 5) |
 | A phone hotspot | 2.4 GHz, WPA2 | Section 3 |
 
@@ -232,8 +232,8 @@ green light.
 | Uptime | The robot's time since power-up, h:mm:ss (16 bits: wraps after 18.2 h) |
 | connect_count | Broker sessions since power-up; it rises by 1 at each reconnect |
 | cmd_reject | Commands S1 refused: codec rejections, post failures (S5's queue full) and commands the driver dropped |
-| rssi | "not measured": the signal strength cannot be read yet |
-| tel_drop / evt_drop | tel_drop: telemetry, live and heartbeat messages the robot did not send since power-up, because its publish queue was too full (it keeps room for acks) or the driver refused them. It should stay 0; if it climbs, the link is too slow for 8 messages a second. It stops at 255, shown as "255 or more": from there the page cannot show new drops until the robot restarts. evt_drop: 0, no events yet |
+| rssi | "not measured": always 0 for now, because the robot cannot read the signal strength yet |
+| tel_drop / evt_drop | tel_drop: telemetry, live and heartbeat messages the robot did not send since power-up, because its publish queue was too full (it keeps room for acks) or the driver refused them. It should stay 0; if it climbs, the link is too slow for 8 messages a second. It stops at 255, shown as "255 or more": from there the page cannot show new drops until the robot restarts. evt_drop: always 0 for now, no events yet |
 | Heartbeats lost | Gaps in the heartbeat sequence since the dashboard started (heartbeats use QoS 0, so a few can go missing). A robot restart does not count |
 | Telemetry / live lost | Gaps in each message's sequence since the dashboard started: messages the robot handed to the driver that never arrived. A gap of more than 25 is read as a restart and not counted |
 | Red banner | A retained command is stored on `<prefix>/cmd/...` (section 11) |
@@ -415,7 +415,7 @@ values are made up; only the formats and rates are real.
 
 - S5's verdict and events: not sent yet (the event channel is the next
   step); the S5 panel shows the state only.
-- RSSI: not measured yet.
+- RSSI: always 0 for now, shown as "not measured".
 - A frame built just after the radio drops can carry 0x10 and arrive after the reconnect.
 - S3 rejected barcodes are one total, not per letter (section 8.1).
 - A restart can leave one wrong S3 timeline entry in a rare case (section

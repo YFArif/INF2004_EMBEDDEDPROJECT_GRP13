@@ -169,14 +169,16 @@ arrive after the reconnect.
 
 ### 3.2 Why 16-bit modulo encoder counts
 
-From code: `S2_WHEEL_DIA_MM` 63 and `S2_TICKS_PER_REV_L/R` 639/629
-(provisional) give about 0.31 mm per count, so about 3200 counts per
-metre. At the 400 mm/s design maximum and 2 Hz telemetry, a wheel moves at
-most about 650 counts between frames. A 16-bit count wraps after about
-20 m of travel, so the decoder can rebuild the full 32-bit count as long
-as fewer than about 20 m pass between two frames it receives (the
-difference of two readings, modulo 65536). The robot keeps the full
-32-bit counters (the agreed ISR exception). Only the wire copy is cut.
+From code (`app_program/subsystem2/subsystem2.h`): `S2_TICKS_PER_REV_L/R`
+639/639 and `S2_WHEEL_CIRC_UM_L/R` 208620/209010 (wheel circumference in
+um, calibrated on the floor in S2-U11) give about 0.33 mm per count, so
+about 3060 counts per metre. At the 400 mm/s design maximum and 2 Hz
+telemetry, a wheel moves at most about 610 counts between frames. A 16-bit
+count wraps after about 21 m of travel, so the decoder can rebuild the
+full 32-bit count as long as fewer than about 21 m pass between two frames
+it receives (the difference of two readings, modulo 65536). The robot
+keeps the full 32-bit counters (the agreed ISR exception). Only the wire
+copy is cut.
 
 ### 3.3 Pitch and roll rounding (fields 14 and 15)
 
@@ -351,10 +353,10 @@ can trigger; the 10-bit field would clamp at -512 and 511 anyway.
 | version, msg_type | see 2.1 | 8 | 0 | see 2.1 | msg_type = 2 |
 | seq | 0 to 255, modulo | 8 | 8 | guess | Own counter, separate from telemetry. |
 | uptime_s | 0 to 65535 s, saturates | 16 | 16 | guess | About 18 h. |
-| rssi_neg | 0 to 127 = -RSSI in dBm, clamped | 7 | 32 | guess | A15: must be read inside the service task. |
+| rssi_neg | 0 to 127 = -RSSI in dBm, clamped | 7 | 32 | guess | Always 0 for now ("not measured"). A15: must be read inside the service task. |
 | connect_count | 0 to 255, saturates | 8 | 39 | guess | `mqtt_link` status `connect_count`. |
 | tel_drop | 0 to 255, saturates | 8 | 47 | from code | Telemetry, live and heartbeat messages the robot did not send: skipped because the publish queue was too full (3.4), or refused by the driver. Since power-up. |
-| evt_drop | 0 to 255, saturates | 8 | 55 | guess | Events dropped on a full `mbf_event`. |
+| evt_drop | 0 to 255, saturates | 8 | 55 | guess | Events dropped on a full `mbf_event`. Always 0 for now: there is no `mbf_event` yet. |
 | cmd_reject | 0 to 255, saturates | 8 | 63 | guess | Codec rejections, post failures and the driver's `command_dropped` (section 5.1). |
 | padding | 0 | 1 | 71 | - | |
 
@@ -494,7 +496,7 @@ Not in the build yet (computed only, Week 6 design):
 | Item | Before |
 |---|---|
 | `mbf_event` storage | 2048 B (about 30 text events of 64 B + 4 B header) |
-| `telemetry_task` stack | 2048 B (not built; measure the high-water mark) |
+| `telemetry_task` stack | 2048 B (Week 6 design). Now built, 2048 B; high-water mark not yet measured with the telemetry and live code in. The static estimate for the deepest path is 688 B (9.2) |
 
 S1 static RAM before, **object level plus computed `mbf_event`** (stack
 not counted): 3382 B + 2048 B = **5430 B**. This is not a linked-image
@@ -752,16 +754,18 @@ so the totals below do not change.
 | `mqtt_link.o` bss | 648 B | 452 B | 354 B | `g_pending` 214 -> 80 -> 32, `g_command` 116 -> 54 -> 4 | measured (`arm-none-eabi-size`) |
 | `mqtt_queue.o` bss | 2733 B | 1165 B | 365 B | the two buffers + 13 B of IDs and counters | measured (`arm-none-eabi-size`) |
 | `mbf_event` (30 events) | 2048 B | 240 B | 240 B | 30 x (4 + 4), record 3 B rounded to 4 | computed (to be created by `telemetry_task`, planned, Stage 4) |
-| **S1 static RAM, object level plus computed `mbf_event`** | **5430 B** | **about 1858 B** | **about 960 B** | Not linked-image figures; see 8.3 for those | mixed: see below |
+| `telemetry_task` stack | 2048 B (Week 6 design) | - | 2048 B at `cb204b3` | `g_stack`, `TELEMETRY_TASK_STACK_BYTES`. Built; high-water mark not yet measured with the telemetry and live code in. The static estimate for the deepest path is 688 B (`telemetry_task` -> `mqtt_link_publish()` -> `tk_snd_mbf()` and the kernel below it; `-fstack-usage` and `-fcallgraph-info=su`; leaves out indirect calls, interrupt frames and library leaves) | measured size; not in the row below |
+| **S1 static RAM, object level** | **5430 B**, with the computed `mbf_event` | **about 1858 B**, with the computed `mbf_event` | **941 B** at `cb204b3`, without the stack and `mbf_event` (the two rows above) | `mqtt_link.o` 1 data + 354 bss and `mqtt_queue.o` 365 bss (as at `df58a14`), `telemetry_task.o` 212 bss without its stack (`g_src` 92, `g_tel` 52, `g_stats` 36, `g_live` 28, four 1-byte variables), `subsystem1.o` 9 bss (the template LED task's 8 B and `gb_mqtt_ok`); `msg_codec.o`, `s1_telem.o` and `s1_radio.o` 0 | measured (`arm-none-eabi-size` and `nm`, `NET=lwip MQTT=1` objects). Not linked-image figures; see 8.3 for those |
 
 **Measured saving: 2664 B** of static RAM in the linked image for the
 driver objects and the two buffers (3392 -> 1628 -> 728 B, 8.3): 1764 B
 from the caps (`d604644`) and 900 B more from the topic ID (`df58a14`).
 At object level it is 2662 B (3382 -> 1618 -> 720 B: `mqtt_link.o`
 648 + 1 data -> 452 + 1 -> 354 + 1, `mqtt_queue.o` 2733 -> 1165 -> 365);
-the 2 B difference is alignment padding in the linked image. The 4470 B
-difference of the total row also contains the computed `mbf_event`
-saving of 1808 B (2048 -> 240 B), which is only confirmed once
+the 2 B difference is alignment padding in the linked image. The total
+row's `cb204b3` figure is not comparable with its first two columns: it
+adds `telemetry_task`'s statics and leaves out `mbf_event`. The computed
+`mbf_event` saving of 1808 B (2048 -> 240 B) is only confirmed once
 `mbf_event` exists; it is to be created by `telemetry_task` (planned,
 Stage 4).
 
