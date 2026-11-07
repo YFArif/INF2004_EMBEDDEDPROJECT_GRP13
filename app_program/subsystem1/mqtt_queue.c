@@ -30,30 +30,26 @@
 
 #include "mqtt_queue.h"
 
-/* Size of the kernel's per-message length header, and also the unit that
- * message data is rounded up to. It is sizeof(INT); see HEADERSZ and
- * ROUNDSZ in kernel/tkernel/messagebuf.h. The check below keeps this
- * constant honest.
+/* Short names for this file; the values and their reasons are in
+ * mqtt_queue.h. The check below keeps the unit size honest.
  */
-#define MBF_UNIT_BYTES          4U
+#define MBF_UNIT_BYTES          MQTT_QUEUE_MBF_UNIT_BYTES
+#define PUBLISH_RECORD_BYTES    MQTT_QUEUE_PUBLISH_RECORD_BYTES
+#define PUBLISH_COST_BYTES      MQTT_QUEUE_PUBLISH_COST_BYTES
 
 /* Largest wait, in milliseconds, that is passed to the kernel. A longer
  * wait is shortened to this, which is about 24 days.
  */
 #define WAIT_MAX_MSEC             0x7FFFFFFFU
 
-/* sizeof is a compile-time constant of a few tens of bytes, so converting
- * it to uint32_t cannot lose any bits.
+/* sizeof is a compile-time constant of a few bytes, so converting it to
+ * uint32_t cannot lose any bits.
  */
-#define PUBLISH_RECORD_BYTES    ((uint32_t)sizeof(mqtt_queue_publish_t))
 #define COMMAND_RECORD_BYTES    ((uint32_t)sizeof(mqtt_link_command_t))
 
-/* Space one record takes in a message buffer: the length header plus the
- * record rounded up to a multiple of MBF_UNIT_BYTES.
+/* Space one command record takes in a message buffer, by the same rule as
+ * MQTT_QUEUE_PUBLISH_COST_BYTES.
  */
-#define PUBLISH_COST_BYTES      (MBF_UNIT_BYTES + \
-    (((PUBLISH_RECORD_BYTES + MBF_UNIT_BYTES - 1U) / MBF_UNIT_BYTES) \
-     * MBF_UNIT_BYTES))
 #define COMMAND_COST_BYTES      (MBF_UNIT_BYTES + \
     (((COMMAND_RECORD_BYTES + MBF_UNIT_BYTES - 1U) / MBF_UNIT_BYTES) \
      * MBF_UNIT_BYTES))
@@ -326,6 +322,29 @@ uint32_t
 mqtt_queue_full_count (void)
 {
     return (g_full_count);
+}
+
+/*!
+ * @brief Read how many bytes of the publish channel's buffer are free.
+ *
+ * @return Free bytes; 0 if the channel is not ready or the kernel call fails.
+ */
+uint32_t
+mqtt_queue_publish_free_bytes (void)
+{
+    T_RMBF   rmbf = {0};
+    uint32_t free_bytes = 0U;
+
+    if (gb_ready && (E_OK == tk_ref_mbf(gh_publish_mbf, &rmbf))
+        && (rmbf.frbufsz > 0))
+    {
+        /* frbufsz is positive here and at most PUBLISH_BUF_BYTES, so the
+         * conversion keeps the value.
+         */
+        free_bytes = (uint32_t)rmbf.frbufsz;
+    }
+
+    return (free_bytes);
 }
 
 /*!

@@ -4,8 +4,8 @@
 
 /** @file msg_layout.h
  *
- * @brief Shared layout of every packed message: telemetry, heartbeat,
- *        command, ack and event.
+ * @brief Shared layout of every packed message: telemetry, live,
+ *        heartbeat, command, ack and event.
  *
  * @par Source of truth
  * docs/S1_binary_frame.md (draft 3). Every position and width below is a
@@ -37,7 +37,7 @@
 /* Widest field in any message. The codec's bit helpers rely on it. */
 #define MSG_FIELD_BITS_MAX          24U
 
-/* Message types, in the low 4 bits of every message. 0 and 6 to 15 are
+/* Message types, in the low 4 bits of every message. 0 and 7 to 15 are
  * reserved.
  */
 #define MSG_TYPE_TELEMETRY          1U
@@ -45,6 +45,7 @@
 #define MSG_TYPE_EVENT              3U
 #define MSG_TYPE_COMMAND            4U
 #define MSG_TYPE_ACK                5U
+#define MSG_TYPE_LIVE               6U
 
 /* Header byte, common to every message. */
 #define MSG_HDR_VERSION_POS         0U
@@ -65,7 +66,7 @@
 #define MSG_TEL_FAULT_BITS          5U
 #define MSG_TEL_LINE_POS            28U     /* S3 line state.           */
 #define MSG_TEL_LINE_BITS           3U
-#define MSG_TEL_BC_LETTER_POS       31U     /* 0 none, 1-43 Code 39.    */
+#define MSG_TEL_BC_LETTER_POS       31U     /* S3 Code 39 index, 63 none. */
 #define MSG_TEL_BC_LETTER_BITS      6U
 #define MSG_TEL_BC_CMD_POS          37U
 #define MSG_TEL_BC_CMD_BITS         2U
@@ -118,10 +119,74 @@
  * NOTE: flg_fault (Buddy 5) must use this same numbering.
  */
 #define MSG_FAULT_STALL             0x01U   /* Bit 0: S2, latched.      */
-#define MSG_FAULT_ENCODER           0x02U   /* Bit 1. TODO: TBD.        */
+#define MSG_FAULT_ENCODER           0x02U   /* Bit 1: S2, reserved.     */
 #define MSG_FAULT_IMU               0x04U   /* Bit 2: S4, latched.      */
-#define MSG_FAULT_NO_ECHO           0x08U   /* Bit 3. TODO: TBD.        */
+#define MSG_FAULT_NO_ECHO           0x08U   /* Bit 3: S5, latched.      */
 #define MSG_FAULT_WIFI              0x10U   /* Bit 4: S1, level.        */
+#define MSG_FAULT_MASK_ALL          0x1FU   /* The five bits above.     */
+
+/* ---------------------------------------------------------------------
+ * LIVE, robot to dashboard, 5 Hz. Section 3A of the document: the fast
+ * values from the motion task (S2) and the line task (S3). It is a
+ * separate message so the 25-byte telemetry frame keeps its 2 Hz rate and
+ * its layout.
+ * ------------------------------------------------------------------- */
+#define MSG_LIV_SEQ_POS             8U      /* 0-255, modulo.           */
+#define MSG_LIV_SEQ_BITS            8U
+#define MSG_LIV_MOTION_POS          16U     /* S2 motion state.         */
+#define MSG_LIV_MOTION_BITS         3U
+#define MSG_LIV_ESTOP_POS           19U     /* S2 E-stop latch set.     */
+#define MSG_LIV_ESTOP_BITS          1U
+#define MSG_LIV_CMD_SPEED_POS       20U     /* mm/s, signed: commanded. */
+#define MSG_LIV_CMD_SPEED_BITS      10U
+#define MSG_LIV_HEADING_POS         30U     /* 0.5 deg steps, signed.   */
+#define MSG_LIV_HEADING_BITS        10U
+#define MSG_LIV_LINE_POS            40U     /* S3 line state.           */
+#define MSG_LIV_LINE_BITS           3U
+#define MSG_LIV_STEER_POS           43U     /* mm/s, signed.            */
+#define MSG_LIV_STEER_BITS          10U
+#define MSG_LIV_OUTER_POS           53U     /* 0 white to 255 black.    */
+#define MSG_LIV_OUTER_BITS          8U
+#define MSG_LIV_CENTRE_POS          61U     /* 0 white to 255 black.    */
+#define MSG_LIV_CENTRE_BITS         8U
+#define MSG_LIV_OVERSHOOT_POS       69U     /* S3 OUTER rule on.        */
+#define MSG_LIV_OVERSHOOT_BITS      1U
+#define MSG_LIV_LETTER_POS          70U     /* S3 Code 39 index, 63 none. */
+#define MSG_LIV_LETTER_BITS         6U
+#define MSG_LIV_BC_CMD_POS          76U     /* MSG_BC_CMD_xxx.          */
+#define MSG_LIV_BC_CMD_BITS         3U
+#define MSG_LIV_BC_REV_POS          79U     /* Read backwards.          */
+#define MSG_LIV_BC_REV_BITS         1U
+#define MSG_LIV_JUNC_TURN_POS       80U     /* MSG_JUNC_xxx.            */
+#define MSG_LIV_JUNC_TURN_BITS      2U
+#define MSG_LIV_REJECTS_POS         82U     /* Wraps at 16.             */
+#define MSG_LIV_REJECTS_BITS        4U
+#define MSG_LIV_JUNCTIONS_POS       86U     /* Wraps at 256.            */
+#define MSG_LIV_JUNCTIONS_BITS      8U
+#define MSG_LIV_LOSTS_POS           94U     /* Wraps at 256.            */
+#define MSG_LIV_LOSTS_BITS          8U
+#define MSG_LIV_BARCODES_POS        102U    /* Wraps at 256.            */
+#define MSG_LIV_BARCODES_BITS       8U
+#define MSG_LIV_DATA_BITS           110U
+#define MSG_LIV_BYTES               14U
+
+/* Barcode command, as S3 reports it (s3_cmd_t, copied with no remap). */
+#define MSG_BC_CMD_NONE             0U      /* Letter not in today's map. */
+#define MSG_BC_CMD_LEFT             1U
+#define MSG_BC_CMD_RIGHT            2U
+#define MSG_BC_CMD_STRAIGHT         3U
+#define MSG_BC_CMD_UTURN            4U
+
+/* Last junction decision (S3_JUNC_xxx, copied with no remap). */
+#define MSG_JUNC_STRAIGHT           0U
+#define MSG_JUNC_LEFT               1U
+#define MSG_JUNC_RIGHT              2U
+#define MSG_JUNC_UTURN              3U
+
+/* Barcode letter field: S3's Code 39 index, 0 to 43; this value means no
+ * letter has been read yet.
+ */
+#define MSG_BC_LETTER_NONE          63U
 
 /* ---------------------------------------------------------------------
  * HEARTBEAT, robot to dashboard, 1 Hz. Section 4.
@@ -199,7 +264,10 @@
  * yet; codes are added here once agreed.
  */
 
-/* Largest message of any type, for buffers that hold any of them. */
+/* Largest message of any type, for buffers that hold any of them. The
+ * LIVE message (14 bytes) is shorter than the telemetry frame, so the
+ * largest stays 25 and MQTT_LINK_PAYLOAD_MAX does not change.
+ */
 #define MSG_MAX_BYTES               MSG_TEL_BYTES
 
 /** One event record, as sent to mbf_event by any task.

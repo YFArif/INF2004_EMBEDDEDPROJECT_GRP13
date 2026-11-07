@@ -36,6 +36,17 @@ typedef struct
     uint8_t                 bytes[MSG_TEL_BYTES];
 } codec_vectors_tel_t;
 
+/** One live vector. */
+typedef struct
+{
+    const char *            p_label;
+    msg_codec_live_t        in;
+    int32_t                 heading_cdeg;   /* Gives in.heading_hdeg. */
+    bool                    b_uses_cdeg;    /* True: heading_cdeg is used.  */
+    msg_codec_live_t        out;
+    uint8_t                 bytes[MSG_LIV_BYTES];
+} codec_vectors_liv_t;
+
 /** One heartbeat vector. */
 typedef struct
 {
@@ -75,6 +86,9 @@ typedef struct
 
 /** @brief Telemetry vectors; *p_count receives how many. */
 const codec_vectors_tel_t * codec_vectors_tel(uint32_t * p_count);
+
+/** @brief Live vectors; *p_count receives how many. */
+const codec_vectors_liv_t * codec_vectors_liv(uint32_t * p_count);
 
 /** @brief Heartbeat vectors; *p_count receives how many. */
 const codec_vectors_hb_t *  codec_vectors_hb(uint32_t * p_count);
