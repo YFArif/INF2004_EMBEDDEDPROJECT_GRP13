@@ -2516,6 +2516,9 @@ FAKE_DIGITS = "1234"            # A login of digits only (A12).
 FAKE_PORT = 1884
 FAKE_PREFIX = "s1u16"
 ALL_STEPS = ["A%d" % number for number in range(1, 15)]
+# Measured between client receipts: allow 0.1 s of jitter below the 3 s limit.
+A8_RED_MIN_S = 2.9
+A8_RED_MAX_S = 3.5
 
 
 def http_call(port, method, path, body=None, headers=None, host=None):
@@ -2868,8 +2871,8 @@ def check_a8(ctx):
     post_json(ctx, "/api/sim", {"action": "hb_resume"})
     green = ctx.stream.wait_for("link", lambda d: d["light"] == "green",
                                 3.0, red[0] if red else since)
-    ok = ((delay is not None) and (3.0 <= delay <= 3.5) and b_controls
-          and b_stop and (green is not None))
+    ok = ((delay is not None) and (A8_RED_MIN_S <= delay <= A8_RED_MAX_S)
+          and b_controls and b_stop and (green is not None))
     return ok, ("light red %s s after the last heartbeat; START and RESET "
                 "disabled, STOP enabled: %s; STOP published while red: %s; "
                 "green after the resume: %s"
