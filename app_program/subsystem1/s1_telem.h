@@ -6,13 +6,14 @@
  *
  * @brief The part of telemetry_task that needs no kernel: a received
  *        command turned into its ack, the heartbeat packed, the schedules,
- *        the rules for keeping room in the publish queue, and the telemetry
- *        and live messages filled in.
+ *        the rules for keeping room in the publish queue, the telemetry and
+ *        live messages filled in, and the WiFi fault rule.
  *
  * @par Why it is separate
  * telemetry_task.c makes every kernel and driver call. This module only
  * works on the values it is given, so the host test S1-U14 can build and
- * run it with a stub in place of subsystem5_command_post().
+ * run it with stubs in place of subsystem5_command_post(),
+ * subsystem5_fault_set() and subsystem5_fault_clear().
  *
  * @par What an ack means (Stage 4a)
  * Result MSG_ACK_ACCEPTED means the command was queued for S5
@@ -94,6 +95,11 @@
  *  negative kernel error code when it was not.
  */
 typedef int32_t (* s1_telem_post_fn_t)(uint8_t opcode, uint8_t cmd_id);
+
+/** Sets or clears fault bits in S5's flg_fault: subsystem5_fault_set() or
+ *  subsystem5_fault_clear(), passed in so that s1_telem.c builds on the host.
+ */
+typedef void (* s1_telem_fault_function_t)(uint32_t faults);
 
 /** Counters kept by telemetry_task. Each one saturates at UINT32_MAX. */
 typedef struct
@@ -191,6 +197,17 @@ typedef struct
     uint32_t    command_dropped;    /* mqtt_link status command_dropped.  */
 } s1_telem_hb_in_t;
 
+/** What the WiFi fault rule reads on each pass of telemetry_task. */
+typedef struct
+{
+    bool                b_link_up;      /* Radio link is CYW43_LINK_UP.       */
+    bool                b_status_read;  /* mqtt_link_get_status() returned    */
+                                        /* true: the fields below are usable. */
+    bool                b_stale;        /* mqtt_link status b_stale.          */
+    mqtt_link_state_t   state;          /* mqtt_link status state.            */
+    uint32_t            connect_count;  /* mqtt_link status connect_count.    */
+} s1_telem_wifi_status_t;
+
 uint32_t s1_telem_sat_add(uint32_t total, uint32_t amount);
 bool     s1_telem_on_command(const mqtt_link_command_t * p_cmd,
                              s1_telem_post_fn_t p_post,
@@ -204,6 +221,10 @@ bool     s1_telem_hb_should_publish(mqtt_link_state_t state, bool b_stale);
 bool     s1_telem_due(uint32_t now_msec, uint32_t period_msec,
                       uint32_t * p_next_msec);
 bool     s1_telem_queue_allows(uint32_t free_slots, uint32_t max_queued);
+bool     s1_telem_wifi_update(const s1_telem_wifi_status_t * p_status,
+                              s1_telem_fault_function_t p_set,
+                              s1_telem_fault_function_t p_clear,
+                              bool * pb_fault_set);
 void     s1_telem_fill_frame(const s1_telem_src_t * p_src, uint8_t seq,
                              msg_codec_telemetry_t * p_tel);
 void     s1_telem_fill_live(const s1_telem_src_t * p_src, uint8_t seq,

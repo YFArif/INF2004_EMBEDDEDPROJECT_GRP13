@@ -53,6 +53,7 @@ standard already accepts, such as `msg` and `buf`, is not repeated here.
 | obst | Obstacle | `obst`, `telemetry_task.c` |
 | odom | Odometry | `subsystem2_odom_t`, `telemetry_task.c` |
 | ok | Okay, no error | `b_ok`, `msg_codec.c` |
+| pb | Pointer to Boolean, `p_` plus `b_` | `pb_fault_set`, `s1_telem.c` |
 | pos | Bit position | `MSG_LIV_SEQ_POS`, `msg_layout.h` |
 | pub | Publish | `s1_telem_pub_t`, `telemetry_task.c` |
 | qos | MQTT quality of service | `MQTT_LINK_QOS_0`, `telemetry_task.c` |

@@ -31,7 +31,10 @@
  * - the publish queue rules (telemetry and live with at most 1 record
  *   queued, the heartbeat with at most 3) and tel_drop in the heartbeat;
  * - the three schedules, started with their offsets, never have two
- *   messages due in the same millisecond.
+ *   messages due in the same millisecond;
+ * - the WiFi fault rule, with stubs in place of subsystem5_fault_set() and
+ *   subsystem5_fault_clear(): armed by the first connection, set by a radio
+ *   or session loss, cleared only when both are good, one call per change.
  *
  * @par How
  * Expected bytes are written out by hand from the document's tables,
@@ -93,6 +96,35 @@ typedef struct
     bool        b_hb_allowed;
 } queue_case_t;
 
+/** One input on which the link counts as lost, once the rule is armed. */
+typedef struct
+{
+    const char *        p_name;
+    bool                b_link_up;
+    mqtt_link_state_t   state;
+    bool                b_stale;
+} wifi_lost_case_t;
+
+/** One pass of a replayed drop: the input, then the stubs' running totals
+ *  and the level it must leave.
+ */
+typedef struct
+{
+    bool                b_link_up;
+    mqtt_link_state_t   state;
+    bool                b_stale;
+    uint32_t            connect_count;
+    uint32_t            set_calls;
+    uint32_t            clear_calls;
+    bool                b_fault_set;
+} wifi_replay_t;
+
+/* S5_FAULT_WIFI, written out by hand from docs/S1_binary_frame.md 3.1. */
+#define FAULT_BIT_WIFI          0x10U
+
+/* Any connect count above 0 arms the WiFi fault rule. */
+#define WIFI_ARMED_COUNT        1U
+
 /* test_period_schedule(): 10 s of 10 ms polls. */
 #define PERIOD_TEST_START_MSEC  1000U
 #define PERIOD_TEST_END_MSEC    11000U
@@ -114,6 +146,53 @@ static uint32_t g_post_calls;
 static uint8_t  g_post_opcode;
 static uint8_t  g_post_cmd_id;
 static int32_t  g_post_return;
+
+/* The fault stubs' call log. */
+static uint32_t g_set_calls;
+static uint32_t g_clear_calls;
+static uint32_t g_set_mask;
+static uint32_t g_clear_mask;
+
+/* Every way the link can count as lost. */
+static const wifi_lost_case_t g_wifi_lost[] =
+{
+    {"wifi: radio down",           false, MQTT_LINK_STATE_CONNECTED,  false},
+    {"wifi: radio down and stale", false, MQTT_LINK_STATE_CONNECTED,  true},
+    {"wifi: radio down, backoff",  false, MQTT_LINK_STATE_BACKOFF,    false},
+    {"wifi: session idle",         true,  MQTT_LINK_STATE_IDLE,       false},
+    {"wifi: session resolving",    true,  MQTT_LINK_STATE_RESOLVING,  false},
+    {"wifi: session connecting",   true,  MQTT_LINK_STATE_CONNECTING, false},
+    {"wifi: session in backoff",   true,  MQTT_LINK_STATE_BACKOFF,    false},
+    {"wifi: connected but stale",  true,  MQTT_LINK_STATE_CONNECTED,  true}
+};
+
+/* A boot, a drop where the session ends first, a drop where the radio goes
+ * first and the session survives, then a broker close: each one set and
+ * clear, in that order, and nothing before the first connection.
+ */
+static const wifi_replay_t g_wifi_replay[] =
+{
+    {false, MQTT_LINK_STATE_IDLE,       false, 0U, 0U, 0U, false},
+    {true,  MQTT_LINK_STATE_CONNECTING, false, 0U, 0U, 0U, false},
+    {true,  MQTT_LINK_STATE_CONNECTED,  false, 1U, 0U, 0U, false},
+    {true,  MQTT_LINK_STATE_BACKOFF,    false, 1U, 1U, 0U, true},
+    {false, MQTT_LINK_STATE_BACKOFF,    false, 1U, 1U, 0U, true},
+    {false, MQTT_LINK_STATE_BACKOFF,    true,  1U, 1U, 0U, true},
+    {true,  MQTT_LINK_STATE_BACKOFF,    false, 1U, 1U, 0U, true},
+    {true,  MQTT_LINK_STATE_CONNECTING, false, 1U, 1U, 0U, true},
+    {true,  MQTT_LINK_STATE_CONNECTED,  false, 2U, 1U, 1U, false},
+    {false, MQTT_LINK_STATE_CONNECTED,  false, 2U, 2U, 1U, true},
+    {false, MQTT_LINK_STATE_CONNECTED,  true,  2U, 2U, 1U, true},
+    {true,  MQTT_LINK_STATE_CONNECTED,  false, 2U, 2U, 2U, false},
+    {true,  MQTT_LINK_STATE_BACKOFF,    false, 2U, 3U, 2U, true},
+    {true,  MQTT_LINK_STATE_CONNECTED,  false, 3U, 3U, 3U, false}
+};
+
+/* sizeof is a small compile-time constant here, so the casts keep the value. */
+#define WIFI_LOST_COUNT     ((uint32_t)(sizeof(g_wifi_lost) \
+                                        / sizeof(g_wifi_lost[0])))
+#define WIFI_REPLAY_COUNT   ((uint32_t)(sizeof(g_wifi_replay) \
+                                        / sizeof(g_wifi_replay[0])))
 
 static void check(bool b_ok, const char * p_what, uint32_t detail);
 static void group_begin(const char * p_name);
@@ -141,6 +220,21 @@ static void test_queue_rules(void);
 static void test_heartbeat_tel_drop(void);
 static void test_schedule_stagger(void);
 static s1_telem_src_t make_src(void);
+static void stub_fault_set(uint32_t faults);
+static void stub_fault_clear(uint32_t faults);
+static void stub_fault_reset(void);
+static s1_telem_wifi_status_t make_wifi_status(bool b_link_up,
+                                               mqtt_link_state_t state,
+                                               bool b_stale,
+                                               uint32_t connect_count);
+static bool wifi_step(const s1_telem_wifi_status_t * p_status,
+                      bool * pb_fault_set);
+static void test_wifi_not_armed(void);
+static void test_wifi_set(void);
+static void test_wifi_clear(void);
+static void test_wifi_held_read(void);
+static void test_wifi_drop_replay(void);
+static void test_wifi_null_arguments(void);
 
 /*!
  * @brief Count one check; print it if it failed.
@@ -591,6 +685,15 @@ main (void)
     test_period_schedule();
     group_end();
 
+    group_begin("wifi fault");
+    test_wifi_not_armed();
+    test_wifi_set();
+    test_wifi_clear();
+    test_wifi_held_read();
+    test_wifi_drop_replay();
+    test_wifi_null_arguments();
+    group_end();
+
     if (0U == g_failures)
     {
         (void)printf("RESULT: all passed (%" PRIu32 " checks)\n", g_checks);
@@ -1012,6 +1115,256 @@ test_schedule_stagger (void)
           "stagger: 2 Hz count in 10 s", n_tel);
     check((STAGGER_TEST_SPAN_MSEC / S1_TELEM_LIVE_PERIOD_MSEC) == n_live,
           "stagger: 5 Hz count in 10 s", n_live);
+}
+
+/*!
+ * @brief Stand-in for subsystem5_fault_set(): records the call.
+ *
+ * @param[in] faults The fault bits passed.
+ */
+static void
+stub_fault_set (uint32_t faults)
+{
+    g_set_calls++;
+    g_set_mask = faults;
+}
+
+/*!
+ * @brief Stand-in for subsystem5_fault_clear(): records the call.
+ *
+ * @param[in] faults The fault bits passed.
+ */
+static void
+stub_fault_clear (uint32_t faults)
+{
+    g_clear_calls++;
+    g_clear_mask = faults;
+}
+
+/*!
+ * @brief Forget the fault stubs' calls.
+ */
+static void
+stub_fault_reset (void)
+{
+    g_set_calls   = 0U;
+    g_clear_calls = 0U;
+    g_set_mask    = 0U;
+    g_clear_mask  = 0U;
+}
+
+/*!
+ * @brief Build one input for the WiFi fault rule, with a consistent read.
+ *
+ * @param[in] b_link_up     The radio link is up.
+ * @param[in] state         The driver state.
+ * @param[in] b_stale       The driver status is stale.
+ * @param[in] connect_count Sessions established so far.
+ *
+ * @return The input.
+ */
+static s1_telem_wifi_status_t
+make_wifi_status (bool b_link_up, mqtt_link_state_t state, bool b_stale,
+                  uint32_t connect_count)
+{
+    const s1_telem_wifi_status_t wifi_status = {b_link_up, true, b_stale, state,
+                                                connect_count};
+
+    return (wifi_status);
+}
+
+/*!
+ * @brief Run the WiFi fault rule once with the stubs.
+ *
+ * @param[in]     p_status     The input.
+ * @param[in,out] pb_fault_set The level.
+ *
+ * @return What s1_telem_wifi_update() returned.
+ */
+static bool
+wifi_step (const s1_telem_wifi_status_t * p_status, bool * pb_fault_set)
+{
+    return (s1_telem_wifi_update(p_status, stub_fault_set, stub_fault_clear,
+                                 pb_fault_set));
+}
+
+/*!
+ * @brief Before the first connection, no input changes the bit.
+ */
+static void
+test_wifi_not_armed (void)
+{
+    uint32_t idx = 0U;
+    bool     b_fault_set = false;
+
+    stub_fault_reset();
+
+    for (idx = 0U; idx < WIFI_LOST_COUNT; idx++)
+    {
+        const s1_telem_wifi_status_t lost =
+            make_wifi_status(g_wifi_lost[idx].b_link_up,
+                             g_wifi_lost[idx].state,
+                             g_wifi_lost[idx].b_stale, 0U);
+
+        check(!wifi_step(&lost, &b_fault_set), g_wifi_lost[idx].p_name, idx);
+    }
+
+    check((0U == g_set_calls) && (0U == g_clear_calls),
+          "wifi: not armed, no calls", g_set_calls + g_clear_calls);
+    check(!b_fault_set, "wifi: not armed, level stays clear", 0U);
+}
+
+/*!
+ * @brief Once armed, each way of losing the link sets the bit exactly once.
+ */
+static void
+test_wifi_set (void)
+{
+    const s1_telem_wifi_status_t good =
+        make_wifi_status(true, MQTT_LINK_STATE_CONNECTED, false,
+                         WIFI_ARMED_COUNT);
+    uint32_t idx = 0U;
+    bool     b_fault_set = false;
+    bool     b_changed = false;
+
+    stub_fault_reset();
+    check(!wifi_step(&good, &b_fault_set), "wifi: first connection, no change",
+          0U);
+    check((0U == g_set_calls) && (0U == g_clear_calls) && (!b_fault_set),
+          "wifi: first connection, no calls", g_set_calls + g_clear_calls);
+
+    for (idx = 0U; idx < WIFI_LOST_COUNT; idx++)
+    {
+        const s1_telem_wifi_status_t lost =
+            make_wifi_status(g_wifi_lost[idx].b_link_up,
+                             g_wifi_lost[idx].state,
+                             g_wifi_lost[idx].b_stale, WIFI_ARMED_COUNT);
+
+        stub_fault_reset();
+        b_fault_set = false;
+        b_changed   = wifi_step(&lost, &b_fault_set);
+        check(b_changed && (1U == g_set_calls) && (0U == g_clear_calls)
+              && (FAULT_BIT_WIFI == g_set_mask) && b_fault_set,
+              g_wifi_lost[idx].p_name, g_set_calls);
+
+        b_changed = wifi_step(&lost, &b_fault_set);
+        check((!b_changed) && (1U == g_set_calls) && (0U == g_clear_calls),
+              "wifi: same input again, no second call", idx);
+    }
+}
+
+/*!
+ * @brief The bit clears only when the radio and the session are both good.
+ */
+static void
+test_wifi_clear (void)
+{
+    const s1_telem_wifi_status_t good =
+        make_wifi_status(true, MQTT_LINK_STATE_CONNECTED, false,
+                         WIFI_ARMED_COUNT);
+    uint32_t idx = 0U;
+    bool     b_fault_set = true;
+    bool     b_changed = false;
+
+    stub_fault_reset();
+
+    for (idx = 0U; idx < WIFI_LOST_COUNT; idx++)
+    {
+        const s1_telem_wifi_status_t lost =
+            make_wifi_status(g_wifi_lost[idx].b_link_up,
+                             g_wifi_lost[idx].state,
+                             g_wifi_lost[idx].b_stale, WIFI_ARMED_COUNT);
+
+        check((!wifi_step(&lost, &b_fault_set)) && b_fault_set,
+              g_wifi_lost[idx].p_name, idx);
+    }
+
+    check((0U == g_set_calls) && (0U == g_clear_calls),
+          "wifi: still lost, no calls", g_set_calls + g_clear_calls);
+
+    b_changed = wifi_step(&good, &b_fault_set);
+    check(b_changed && (0U == g_set_calls) && (1U == g_clear_calls)
+          && (FAULT_BIT_WIFI == g_clear_mask) && (!b_fault_set),
+          "wifi: both good, one clear", g_clear_calls);
+
+    b_changed = wifi_step(&good, &b_fault_set);
+    check((!b_changed) && (0U == g_set_calls) && (1U == g_clear_calls),
+          "wifi: still good, no second call", g_clear_calls);
+}
+
+/*!
+ * @brief An inconsistent status read holds the level, whichever it is.
+ */
+static void
+test_wifi_held_read (void)
+{
+    s1_telem_wifi_status_t wifi_status =
+        make_wifi_status(false, MQTT_LINK_STATE_CONNECTED, false,
+                         WIFI_ARMED_COUNT);
+    bool                   b_fault_set = false;
+
+    wifi_status.b_status_read = false;
+    stub_fault_reset();
+    check((!wifi_step(&wifi_status, &b_fault_set)) && (!b_fault_set),
+          "wifi: read failed, radio down, level stays clear", 0U);
+
+    wifi_status.b_link_up = true;
+    b_fault_set           = true;
+    check((!wifi_step(&wifi_status, &b_fault_set)) && b_fault_set,
+          "wifi: read failed, all good, level stays set", 0U);
+
+    check((0U == g_set_calls) && (0U == g_clear_calls),
+          "wifi: read failed, no calls", g_set_calls + g_clear_calls);
+}
+
+/*!
+ * @brief Replay whole drops: the running totals are exact after every pass.
+ */
+static void
+test_wifi_drop_replay (void)
+{
+    uint32_t idx = 0U;
+    bool     b_fault_set = false;
+
+    stub_fault_reset();
+
+    for (idx = 0U; idx < WIFI_REPLAY_COUNT; idx++)
+    {
+        const wifi_replay_t * const  p_pass = &g_wifi_replay[idx];
+        const s1_telem_wifi_status_t wifi_status =
+            make_wifi_status(p_pass->b_link_up, p_pass->state, p_pass->b_stale,
+                             p_pass->connect_count);
+
+        (void)wifi_step(&wifi_status, &b_fault_set);
+        check((p_pass->set_calls == g_set_calls)
+              && (p_pass->clear_calls == g_clear_calls)
+              && (p_pass->b_fault_set == b_fault_set),
+              "wifi: replay totals", idx);
+    }
+}
+
+/*!
+ * @brief A NULL argument makes no call and leaves the level alone.
+ */
+static void
+test_wifi_null_arguments (void)
+{
+    const s1_telem_wifi_status_t lost =
+        make_wifi_status(false, MQTT_LINK_STATE_CONNECTED, false,
+                         WIFI_ARMED_COUNT);
+    bool b_fault_set = false;
+
+    stub_fault_reset();
+    check(!s1_telem_wifi_update(NULL, stub_fault_set, stub_fault_clear,
+                                &b_fault_set), "wifi: null status", 0U);
+    check(!s1_telem_wifi_update(&lost, NULL, stub_fault_clear, &b_fault_set),
+          "wifi: null set", 0U);
+    check(!s1_telem_wifi_update(&lost, stub_fault_set, NULL, &b_fault_set),
+          "wifi: null clear", 0U);
+    check(!s1_telem_wifi_update(&lost, stub_fault_set, stub_fault_clear, NULL),
+          "wifi: null level", 0U);
+    check((0U == g_set_calls) && (0U == g_clear_calls) && (!b_fault_set),
+          "wifi: null arguments, no calls", g_set_calls + g_clear_calls);
 }
 
 /*** end of file ***/

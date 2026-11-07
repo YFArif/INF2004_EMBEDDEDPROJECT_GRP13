@@ -23,7 +23,7 @@ SDK's copy, `STABLE-2_2_1_RELEASE`.
 | Message codec (`msg_codec`) | Built, host-tested and timed on the Pico | `app_program/subsystem1/`; TEST_LOG S1-U05, S1-U08 |
 | Dashboard decoder (`s1_decode.py`) | Built and host-tested | `app_program/subsystem1/dashboard/`; TEST_LOG S1-U11, S1-U12 |
 | Stage 3: the radio service task calls `mqtt_link_poll()` | Adapter written: `mqtt_utk_start()` calls `mqtt_link_poll(netif_default)`. Instructor approval 27 Oct 2026; team agreement in person 29 Oct 2026. On the robot: S1-U13 PASS at `9a01717`, 31 Oct 2026 | `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c`; TEAM.md section 3 ("WiFi and MQTT are special"); TEST_LOG S1-U13 |
-| `telemetry_task`, Stage 4a: START, STOP and RESET forwarded to S5 with an ack, and the 1 Hz heartbeat | Written on the local branch `buddy1-integration` (main plus Stage 3) and host-tested (S1-U14). Not run on the robot yet (S1-U06). The 2 Hz telemetry frame and the 5 Hz live message are written in the same task (7 Nov 2026) and host-tested (S1-U05, S1-U11, S1-U14, S1-U16 part A), not run on the robot yet; each goes only under the queue rule of section 1.1. Events and the WiFi fault bit are Stage 4b | `app_program/subsystem1/telemetry_task.c`, `s1_telem.c`; section 1.1; TEST_LOG S1-U14, S1-U06 |
+| `telemetry_task`, Stage 4a: START, STOP and RESET forwarded to S5 with an ack, and the 1 Hz heartbeat | Written on the local branch `buddy1-integration` (main plus Stage 3) and host-tested (S1-U14). Not run on the robot yet (S1-U06). The 2 Hz telemetry frame and the 5 Hz live message are written in the same task (7 Nov 2026) and host-tested (S1-U05, S1-U11, S1-U14, S1-U16 part A), not run on the robot yet; each goes only under the queue rule of section 1.1. Fault bit 4 is written (8 Nov 2026, section 1.1) and host-tested (S1-U14), not run on the robot yet. Events are Stage 4b | `app_program/subsystem1/telemetry_task.c`, `s1_telem.c`; section 1.1; TEST_LOG S1-U14, S1-U06 |
 | Laptop dashboard (`s1_dashboard.py`) | Written on `buddy1-integration`: START, STOP and RESET with each ack matched by cmd_id, the online light and heartbeat, the retained-command banner, and `--simulate` (a fake car). Test S1-U16: part A automated in simulate mode, part B on the robot after S1-U06 | `testing/subsystem1/s1_dashboard.py`; [S1_dashboard.md](S1_dashboard.md); TEST_LOG S1-U16 |
 
 Stage 3 replaced the template's demo client in `mqtt_utk.c` (a text
@@ -87,6 +87,21 @@ adds nothing to a STOP's round trip (NFR15).
   Never publish a command with retain: lwIP does not report the retain
   flag, so the robot would run a retained command again after every
   reconnect.
+- **Fault bit 4 (dashboard link lost).** Each pass reads the radio link
+  (`s1_radio_link_read()`, through `cyw43_utk_get_status()`) and the driver
+  status. `s1_telem_wifi_update()` sets `S5_FAULT_WIFI` with
+  `subsystem5_fault_set()` when the radio is not `CYW43_LINK_UP` or the
+  session is down (the heartbeat's test, so a stale status counts as down),
+  and clears it with `subsystem5_fault_clear()` when both are good. It is
+  armed only after the first successful connection and acts only on a
+  change. There is no `EV_FAULT` and no wire change, and S5 does not act on
+  the bit (S1_binary_frame.md section 3.1). Each change prints one line:
+  `S1: wifi fault set link=<L> mqtt=<M> stale=<0|1> mask=0x<hh>`, or the same
+  with `clear`. `link` is the radio link status, `mqtt` the driver state (0
+  IDLE, 1 RESOLVING, 2 CONNECTING, 3 CONNECTED, 4 BACKOFF) and `mask` the flag
+  read back, cut to 5 bits. `tm_printf` masks core 0's interrupts for the
+  whole line, and a core-1 task that prints at that moment waits for it; not
+  measured.
 
 ## 2. Configuration
 
@@ -378,7 +393,7 @@ python3 app_program/subsystem1/dashboard/s1_decode.py [--describe] [--session]
 - `--session` keeps state across lines: lost frames from `seq`, and full
   encoder counts rebuilt from the 16 bits sent (`Session`, `unwrap16()`).
 
-Offline check with the 18 golden vectors:
+Offline check with the 21 golden vectors:
 
 ```
 python3 testing/subsystem1/golden.py docs/S1_binary_frame.md \
@@ -479,9 +494,10 @@ STOP round trip under 300 ms) and of the NFR14 test.
 - S1-U13 done (31 Oct 2026): sections 1, 9 and 12 carry its results.
 - Stage 4a written (1 Nov 2026): sections 1, 1.1, 8 and 13. S1-U06 adds
   the measured heartbeat rate and STOP round trip.
-- With Stage 4b (events, the WiFi fault bit, S5's verdict in the ack): the
-  planned values in sections 5 and 8 become code, and the measured rates
-  are added.
+- Fault bit 4 written (8 Nov 2026): sections 1 and 1.1. S1-U06 checks it on
+  the robot.
+- With Stage 4b (events, S5's verdict in the ack): the planned values in
+  sections 5 and 8 become code, and the measured rates are added.
 - After the car measurements: decide whether a QoS 0 publish should count
   as finished before its TCP ACK (section 1.1).
 - Sections 2, 3, 4, 7, 11 and 13 stay as they are, unless the layout

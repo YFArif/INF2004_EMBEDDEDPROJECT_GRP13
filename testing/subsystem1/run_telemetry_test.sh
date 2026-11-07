@@ -18,9 +18,9 @@
 #   1  Build s1_telem_test.c, s1_telem.c and msg_codec.c with strict
 #      warnings as errors, UBSan and ASan.
 #   2  Run the test; it must end with "RESULT: all passed".
-#   3  Eighteen mutations, each on a copy of s1_telem in a temporary folder;
+#   3  Twenty-five mutations, each on a copy of s1_telem in a temporary folder;
 #      every one must be caught. One must stop the build at a compile-time
-#      check; seventeen must build and make the test fail. Each mutation
+#      check; twenty-four must build and make the test fail. Each mutation
 #      matches on text, and exactly one line must change, except M17, which
 #      sets both schedule offsets and so changes two.
 #   4  If arm-none-eabi-gcc is on the PATH, compile s1_telem.c for the
@@ -223,9 +223,30 @@ mutate M17 run s1_telem.h \
     's/\(#define S1_TELEM_TEL_OFFSET_MSEC  *\)250U/\10U/
 s/\(#define S1_TELEM_LIVE_OFFSET_MSEC  *\)100U/\10U/' \
     "both schedule offsets 0" 2
+mutate M18 run s1_telem.c \
+    's/(0U != p_status->connect_count))/(true))/' \
+    "WiFi fault armed before the first connection"
+mutate M19 run s1_telem.c \
+    's/|| (!s1_telem_hb_should_publish(p_status->state,/\&\& (!s1_telem_hb_should_publish(p_status->state,/' \
+    "WiFi fault needs the radio and the session both down"
+mutate M20 run s1_telem.c \
+    's/b_fault_wanted ? p_set : p_clear;/b_fault_wanted ? p_clear : p_set;/' \
+    "WiFi fault set and clear swapped"
+mutate M21 run s1_telem.c \
+    's/if (b_fault_wanted != \*pb_fault_set)/if (true)/' \
+    "WiFi fault acted on every pass, not on a change"
+mutate M22 run s1_telem.c \
+    's/p_status->b_stale));/false));/' \
+    "WiFi fault ignores a stale driver status"
+mutate M23 run s1_telem.c \
+    's/(p_status->b_status_read)/(true)/' \
+    "WiFi fault acts on an inconsistent status read"
+mutate M24 run s1_telem.c \
+    's/p_change(MSG_FAULT_WIFI);/p_change(MSG_FAULT_IMU);/' \
+    "WiFi fault changes the IMU bit"
 
-echo "stage 3: $CAUGHT/18 mutations caught"
-if [ "$CAUGHT" -ne 18 ] || [ "$MISSED" -ne 0 ]
+echo "stage 3: $CAUGHT/25 mutations caught"
+if [ "$CAUGHT" -ne 25 ] || [ "$MISSED" -ne 0 ]
 then
     fail "3: mutations"
 fi
@@ -257,6 +278,6 @@ else
     echo "stage 4 skipped (arm-none-eabi-gcc is not on the PATH)"
 fi
 
-echo "S1-U14: PASS ($CHECKS checks, $CAUGHT/18 mutations caught," \
+echo "S1-U14: PASS ($CHECKS checks, $CAUGHT/25 mutations caught," \
      "target compile $STAGE4)"
 exit 0
