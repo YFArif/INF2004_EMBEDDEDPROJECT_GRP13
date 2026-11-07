@@ -9,6 +9,13 @@ Version history:
 - Draft 3, 19 Oct 2026: first agreed layout. It is the basis for
   `msg_layout.h`, `msg_codec.h` and `msg_codec.c` in
   `app_program/subsystem1/`.
+- Draft 3a, 7 Nov 2026: adds message type 6, LIVE (section 3A), for the
+  fast S2 and S3 values the dashboard needs. No existing position or
+  width changes, so the layout version stays 1: a version 1 decoder that
+  knows only types 1 to 5 rejects type 6 as an unknown type, and every
+  existing vector is unchanged. Two meanings are clarified (section 3,
+  rows 6 and 7): `bc_letter` is S3's Code 39 index with 63 for none, and
+  `bc_cmd` is not filled (LIVE carries the barcode command).
 
 This document answers the Tribunal 1 change requirement "Minimum-Bit
 Data Representation" for the MQTT messages S1 sends and receives. It is
@@ -67,7 +74,7 @@ Rulings applied (19 Oct 2026, after Tribunal 1):
 | Field | Range | Bits | Bit offset | Status | Notes |
 |---|---|---|---|---|---|
 | version | 0 to 15 | 4 | 0 | from Version B | Layout version. The first agreed layout is 1. 0 is never valid. |
-| msg_type | 0 to 15 | 4 | 4 | guess | 1 TELEMETRY, 2 HEARTBEAT, 3 EVENT, 4 COMMAND, 5 ACK. 0 and 6 to 15 reserved. |
+| msg_type | 0 to 15 | 4 | 4 | guess | 1 TELEMETRY, 2 HEARTBEAT, 3 EVENT, 4 COMMAND, 5 ACK, 6 LIVE. 0 and 7 to 15 reserved. |
 
 Version B asked for "a version byte in each message". Sharing the byte
 with the type keeps the 2-byte command at 2 bytes.
@@ -87,11 +94,11 @@ one-to-one copy of it.
 | 0 | version, msg_type | S1 | see 2.1 | 8 | 0 | see 2.1 | msg_type = 1 |
 | 1 | seq | S1 | 0 to 255, modulo | 8 | 8 | guess | +1 per frame. The dashboard counts gaps as lost frames. |
 | 2 | ctrl_state | S5 | 0 to 10 used, 0 to 15 | 4 | 16 | from Version B | 11 flat states in the Week 6 statechart: INIT, CALIBRATING, READY, LINE_FOLLOWING, APPROACH_JUNCTION, EXECUTING_COMMAND, REACQUIRE_LINE, LINE_RECOVERY, OBSTACLE_AVOIDANCE, FAULT, FINISHED. Numbering from B5. |
-| 3 | motion_state | S2 | 0 to 5 used, 0 to 7 | 3 | 20 | from Version B | "3 bits, 6 states". The 6 states are not in code yet (`MC_TYPE` has 5 command types, not states). |
+| 3 | motion_state | S2 | 0 to 4 used, 0 to 7 | 3 | 20 | from code | `subsystem2_status_t.state`: 0 IDLE, 1 FOLLOWING, 2 MOVING, 3 TURNING, 4 ESTOP. Version B asked for 3 bits for 6 states; S2's code has 5. |
 | 4 | fault_mask | all | 5 flag bits | 5 | 23 | from Version B | `flg_fault & 0x1F` (`tk_ref_flg`), copied with no remap: integer bit n is fault n, at offset 27 - n (3.1). |
-| 5 | line_state | S3 | 0 to 7 | 3 | 28 | from Version B | Values from B3 (TRACKING, JUNCTION, LOST, SEARCHING, SENSOR_FAULT ... in Week 6). |
-| 6 | bc_letter | S3 | 0 = none, 1 to 43 = Code 39 symbol | 6 | 31 | from Version B | Last decoded barcode. Symbol order from B3. |
-| 7 | bc_cmd | S3 | 0 to 3 | 2 | 37 | from Version B | Barcode command. Meaning of each value from B3. |
+| 5 | line_state | S3 | 0 to 5 used, 0 to 7 | 3 | 28 | from code | `s3_line_state_t`: 0 FOLLOW, 1 JUNCTION, 2 LOST, 3 DISABLED, 4 SEARCH, 5 UNCAL. Also sent as 5 when S3 cannot be read (3.4). |
+| 6 | bc_letter | S3 | 0 to 43 = Code 39 index (`s3_nav_msg_char()`: 0 to 9 are '0' to '9', 10 to 35 are 'A' to 'Z', then - . space * $ / + %); 63 = none yet | 6 | 31 | from code | Last decoded barcode, S3's own index with no remap (`last_ch`). Draft 3 said "0 = none, 1 to 43"; S3's code uses 63 for none, and nothing sent the old numbering, so the field follows S3. |
+| 7 | bc_cmd | S3 | 0 to 3 | 2 | 37 | from Version B | Not filled (always 0). S3's command has five values (NONE, LEFT, RIGHT, STRAIGHT, U-TURN), which need 3 bits; the barcode command is carried by LIVE (section 3A). The field stays so the frame does not move. |
 | 8 | bc_dir | S3 | 0 or 1 | 1 | 39 | from Version B | `dir_reversed` of NAV_MSG. |
 | 9 | speed_l_mms | S2 | -512 to 511 mm/s -> 0 to 1023 | 10 | 40 | from Version B | `ODOM.speed_l_mms` is `W` (from code). Design max 400 mm/s. Signedness unconfirmed. |
 | 10 | speed_r_mms | S2 | -512 to 511 mm/s -> 0 to 1023 | 10 | 50 | from Version B | `ODOM.speed_r_mms`, as above. Robot speed = mean of the two, done by the decoder. |
@@ -127,9 +134,9 @@ wire (offset 23) and integer bit 0 is the last (offset 27).
 | `flg_fault` bit n | Value | Fault | Wire offset | Owner sets | Who clears | Kind | Status |
 |---|---|---|---|---|---|---|---|
 | 0 | 0x01 | motor stall | 27 | S2 | vehicle_ctrl_task only | latched | from Version B |
-| 1 | 0x02 | encoder fault | 26 | TBD | TBD | TBD | reserved (TBD) |
+| 1 | 0x02 | encoder fault | 26 | S2 (reserved, not set yet) | vehicle_ctrl_task only | latched | from code (`S5_FAULT_ENCODER`, `FAULTS_LATCHED`) |
 | 2 | 0x04 | IMU fault | 25 | S4 | vehicle_ctrl_task only | latched | from Version B |
-| 3 | 0x08 | no echo | 24 | TBD | TBD | TBD | reserved (TBD). Week 6 says "not a fault"; the requirement lists it. |
+| 3 | 0x08 | no echo | 24 | S5 | vehicle_ctrl_task only | latched | from code (`S5_FAULT_NO_ECHO`, `FAULTS_LATCHED`). Week 6 said "not a fault"; S5's code sets it when the ultrasonic fails. |
 | 4 | 0x10 | WiFi loss | 23 | S1 | S1 | level | from Version B |
 
 The numbering is the 19 Oct ruling. Version B gives Buddy 5 the
@@ -209,6 +216,120 @@ Test cases (S1-U05). "stored" is the 7-bit field value.
 | `INT32_MAX` (2147483647) | +80 (input limited to 4000) | +63 | 127 | +31.5 | largest input, no overflow |
 | `INT32_MIN` (-2147483648) | -80 (input limited to -4000) | -64 | 0 | -32.0 | abs() would overflow without the limit |
 
+### 3.4 How telemetry_task fills the frame
+
+`telemetry_task` reads each subsystem through its own getter (S2 status,
+odometry and E-stop; S3 line status; S4 terrain and the IMU flags; S5
+controller state, fault bits, last ping and last profile), copies the
+values into one plain struct (`s1_telem_src_t`), and
+`s1_telem_fill_frame()` (this section) and `s1_telem_fill_live()` (3A) turn
+that struct into the codec's fields. Those two functions need no kernel, so
+S1-U14 tests them on the host. The rules:
+
+| Field | Rule |
+|---|---|
+| ctrl_state, motion_state, hump_state, hump_count, peak, turn rate, flags | Copied; the codec clamps to the field |
+| fault_mask | S5's `flg_fault` masked with 0x1F; bits copied as S5 sets them (3.1) |
+| line_state, bc_letter, bc_dir | From S3. If S3 cannot be read: line_state 5 (UNCAL), bc_letter 63 (none), bc_dir 0 |
+| bc_cmd | Always 0 in this message; the barcode command is in LIVE |
+| motion_class | S4's class, but 6 (IMPACT) for as long as the impact is latched (it stays latched until the E-stop clears) |
+| closest_mm, angle_idx | Last ping's range if the ping had an echo, else 0; angle_idx = servo degrees x 2 / 15 (7.5 degree steps, 0 to 24; the servo angle is limited to 0 to 180 first) |
+| width, clear_l, clear_r | Last profile if a scan has been done, else 0 |
+
+The S2, S3, S4 and S5 getters take their owner's mutex with a wait forever
+(the owners wrote them for telemetry), so `telemetry_task` calls them from
+its own task, never from an interrupt. The owners hold these mutexes only
+for a struct copy, so `telemetry_task` itself rarely waits long, and a long
+hold would delay a frame, not corrupt it. The task copies the values out
+and publishes only through the `mqtt_link_publish` queue, so the MQTT
+driver is still called from the WiFi service task alone.
+
+**Known risk, not worked around.** The wait can also go the other way. If
+`cyw43_utk_task` (priority 4, core 0) preempts `telemetry_task` (priority
+14, core 0) while it holds one of these mutexes, a core-1 task that wants
+that mutex (`motion_task` 9, `task_line` 8, `vehicle_ctrl_task` 7) waits
+until `telemetry_task` runs again. Priority inheritance lifts
+`telemetry_task` only to the waiter's priority, still below 4, so the
+core-1 task waits out the WiFi task's busy period: 8.3 ms worst case was
+measured on core 0 in S1-U08, and from the code it could reach the cyw43
+ioctl timeout (0.5 s) during a WiFi fault. The window is a few microseconds,
+about 7 times a second, so this is rare, but it is against NFR9's "loss of
+WiFi shall not delay any core-1 control task". It has not been measured on
+the robot.
+
+`telemetry_task` keeps three absolute schedules: the heartbeat (1 Hz), the
+frame (2 Hz) and the live message (5 Hz). They start apart. The first
+heartbeat is due when the task starts, the first live message 100 ms later
+(`S1_TELEM_LIVE_OFFSET_MSEC`) and the first frame 250 ms later
+(`S1_TELEM_TEL_OFFSET_MSEC`), so no two of them ever share a deadline. With
+no offsets, all three fall due in the same pass every 1000 ms. S1-U14 checks
+this at 1 ms steps; docs/MQTT.md section 8 says what it means for the task's
+50 ms pass.
+
+A periodic message joins the publish queue only if the queue is short
+enough (`s1_telem_queue_allows()`, docs/MQTT.md section 1.1). One that does
+not is counted in `tel_drop` and uses no `seq` number, so it shows no gap.
+
+## 3A. LIVE (robot to dashboard, 5 Hz)
+
+Published by the MQTT code inside `cyw43_utk_task`, from a message that
+`telemetry_task` builds every 200 ms, on the same topic as telemetry
+(`<prefix>/telemetry`; the dashboard tells the types apart by the low
+nibble of byte 0). It carries the values that change fast or that the
+S2 and S3 owners asked to see live: the S2 motion state and commanded
+speed, the heading, the E-stop latch, and the S3 line state, steering,
+line sensor readings and counters. The 25-byte telemetry frame keeps its
+2 Hz rate and its layout; the measured wheel speeds, distance, encoder
+counts and the S4 and S5 fields stay there.
+
+The S3 owner asked for the barcode, junction and line-lost events as a
+timeline. LIVE carries S3's own wrapping counters (`barcodes`,
+`junctions`, `losts`, `rejects`), so the dashboard logs an entry when a
+counter changes, with the values (`bc_letter`, `bc_cmd`, `junc_turn`)
+that S3 holds for the last one. At 5 Hz two barcodes closer than 200 ms
+would merge into one entry; the counter difference shows that it
+happened.
+
+| Field | Range | Bits | Bit offset | Status | Notes |
+|---|---|---|---|---|---|
+| version, msg_type | see 2.1 | 8 | 0 | see 2.1 | msg_type = 6 |
+| seq | 0 to 255, modulo | 8 | 8 | guess | Own counter, separate from telemetry. The dashboard counts gaps as lost messages. A message the queue rule skipped uses no number (3.4). |
+| motion_state | 0 to 4 used, 0 to 7 | 3 | 16 | from code | `subsystem2_status_t.state`: 0 IDLE, 1 FOLLOWING, 2 MOVING, 3 TURNING, 4 ESTOP. |
+| estop | 0 or 1 | 1 | 19 | from code | `subsystem2_estop_is_set()`. |
+| cmd_speed_mms | -512 to 511 mm/s -> 0 to 1023 | 10 | 20 | from code | Commanded robot speed: the mean of `target_l_mms` and `target_r_mms` in `subsystem2_status_t`, clamped. The measured speeds are in telemetry. |
+| heading | -360 to 360 half-degrees -> 0 to 1023 | 10 | 30 | from code | `subsystem2_odom_t.heading_cdeg` (-17999 to 18000, + = left of the power-up heading) converted by 3A.1. |
+| line_state | 0 to 5 used, 0 to 7 | 3 | 40 | from code | `s3_line_state_t`: 0 FOLLOW, 1 JUNCTION, 2 LOST, 3 DISABLED, 4 SEARCH, 5 UNCAL. |
+| steer_dv | -512 to 511 mm/s -> 0 to 1023 | 10 | 43 | from code | `s3_line_status_t.steer_dv` (-511 to 511, + = turn right). |
+| n_outer | 0 to 255 | 8 | 53 | from code | Left IR reading, 0 white to 255 black. |
+| n_centre | 0 to 255 | 8 | 61 | from code | Centre IR reading, 0 white to 255 black. |
+| overshoot | 0 or 1 | 1 | 69 | from code | The OUTER rule is on (outer sensor not white). |
+| bc_letter | 0 to 43 = Code 39 index, 63 = none yet | 6 | 70 | from code | `last_ch`, as telemetry row 6. |
+| bc_cmd | 0 to 4 used, 0 to 7 | 3 | 76 | from code | `last_cmd` (`s3_cmd_t`): 0 NONE (letter not in today's map), 1 LEFT, 2 RIGHT, 3 STRAIGHT, 4 U-TURN. Copied with no remap. |
+| bc_rev | 0 or 1 | 1 | 79 | from code | `last_rev`: the barcode was read backwards. |
+| junc_turn | 0 to 3 | 2 | 80 | from code | What the car did at the last junction: 0 straight, 1 left, 2 right, 3 U-turn. |
+| rejects | 0 to 15, modulo | 4 | 82 | from code | Rejected barcode passes; the dashboard uses differences. |
+| junctions | 0 to 255, modulo | 8 | 86 | from code | Junction count. |
+| losts | 0 to 255, modulo | 8 | 94 | from code | Line-lost count. |
+| barcodes | 0 to 255, modulo | 8 | 102 | from code | Accepted barcode count. |
+| padding | 0 | 2 | 110 | - | |
+
+**Total: 110 data bits + 2 padding bits = 112 bits = 14 bytes.**
+
+A value that is not available yet (no letter read) is sent as 0, except
+`bc_letter`, which is 63. When S3 cannot be read, `line_state` is 5
+(UNCAL), `bc_letter` is 63 and every other S3 field is 0; the dashboard
+shows what it receives, so an UNCAL line state means "S3 not ready", not
+"line lost".
+
+### 3A.1 Heading rounding
+
+Input: `heading_cdeg`, signed centidegrees, -17999 to 18000. Output:
+signed half-degrees, then stored as `hdeg + 512` in 10 bits. As 3.3
+step 1, with a limit of 18000: limit the input to -18000 ... +18000
+while still signed, work on the magnitude, `hdeg = (mag + 25) / 50`,
+negate if the input was negative. The result is -360 to 360, so no clamp
+can trigger; the 10-bit field would clamp at -512 and 511 anyway.
+
 ## 4. HEARTBEAT (robot to dashboard, 1 Hz)
 
 | Field | Range | Bits | Bit offset | Status | Notes |
@@ -218,7 +339,7 @@ Test cases (S1-U05). "stored" is the 7-bit field value.
 | uptime_s | 0 to 65535 s, saturates | 16 | 16 | guess | About 18 h. |
 | rssi_neg | 0 to 127 = -RSSI in dBm, clamped | 7 | 32 | guess | A15: must be read inside the service task. |
 | connect_count | 0 to 255, saturates | 8 | 39 | guess | `mqtt_link` status `connect_count`. |
-| tel_drop | 0 to 255, saturates | 8 | 47 | guess | Telemetry frames dropped on a full buffer. |
+| tel_drop | 0 to 255, saturates | 8 | 47 | from code | Telemetry, live and heartbeat messages the robot did not send: skipped because the publish queue was too full (3.4), or refused by the driver. Since power-up. |
 | evt_drop | 0 to 255, saturates | 8 | 55 | guess | Events dropped on a full `mbf_event`. |
 | cmd_reject | 0 to 255, saturates | 8 | 63 | guess | Codec rejections, post failures and the driver's `command_dropped` (section 5.1). |
 | padding | 0 | 1 | 71 | - | |
@@ -572,6 +693,7 @@ ID, `df58a14`), and so is the codec's flash (S1-U08 build, `3814f93`);
 | Event, on the wire | up to 64 B | 7 B | -57 B |
 | Event, `mbf_event` record | up to 64 B | 3 B | -61 B |
 | Heartbeat payload | not defined | 9 B | - |
+| Live payload (5 Hz) | not defined | 14 B | - |
 | Ack payload | not defined | 3 B | - |
 
 Example on the wire, topic `robot/telemetry` (15 characters; the suffix
@@ -760,6 +882,9 @@ before the modulo, pitch and roll as both cdeg (input) and hdeg (sent).
 | TEL-F3 | TEL-2 with only fault_mask 0x08 set (flg_fault bit 3, no echo; wire offset 24) | `11 00 00 80 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00` |
 | TEL-F4 | TEL-2 with only fault_mask 0x10 set (flg_fault bit 4, WiFi loss; wire offset 23) | `11 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00` |
 | TEL-INDEP | a second independent calculation from the section 3 table: seq 165, ctrl 9, motion 5, fault 0x01 (stall), line 6, letter 37, bc_cmd 2, bc_dir 1, speed_l -400, speed_r +400, count_l 0x00071234 (sent 0x1234), count_r 0x0009ABCD (sent 0xABCD), dist -1500, pitch +75 cdeg (+2 hdeg), roll -25 cdeg (-1 hdeg), hump_state 2, peak 60, hump_count 3, class 4, turn -90, imu_ok 1, cal_done 0, closest 1500 (clamped to 1023), angle 12, width 250, clear_l 0, clear_r 1023 | `11 A5 9A 1D 2D 1C 39 01 23 4A BC D7 A2 48 4F E3 C3 8D 35 FF B0 FA 00 3F F0` |
+| LIV-1 typical | seq 9, motion 1 (FOLLOWING), estop 0, cmd_speed +300, heading +4575 cdeg (+92 hdeg, rounds up), line_state 1, steer_dv -87, n_outer 12, n_centre 230, overshoot 1, bc_letter 11 ('B'), bc_cmd 2 (RIGHT), bc_rev 1, junc_turn 2, rejects 3, junctions 300 (sent 44), losts 1, barcodes 5 | `16 09 2C B2 5C 2D 48 67 34 B5 8C B0 04 14` |
+| LIV-2 all minimum | every unsigned field 0, flags 0, every signed field at its minimum (cmd_speed -512, heading -512 hdeg, steer_dv -512) | `16 00 00 00 00 00 00 00 00 00 00 00 00 00` |
+| LIV-3 all maximum | every field at its largest stored value (cmd_speed 511, heading 511 hdeg, steer_dv 511, bc_letter 63, bc_cmd 7) | `16 FF FF FF FF FF FF FF FF FF FF FF FF FC` |
 | HB-1 | seq 42, uptime 1234 s, rssi -67 dBm (sent 67), connect 3, tel_drop 1, evt_drop 0, cmd_reject 2 | `12 2A 04 D2 86 06 02 00 04` |
 | EVT-1 | code 0x21, args 0x25 0x30, t_ms 123456 | `13 21 25 30 01 E2 40` |
 | CMD-1 | STOP, id 5 | `14 85` |
@@ -777,6 +902,10 @@ TEL-F0 to TEL-F4 are TEL-2 with one fault bit set, so the only 1 bit
 after the header is that fault's wire offset (3.1): stall (`0x01`) is
 the last of the five bits (offset 27, `10` in byte 3) and WiFi loss
 (`0x10`) the first (offset 23, `01` in byte 2).
+LIV-2 and LIV-3 are the same kind of vector for LIVE: all zeros after
+the header, and all ones except the 2 padding bits. LIV-1 checks the
+heading rounding (3A.1): 4575 cdeg is 91.5 hdeg and rounds away from zero
+to 92.
 TEL-INDEP was not made by `golden.py`: it is a second independent
 calculation from the section 3 table. `golden.py` and the C codec both
 reproduce it byte for byte.

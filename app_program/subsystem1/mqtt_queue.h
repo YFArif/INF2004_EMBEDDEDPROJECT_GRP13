@@ -63,6 +63,25 @@ typedef struct
     uint8_t     payload[MQTT_LINK_PAYLOAD_MAX];
 } mqtt_queue_publish_t;
 
+/* Size of the kernel's per-message length header, and also the unit that
+ * message data is rounded up to. It is sizeof(INT); see HEADERSZ and
+ * ROUNDSZ in kernel/tkernel/messagebuf.h. mqtt_queue.c checks this constant
+ * against the kernel's type at compile time.
+ */
+#define MQTT_QUEUE_MBF_UNIT_BYTES   4U
+
+/* sizeof is a compile-time constant of a few tens of bytes, so converting
+ * it to uint32_t cannot lose any bits.
+ */
+#define MQTT_QUEUE_PUBLISH_RECORD_BYTES ((uint32_t)sizeof(mqtt_queue_publish_t))
+
+/* Space one publish record takes in the message buffer: the length header
+ * plus the record rounded up to a multiple of MQTT_QUEUE_MBF_UNIT_BYTES.
+ */
+#define MQTT_QUEUE_PUBLISH_COST_BYTES   (MQTT_QUEUE_MBF_UNIT_BYTES + \
+    (((MQTT_QUEUE_PUBLISH_RECORD_BYTES + MQTT_QUEUE_MBF_UNIT_BYTES - 1U) \
+      / MQTT_QUEUE_MBF_UNIT_BYTES) * MQTT_QUEUE_MBF_UNIT_BYTES))
+
 /**
  * @brief Create the two message buffers.
  *
@@ -145,6 +164,16 @@ int32_t mqtt_queue_get_command(mqtt_link_command_t * p_command,
  * @return Drops since start-up.
  */
 uint32_t mqtt_queue_full_count(void);
+
+/**
+ * @brief Read how many bytes of the publish channel's buffer are free.
+ *
+ * Safe from any task on either core. It never blocks.
+ *
+ * @return Free bytes. 0 if the channel is not ready or the kernel call
+ *         fails, so a caller that needs room treats either as "no room".
+ */
+uint32_t mqtt_queue_publish_free_bytes(void);
 
 /**
  * @brief Read the kernel's own millisecond clock.

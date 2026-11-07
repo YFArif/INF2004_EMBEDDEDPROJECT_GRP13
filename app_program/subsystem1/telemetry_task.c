@@ -4,16 +4,26 @@
 
 /** @file telemetry_task.c
  *
- * @brief S1's telemetry_task, Stage 4a (see telemetry_task.h): takes each
- *        dashboard command from the MQTT driver, posts it to S5 with
- *        subsystem5_command_post(), publishes its ack on <prefix>/ack, and
- *        publishes the heartbeat once a second while the session is up.
+ * @brief S1's telemetry_task (see telemetry_task.h): takes each dashboard
+ *        command from the MQTT driver, posts it to S5 with
+ *        subsystem5_command_post(), publishes its ack on <prefix>/ack, and,
+ *        while the session is up, publishes the heartbeat once a second,
+ *        the telemetry frame at 2 Hz and the live message at 5 Hz.
  *
  * @par Commands while the session is down
  * The driver's session is clean, so the broker keeps nothing for the car:
  * a command sent while the car is offline is lost and never acked.
  * Commands already received when a session drops are still posted; their
  * acks wait in the publish queue and go out after the reconnect.
+ *
+ * @par Keeping room for the acks
+ * The publish queue is first in, first out and the driver sends one message
+ * at a time, so a periodic message delays any ack queued behind it. Before
+ * each periodic message this task reads how full the queue is
+ * (mqtt_link_publish_free()) and compares it with that message's limit in
+ * s1_telem.h: S1_TELEM_TEL_QUEUED_MAX, S1_TELEM_LIVE_QUEUED_MAX or
+ * S1_TELEM_HB_QUEUED_MAX. A message held back is counted, not retried. Acks
+ * are never held back.
  *
  * @par Kernel and driver calls
  * This file makes them all; the logic that needs none is in s1_telem.c,
@@ -29,6 +39,9 @@
 #include <stdint.h>
 
 #include "../app.h"
+#include "../subsystem2/subsystem2.h"
+#include "../subsystem3/s3_api.h"
+#include "../subsystem3/s3_code39.h"
 #include "../subsystem4/subsystem4.h"
 #include "../subsystem5/subsystem5.h"
 #include "msg_codec.h"
@@ -50,15 +63,41 @@ typedef uint8_t telemetry_task_check_t[((MSG_OP_START == S5_CMD_START)
     && (MSG_OP_STOP == S5_CMD_STOP) && (MSG_OP_RESET == S5_CMD_RESET)
     && (0U == (TELEMETRY_TASK_STACK_BYTES % 8U))) ? 1 : -1];
 
+/* The other subsystems' values are copied to the wire with no remapping,
+ * so the numbers S1 relies on must be theirs: the fault bits (S5), the
+ * barcode commands, junction turns, "no letter" and UNCAL (S3), and the
+ * IMPACT class (S4). A renumbering by an owner stops the build here. The
+ * casts only make each comparison unsigned: every enum constant here is
+ * small and not negative, so it keeps its value.
+ */
+typedef uint8_t telemetry_task_check_map_t[((MSG_FAULT_STALL == S5_FAULT_STALL)
+    && (MSG_FAULT_ENCODER == S5_FAULT_ENCODER)
+    && (MSG_FAULT_IMU == S5_FAULT_IMU)
+    && (MSG_FAULT_NO_ECHO == S5_FAULT_NO_ECHO)
+    && (MSG_FAULT_WIFI == S5_FAULT_WIFI)
+    && (MSG_BC_CMD_NONE == (uint32_t)S3_CMD_NONE)
+    && (MSG_BC_CMD_LEFT == (uint32_t)S3_CMD_LEFT)
+    && (MSG_BC_CMD_RIGHT == (uint32_t)S3_CMD_RIGHT)
+    && (MSG_BC_CMD_STRAIGHT == (uint32_t)S3_CMD_STRAIGHT)
+    && (MSG_BC_CMD_UTURN == (uint32_t)S3_CMD_UTURN)
+    && (MSG_JUNC_STRAIGHT == S3_JUNC_STRAIGHT)
+    && (MSG_JUNC_LEFT == S3_JUNC_LEFT)
+    && (MSG_JUNC_RIGHT == S3_JUNC_RIGHT)
+    && (MSG_JUNC_UTURN == S3_JUNC_UTURN)
+    && (MSG_BC_LETTER_NONE == S3_C39_IDX_NONE)
+    && (S1_TELEM_LINE_UNCAL == (uint32_t)S3_LINE_UNCAL)
+    && (S1_TELEM_CLASS_IMPACT == (uint32_t)S4_CLASS_IMPACT)) ? 1 : -1];
+
 #define STACK_WORDS                 (TELEMETRY_TASK_STACK_BYTES / 8U)
 #define STACK_FILL                  (0xDEADBEEFDEADBEEFULL)
 #define MSEC_PER_SEC                1000U
 
-/* Telemetry frame at 2 Hz. Only the S4 fields are filled for now; the
- * other subsystems' fields are sent as 0 until they are added.
+/* The telemetry frame (2 Hz) and the live message (5 Hz) use the
+ * absolute schedule of s1_telem_due(), like the heartbeat; the periods are
+ * S1_TELEM_TEL_PERIOD_MSEC and S1_TELEM_LIVE_PERIOD_MSEC, and
+ * S1_TELEM_TEL_OFFSET_MSEC and S1_TELEM_LIVE_OFFSET_MSEC keep the deadlines
+ * of all three apart.
  */
-#define TEL_PERIOD_MSEC             500U
-#define TEL_HALF_RANGE_MSEC         0x80000000U
 
 #if S1_TELEM_STACK_REPORT
 #define REPORT_PERIOD_MSEC          60000U
@@ -71,14 +110,28 @@ static uint64_t         g_stack[STACK_WORDS];
 
 /* Written by telemetry_task only. */
 static s1_telem_stats_t g_stats;
-static uint8_t          g_hb_seq;
-static uint8_t          g_tel_seq;
+static uint8_t          g_hb_seq = 0U;
+static uint8_t          g_tel_seq = 0U;
+static uint8_t          g_live_seq = 0U;
+
+/* The subsystem values and the two messages being filled. They are here,
+ * not on the task's 2048-byte stack, because only telemetry_task uses them.
+ */
+static s1_telem_src_t        g_src;
+static msg_codec_telemetry_t g_tel;
+static msg_codec_live_t      g_live;
 
 static void     telemetry_task(INT stacd, void * p_exinf);
 static int32_t  post_to_s5(uint8_t opcode, uint8_t cmd_id);
 static void     handle_command(const mqtt_link_command_t * p_cmd);
 static void     send_heartbeat(void);
-static void     send_telemetry(void);
+static void     publish_heartbeat(const mqtt_link_status_t * p_status);
+static void     collect_sources(s1_telem_src_t * p_src);
+static void     send_periodic(bool b_tel_due, bool b_live_due);
+static void     publish_frame(void);
+static void     publish_live(void);
+static void     publish_periodic(const uint8_t * p_buf, uint16_t len,
+                                 uint8_t * p_seq);
 static uint32_t now_msec(void);
 static uint32_t uptime_s(void);
 #if S1_TELEM_STACK_REPORT
@@ -174,7 +227,12 @@ telemetry_task (INT stacd, void * p_exinf)
 {
     mqtt_link_command_t cmd = {0U, {0U}};
     uint32_t            next_hb_msec = now_msec();
-    uint32_t            next_tel_msec = next_hb_msec;
+    uint32_t            next_tel_msec = next_hb_msec
+                                        + S1_TELEM_TEL_OFFSET_MSEC;
+    uint32_t            next_live_msec = next_hb_msec
+                                         + S1_TELEM_LIVE_OFFSET_MSEC;
+    bool                b_tel_due = false;
+    bool                b_live_due = false;
 #if S1_TELEM_STACK_REPORT
     uint32_t            next_report_msec = next_hb_msec;
 #endif
@@ -221,10 +279,14 @@ telemetry_task (INT stacd, void * p_exinf)
             send_heartbeat();
         }
 
-        if ((now_msec() - next_tel_msec) < TEL_HALF_RANGE_MSEC)
+        b_tel_due  = s1_telem_due(now_msec(), S1_TELEM_TEL_PERIOD_MSEC,
+                                  &next_tel_msec);
+        b_live_due = s1_telem_due(now_msec(), S1_TELEM_LIVE_PERIOD_MSEC,
+                                  &next_live_msec);
+
+        if (b_tel_due || b_live_due)
         {
-            next_tel_msec += TEL_PERIOD_MSEC;
-            send_telemetry();
+            send_periodic(b_tel_due, b_live_due);
         }
 
 #if S1_TELEM_STACK_REPORT
@@ -286,30 +348,53 @@ handle_command (const mqtt_link_command_t * p_cmd)
 }
 
 /*!
- * @brief Publish one heartbeat, if the session is up.
- *
- * The counter goes up for every heartbeat handed to the driver, so a
- * heartbeat the full queue dropped shows as a gap on the dashboard.
+ * @brief Publish one heartbeat, if the session is up and the publish queue
+ *        is short enough.
  */
 static void
 send_heartbeat (void)
 {
     mqtt_link_status_t status;
-    s1_telem_hb_in_t   hb_in = {0U, 0U, 0U};
-    s1_telem_pub_t     hb_msg = {MQTT_LINK_TOPIC_TELEMETRY, MQTT_LINK_QOS_0,
-                                 false, 0U, {0U}};
-    bool               b_fresh = mqtt_link_get_status(&status);
-    bool               b_send = false;
+    const bool         b_fresh = mqtt_link_get_status(&status);
 
-    if (b_fresh && s1_telem_hb_should_publish(status.state, status.b_stale))
+    if ((!b_fresh)
+        || (!s1_telem_hb_should_publish(status.state, status.b_stale)))
     {
-        hb_in.uptime_s = uptime_s();
-        hb_in.connect_count = status.connect_count;
-        hb_in.command_dropped = status.command_dropped;
-        b_send = s1_telem_heartbeat(g_hb_seq, &hb_in, &g_stats, &hb_msg);
+        g_stats.hb_skipped = s1_telem_sat_add(g_stats.hb_skipped, 1U);
     }
+    else if (!s1_telem_queue_allows(mqtt_link_publish_free(),
+                                    S1_TELEM_HB_QUEUED_MAX))
+    {
+        g_stats.periodic_skipped =
+            s1_telem_sat_add(g_stats.periodic_skipped, 1U);
+    }
+    else
+    {
+        publish_heartbeat(&status);
+    }
+}
 
-    if (!b_send)
+/*!
+ * @brief Pack one heartbeat and hand it to the driver.
+ *
+ * The counter goes up for every heartbeat handed to the driver, so a
+ * heartbeat the driver refuses shows as a gap on the dashboard as well as in
+ * hb_publish_failed.
+ *
+ * @param[in] p_status The driver status just read.
+ */
+static void
+publish_heartbeat (const mqtt_link_status_t * p_status)
+{
+    s1_telem_hb_in_t hb_in = {0U, 0U, 0U};
+    s1_telem_pub_t   hb_msg = {MQTT_LINK_TOPIC_TELEMETRY, MQTT_LINK_QOS_0,
+                               false, 0U, {0U}};
+
+    hb_in.uptime_s        = uptime_s();
+    hb_in.connect_count   = p_status->connect_count;
+    hb_in.command_dropped = p_status->command_dropped;
+
+    if (!s1_telem_heartbeat(g_hb_seq, &hb_in, &g_stats, &hb_msg))
     {
         g_stats.hb_skipped = s1_telem_sat_add(g_stats.hb_skipped, 1U);
     }
@@ -335,45 +420,202 @@ send_heartbeat (void)
 }
 
 /*!
- * @brief Publish one telemetry frame, if the session is up.
+ * @brief Copy the latest values from S2, S3, S4 and S5 into plain integers.
  *
- * Fills the S4 fields from subsystem4_terrain_get(). Every other field
- * is 0 for now. A frame the full queue dropped shows as a seq gap.
+ * Every call here is a getter the owner provides for telemetry. Those of
+ * S2, S3, S4 and S5 take the owner's mutex and wait forever for it, then
+ * copy a snapshot. The owners hold their mutexes only for a copy, so this
+ * task rarely waits long. If S3 cannot be read (not started), b_s3_ok is
+ * false and s1_telem.c sends the documented defaults.
+ *
+ * WARNING: The wait can also go the other way. If cyw43_utk_task (priority
+ * 4, core 0) preempts this task while it holds an owner's mutex, a core-1
+ * task that wants that mutex waits until this task runs again: priority
+ * inheritance lifts this task only to the waiter's priority, still below 4.
+ * The window is a few microseconds, about 7 times a second. See
+ * docs/S1_binary_frame.md section 3.4; it is known and not worked around.
+ *
+ * @param[out] p_src Receives the values.
  */
 static void
-send_telemetry (void)
+collect_sources (s1_telem_src_t * p_src)
 {
-    mqtt_link_status_t      status;
-    subsystem4_terrain_t    terrain;
-    msg_codec_telemetry_t   tel = {0};
-    uint8_t                 buf[MSG_TEL_BYTES] = {0U};
-    uint32_t                len = 0U;
-    bool                    b_fresh = mqtt_link_get_status(&status);
+    subsystem2_odom_t        odom = {0U};
+    subsystem2_status_t      motion = {S2_STATE_IDLE};
+    s3_line_status_t         line = {0};
+    subsystem4_terrain_t     terrain = {0};
+    subsystem5_obst_status_t obst = {S5_OBST_HOLD};
+    s5_profile_t             profile = {0U};
+
+    *p_src = (s1_telem_src_t){0U};
+
+    subsystem2_odom_get(&odom);
+    subsystem2_status_get(&motion);
+    p_src->b_estop      = subsystem2_estop_is_set();
+    /* subsystem2_state_t has 5 values, so the cast keeps the value. */
+    p_src->motion_state = (uint8_t)motion.state;
+    p_src->target_l_mms = motion.target_l_mms;
+    p_src->target_r_mms = motion.target_r_mms;
+    p_src->count_l      = odom.count_l;
+    p_src->count_r      = odom.count_r;
+    p_src->dist_mm      = odom.dist_mm;
+    p_src->speed_l_mms  = odom.speed_l_mms;
+    p_src->speed_r_mms  = odom.speed_r_mms;
+    p_src->heading_cdeg = odom.heading_cdeg;
+
+    if (E_OK == s3_get_line_status(&line))
+    {
+        /* The S3 fields are bit-fields of 1 to 10 bits; each fits the plain
+         * type it is copied to.
+         */
+        p_src->b_s3_ok      = true;
+        p_src->line_state   = (uint8_t)line.state;
+        p_src->steer_dv_mms = (int32_t)line.steer_dv;
+        p_src->outer_ir     = (uint8_t)line.n_outer;
+        p_src->centre_ir    = (uint8_t)line.n_centre;
+        p_src->b_overshoot  = (0U != line.overshoot);
+        p_src->last_ch      = (uint8_t)line.last_ch;
+        p_src->last_cmd     = (uint8_t)line.last_cmd;
+        p_src->b_last_rev   = (0U != line.last_rev);
+        p_src->junc_turn    = (uint8_t)line.junc_turn;
+        p_src->rejects      = (uint8_t)line.rejects;
+        p_src->junctions    = (uint8_t)line.junctions;
+        p_src->losts        = (uint8_t)line.losts;
+        p_src->barcodes     = (uint8_t)line.barcodes;
+    }
+
+    subsystem4_terrain_get(&terrain);
+    p_src->pitch_hdeg    = terrain.pitch_hdeg;
+    p_src->roll_hdeg     = terrain.roll_hdeg;
+    p_src->turn_rate_dps = terrain.turn_rate_dps;
+    p_src->peak_mm       = terrain.peak_mm;
+    p_src->hump_state    = terrain.hump_state;
+    p_src->motion_class  = terrain.motion_class;
+    p_src->hump_count    = terrain.hump_count;
+    p_src->b_imu_ok      = terrain.b_imu_ok;
+    p_src->b_cal_done    = terrain.b_cal_done;
+    p_src->b_impact      = terrain.b_impact;
+
+    subsystem5_obst_status_get(&obst);
+    subsystem5_profile_get(&profile);
+    /* subsystem5_ctrl_state_t has 11 values, so the cast keeps the value. */
+    p_src->ctrl_state      = (uint8_t)subsystem5_ctrl_state_get();
+    p_src->fault_mask      = subsystem5_fault_get();
+    p_src->b_range_valid   = obst.b_range_valid;
+    p_src->range_mm        = obst.range_mm;
+    p_src->servo_deg       = obst.servo_deg;
+    p_src->b_profile_valid = profile.b_valid;
+    p_src->width_mm        = profile.width_mm;
+    p_src->clear_left_mm   = profile.clear_left_mm;
+    p_src->clear_right_mm  = profile.clear_right_mm;
+}
+
+/*!
+ * @brief Publish the telemetry frame and/or the live message, if the
+ *        session is up.
+ *
+ * The values are read once for both.
+ *
+ * @param[in] b_tel_due  The 2 Hz frame is due.
+ * @param[in] b_live_due The 5 Hz live message is due.
+ */
+static void
+send_periodic (bool b_tel_due, bool b_live_due)
+{
+    mqtt_link_status_t status;
+    const bool         b_fresh = mqtt_link_get_status(&status);
 
     if (b_fresh && s1_telem_hb_should_publish(status.state, status.b_stale))
     {
-        subsystem4_terrain_get(&terrain);
+        collect_sources(&g_src);
 
-        tel.seq          = g_tel_seq;
-        tel.pitch_hdeg   = terrain.pitch_hdeg;
-        tel.roll_hdeg    = terrain.roll_hdeg;
-        tel.hump_state   = terrain.hump_state;
-        tel.peak_mm      = terrain.peak_mm;
-        tel.hump_count   = terrain.hump_count;
-        tel.motion_class = terrain.motion_class;
-        tel.turn_dps     = terrain.turn_rate_dps;
-        tel.b_imu_ok     = terrain.b_imu_ok;
-        tel.b_cal_done   = terrain.b_cal_done;
-
-        len = msg_codec_put_telemetry(&tel, buf, (uint32_t)sizeof(buf));
-
-        if (MSG_TEL_BYTES == len)
+        if (b_tel_due)
         {
-            /* Modulo 256 by design. */
-            g_tel_seq = (uint8_t)(g_tel_seq + 1U);
-            (void)mqtt_link_publish(MQTT_LINK_TOPIC_TELEMETRY, buf,
-                                    (uint16_t)len, MQTT_LINK_QOS_0, false);
+            publish_frame();
         }
+
+        if (b_live_due)
+        {
+            publish_live();
+        }
+    }
+}
+
+/*!
+ * @brief Pack the telemetry frame from g_src and hand it to the driver, or
+ *        count it as skipped if the publish queue is too full.
+ */
+static void
+publish_frame (void)
+{
+    uint8_t buf[MSG_TEL_BYTES] = {0U};
+
+    if (!s1_telem_queue_allows(mqtt_link_publish_free(),
+                               S1_TELEM_TEL_QUEUED_MAX))
+    {
+        g_stats.periodic_skipped =
+            s1_telem_sat_add(g_stats.periodic_skipped, 1U);
+    }
+    else
+    {
+        s1_telem_fill_frame(&g_src, g_tel_seq, &g_tel);
+
+        if (MSG_TEL_BYTES == msg_codec_put_telemetry(&g_tel, buf,
+                                                     MSG_TEL_BYTES))
+        {
+            publish_periodic(buf, MSG_TEL_BYTES, &g_tel_seq);
+        }
+    }
+}
+
+/*!
+ * @brief Pack the live message from g_src and hand it to the driver, or
+ *        count it as skipped if the publish queue is too full.
+ */
+static void
+publish_live (void)
+{
+    uint8_t buf[MSG_LIV_BYTES] = {0U};
+
+    if (!s1_telem_queue_allows(mqtt_link_publish_free(),
+                               S1_TELEM_LIVE_QUEUED_MAX))
+    {
+        g_stats.periodic_skipped =
+            s1_telem_sat_add(g_stats.periodic_skipped, 1U);
+    }
+    else
+    {
+        s1_telem_fill_live(&g_src, g_live_seq, &g_live);
+
+        if (MSG_LIV_BYTES == msg_codec_put_live(&g_live, buf, MSG_LIV_BYTES))
+        {
+            publish_periodic(buf, MSG_LIV_BYTES, &g_live_seq);
+        }
+    }
+}
+
+/*!
+ * @brief Hand one packed telemetry or live message to the driver.
+ *
+ * The seq goes up for every message handed to the driver, so one the driver
+ * refuses shows as a gap on the dashboard as well as in periodic_failed. A
+ * message the queue rule skipped never gets here and uses no seq number.
+ *
+ * @param[in]     p_buf The packed message.
+ * @param[in]     len   Its length.
+ * @param[in,out] p_seq The message type's counter.
+ */
+static void
+publish_periodic (const uint8_t * p_buf, uint16_t len, uint8_t * p_seq)
+{
+    /* The counter is modulo 256 by design: the cast keeps the low byte. */
+    *p_seq = (uint8_t)(*p_seq + 1U);
+
+    if (MQTT_LINK_OK != mqtt_link_publish(MQTT_LINK_TOPIC_TELEMETRY, p_buf,
+                                          len, MQTT_LINK_QOS_0, false))
+    {
+        g_stats.periodic_failed =
+            s1_telem_sat_add(g_stats.periodic_failed, 1U);
     }
 }
 

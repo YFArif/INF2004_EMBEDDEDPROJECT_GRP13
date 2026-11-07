@@ -42,6 +42,12 @@
 #define HDEG_MIN                (-64)
 #define HDEG_MAX                63
 
+/* Heading conversion, section 3A.1 of the document: S2 reports the heading
+ * from -17999 to 18000 cdeg, so the half-degree value is -360 to 360 and
+ * fits the 10-bit field (-512 to 511).
+ */
+#define HEADING_CDEG_LIMIT      18000
+
 /* Compile-time checks. Each typedef has a negative array size, and so stops
  * the build, when its condition is false.
  *
@@ -95,6 +101,38 @@ typedef uint8_t msg_codec_check_tel_b_t[(
     && (MSG_TEL_DATA_BITS
         == (MSG_TEL_CLEAR_R_POS + MSG_TEL_CLEAR_R_BITS))
     && (MSG_TEL_BYTES == ((MSG_TEL_DATA_BITS + 7U) / 8U))) ? 1 : -1];
+
+typedef uint8_t msg_codec_check_liv_a_t[((MSG_LIV_SEQ_POS == 8U)
+    && (MSG_LIV_MOTION_POS == (MSG_LIV_SEQ_POS + MSG_LIV_SEQ_BITS))
+    && (MSG_LIV_ESTOP_POS == (MSG_LIV_MOTION_POS + MSG_LIV_MOTION_BITS))
+    && (MSG_LIV_CMD_SPEED_POS
+        == (MSG_LIV_ESTOP_POS + MSG_LIV_ESTOP_BITS))
+    && (MSG_LIV_HEADING_POS
+        == (MSG_LIV_CMD_SPEED_POS + MSG_LIV_CMD_SPEED_BITS))
+    && (MSG_LIV_LINE_POS == (MSG_LIV_HEADING_POS + MSG_LIV_HEADING_BITS))
+    && (MSG_LIV_STEER_POS == (MSG_LIV_LINE_POS + MSG_LIV_LINE_BITS))
+    && (MSG_LIV_OUTER_POS == (MSG_LIV_STEER_POS + MSG_LIV_STEER_BITS))
+    && (MSG_LIV_CENTRE_POS == (MSG_LIV_OUTER_POS + MSG_LIV_OUTER_BITS)))
+    ? 1 : -1];
+
+typedef uint8_t msg_codec_check_liv_b_t[(
+    (MSG_LIV_OVERSHOOT_POS == (MSG_LIV_CENTRE_POS + MSG_LIV_CENTRE_BITS))
+    && (MSG_LIV_LETTER_POS
+        == (MSG_LIV_OVERSHOOT_POS + MSG_LIV_OVERSHOOT_BITS))
+    && (MSG_LIV_BC_CMD_POS == (MSG_LIV_LETTER_POS + MSG_LIV_LETTER_BITS))
+    && (MSG_LIV_BC_REV_POS == (MSG_LIV_BC_CMD_POS + MSG_LIV_BC_CMD_BITS))
+    && (MSG_LIV_JUNC_TURN_POS
+        == (MSG_LIV_BC_REV_POS + MSG_LIV_BC_REV_BITS))
+    && (MSG_LIV_REJECTS_POS
+        == (MSG_LIV_JUNC_TURN_POS + MSG_LIV_JUNC_TURN_BITS))
+    && (MSG_LIV_JUNCTIONS_POS
+        == (MSG_LIV_REJECTS_POS + MSG_LIV_REJECTS_BITS))
+    && (MSG_LIV_LOSTS_POS
+        == (MSG_LIV_JUNCTIONS_POS + MSG_LIV_JUNCTIONS_BITS))
+    && (MSG_LIV_BARCODES_POS == (MSG_LIV_LOSTS_POS + MSG_LIV_LOSTS_BITS))
+    && (MSG_LIV_DATA_BITS
+        == (MSG_LIV_BARCODES_POS + MSG_LIV_BARCODES_BITS))
+    && (MSG_LIV_BYTES == ((MSG_LIV_DATA_BITS + 7U) / 8U))) ? 1 : -1];
 
 typedef uint8_t msg_codec_check_hb_t[((MSG_HB_SEQ_POS == 8U)
     && (MSG_HB_UPTIME_POS == (MSG_HB_SEQ_POS + MSG_HB_SEQ_BITS))
@@ -153,6 +191,9 @@ typedef uint8_t msg_codec_check_max_t[((MSG_FIELD_BITS_MAX < 32U)
     && (MSG_TEL_PITCH_BITS <= 16U)
     && (MSG_TEL_ROLL_BITS <= 16U)
     && (MSG_TEL_TURN_BITS <= 16U)
+    && (MSG_LIV_HEADING_BITS <= 16U)
+    && (MSG_LIV_STEER_BITS <= 16U)
+    && (MSG_LIV_BYTES <= MSG_MAX_BYTES)
     && (MSG_TEL_BYTES <= MSG_MAX_BYTES)
     && (MSG_HB_BYTES <= MSG_MAX_BYTES)
     && (MSG_EVT_BYTES <= MSG_MAX_BYTES)
@@ -385,6 +426,161 @@ msg_codec_get_telemetry (const uint8_t * p_buf, uint32_t len,
                                     MSG_TEL_CLEAR_L_BITS);
         p_out->clear_r_mm = get_u16(p_buf, MSG_TEL_CLEAR_R_POS,
                                     MSG_TEL_CLEAR_R_BITS);
+        b_ok = true;
+    }
+
+    return (b_ok);
+}
+
+/*!
+ * @brief Convert a heading in centidegrees to the half-degrees sent.
+ *
+ * Limit the input to +/-18000 cdeg while still signed, then round half
+ * away from zero on the magnitude (C division truncates toward zero).
+ *
+ * @param[in] cdeg Heading in centidegrees, any int32_t value.
+ *
+ * @return Half-degrees, -360 to 360.
+ */
+int16_t
+msg_codec_heading_to_hdeg (int32_t cdeg)
+{
+    int32_t limited = cdeg;
+    int32_t hdeg;
+
+    if (limited > HEADING_CDEG_LIMIT)
+    {
+        limited = HEADING_CDEG_LIMIT;
+    }
+    else if (limited < -HEADING_CDEG_LIMIT)
+    {
+        limited = -HEADING_CDEG_LIMIT;
+    }
+    else
+    {
+        /* Already within the limit. */
+    }
+
+    if (limited < 0)
+    {
+        hdeg = -((-limited + CDEG_HALF_STEP) / CDEG_PER_HDEG);
+    }
+    else
+    {
+        hdeg = (limited + CDEG_HALF_STEP) / CDEG_PER_HDEG;
+    }
+
+    /* limited is -18000 to 18000, so hdeg is -360 to 360 and fits int16_t. */
+    return ((int16_t)hdeg);
+}
+
+/*!
+ * @brief Pack a live message.
+ *
+ * @param[in]  p_in    Field values; out-of-range values are clamped.
+ * @param[out] p_buf   Receives MSG_LIV_BYTES bytes.
+ * @param[in]  buf_len Size of p_buf.
+ *
+ * @return MSG_LIV_BYTES, or 0 if a pointer is NULL or p_buf is too small.
+ */
+uint32_t
+msg_codec_put_live (const msg_codec_live_t * p_in,
+                    uint8_t * p_buf, uint32_t buf_len)
+{
+    uint32_t written = 0U;
+
+    if ((NULL != p_in) && (NULL != p_buf) && (buf_len >= MSG_LIV_BYTES))
+    {
+        start_message(p_buf, MSG_LIV_BYTES, MSG_TYPE_LIVE);
+        put_modulo(p_buf, MSG_LIV_SEQ_POS, MSG_LIV_SEQ_BITS, p_in->seq);
+        put_unsigned(p_buf, MSG_LIV_MOTION_POS, MSG_LIV_MOTION_BITS,
+                     p_in->motion_state);
+        put_flag(p_buf, MSG_LIV_ESTOP_POS, p_in->b_estop);
+        put_signed(p_buf, MSG_LIV_CMD_SPEED_POS, MSG_LIV_CMD_SPEED_BITS,
+                   p_in->cmd_speed_mms);
+        put_signed(p_buf, MSG_LIV_HEADING_POS, MSG_LIV_HEADING_BITS,
+                   p_in->heading_hdeg);
+        put_unsigned(p_buf, MSG_LIV_LINE_POS, MSG_LIV_LINE_BITS,
+                     p_in->line_state);
+        put_signed(p_buf, MSG_LIV_STEER_POS, MSG_LIV_STEER_BITS,
+                   p_in->steer_dv_mms);
+        put_unsigned(p_buf, MSG_LIV_OUTER_POS, MSG_LIV_OUTER_BITS,
+                     p_in->outer_ir);
+        put_unsigned(p_buf, MSG_LIV_CENTRE_POS, MSG_LIV_CENTRE_BITS,
+                     p_in->centre_ir);
+        put_flag(p_buf, MSG_LIV_OVERSHOOT_POS, p_in->b_overshoot);
+        put_unsigned(p_buf, MSG_LIV_LETTER_POS, MSG_LIV_LETTER_BITS,
+                     p_in->bc_letter);
+        put_unsigned(p_buf, MSG_LIV_BC_CMD_POS, MSG_LIV_BC_CMD_BITS,
+                     p_in->bc_cmd);
+        put_flag(p_buf, MSG_LIV_BC_REV_POS, p_in->b_bc_rev);
+        put_unsigned(p_buf, MSG_LIV_JUNC_TURN_POS, MSG_LIV_JUNC_TURN_BITS,
+                     p_in->junc_turn);
+        put_modulo(p_buf, MSG_LIV_REJECTS_POS, MSG_LIV_REJECTS_BITS,
+                   p_in->rejects);
+        put_modulo(p_buf, MSG_LIV_JUNCTIONS_POS, MSG_LIV_JUNCTIONS_BITS,
+                   p_in->junctions);
+        put_modulo(p_buf, MSG_LIV_LOSTS_POS, MSG_LIV_LOSTS_BITS,
+                   p_in->losts);
+        put_modulo(p_buf, MSG_LIV_BARCODES_POS, MSG_LIV_BARCODES_BITS,
+                   p_in->barcodes);
+        written = MSG_LIV_BYTES;
+    }
+
+    return (written);
+}
+
+/*!
+ * @brief Unpack a live message.
+ *
+ * @param[in]  p_buf The received bytes.
+ * @param[in]  len   Number of received bytes.
+ * @param[out] p_out Receives the fields. Unchanged when false is returned.
+ *
+ * @return True if len, version and type are right.
+ */
+bool
+msg_codec_get_live (const uint8_t * p_buf, uint32_t len,
+                    msg_codec_live_t * p_out)
+{
+    bool b_ok = false;
+
+    if ((NULL != p_out)
+        && (header_ok(p_buf, len, MSG_LIV_BYTES, MSG_TYPE_LIVE)))
+    {
+        p_out->seq           = get_u8(p_buf, MSG_LIV_SEQ_POS, MSG_LIV_SEQ_BITS);
+        p_out->motion_state  = get_u8(p_buf, MSG_LIV_MOTION_POS,
+                                      MSG_LIV_MOTION_BITS);
+        p_out->b_estop       = get_flag(p_buf, MSG_LIV_ESTOP_POS);
+        p_out->cmd_speed_mms = get_signed(p_buf, MSG_LIV_CMD_SPEED_POS,
+                                          MSG_LIV_CMD_SPEED_BITS);
+        p_out->heading_hdeg  = get_s16(p_buf, MSG_LIV_HEADING_POS,
+                                       MSG_LIV_HEADING_BITS);
+        p_out->line_state    = get_u8(p_buf, MSG_LIV_LINE_POS,
+                                      MSG_LIV_LINE_BITS);
+        p_out->steer_dv_mms  = get_signed(p_buf, MSG_LIV_STEER_POS,
+                                          MSG_LIV_STEER_BITS);
+        p_out->outer_ir      = get_u8(p_buf, MSG_LIV_OUTER_POS,
+                                      MSG_LIV_OUTER_BITS);
+        p_out->centre_ir     = get_u8(p_buf, MSG_LIV_CENTRE_POS,
+                                      MSG_LIV_CENTRE_BITS);
+        p_out->b_overshoot   = get_flag(p_buf, MSG_LIV_OVERSHOOT_POS);
+        p_out->bc_letter     = get_u8(p_buf, MSG_LIV_LETTER_POS,
+                                      MSG_LIV_LETTER_BITS);
+        p_out->bc_cmd        = get_u8(p_buf, MSG_LIV_BC_CMD_POS,
+                                      MSG_LIV_BC_CMD_BITS);
+        p_out->b_bc_rev      = get_flag(p_buf, MSG_LIV_BC_REV_POS);
+        p_out->junc_turn     = get_u8(p_buf, MSG_LIV_JUNC_TURN_POS,
+                                      MSG_LIV_JUNC_TURN_BITS);
+        p_out->rejects       = get_u8(p_buf, MSG_LIV_REJECTS_POS,
+                                      MSG_LIV_REJECTS_BITS);
+        p_out->junctions     = get_u8(p_buf, MSG_LIV_JUNCTIONS_POS,
+                                      MSG_LIV_JUNCTIONS_BITS);
+        p_out->losts         = get_u8(p_buf, MSG_LIV_LOSTS_POS,
+                                      MSG_LIV_LOSTS_BITS);
+        p_out->barcodes      = get_u8(p_buf, MSG_LIV_BARCODES_POS,
+                                      MSG_LIV_BARCODES_BITS);
+
         b_ok = true;
     }
 

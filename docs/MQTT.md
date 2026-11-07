@@ -23,7 +23,7 @@ SDK's copy, `STABLE-2_2_1_RELEASE`.
 | Message codec (`msg_codec`) | Built, host-tested and timed on the Pico | `app_program/subsystem1/`; TEST_LOG S1-U05, S1-U08 |
 | Dashboard decoder (`s1_decode.py`) | Built and host-tested | `app_program/subsystem1/dashboard/`; TEST_LOG S1-U11, S1-U12 |
 | Stage 3: the radio service task calls `mqtt_link_poll()` | Adapter written: `mqtt_utk_start()` calls `mqtt_link_poll(netif_default)`. Instructor approval 27 Oct 2026; team agreement in person 29 Oct 2026. On the robot: S1-U13 PASS at `9a01717`, 31 Oct 2026 | `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c`; TEAM.md section 3 ("WiFi and MQTT are special"); TEST_LOG S1-U13 |
-| `telemetry_task`, Stage 4a: START, STOP and RESET forwarded to S5 with an ack, and the 1 Hz heartbeat | Written on the local branch `buddy1-integration` (main plus Stage 3) and host-tested (S1-U14). Not run on the robot yet (S1-U06). Telemetry frames, events and the WiFi fault bit are Stage 4b | `app_program/subsystem1/telemetry_task.c`, `s1_telem.c`; section 1.1; TEST_LOG S1-U14, S1-U06 |
+| `telemetry_task`, Stage 4a: START, STOP and RESET forwarded to S5 with an ack, and the 1 Hz heartbeat | Written on the local branch `buddy1-integration` (main plus Stage 3) and host-tested (S1-U14). Not run on the robot yet (S1-U06). The 2 Hz telemetry frame and the 5 Hz live message are written in the same task (7 Nov 2026) and host-tested (S1-U05, S1-U11, S1-U14, S1-U16 part A), not run on the robot yet; each goes only under the queue rule of section 1.1. Events and the WiFi fault bit are Stage 4b | `app_program/subsystem1/telemetry_task.c`, `s1_telem.c`; section 1.1; TEST_LOG S1-U14, S1-U06 |
 | Laptop dashboard (`s1_dashboard.py`) | Written on `buddy1-integration`: START, STOP and RESET with each ack matched by cmd_id, the online light and heartbeat, the retained-command banner, and `--simulate` (a fake car). Test S1-U16: part A automated in simulate mode, part B on the robot after S1-U06 | `testing/subsystem1/s1_dashboard.py`; [S1_dashboard.md](S1_dashboard.md); TEST_LOG S1-U16 |
 
 Stage 3 replaced the template's demo client in `mqtt_utk.c` (a text
@@ -65,10 +65,22 @@ adds nothing to a STOP's round trip (NFR15).
 - **Heartbeat.** 9 bytes on the telemetry topic at QoS 0, once a second
   on absolute deadlines, and only while the session is up and the driver
   snapshot is fresh, so an outage does not fill the publish queue that
-  the acks need. In Stage 4a rssi is 0 ("not measured": no RSSI can be
-  read outside the radio service task yet), tel_drop and evt_drop are 0,
-  and cmd_reject is the codec rejections plus the post failures plus the
-  driver's `command_dropped`.
+  the acks need. rssi is 0 ("not measured": no RSSI can be read outside
+  the radio service task yet), evt_drop is 0 (no `mbf_event` yet), tel_drop
+  is the periodic messages skipped or refused (next point), and cmd_reject
+  is the codec rejections plus the post failures plus the driver's
+  `command_dropped`.
+- **Keeping room for the acks.** The publish queue is first in, first out
+  and the driver sends one message at a time, so a periodic message delays
+  any ack queued behind it. Before each periodic message `telemetry_task`
+  reads `mqtt_link_publish_free()`: telemetry and live each go only with at
+  most 1 record queued (`S1_TELEM_TEL_QUEUED_MAX`,
+  `S1_TELEM_LIVE_QUEUED_MAX`), the heartbeat only with at most 3
+  (`S1_TELEM_HB_QUEUED_MAX`), all in `s1_telem.h`. A message held back is
+  counted in
+  `periodic_skipped`, sent as tel_drop, and is not retried. Acks are never
+  held back. A QoS 0 publish still counts as finished only when its TCP ACK
+  arrives; whether to change that waits for the measurements on the car.
 - **Offline.** The session is clean: a command sent while the robot is
   offline is lost and never acked. A command already received when the
   session drops is still posted; its ack waits in the publish queue.
@@ -121,7 +133,7 @@ will topic as `<prefix>/status` (`build_topics()`,
 
 | Topic | ID | Direction | Carries | Source |
 |---|---|---|---|---|
-| `<prefix>/telemetry` | 0 | robot to dashboard | TELEMETRY and HEARTBEAT frames; the type nibble of the header byte tells them apart | `MQTT_LINK_TOPIC_TELEMETRY`, `TOPIC_TELEMETRY`; S1_binary_frame.md section 11 |
+| `<prefix>/telemetry` | 0 | robot to dashboard | TELEMETRY, LIVE and HEARTBEAT frames; the type nibble of the header byte tells them apart | `MQTT_LINK_TOPIC_TELEMETRY`, `TOPIC_TELEMETRY`; S1_binary_frame.md section 11 |
 | `<prefix>/event` | 1 | robot to dashboard | EVENT frames | `MQTT_LINK_TOPIC_EVENT`, `TOPIC_EVENT` |
 | `<prefix>/ack` | 2 | robot to dashboard | ACK frames | `MQTT_LINK_TOPIC_ACK`, `TOPIC_ACK` |
 | `<prefix>/cmd/#` | - | dashboard to robot | COMMAND frames. Only the payload reaches the robot's code, not the topic | `build_topics()`, `incoming_publish_cb()` |
@@ -143,12 +155,14 @@ will topic as `<prefix>/status` (`build_topics()`,
 |---|---|---|---|
 | `status` | 1 | yes | `start_connect()` (last will), `send_birth()` |
 | `cmd/#` (subscription) | 1 | - | `COMMAND_QOS` |
-| `telemetry` (TELEMETRY, HEARTBEAT) | 0 | no | **planned** (`telemetry_task`) |
-| `event`, `ack` | 1 | no | **planned** (`telemetry_task`) |
+| `telemetry` (TELEMETRY, LIVE, HEARTBEAT) | 0 | no | `telemetry_task` |
+| `ack` | 1 | no | `telemetry_task` (`s1_telem_on_command()`) |
+| `event` | 1 | no | **planned** (Stage 4b) |
 
 The driver takes QoS and retain from each `mqtt_link_publish()` call, so
-the planned values become real only with `telemetry_task`. A command can
-arrive twice under QoS 1, so the command handler must accept a repeat
+the `event` row becomes real only when `telemetry_task` publishes events. A
+command can arrive twice under QoS 1, so the command handler must accept a
+repeat
 (the "Command delivery" note in `mqtt_link.h`).
 
 ## 6. Online and offline (NFR14)
@@ -181,6 +195,7 @@ version is 1 (`MSG_LAYOUT_VERSION`); a receiver rejects any other.
 | Message | Topic | Payload size | Source |
 |---|---|---|---|
 | TELEMETRY | `telemetry` | 25 B | `MSG_TEL_BYTES` |
+| LIVE | `telemetry` | 14 B | `MSG_LIV_BYTES` |
 | HEARTBEAT | `telemetry` | 9 B | `MSG_HB_BYTES` |
 | EVENT | `event` | 7 B | `MSG_EVT_BYTES` |
 | COMMAND | `cmd/...` | 2 B | `MSG_CMD_BYTES` |
@@ -195,14 +210,35 @@ refuses to publish a payload over 25 bytes (`MQTT_LINK_PAYLOAD_MAX`).
 
 | Message | Rate | Source |
 |---|---|---|
-| TELEMETRY | 2 Hz | **planned**: S1_binary_frame.md section 3 |
+| TELEMETRY | 2 Hz | `telemetry_task.c`, `S1_TELEM_TEL_PERIOD_MSEC` (written, not run on the robot): S1_binary_frame.md section 3 |
+| LIVE | 5 Hz | `telemetry_task.c`, `S1_TELEM_LIVE_PERIOD_MSEC` (written, not run on the robot): S1_binary_frame.md section 3A |
 | HEARTBEAT | 1 Hz while the session is up | Stage 4a: `telemetry_task.c`, `S1_TELEM_HB_PERIOD_MSEC` |
 | EVENT | When something happens | **planned** (Stage 4b) |
 | ACK | One per command the driver delivers | Stage 4a: `telemetry_task.c` |
 
-TELEMETRY and EVENT do not exist in the code yet (Stage 4b). The
-heartbeat and the ack exist since Stage 4a; neither is measured on the
-robot yet (S1-U06).
+EVENT does not exist in the code yet (Stage 4b). The heartbeat and the ack
+exist since Stage 4a, and TELEMETRY and LIVE since 7 Nov 2026; none is
+measured on the robot yet (S1-U06). The telemetry topic now carries 8
+publishes a second (2 Hz telemetry, 5 Hz live, 1 Hz heartbeat), so the
+NFR15 trials must be run with all three on. Those are the rates on a link
+that keeps up; on a slower one the queue rule of section 1.1 skips messages
+and tel_drop counts them.
+
+The three schedules start apart so that they never share a deadline. After
+the first heartbeat, the first live message is due at 100 ms and the first
+telemetry frame at 250 ms (`S1_TELEM_LIVE_OFFSET_MSEC`,
+`S1_TELEM_TEL_OFFSET_MSEC`). With no offsets, all three fall due in the same
+pass every 1000 ms. S1-U14 checks the deadlines at 1 ms steps.
+
+A deadline is not the same as the pass that notices it. `telemetry_task`
+looks at its schedules once a pass, and a pass lasts the 50 ms command wait
+(`TELEMETRY_TASK_RX_WAIT_MSEC`) plus its own work, or less when a command
+arrives. The closest deadlines are a frame and a live message 50 ms apart,
+the largest gap these periods allow with any offsets, so a pass longer than
+50 ms can still find those two due together. A model with a fixed pass length
+gives none at 50 ms, one about every 25 s at 51 ms and one about every 3 s at
+60 ms; the real pass length is not measured. `send_periodic()` sends both,
+each under the queue rule of section 1.1.
 
 ## 9. Recovery
 
@@ -294,9 +330,17 @@ outage the robot sends the oldest first.
 | `connect_count`, `disconnect_count`, `backoff_msec` | Sessions made and lost, and the current retry delay | `connection_cb()`, `enter_backoff()` |
 | `b_stale` | The driver has not run for 1000 ms or more | `MQTT_LINK_STALE_MSEC` |
 
-Read them with `mqtt_link_get_status()`. The heartbeat's `tel_drop`,
-`evt_drop` and `cmd_reject` fields will carry the robot-side drops to
-the dashboard: **planned** (`telemetry_task`).
+Read them with `mqtt_link_get_status()`. `mqtt_link_publish_free()` says how
+many more records the publish queue can take, from the kernel's free buffer
+size (`tk_ref_mbf`); it counts the queue only, not the message being sent.
+
+The heartbeat carries the robot-side drops to the dashboard. `tel_drop` is
+`telemetry_task`'s `periodic_skipped` (the queue rule, section 1.1) plus
+`periodic_failed` and `hb_publish_failed` (refused by the driver).
+`cmd_reject` is section 1.1's sum. `evt_drop` is 0 until `mbf_event` exists.
+Messages not sent because the session is down are not drops: nothing is
+built for them. A message the driver refuses also shows as a seq gap on the
+dashboard; one the queue rule skips does not.
 
 A task that calls `mqtt_link_publish()` needs 72 B of its own stack for
 it, before the kernel's `tk_snd_mbf()`: 64 B for `mqtt_link_publish()`
@@ -420,6 +464,8 @@ STOP round trip under 300 ms) and of the NFR14 test.
 | A retained command whose topic is longer than lwIP's 128-byte header buffer makes the robot reconnect over and over until the retained message is cleared; only trusted clients should publish under `<prefix>/cmd/` | lwIP `MQTT_VAR_HEADER_BUFFER_LEN`; "Command topic length" note in `mqtt_link.h` |
 | Prefix 32 characters, command topic suffix 48, command 2 bytes, payload 25 bytes | `PREFIX_MAX_LEN`, `MQTT_LINK_TOPIC_MAX`, `MQTT_LINK_COMMAND_MAX`, `MQTT_LINK_PAYLOAD_MAX` |
 | 8 messages per queue; when full, the new message is refused | `MQTT_LINK_QUEUE_DEPTH` |
+| With the queue rule, an ack can still wait behind the message being sent plus 2 queued ones, or more if heartbeats were queued while the link was slow. The driver waits for each message's TCP ACK before the next, so this delay is not known until measured on the car | section 1.1; `step_publish()`; S1-U06 |
+| `telemetry_task` preempted by the WiFi task while it holds an owner's mutex delays a core-1 task; rare, known, not worked around, not measured | S1_binary_frame.md section 3.4 |
 | Only one task may read commands | "Commands" note in `mqtt_link.h` |
 | The robot notices a silent broker 5 to 10 s late | section 3 |
 | The retry-delay reset after a 10 s session has no test yet | `STABLE_SESSION_MSEC` |
@@ -433,8 +479,10 @@ STOP round trip under 300 ms) and of the NFR14 test.
 - S1-U13 done (31 Oct 2026): sections 1, 9 and 12 carry its results.
 - Stage 4a written (1 Nov 2026): sections 1, 1.1, 8 and 13. S1-U06 adds
   the measured heartbeat rate and STOP round trip.
-- With Stage 4b (telemetry frames, events, the WiFi fault bit, S5's
-  verdict in the ack): the planned values in sections 5, 8 and 10 become
-  code, and the measured rates are added.
+- With Stage 4b (events, the WiFi fault bit, S5's verdict in the ack): the
+  planned values in sections 5 and 8 become code, and the measured rates
+  are added.
+- After the car measurements: decide whether a QoS 0 publish should count
+  as finished before its TCP ACK (section 1.1).
 - Sections 2, 3, 4, 7, 11 and 13 stay as they are, unless the layout
   version changes.

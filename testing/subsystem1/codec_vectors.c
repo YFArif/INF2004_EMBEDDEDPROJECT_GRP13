@@ -348,6 +348,97 @@ static const codec_vectors_tel_t g_tel[] =
     },
 };
 
+/* Live: LIV-1, LIV-2, LIV-3. junctions 300 in the document is sent
+ * modulo 256, so the in and out value is 44.
+ */
+static const codec_vectors_liv_t g_liv[] =
+{
+    {
+        .p_label = "LIV-1",
+        .in =
+        {
+            .seq = 9U, .motion_state = 1U, .b_estop = false,
+            .cmd_speed_mms = 300, .heading_hdeg = 92, .line_state = 1U,
+            .steer_dv_mms = -87, .outer_ir = 12U, .centre_ir = 230U,
+            .b_overshoot = true, .bc_letter = 11U, .bc_cmd = 2U,
+            .b_bc_rev = true, .junc_turn = 2U, .rejects = 3U,
+            .junctions = 44U, .losts = 1U, .barcodes = 5U,
+        },
+        .heading_cdeg = 4575,
+        .b_uses_cdeg = true,
+        .out =
+        {
+            .seq = 9U, .motion_state = 1U, .b_estop = false,
+            .cmd_speed_mms = 300, .heading_hdeg = 92, .line_state = 1U,
+            .steer_dv_mms = -87, .outer_ir = 12U, .centre_ir = 230U,
+            .b_overshoot = true, .bc_letter = 11U, .bc_cmd = 2U,
+            .b_bc_rev = true, .junc_turn = 2U, .rejects = 3U,
+            .junctions = 44U, .losts = 1U, .barcodes = 5U,
+        },
+        .bytes =
+        {
+            0x16U, 0x09U, 0x2CU, 0xB2U, 0x5CU, 0x2DU, 0x48U, 0x67U,
+            0x34U, 0xB5U, 0x8CU, 0xB0U, 0x04U, 0x14U,
+        },
+    },
+    {
+        .p_label = "LIV-2",
+        .in =
+        {
+            .seq = 0U, .motion_state = 0U, .b_estop = false,
+            .cmd_speed_mms = -512, .heading_hdeg = -512, .line_state = 0U,
+            .steer_dv_mms = -512, .outer_ir = 0U, .centre_ir = 0U,
+            .b_overshoot = false, .bc_letter = 0U, .bc_cmd = 0U,
+            .b_bc_rev = false, .junc_turn = 0U, .rejects = 0U,
+            .junctions = 0U, .losts = 0U, .barcodes = 0U,
+        },
+        .heading_cdeg = 0,
+        .b_uses_cdeg = false,
+        .out =
+        {
+            .seq = 0U, .motion_state = 0U, .b_estop = false,
+            .cmd_speed_mms = -512, .heading_hdeg = -512, .line_state = 0U,
+            .steer_dv_mms = -512, .outer_ir = 0U, .centre_ir = 0U,
+            .b_overshoot = false, .bc_letter = 0U, .bc_cmd = 0U,
+            .b_bc_rev = false, .junc_turn = 0U, .rejects = 0U,
+            .junctions = 0U, .losts = 0U, .barcodes = 0U,
+        },
+        .bytes =
+        {
+            0x16U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U,
+            0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U,
+        },
+    },
+    {
+        .p_label = "LIV-3",
+        .in =
+        {
+            .seq = 255U, .motion_state = 7U, .b_estop = true,
+            .cmd_speed_mms = 511, .heading_hdeg = 511, .line_state = 7U,
+            .steer_dv_mms = 511, .outer_ir = 255U, .centre_ir = 255U,
+            .b_overshoot = true, .bc_letter = 63U, .bc_cmd = 7U,
+            .b_bc_rev = true, .junc_turn = 3U, .rejects = 15U,
+            .junctions = 255U, .losts = 255U, .barcodes = 255U,
+        },
+        .heading_cdeg = 0,
+        .b_uses_cdeg = false,
+        .out =
+        {
+            .seq = 255U, .motion_state = 7U, .b_estop = true,
+            .cmd_speed_mms = 511, .heading_hdeg = 511, .line_state = 7U,
+            .steer_dv_mms = 511, .outer_ir = 255U, .centre_ir = 255U,
+            .b_overshoot = true, .bc_letter = 63U, .bc_cmd = 7U,
+            .b_bc_rev = true, .junc_turn = 3U, .rejects = 15U,
+            .junctions = 255U, .losts = 255U, .barcodes = 255U,
+        },
+        .bytes =
+        {
+            0x16U, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU,
+            0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFCU,
+        },
+    },
+};
+
 /* Heartbeat: HB-1. */
 static const codec_vectors_hb_t g_hb[] =
 {
@@ -492,6 +583,27 @@ codec_vectors_tel (uint32_t * p_count)
     }
 
     return (g_tel);
+}
+
+/*!
+ * @brief Return the live vectors.
+ *
+ * @param[out] p_count Receives the number of vectors (ignored if NULL).
+ *
+ * @return The first vector.
+ */
+const codec_vectors_liv_t *
+codec_vectors_liv (uint32_t * p_count)
+{
+    if (NULL != p_count)
+    {
+        /* The table holds a handful of entries, so its count fits
+         * uint32_t.
+         */
+        *p_count = (uint32_t)(sizeof(g_liv) / sizeof(g_liv[0]));
+    }
+
+    return (g_liv);
 }
 
 /*!

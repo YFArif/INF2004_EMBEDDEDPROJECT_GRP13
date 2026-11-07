@@ -5,7 +5,7 @@ one MQTT payload into a dict whose field names and values are exactly
 what msg_codec_get_*() in app_program/subsystem1/msg_codec.c returns, so
 the robot, the C test and the dashboard use one name per field. It
 accepts and rejects the same payloads as the C decoder: the length must
-be exact for the type, the version must be 1 and the type 1 to 5.
+be exact for the type, the version must be 1 and the type 1 to 6.
 Padding bits are ignored (rule 5 of section 2).
 
 Use from Python:
@@ -36,6 +36,7 @@ HEARTBEAT = 2
 EVENT = 3
 COMMAND = 4
 ACK = 5
+LIVE = 6
 
 TYPE_NAMES = {
     TELEMETRY: "TELEMETRY",
@@ -43,10 +44,12 @@ TYPE_NAMES = {
     EVENT: "EVENT",
     COMMAND: "COMMAND",
     ACK: "ACK",
+    LIVE: "LIVE",
 }
 
 # Exact payload length of each message type, in bytes.
-LENGTHS = {TELEMETRY: 25, HEARTBEAT: 9, EVENT: 7, COMMAND: 2, ACK: 3}
+LENGTHS = {TELEMETRY: 25, HEARTBEAT: 9, EVENT: 7, COMMAND: 2, ACK: 3,
+           LIVE: 14}
 
 # How a stored field becomes a value.
 UNSIGNED = "unsigned"      # as stored
@@ -88,6 +91,26 @@ FIELDS = {
         ("clear_l_mm", 176, 10, UNSIGNED),
         ("clear_r_mm", 186, 10, UNSIGNED),
     ),
+    LIVE: (
+        ("seq", 8, 8, UNSIGNED),
+        ("motion_state", 16, 3, UNSIGNED),
+        ("b_estop", 19, 1, FLAG),
+        ("cmd_speed_mms", 20, 10, SIGNED),
+        ("heading_hdeg", 30, 10, SIGNED),
+        ("line_state", 40, 3, UNSIGNED),
+        ("steer_dv_mms", 43, 10, SIGNED),
+        ("outer_ir", 53, 8, UNSIGNED),
+        ("centre_ir", 61, 8, UNSIGNED),
+        ("b_overshoot", 69, 1, FLAG),
+        ("bc_letter", 70, 6, UNSIGNED),
+        ("bc_cmd", 76, 3, UNSIGNED),
+        ("b_bc_rev", 79, 1, FLAG),
+        ("junc_turn", 80, 2, UNSIGNED),
+        ("rejects", 82, 4, UNSIGNED),
+        ("junctions", 86, 8, UNSIGNED),
+        ("losts", 94, 8, UNSIGNED),
+        ("barcodes", 102, 8, UNSIGNED),
+    ),
     HEARTBEAT: (
         ("seq", 8, 8, UNSIGNED),
         ("uptime_s", 16, 16, UNSIGNED),
@@ -115,11 +138,42 @@ FIELDS = {
 
 OP_INVALID = 0
 OPCODE_NAMES = {0: "INVALID", 1: "START", 2: "STOP", 3: "RESET"}
-RESULT_NAMES = {0: "accepted", 1: "rejected"}
+# Result 0 means the command was queued for S5, not that S5 carried it out.
+RESULT_NAMES = {0: "queued", 1: "rejected"}
 
-# Section 3.1: bit n of fault_mask is fault n. Bits 1 and 3 are not
-# defined yet, so describe() shows them only by number.
-FAULT_NAMES = {0: "stall", 2: "imu", 4: "wifi"}
+# Section 3.1: bit n of fault_mask is fault n, as S5 numbers them
+# (S5_FAULT_xxx in subsystem5.h).
+FAULT_NAMES = {0: "stall", 1: "encoder", 2: "imu", 3: "no echo", 4: "wifi"}
+
+# Names the owners' code defines. A value outside a table is shown as its
+# number (see name_of()), so a state that is added later still displays.
+# S2: subsystem2_state_t.
+MOTION_NAMES = {0: "IDLE", 1: "FOLLOWING", 2: "MOVING", 3: "TURNING",
+                4: "ESTOP"}
+# S3: s3_line_state_t.
+LINE_NAMES = {0: "FOLLOW", 1: "JUNCTION", 2: "LOST", 3: "DISABLED",
+              4: "SEARCH", 5: "UNCAL"}
+# S3: s3_cmd_t, copied with no remap (a renumbering by S3 changes this).
+BC_CMD_NAMES = {0: "none", 1: "left", 2: "right", 3: "straight",
+                4: "u-turn"}
+# S3: S3_JUNC_xxx.
+JUNC_NAMES = {0: "straight", 1: "left", 2: "right", 3: "u-turn"}
+# S4: subsystem4_hump_t and subsystem4_class_t.
+HUMP_NAMES = {0: "flat", 1: "climbing", 2: "descending"}
+CLASS_NAMES = {0: "stationary", 1: "moving", 2: "accelerating",
+               3: "turning", 4: "climbing hump", 5: "descending hump",
+               6: "IMPACT"}
+CLASS_IMPACT = 6
+# S5: subsystem5_ctrl_state_t.
+CTRL_NAMES = {0: "INIT", 1: "CALIBRATING", 2: "READY",
+              3: "LINE_FOLLOWING", 4: "APPROACH_JUNCTION",
+              5: "EXECUTING_COMMAND", 6: "REACQUIRE_LINE",
+              7: "LINE_RECOVERY", 8: "OBSTACLE_AVOIDANCE", 9: "FAULT",
+              10: "FINISHED"}
+
+# S3's Code 39 index (s3_code39.c): the symbol at each index. 63 = none.
+CODE39 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. *$/+%"
+LETTER_NONE = 63
 
 USAGE = "usage: s1_decode.py [--describe] [--session] < hex_lines"
 
@@ -162,7 +216,7 @@ def decode(data):
             version, LAYOUT_VERSION,
             " (0 is never valid)" if version == 0 else ""))
     if msg_type not in LENGTHS:
-        raise DecodeError("type", "type %d is not 1 to 5" % msg_type)
+        raise DecodeError("type", "type %d is not 1 to 6" % msg_type)
     if len(data) != LENGTHS[msg_type]:
         raise DecodeError("length", "%d bytes; %s needs exactly %d" % (
             len(data), TYPE_NAMES[msg_type], LENGTHS[msg_type]))
@@ -184,21 +238,46 @@ def decode(data):
     return msg
 
 
+def name_of(table, value):
+    """The name of a value, or its number when the table lacks it."""
+    return table.get(value, str(value))
+
+
+def letter_of(index):
+    """The barcode symbol for S3's Code 39 index; '' when none yet."""
+    if 0 <= index < len(CODE39):
+        return CODE39[index]
+    return ""
+
+
 def describe(msg):
     """Return a copy of a decoded message with display-only fields added.
 
-    Only names and units the layout document defines are added. Controller,
-    motion, line and hump states, barcode commands, motion classes and
-    event codes stay numbers until their owners define them.
+    Only names and units the owners' code defines are added (the tables
+    above). Event codes stay numbers until S5's table is agreed.
     """
     shown = dict(msg)
     if msg["msg_type"] == TELEMETRY:
+        shown["ctrl_name"] = name_of(CTRL_NAMES, msg["ctrl_state"])
+        shown["motion_name"] = name_of(MOTION_NAMES, msg["motion_state"])
+        shown["line_name"] = name_of(LINE_NAMES, msg["line_state"])
+        shown["bc_char"] = letter_of(msg["bc_letter"])
+        shown["hump_name"] = name_of(HUMP_NAMES, msg["hump_state"])
+        shown["class_name"] = name_of(CLASS_NAMES, msg["motion_class"])
+        shown["b_impact"] = msg["motion_class"] == CLASS_IMPACT
         shown["pitch_deg"] = msg["pitch_hdeg"] / 2.0
         shown["roll_deg"] = msg["roll_hdeg"] / 2.0
         shown["speed_mms"] = (msg["speed_l_mms"] + msg["speed_r_mms"]) / 2.0
         shown["faults"] = [FAULT_NAMES.get(bit, "bit%d" % bit)
                            for bit in range(5)
                            if (msg["fault_mask"] >> bit) & 1]
+    elif msg["msg_type"] == LIVE:
+        shown["motion_name"] = name_of(MOTION_NAMES, msg["motion_state"])
+        shown["heading_deg"] = msg["heading_hdeg"] / 2.0
+        shown["line_name"] = name_of(LINE_NAMES, msg["line_state"])
+        shown["bc_char"] = letter_of(msg["bc_letter"])
+        shown["bc_cmd_name"] = name_of(BC_CMD_NAMES, msg["bc_cmd"])
+        shown["junc_name"] = name_of(JUNC_NAMES, msg["junc_turn"])
     elif msg["msg_type"] in (COMMAND, ACK):
         shown["opcode_name"] = OPCODE_NAMES[msg["opcode"]]
         if msg["msg_type"] == ACK:
@@ -221,21 +300,41 @@ class Session:
     """State for one robot: full encoder counts and lost frames.
 
     feed() decodes a payload like decode() and adds, for telemetry and
-    heartbeat, lost_before (frames missing since the previous one of that
-    type, from seq modulo 256) and duplicate (same seq as the previous
-    one); for telemetry also count_l_full, count_r_full and
+    heartbeat and live, lost_before (frames missing since the previous one
+    of that type, from seq modulo 256) and duplicate (same seq as the
+    previous one); for telemetry also count_l_full, count_r_full and
     counts_anchored (False on the first telemetry frame, whose full counts
-    are only the 16 bits received).
+    are only the 16 bits received); for live also d_barcodes, d_junctions,
+    d_losts and d_rejects, how many of each S3 counted since the previous
+    live message (0 on the first one), taken modulo the counter's range.
     """
+
+    LIVE_COUNTERS = (("barcodes", 256), ("junctions", 256), ("losts", 256),
+                     ("rejects", 16))
 
     def __init__(self):
         self._last_seq = {}
         self._full = {}
 
+    def rebase_robot(self):
+        """Forget every baseline, for when the robot restarted: its seq
+        numbers, encoder counts and S3 counters all start again, so the next
+        message of each type counts as the first one."""
+        self._last_seq.clear()
+        self._full.clear()
+
+    def rebase_live(self):
+        """Forget the live counters' baseline, for example when the robot
+        restarted and S3 counts from 0 again: the next live message counts
+        as the first one (d_ values 0, lost_before 0)."""
+        self._last_seq.pop(LIVE, None)
+        for name, _ in self.LIVE_COUNTERS:
+            self._full.pop("live_" + name, None)
+
     def feed(self, data):
         msg = decode(data)
         msg_type = msg["msg_type"]
-        if msg_type in (TELEMETRY, HEARTBEAT):
+        if msg_type in (TELEMETRY, HEARTBEAT, LIVE):
             prev = self._last_seq.get(msg_type)
             msg["duplicate"] = (prev is not None) and (msg["seq"] == prev)
             if (prev is None) or msg["duplicate"]:
@@ -243,6 +342,15 @@ class Session:
             else:
                 msg["lost_before"] = (msg["seq"] - prev - 1) % 256
             self._last_seq[msg_type] = msg["seq"]
+        if msg_type == LIVE:
+            for name, modulus in self.LIVE_COUNTERS:
+                key = "live_" + name
+                prev_count = self._full.get(key)
+                if prev_count is None:
+                    msg["d_" + name] = 0
+                else:
+                    msg["d_" + name] = (msg[name] - prev_count) % modulus
+                self._full[key] = msg[name]
         if msg_type == TELEMETRY:
             msg["counts_anchored"] = "count_l" in self._full
             for name in ("count_l", "count_r"):

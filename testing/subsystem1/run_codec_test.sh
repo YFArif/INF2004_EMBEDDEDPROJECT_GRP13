@@ -19,10 +19,10 @@
 #      warnings as errors, UBSan and ASan.
 #   2  Run the test; it must end with "RESULT: all passed".
 #   3  golden.py --check: golden.py's own packing, the document's 10.2
-#      table and codec_vectors.c agree on all 18 vectors.
-#   4  Ten mutations, each on a copy of the codec in a temporary folder;
-#      every one must be caught. Four must stop the build at a
-#      compile-time check; six must build and make the test fail. Each
+#      table and codec_vectors.c agree on all 21 vectors.
+#   4  Thirteen mutations, each on a copy of the codec in a temporary
+#      folder; every one must be caught. Six must stop the build at a
+#      compile-time check; seven must build and make the test fail. Each
 #      mutation matches on text, not line numbers, and the mutated copy is
 #      compared with the original: "mutation did not apply" if nothing
 #      changed, and exactly one changed line is required.
@@ -199,6 +199,12 @@ mutate C3 compile msg_layout.h \
 mutate C4 compile msg_layout.h \
     's/\(MSG_TEL_TURN_BITS  *\)10U/\117U/' \
     "MSG_TEL_TURN_BITS 10 -> 17"
+mutate C5 compile msg_layout.h \
+    's/\(MSG_LIV_STEER_POS  *\)43U/\144U/' \
+    "MSG_LIV_STEER_POS 43 -> 44"
+mutate C6 compile msg_layout.h \
+    's/\(MSG_LIV_BYTES  *\)14U/\115U/' \
+    "MSG_LIV_BYTES 14 -> 15"
 mutate R1 run msg_codec.c \
     's/mask = 0x80U >> (bit_pos % 8U);/mask = 0x01U << (bit_pos % 8U);/' \
     "bit order reversed in put_field"
@@ -217,9 +223,12 @@ mutate R5 run msg_codec.c \
 mutate R6 run msg_codec.c \
     '/^header_ok (/,/^}/s/(expected_len == len)/(expected_len == expected_len)/' \
     "header_ok length check always true"
+mutate R7 run msg_codec.c \
+    's/\(HEADING_CDEG_LIMIT  *\)18000$/\117000/' \
+    "heading limit 18000 -> 17000"
 
-echo "stage 4: $CAUGHT/10 mutations caught"
-if [ "$CAUGHT" -ne 10 ] || [ "$MISSED" -ne 0 ]
+echo "stage 4: $CAUGHT/13 mutations caught"
+if [ "$CAUGHT" -ne 13 ] || [ "$MISSED" -ne 0 ]
 then
     fail "4: mutations"
 fi
@@ -251,6 +260,6 @@ else
     echo "stage 5 skipped (arm-none-eabi-gcc is not on the PATH)"
 fi
 
-echo "S1-U05: PASS ($CHECKS checks, 18/18 vectors agree," \
-     "$CAUGHT/10 mutations caught, target compile $STAGE5)"
+echo "S1-U05: PASS ($CHECKS checks, 21/21 vectors agree," \
+     "$CAUGHT/13 mutations caught, target compile $STAGE5)"
 exit 0

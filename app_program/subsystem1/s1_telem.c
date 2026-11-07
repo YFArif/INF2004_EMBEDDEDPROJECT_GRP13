@@ -4,8 +4,9 @@
 
 /** @file s1_telem.c
  *
- * @brief Command to ack, heartbeat packing and the heartbeat schedule for
- *        telemetry_task (see s1_telem.h). No kernel or driver calls.
+ * @brief Command to ack, heartbeat packing, schedules, the queue room rule
+ *        and message filling for telemetry_task (see s1_telem.h). No kernel
+ *        or driver calls.
  */
 
 #include "s1_telem.h"
@@ -27,6 +28,13 @@ typedef uint8_t s1_telem_check_pub_t[((MSG_ACK_BYTES <= S1_TELEM_PUB_MAX)
  * far behind "now" has passed; one further away is still ahead.
  */
 #define HALF_RANGE_MSEC             0x80000000U
+
+/* Servo angle to the telemetry angle_idx: 7.5 degree steps over 0 to 180
+ * degrees (angle_idx = degrees x 2 / 15, 0 to 24).
+ */
+#define S1_TELEM_SERVO_MAX_DEG      180
+#define S1_TELEM_ANGLE_NUMERATOR    2
+#define S1_TELEM_ANGLE_DENOMINATOR  15
 
 /*!
  * @brief Add two counts without wrapping.
@@ -117,11 +125,14 @@ s1_telem_on_command (const mqtt_link_command_t * p_cmd,
  *
  * rssi is sent as 0: no RSSI can be read outside the radio service task
  * yet (assumption A15), and 0 dBm never occurs on a real link, so it
- * reads as "not measured". tel_drop and evt_drop are 0 in Stage 4a, which
- * sends no telemetry frames and has no mbf_event. cmd_reject is the sum
- * of the codec rejections, the post failures and the driver's
- * command_dropped. The codec saturates every count at its field's
- * largest value.
+ * reads as "not measured". tel_drop is the sum of the periodic messages
+ * the queue rule skipped and the ones the driver refused (telemetry, live
+ * and heartbeats). cmd_reject is the sum of the codec rejections, the post
+ * failures and the driver's command_dropped. The codec saturates every count
+ * at its field's largest value.
+ *
+ * TODO: evt_drop is 0: there is no mbf_event yet. Count its drops when
+ * Stage 4b adds it.
  *
  * @param[in]  seq     Heartbeat counter, modulo 256.
  * @param[in]  p_in    Uptime and driver counts.
@@ -140,13 +151,16 @@ s1_telem_heartbeat (uint8_t seq, const s1_telem_hb_in_t * p_in,
 
     if ((NULL != p_in) && (NULL != p_stats) && (NULL != p_hb))
     {
-        hb_fields.seq = seq;
-        hb_fields.uptime_s = p_in->uptime_s;
-        hb_fields.rssi_dbm = 0;
+        hb_fields.seq           = seq;
+        hb_fields.uptime_s      = p_in->uptime_s;
+        hb_fields.rssi_dbm      = 0;
         hb_fields.connect_count = p_in->connect_count;
-        hb_fields.tel_drop = 0U;
-        hb_fields.evt_drop = 0U;
-        hb_fields.cmd_reject = s1_telem_sat_add(
+        hb_fields.tel_drop      = s1_telem_sat_add(
+            s1_telem_sat_add(p_stats->periodic_skipped,
+                             p_stats->periodic_failed),
+            p_stats->hb_publish_failed);
+        hb_fields.evt_drop      = 0U;
+        hb_fields.cmd_reject    = s1_telem_sat_add(
             s1_telem_sat_add(p_stats->codec_reject, p_stats->post_failure),
             p_in->command_dropped);
 
@@ -182,18 +196,37 @@ s1_telem_heartbeat (uint8_t seq, const s1_telem_hb_in_t * p_in,
 bool
 s1_telem_hb_due (uint32_t now_msec, uint32_t * p_next_msec)
 {
+    return (s1_telem_due(now_msec, S1_TELEM_HB_PERIOD_MSEC, p_next_msec));
+}
+
+/*!
+ * @brief Say whether a periodic message is due, on an absolute schedule.
+ *
+ * The same rule as s1_telem_hb_due(), for any period: deadlines are
+ * period_msec apart from the first one, a stall that missed several
+ * deadlines gives one due message and not a burst, and the clock may wrap.
+ *
+ * @param[in]     now_msec    The clock now, in milliseconds.
+ * @param[in]     period_msec The period; 0 is never due.
+ * @param[in,out] p_next_msec The next deadline; moved on when one is due.
+ *
+ * @return True if the message is due now.
+ */
+bool
+s1_telem_due (uint32_t now_msec, uint32_t period_msec,
+              uint32_t * p_next_msec)
+{
     uint32_t late_msec = 0U;
     bool     b_due = false;
 
-    if (NULL != p_next_msec)
+    if ((NULL != p_next_msec) && (period_msec > 0U))
     {
         late_msec = now_msec - *p_next_msec;    /* Modulo 2^32. */
 
         if (late_msec < HALF_RANGE_MSEC)
         {
             b_due = true;
-            *p_next_msec += ((late_msec / S1_TELEM_HB_PERIOD_MSEC) + 1U)
-                            * S1_TELEM_HB_PERIOD_MSEC;
+            *p_next_msec += ((late_msec / period_msec) + 1U) * period_msec;
         }
     }
 
@@ -216,6 +249,162 @@ bool
 s1_telem_hb_should_publish (mqtt_link_state_t state, bool b_stale)
 {
     return ((MQTT_LINK_STATE_CONNECTED == state) && (!b_stale));
+}
+
+/*!
+ * @brief Say whether the publish queue is short enough for a periodic
+ *        message to join it.
+ *
+ * @param[in] free_slots From mqtt_link_publish_free(). More than
+ *                       MQTT_LINK_QUEUE_DEPTH is read as an empty queue.
+ * @param[in] max_queued S1_TELEM_TEL_QUEUED_MAX, S1_TELEM_LIVE_QUEUED_MAX
+ *                       or S1_TELEM_HB_QUEUED_MAX.
+ *
+ * @return True if at most max_queued records are in the queue.
+ */
+bool
+s1_telem_queue_allows (uint32_t free_slots, uint32_t max_queued)
+{
+    uint32_t queued = 0U;
+
+    if (free_slots < MQTT_LINK_QUEUE_DEPTH)
+    {
+        queued = MQTT_LINK_QUEUE_DEPTH - free_slots;
+    }
+
+    return (queued <= max_queued);
+}
+
+/*!
+ * @brief Fill the 2 Hz telemetry frame from the subsystem values.
+ *
+ * Mapping, section 3.4 of docs/S1_binary_frame.md: S2 gives the motion
+ * state, wheel speeds, counts and distance; S3 the line state and the last
+ * barcode's letter and direction (the barcode command is in the live
+ * message, so bc_cmd is 0); S4 the terrain fields, with motion_class
+ * forced to IMPACT while the impact is latched; S5 the controller state,
+ * the fault bits, the last ping (closest_mm, angle_idx) and the last
+ * profile (width, clearances). Anything a subsystem cannot give is 0.
+ *
+ * @param[in]  p_src Values; a NULL pointer leaves p_tel unchanged.
+ * @param[in]  seq   Frame counter.
+ * @param[out] p_tel Receives the fields.
+ */
+void
+s1_telem_fill_frame (const s1_telem_src_t * p_src, uint8_t seq,
+                     msg_codec_telemetry_t * p_tel)
+{
+    int32_t angle_deg = 0;
+
+    if ((NULL != p_src) && (NULL != p_tel))
+    {
+        angle_deg = p_src->servo_deg;
+
+        if (angle_deg < 0)
+        {
+            angle_deg = 0;
+        }
+        else if (angle_deg > S1_TELEM_SERVO_MAX_DEG)
+        {
+            angle_deg = S1_TELEM_SERVO_MAX_DEG;
+        }
+        else
+        {
+            /* Already within the servo's range. */
+        }
+
+        *p_tel = (msg_codec_telemetry_t){0U};
+
+        p_tel->seq          = seq;
+        p_tel->ctrl_state   = p_src->ctrl_state;
+        p_tel->motion_state = p_src->motion_state;
+        /* The mask keeps 5 bits, which fit uint8_t. */
+        p_tel->fault_mask   = (uint8_t)(p_src->fault_mask
+                                        & MSG_FAULT_MASK_ALL);
+        p_tel->line_state   = p_src->b_s3_ok ? p_src->line_state
+                                             : S1_TELEM_LINE_UNCAL;
+        p_tel->bc_letter    = p_src->b_s3_ok ? p_src->last_ch
+                                             : MSG_BC_LETTER_NONE;
+        p_tel->b_bc_dir     = (p_src->b_s3_ok) && (p_src->b_last_rev);
+        p_tel->speed_l_mms  = p_src->speed_l_mms;
+        p_tel->speed_r_mms  = p_src->speed_r_mms;
+        p_tel->count_l      = p_src->count_l;
+        p_tel->count_r      = p_src->count_r;
+        p_tel->dist_mm      = p_src->dist_mm;
+        p_tel->pitch_hdeg   = p_src->pitch_hdeg;
+        p_tel->roll_hdeg    = p_src->roll_hdeg;
+        p_tel->hump_state   = p_src->hump_state;
+        p_tel->peak_mm      = p_src->peak_mm;
+        p_tel->hump_count   = p_src->hump_count;
+        p_tel->motion_class = p_src->b_impact ? S1_TELEM_CLASS_IMPACT
+                                              : p_src->motion_class;
+        p_tel->turn_dps     = p_src->turn_rate_dps;
+        p_tel->b_imu_ok     = p_src->b_imu_ok;
+        p_tel->b_cal_done   = p_src->b_cal_done;
+        p_tel->closest_mm   = p_src->b_range_valid ? p_src->range_mm : 0U;
+        /* angle_deg is 0 to 180, so the result is 0 to 24 and fits
+         * uint8_t.
+         */
+        p_tel->angle_idx    = (uint8_t)((angle_deg * S1_TELEM_ANGLE_NUMERATOR)
+                                        / S1_TELEM_ANGLE_DENOMINATOR);
+        p_tel->width_mm     = p_src->b_profile_valid ? p_src->width_mm : 0U;
+        p_tel->clear_l_mm   = p_src->b_profile_valid ? p_src->clear_left_mm
+                                                     : 0U;
+        p_tel->clear_r_mm   = p_src->b_profile_valid ? p_src->clear_right_mm
+                                                     : 0U;
+    }
+}
+
+/*!
+ * @brief Fill the 5 Hz live message from the subsystem values.
+ *
+ * Mapping, section 3A of docs/S1_binary_frame.md. cmd_speed_mms is the
+ * mean of the two wheel set-points (rounded toward zero); heading is
+ * converted from centidegrees to half-degrees. When S3 could not be read,
+ * line_state is UNCAL, bc_letter is 63 and every other S3 field is 0.
+ *
+ * @param[in]  p_src  Values; a NULL pointer leaves p_live unchanged.
+ * @param[in]  seq    Message counter.
+ * @param[out] p_live Receives the fields.
+ */
+void
+s1_telem_fill_live (const s1_telem_src_t * p_src, uint8_t seq,
+                    msg_codec_live_t * p_live)
+{
+    if ((NULL != p_src) && (NULL != p_live))
+    {
+        *p_live = (msg_codec_live_t){0U};
+
+        p_live->seq           = seq;
+        p_live->motion_state  = p_src->motion_state;
+        p_live->b_estop       = p_src->b_estop;
+        /* Each set-point is a few hundred mm/s, so the sum cannot overflow
+         * int32_t.
+         */
+        p_live->cmd_speed_mms = (p_src->target_l_mms + p_src->target_r_mms)
+                                / 2;
+        p_live->heading_hdeg  = msg_codec_heading_to_hdeg(
+                                    p_src->heading_cdeg);
+        p_live->line_state    = S1_TELEM_LINE_UNCAL;
+        p_live->bc_letter     = MSG_BC_LETTER_NONE;
+
+        if (p_src->b_s3_ok)
+        {
+            p_live->line_state   = p_src->line_state;
+            p_live->steer_dv_mms = p_src->steer_dv_mms;
+            p_live->outer_ir     = p_src->outer_ir;
+            p_live->centre_ir    = p_src->centre_ir;
+            p_live->b_overshoot  = p_src->b_overshoot;
+            p_live->bc_letter    = p_src->last_ch;
+            p_live->bc_cmd       = p_src->last_cmd;
+            p_live->b_bc_rev     = p_src->b_last_rev;
+            p_live->junc_turn    = p_src->junc_turn;
+            p_live->rejects      = p_src->rejects;
+            p_live->junctions    = p_src->junctions;
+            p_live->losts        = p_src->losts;
+            p_live->barcodes     = p_src->barcodes;
+        }
+    }
 }
 
 #endif /* TM_MQTT */

@@ -35,7 +35,9 @@
 #   4  The run-time check of the topic mapping. Build and run the host test
 #      against the unmutated copy (R0), which must pass, then against a
 #      copy whose event suffix is changed to "ack" (R1), which must fail,
-#      and only in the "-- topic mapping" section.
+#      and only in the "-- topic mapping" section. Then a copy whose
+#      mqtt_link_publish_free() returns bytes, not records (R2), which must
+#      fail, and only in the "-- publish queue free slots" section.
 #
 # The last line is "S1-U09: PASS (...)" with exit status 0, or
 # "S1-U09: FAIL (...)" with exit status 1. Nothing in the repository is
@@ -261,9 +263,31 @@ then
 fi
 grep '^  FAIL line ' "$WORK/R1/run.out"
 echo "R1 TOPIC_EVENT \"event\" -> \"ack\": caught by the topic mapping test"
-echo "stage 4: 1/1 mutation caught"
+
+if ! copy_to "$WORK/R2/app_program/subsystem1" mqtt_link.c \
+        's|return (mqtt_queue_publish_free_bytes() / MQTT_QUEUE_PUBLISH_COST_BYTES);|return (mqtt_queue_publish_free_bytes());|' \
+        R2 'free slots returned as bytes'
+then
+    fail "4: R2 mutation"
+fi
+run_copy R2
+SECTIONS=$(awk '/^-- /{ s = $0 } /^  FAIL line /{ print s }' \
+           "$WORK/R2/run.out" | sort -u)
+if [ "$RUN_RC" -eq 0 ]
+then
+    echo "R2 free slots returned as bytes: NOT caught (the test passed)"
+    fail "4: R2"
+elif [ "$SECTIONS" != "-- publish queue free slots" ]
+then
+    cat "$WORK/R2/run.out"
+    echo "R2: failed outside the free slots section"
+    fail "4: R2"
+fi
+grep '^  FAIL line ' "$WORK/R2/run.out"
+echo "R2 free slots returned as bytes: caught by the free slots test"
+echo "stage 4: 2/2 mutations caught"
 
 echo "S1-U09: PASS (host test all passed, clean compile of the copy," \
-     "$CAUGHT/4 compile-time mutations caught, 1/1 run-time mutation" \
+     "$CAUGHT/4 compile-time mutations caught, 2/2 run-time mutations" \
      "caught)"
 exit 0

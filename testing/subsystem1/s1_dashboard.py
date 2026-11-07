@@ -1,4 +1,5 @@
-"""S1 laptop dashboard: START, STOP and RESET, their acks and the heartbeat.
+"""S1 laptop dashboard: START, STOP and RESET, their acks, the heartbeat
+and the robot's telemetry (S2 motion, S3 line, S4 IMU, S5 state).
 
 Serves one page on http://127.0.0.1:8765/ (this machine only) and pushes
 live updates to it with server-sent events. It reaches the broker through
@@ -12,7 +13,11 @@ Mission commands only, never teleoperation. Commands go to
 retain flag, so the robot would run a retained command again after every
 reconnect (docs/MQTT.md section 1.1). An ack with result 0 means "queued
 for S5", not carried out: S5's verdict is on the robot's console only
-until Stage 4b.
+until the event channel is built (the S5 panel shows the state change).
+
+The telemetry panels read two messages on <prefix>/telemetry: the 2 Hz
+telemetry frame (type 1) and the 5 Hz live message (type 6), both defined
+in docs/S1_binary_frame.md. A panel greys out when its messages stop.
 
 The broker host, port and prefix come from app_program/subsystem1/
 mqtt_config.h (git-ignored) or from --host, --port and --prefix. The page,
@@ -27,7 +32,8 @@ Run from the repository root (docs/S1_dashboard.md is the full guide):
     python3 -I -B testing/subsystem1/s1_dashboard.py --check
 
 --simulate needs no broker: a fake car answers with S5's command rules
-and telemetry_task's acks and heartbeat. --check is test S1-U16 part A;
+and telemetry_task's acks, heartbeat, telemetry and live message.
+--check is test S1-U16 part A;
 it exits 0 PASS, 1 FAIL, 2 INCOMPLETE (steps not built yet).
 """
 
@@ -40,6 +46,7 @@ import http.client
 import http.server
 import io
 import json
+import math
 import os
 import queue
 import random
@@ -81,6 +88,20 @@ CMD_SUFFIX = "cmd/dash"
 LOG_KEEP = 200
 COMMANDS_KEEP = 20
 RECENT_KEEP_S = 30.0            # How long a late or duplicate ack is known.
+TIMELINE_KEEP = 100             # S3 timeline entries kept for a new page.
+IMU_KEEP = 120                  # Pitch and roll points: 60 s at 2 Hz.
+# The largest believable change of an S3 counter between two live messages
+# (200 ms apart). A bigger one, or a live seq gap above SEQ_GAP_MAX, means
+# the robot restarted or many messages were lost, so the timeline starts
+# again instead of showing a burst.
+# NOTE: A counter that was close below its wrap reads as a small change when
+# a restart sets it to 0: rejects 13 to 15 give 3, 2 or 1 (barcodes, junctions
+# and losts: 252 to 255). The seq gap catches that unless the live seq was
+# also within SEQ_GAP_MAX of its own wrap. Then one wrong timeline entry can
+# appear before the heartbeat shows the restart.
+COUNTER_JUMP_MAX = {"barcodes": 4, "junctions": 4, "losts": 4, "rejects": 3}
+SEQ_GAP_MAX = 25                # About 5 s of live messages.
+TEL_DROP_MAX = 255              # tel_drop is 8 bits and clamps here.
 RETAINED_TEST_SUFFIX = "cmd/test"
 SUB_FORMAT = "@Y-@m-@dT@H:@M:@S.@N %r %t %x"
 LABELS = {0: "queued", 1: "rejected"}
@@ -101,6 +122,20 @@ CONFIG_PATTERNS = {
 def now_text():
     """This machine's local time, ISO, to the millisecond."""
     return datetime.datetime.now().isoformat(timespec="milliseconds")
+
+
+def age_ms(now, then):
+    """Milliseconds since a monotonic time stamp, or None if never."""
+    if then is None:
+        return None
+    return int((now - then) * 1000.0)
+
+
+def tel_drop_text(value):
+    """tel_drop for the page: at its clamp, the true count may be higher."""
+    if value >= TEL_DROP_MAX:
+        return "%d or more" % TEL_DROP_MAX
+    return str(value)
 
 
 def read_config(path):
@@ -167,6 +202,9 @@ class Scrubber:
 
     A loopback host is left alone: it says nothing about the network, and
     the dashboard's own address 127.0.0.1 must stay readable.
+
+    NOTE: Scrub the values, then serialize. Replacing text in serialized JSON
+    would turn a number that holds a digit-only login into invalid JSON.
     """
 
     def __init__(self, settings):
@@ -182,11 +220,12 @@ class Scrubber:
         return value
 
     def obj(self, value):
-        """Scrub every string inside a JSON-like value."""
+        """Scrub every string, keys included, inside a JSON-like value."""
         if isinstance(value, str):
             return self.text(value)
         if isinstance(value, dict):
-            return {key: self.obj(item) for key, item in value.items()}
+            return {self.obj(key): self.obj(item)
+                    for key, item in value.items()}
         if isinstance(value, (list, tuple)):
             return [self.obj(item) for item in value]
         return value
@@ -401,12 +440,29 @@ class FakeCar:
     real parser is used. The command rules copy s5_mission_command()
     (app_program/subsystem5/s5_mission.c); the acks and the heartbeat copy
     telemetry_task (ack result 0 = queued for S5, a 1 Hz heartbeat with
-    rssi 0). The fake car's state is shown only in the simulator panel: a
-    real car's state is not visible until Stage 4b.
+    rssi 0). It also sends the 2 Hz telemetry frame and the 5 Hz live
+    message with made-up but plausible values (a car that follows a line,
+    reads a barcode every 7 s, takes a junction every 11 s, loses the line
+    every 29 s and crosses a hump every 17 s while it is running), so every
+    panel can be seen working. After each 5 s of running its heartbeat also
+    reports 3 more skipped messages in tel_drop, which clamps at 255 as the
+    robot's does. The fake car's own state is also in the
+    simulator panel; a real car's state is in the S5 panel.
     """
 
     CAL_S = 3.0
     RUNNING = "LINE_FOLLOWING"
+    TEL_S = 0.5                 # s1_telem.h: S1_TELEM_TEL_PERIOD_MSEC.
+    LIVE_S = 0.2                # s1_telem.h: S1_TELEM_LIVE_PERIOD_MSEC.
+    TRACK_MM = 140.0            # Made-up wheel track, for the heading.
+    COUNTS_PER_MM = 3.1         # Made-up encoder scale.
+    CTRL_INDEX = {"CALIBRATING": 1, "READY": 2, "LINE_FOLLOWING": 3,
+                  "FAULT": 9, "FINISHED": 10}
+    SCRIPT = (("barcode", 7.0), ("junction", 11.0), ("reject", 19.0),
+              ("lost", 29.0), ("hump", 17.0), ("skip", 5.0))
+    SKIPS_PER_FIRE = 3
+    HUMP_S = 3.0
+    BARCODE_LETTERS = "ABCD"
 
     def __init__(self, settings, scrub, opts_dir, b_v5):
         self._settings = settings
@@ -438,11 +494,32 @@ class FakeCar:
         self._cmd_reject = 0
         self._b_connected = True
         self._b_hb_paused = False
+        self._model_lock = threading.Lock()
+        self._tel_seq = 0
+        self._live_seq = 0
+        self._next_tel = self._t0 + 0.3
+        self._next_live = self._t0 + 0.3
+        self._last_model = None
+        self._run_s = 0.0
+        self._due = dict(self.SCRIPT)
+        self._hump_left = 0.0
+        self._hump_count = 0
+        self._hold = {"junction": 0.0, "lost": 0.0, "impact": 0.0}
+        self._dist_mm = 0.0
+        self._heading_deg = 0.0
+        self._enc = [0.0, 0.0]
+        self._tel_drop = 0
+        self._s3 = {"barcodes": 0, "rejects": 0, "junctions": 0, "losts": 0}
+        self._bc = {"letter": s1_decode.LETTER_NONE, "cmd": 0,
+                    "b_rev": False, "turn": 0}
+        self._view = {}
 
     def start(self):
         self._t0 = time.monotonic()
         self._next_hb = self._t0 + 1.5
         self._next_sys = self._t0 + 5.0
+        self._next_tel = self._t0 + 0.3
+        self._next_live = self._t0 + 0.3
         self.on_sim(self._state, "fake car console: power-up, CALIBRATING")
         self.on_line(sub_line(True, self._topic["status"], b"online"))
         self.on_line(sub_line(True, "$SYS/broker/uptime", b"1 seconds"))
@@ -477,13 +554,208 @@ class FakeCar:
         if now >= self._next_hb:
             self._next_hb = max(self._next_hb + 1.0, now + 0.5)
             self._heartbeat(now)
+        self._advance(now)
+        if self._b_connected and (now >= self._next_live):
+            self._next_live = max(self._next_live + self.LIVE_S, now + 0.1)
+            self._send_live()
+        if self._b_connected and (now >= self._next_tel):
+            self._next_tel = max(self._next_tel + self.TEL_S, now + 0.25)
+            self._send_telemetry()
+
+    def _advance(self, now):
+        """Move the made-up car on to time `now` and work out the values
+        both messages send (the S2, S3, S4 and S5 fields of section 3A)."""
+        with self._model_lock:
+            dt = 0.0 if self._last_model is None else min(
+                now - self._last_model, 0.5)
+            self._last_model = now
+            for key in self._hold:
+                self._hold[key] = max(0.0, self._hold[key] - dt)
+            b_run = self._state == self.RUNNING
+            if b_run:
+                self._run_s += dt
+                for name, period in self.SCRIPT:
+                    if self._run_s >= self._due[name]:
+                        self._due[name] += period
+                        self._fire(name)
+            hump_before = self._hump_left
+            self._hump_left = max(0.0, self._hump_left - dt)
+            if (hump_before > 0.0) and (self._hump_left == 0.0):
+                self._hump_count += 1
+            self._view = self._values(dt, b_run)
+
+    def _values(self, dt, b_run):
+        """The fake car's current numbers (model lock held)."""
+        run = self._run_s
+        b_lost = self._hold["lost"] > 0.0
+        b_junction = self._hold["junction"] > 0.0
+        b_fault = self._state == "FAULT"
+        steer = 0
+        target = 0
+        if b_run and (not b_lost):
+            target = 80 if b_junction else 200
+            if not b_junction:
+                steer = int(60.0 * math.sin(0.8 * run))
+        measured = 0.0
+        if b_run and (not b_lost):
+            measured = target + 12.0 * math.sin(2.3 * run)
+        speed_l = int(measured - steer / 2.0)
+        speed_r = int(measured + steer / 2.0)
+        self._dist_mm = min(self._dist_mm + measured * dt, 32767.0)
+        self._heading_deg += math.degrees((speed_r - speed_l)
+                                          / self.TRACK_MM) * dt
+        self._heading_deg = (self._heading_deg + 180.0) % 360.0 - 180.0
+        self._enc[0] += speed_l * dt * self.COUNTS_PER_MM
+        self._enc[1] += speed_r * dt * self.COUNTS_PER_MM
+        pitch = 1.5 * math.sin(2.0 * run) if b_run else 0.0
+        roll = 2.0 * math.sin(0.7 * run) if b_run else 0.0
+        hump_state = 0
+        if self._hump_left > 0.0:
+            phase = self.HUMP_S - self._hump_left
+            half = self.HUMP_S / 2.0
+            if phase < half:
+                hump_state = 1
+                pitch += 12.0 * math.sin(math.pi * phase / half)
+            else:
+                hump_state = 2
+                pitch -= 12.0 * math.sin(math.pi * (phase - half) / half)
+        b_impact = self._hold["impact"] > 0.0
+        if b_fault:
+            motion = 4
+        elif b_junction:
+            motion = 3
+        elif b_run:
+            motion = 1
+        else:
+            motion = 0
+        if b_impact:
+            klass = 6
+        elif hump_state == 1:
+            klass = 4
+        elif hump_state == 2:
+            klass = 5
+        elif b_junction:
+            klass = 3
+        elif b_run:
+            klass = 1
+        else:
+            klass = 0
+        if self._state == "CALIBRATING":
+            line = 5
+        elif b_lost:
+            line = 2
+        elif b_junction:
+            line = 1
+        elif b_run:
+            line = 0
+        else:
+            line = 3
+        outer = int(10.0 + 15.0 * abs(math.sin(0.9 * run))) if b_run else 0
+        centre = int(200.0 + 30.0 * math.sin(1.7 * run)) if b_run else 0
+        if b_lost:
+            outer, centre = 0, 0
+        return {
+            "motion": motion, "b_estop": b_fault, "cmd_speed": target,
+            "speed_l": speed_l, "speed_r": speed_r, "steer": steer,
+            "heading_hdeg": int(round(self._heading_deg * 2.0)),
+            "dist": int(self._dist_mm),
+            "turn_dps": int(math.degrees((speed_r - speed_l)
+                                         / self.TRACK_MM)),
+            "pitch_hdeg": max(-64, min(63, int(round(pitch * 2.0)))),
+            "roll_hdeg": max(-64, min(63, int(round(roll * 2.0)))),
+            "hump_state": hump_state, "klass": klass, "line": line,
+            "outer": min(outer, 255), "centre": min(centre, 255),
+            "b_overshoot": outer > 22,
+            "ctrl": self.CTRL_INDEX.get(self._state, 0),
+            "fault_mask": 1 if b_fault else 0,
+            "b_cal_done": self._state != "CALIBRATING"}
+
+    def _fire(self, name):
+        """One scripted or simulator-button event (model lock held)."""
+        if name == "barcode":
+            number = self._s3["barcodes"]
+            letter = self.BARCODE_LETTERS[number % len(self.BARCODE_LETTERS)]
+            self._bc = {"letter": s1_decode.CODE39.index(letter),
+                        "cmd": 1 + (number % 4),
+                        "b_rev": (number % 5) == 4, "turn": self._bc["turn"]}
+            self._s3["barcodes"] += 1
+        elif name == "reject":
+            self._s3["rejects"] += 1
+        elif name == "junction":
+            self._bc["turn"] = (self._s3["junctions"] + 1) % 4
+            self._s3["junctions"] += 1
+            self._hold["junction"] = 0.6
+        elif name == "lost":
+            self._s3["losts"] += 1
+            self._hold["lost"] = 0.8
+        elif name == "hump":
+            self._hump_left = self.HUMP_S
+        elif name == "impact":
+            self._hold["impact"] = 1.0
+        elif name == "skip":
+            self._tel_drop = min(self._tel_drop + self.SKIPS_PER_FIRE, 255)
+        else:
+            pass
+
+    def _send_telemetry(self):
+        with self._model_lock:
+            view = dict(self._view)
+            bc = dict(self._bc)
+            seq = self._tel_seq
+            self._tel_seq += 1
+            enc = [int(self._enc[0]), int(self._enc[1])]
+            humps = self._hump_count
+        if not view:
+            return
+        values = {
+            "seq": seq & 0xFF, "ctrl_state": view["ctrl"],
+            "motion_state": view["motion"],
+            "fault_mask": view["fault_mask"], "line_state": view["line"],
+            "bc_letter": bc["letter"], "bc_cmd": 0,
+            "b_bc_dir": bc["b_rev"],
+            "speed_l_mms": view["speed_l"], "speed_r_mms": view["speed_r"],
+            "count_l": enc[0], "count_r": enc[1], "dist_mm": view["dist"],
+            "pitch_hdeg": view["pitch_hdeg"],
+            "roll_hdeg": view["roll_hdeg"],
+            "hump_state": view["hump_state"],
+            "peak_mm": 25 if humps > 0 else 0,
+            "hump_count": min(humps, 15), "motion_class": view["klass"],
+            "turn_dps": view["turn_dps"], "b_imu_ok": True,
+            "b_cal_done": view["b_cal_done"]}
+        self.on_line(sub_line(False, self._topic["telemetry"],
+                              pack(s1_decode.TELEMETRY, values)))
+
+    def _send_live(self):
+        with self._model_lock:
+            view = dict(self._view)
+            bc = dict(self._bc)
+            counts = dict(self._s3)
+            seq = self._live_seq
+            self._live_seq += 1
+        if not view:
+            return
+        values = {
+            "seq": seq & 0xFF, "motion_state": view["motion"],
+            "b_estop": view["b_estop"], "cmd_speed_mms": view["cmd_speed"],
+            "heading_hdeg": view["heading_hdeg"], "line_state": view["line"],
+            "steer_dv_mms": view["steer"], "outer_ir": view["outer"],
+            "centre_ir": view["centre"],
+            "b_overshoot": view["b_overshoot"],
+            "bc_letter": bc["letter"], "bc_cmd": bc["cmd"],
+            "b_bc_rev": bc["b_rev"], "junc_turn": bc["turn"],
+            "rejects": counts["rejects"] & 0xF,
+            "junctions": counts["junctions"] & 0xFF,
+            "losts": counts["losts"] & 0xFF,
+            "barcodes": counts["barcodes"] & 0xFF}
+        self.on_line(sub_line(False, self._topic["telemetry"],
+                              pack(s1_decode.LIVE, values)))
 
     def _heartbeat(self, now):
         values = {"seq": self._hb_seq & 0xFF,
                   "uptime_s": (self._uptime0 + int(now - self._t0)) & 0xFFFF,
                   "rssi_dbm": 0,
                   "connect_count": self._connect_count & 0xFF,
-                  "tel_drop": 0, "evt_drop": 0,
+                  "tel_drop": self._tel_drop, "evt_drop": 0,
                   "cmd_reject": min(self._cmd_reject, 255)}
         if not self._b_connected:
             return
@@ -586,6 +858,10 @@ class FakeCar:
             self._set_connected(action == "online")
         elif action in ("fault", "gp20"):
             self._car_action(action)
+        elif action in ("s3_barcode", "s3_reject", "s3_junction", "s3_lost",
+                        "s4_impact", "s4_hump"):
+            with self._model_lock:
+                self._fire(action[3:])
         elif action in ("retained_cmd", "retained_clear"):
             # Another client publishes on <prefix>/cmd/test with retain: a
             # RESET with cmd_id 42, or the empty message that clears it.
@@ -687,6 +963,18 @@ class Dashboard:
         self.cmd_count = 0
         self.log = collections.deque(maxlen=LOG_KEEP)
         self.telemetry = None
+        self.tel_mono = None
+        self.tel_lost_total = 0
+        self.live = None
+        self.live_lost_total = 0
+        self.live_mono = None
+        self.s3_timeline = collections.deque(maxlen=TIMELINE_KEEP)
+        self.s3_tally = {}
+        self.s3_rejected = 0
+        self.imu_history = collections.deque(maxlen=IMU_KEEP)
+        self.impact_count = 0
+        self.impact_at = None
+        self.b_impact_prev = False
         self.car_state = None
         self.log_file = None
         if log_path:
@@ -706,16 +994,16 @@ class Dashboard:
         data = self.scrub.obj(dict(data))
         data["t"] = now_text()
         self.event_id += 1
-        text = self.scrub.text(json.dumps(data, sort_keys=True))
+        text = json.dumps(data, sort_keys=True)
         if "log" in data:
             self.log.append({"t": data["t"], "kind": log_kind(name, data),
                              "text": data["log"]})
             print(self.scrub.text("%s  %s" % (data["t"][11:], data["log"])),
                   flush=True)
         if self.log_file is not None:
-            self.log_file.write(self.scrub.text(json.dumps(
+            self.log_file.write(json.dumps(
                 {"id": self.event_id, "event": name, "data": data},
-                sort_keys=True)) + "\n")
+                sort_keys=True) + "\n")
             self.log_file.flush()
         message = "id: %d\nevent: %s\ndata: %s\n\n" % (self.event_id, name,
                                                          text)
@@ -726,8 +1014,7 @@ class Dashboard:
         """Register a page: its first event is the snapshot."""
         client = queue.Queue()
         with self.lock:
-            text = self.scrub.text(json.dumps(self.snapshot(),
-                                              sort_keys=True))
+            text = json.dumps(self.snapshot(), sort_keys=True)
             client.put("id: %d\nevent: snapshot\ndata: %s\n\n"
                        % (self.event_id, text))
             self.clients.append(client)
@@ -750,7 +1037,14 @@ class Dashboard:
                 "link": self.light, "heartbeat": self.heartbeat,
                 "hb_age_ms": age, "controls": self.controls,
                 "commands": [public(rec) for rec in self.commands],
-                "log": list(self.log), "telemetry": self.telemetry,
+                "log": list(self.log), "telemetry": self.telemetry_view(),
+                "tel_age_ms": age_ms(now, self.tel_mono),
+                "live": self.live,
+                "live_age_ms": age_ms(now, self.live_mono),
+                "s3_timeline": list(self.s3_timeline),
+                "s3_tally": self.s3_tally,
+                "s3_rejected": self.s3_rejected,
+                "imu_history": list(self.imu_history),
                 "car_state": self.car_state, "banner": self.banner,
                 "banner_why": self.banner_why,
                 "retained_cmd": [dict(e) for e in self.retained.values()],
@@ -840,11 +1134,113 @@ class Dashboard:
         if msg["msg_type"] == s1_decode.HEARTBEAT:
             self.on_heartbeat(msg)
         elif msg["msg_type"] == s1_decode.TELEMETRY:
-            self.telemetry = s1_decode.describe(msg)
-            self.emit("telemetry", self.telemetry)
+            self.on_frame(msg)
+        elif msg["msg_type"] == s1_decode.LIVE:
+            self.on_live(msg)
         else:
             self.emit("note", {"log": "%s message on %s ignored"
                                       % (msg["type"], suffix)})
+
+    def telemetry_view(self):
+        """The last telemetry frame plus what the dashboard adds: how many
+        IMPACT flags it has seen and when the last one arrived."""
+        if self.telemetry is None:
+            return None
+        view = dict(self.telemetry)
+        view["impact_count"] = self.impact_count
+        view["impact_at"] = self.impact_at
+        view["lost_total"] = self.tel_lost_total
+        return view
+
+    def on_frame(self, msg):
+        """A 2 Hz telemetry frame: S2 odometry, S4 IMU, S5 state."""
+        self.telemetry = s1_decode.describe(msg)
+        self.tel_mono = time.monotonic()
+        if msg["lost_before"] <= SEQ_GAP_MAX:
+            self.tel_lost_total += msg["lost_before"]
+        self.imu_history.append([self.telemetry["pitch_deg"],
+                                 self.telemetry["roll_deg"]])
+        b_impact = self.telemetry["b_impact"]
+        b_new = b_impact and (not self.b_impact_prev)
+        self.b_impact_prev = b_impact
+        if b_new:
+            # Count the rising edge only; S4's flag may stay up for a while.
+            self.impact_count += 1
+            self.impact_at = now_text()
+        view = self.telemetry_view()
+        if b_new:
+            view["log"] = "IMPACT reported by S4 (number %d)" % (
+                self.impact_count)
+        self.emit("telemetry", view)
+
+    def on_live(self, msg):
+        """A 5 Hz live message: S2 command and heading, S3 line state."""
+        self.live = s1_decode.describe(msg)
+        self.live_mono = time.monotonic()
+        if msg["lost_before"] <= SEQ_GAP_MAX:
+            self.live_lost_total += msg["lost_before"]
+        self.live["lost_total"] = self.live_lost_total
+        entries = self.live_entries(msg)
+        self.emit("live", self.live)
+        if entries:
+            self.emit("s3_events", {"entries": entries,
+                                    "tally": self.s3_tally,
+                                    "rejected": self.s3_rejected})
+
+    def add_timeline(self, kind, text):
+        """Append one entry to the S3 timeline and return it."""
+        entry = {"t": now_text(), "kind": kind, "text": text}
+        self.s3_timeline.append(entry)
+        return entry
+
+    def live_entries(self, msg):
+        """Timeline entries for the S3 counters that moved since the
+        previous live message; also updates the letter tally.
+
+        S3 sends counters, not events, so each entry is dated by when the
+        message arrived (200 ms resolution). Only the latest letter is
+        known, so a second barcode inside one interval is counted under "?".
+        """
+        deltas = {name: msg["d_" + name]
+                  for name, _ in s1_decode.Session.LIVE_COUNTERS}
+        if ((msg["lost_before"] > SEQ_GAP_MAX)
+                or any(deltas[name] > COUNTER_JUMP_MAX[name]
+                       for name in deltas)):
+            self.session.rebase_live()
+            return [self.add_timeline(
+                "note", "S3 counters or live messages jumped: the robot "
+                        "restarted or messages were lost, counting again "
+                        "from here")]
+        entries = []
+        shown = self.live
+        if deltas["barcodes"] > 0:
+            symbol = shown["bc_char"] or "?"
+            self.s3_tally[symbol] = self.s3_tally.get(symbol, 0) + 1
+            extra = deltas["barcodes"] - 1
+            if extra > 0:
+                self.s3_tally["?"] = self.s3_tally.get("?", 0) + extra
+            text = "barcode %s accepted: %s, read %s" % (
+                symbol, shown["bc_cmd_name"],
+                "backwards" if shown["b_bc_rev"] else "forwards")
+            if extra > 0:
+                text += " (and %d more, letters not seen)" % extra
+            entries.append(self.add_timeline("barcode", text))
+        if deltas["rejects"] > 0:
+            self.s3_rejected += deltas["rejects"]
+            entries.append(self.add_timeline(
+                "reject", "barcode rejected (%d)" % deltas["rejects"]))
+        if deltas["junctions"] > 0:
+            entries.append(self.add_timeline(
+                "junction", "junction: turn %s%s" % (
+                    shown["junc_name"],
+                    "" if deltas["junctions"] == 1
+                    else " (%d junctions, last turn)" % deltas["junctions"])))
+        if deltas["losts"] > 0:
+            entries.append(self.add_timeline(
+                "lost", "line lost%s" % (
+                    "" if deltas["losts"] == 1
+                    else " (%d times)" % deltas["losts"])))
+        return entries
 
     def on_heartbeat(self, msg):
         notes = []
@@ -852,6 +1248,14 @@ class Dashboard:
         if old is not None:
             if msg["uptime_s"] < old["uptime_s"]:
                 notes.append("uptime went back: the robot restarted")
+                self.session.rebase_robot()
+                # feed() compared this seq with the previous run's.
+                msg["lost_before"] = 0
+                self.emit("s3_events", {
+                    "entries": [self.add_timeline(
+                        "note", "the robot restarted: S3 counts again "
+                                "from 0")],
+                    "tally": self.s3_tally, "rejected": self.s3_rejected})
             if msg["connect_count"] != old["connect_count"]:
                 notes.append("connect_count %d -> %d: the robot reconnected"
                              % (old["connect_count"], msg["connect_count"]))
@@ -864,6 +1268,7 @@ class Dashboard:
             "rssi_text": "not measured" if rssi == 0 else "%d dBm" % rssi,
             "connect_count": msg["connect_count"],
             "tel_drop": msg["tel_drop"], "evt_drop": msg["evt_drop"],
+            "tel_drop_text": tel_drop_text(msg["tel_drop"]),
             "cmd_reject": msg["cmd_reject"]}
         self.hb_mono = time.monotonic()
         data = dict(self.heartbeat)
@@ -1342,8 +1747,62 @@ li { margin-bottom: 4px; }
 #log div { padding: 1px 0; border-bottom: 1px dotted var(--line); }
 .log-no_ack, .log-cmd_failed, .log-decode_error { color: var(--red); }
 .log-sim, .log-cmd_seen { color: var(--muted); }
+.log-telemetry { color: var(--red); font-weight: 700; }
 .log-retained_cmd { color: var(--red); font-weight: 700; }
 .sim-buttons button { margin: 4px 6px 0 0; }
+.tgrid {
+  display: grid; gap: 16px; grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+.tgrid .panel { margin-bottom: 0; }
+.age { font-size: 12px; font-weight: 400; color: var(--muted); }
+.panel.stale .vals { opacity: 0.4; }
+.panel.stale .age { color: var(--red); font-weight: 700; }
+.flag {
+  display: inline-block; padding: 1px 8px; border-radius: 6px;
+  font-size: 14px; font-weight: 700; background: var(--red); color: #fff;
+  vertical-align: 2px;
+}
+.flag[hidden] { display: none; }
+.impact {
+  margin: 2px 0 6px; padding: 12px 8px; text-align: center;
+  border: 2px solid var(--line); border-radius: 10px; font-size: 34px;
+  font-weight: 800; letter-spacing: 4px; color: var(--muted);
+}
+.impact.hot { background: var(--red); border-color: var(--red); color: #fff; }
+.letter {
+  display: inline-block; min-width: 1.4em; margin-left: 10px;
+  padding: 0 6px; text-align: center; border: 2px solid var(--line);
+  border-radius: 8px; font-size: 26px; font-weight: 800;
+}
+.bar {
+  height: 10px; margin-top: 2px; border: 1px solid var(--line);
+  border-radius: 5px; overflow: hidden;
+}
+.bar i { display: block; width: 0; height: 100%; background: var(--queued); }
+.tally { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+.tally span {
+  padding: 1px 8px; border: 1px solid var(--line); border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+#timeline {
+  max-height: 180px; overflow: auto; font-size: 13px;
+  font-family: ui-monospace, Menlo, monospace;
+}
+#timeline div { padding: 1px 0; border-bottom: 1px dotted var(--line); }
+.tl-reject, .tl-lost { color: var(--red); }
+.tl-junction { color: var(--queued); }
+.tl-note { color: var(--muted); }
+#imu {
+  width: 100%; height: 90px; margin-top: 8px; border: 1px solid var(--line);
+  border-radius: 6px;
+}
+#imu line { stroke: var(--line); stroke-width: 1; }
+#imu polyline {
+  fill: none; stroke-width: 1.6; vector-effect: non-scaling-stroke;
+}
+#g-pitch { stroke: var(--queued); }
+#g-roll { stroke: var(--amber); stroke-dasharray: 5 3; }
 #banner { display: none; padding: 10px 16px; font-weight: 600; }
 #banner.warn { display: block; background: var(--red); color: #fff; }
 #banner.done { display: block; background: var(--amber); color: #000; }
@@ -1401,6 +1860,7 @@ li { margin-bottom: 4px; }
       <tr><td>rssi</td><td id="rssi">-</td></tr>
       <tr><td>tel_drop / evt_drop</td><td id="drops">-</td></tr>
       <tr><td>heartbeats lost</td><td id="lost">-</td></tr>
+      <tr><td>telemetry / live lost</td><td id="msg-lost">-</td></tr>
     </table>
   </div>
   <div class="panel">
@@ -1423,16 +1883,17 @@ li { margin-bottom: 4px; }
         step arms the controller.</li>
       <li>"queued" means S5 received the command, not that it acted.
         S5's verdict is on the robot's console only (EVT 0x65 a=opcode
-        b=1 or 0) until Stage 4b. "rejected" means S1 refused the command
-        or could not hand it to S5.</li>
+        b=1 or 0) until the event channel is built; the S5 panel shows
+        the state change. "rejected" means S1 refused the command or
+        could not hand it to S5.</li>
       <li>A command sent while the robot is offline is lost: no ack.</li>
     </ul>
   </div>
   <div class="panel" id="sim-panel" hidden>
     <h2>Simulator</h2>
     <div>fake car state: <b id="car-state">-</b>
-      <span class="muted">(a real car's state is not visible until
-      Stage 4b)</span></div>
+      <span class="muted">(a real car's state is in the S5 panel)</span>
+    </div>
     <div class="sim-buttons">
       <button type="button" data-sim="hb_pause">Pause heartbeat</button>
       <button type="button" data-sim="hb_resume">Resume heartbeat</button>
@@ -1450,12 +1911,93 @@ li { margin-bottom: 4px; }
         </button>
       <button type="button" data-sim="retained_clear">Clear retained
         </button>
+      <button type="button" data-sim="s4_impact">S4 impact</button>
+      <button type="button" data-sim="s4_hump">S4 hump</button>
+      <button type="button" data-sim="s3_barcode">S3 barcode</button>
+      <button type="button" data-sim="s3_reject">S3 barcode rejected
+        </button>
+      <button type="button" data-sim="s3_junction">S3 junction</button>
+      <button type="button" data-sim="s3_lost">S3 line lost</button>
     </div>
   </div>
-  <details class="panel">
-    <summary>Telemetry</summary>
-    <div id="telemetry">No telemetry frames yet (Stage 4b).</div>
-  </details>
+</section>
+<section class="tgrid">
+  <div class="panel" id="p-s2">
+    <h2>S2 motion <span class="age" id="age-s2"></span></h2>
+    <div class="vals">
+      <div class="bigline"><span id="s2-state">-</span>
+        <span id="s2-estop" class="flag" hidden>E-STOP</span>
+        <span id="s2-stall" class="flag" hidden>STALL</span></div>
+      <table class="kv">
+        <tr><td>commanded speed</td><td id="s2-cmd">-</td></tr>
+        <tr><td>measured speed</td><td id="s2-speed">-</td></tr>
+        <tr><td>left / right wheel</td><td id="s2-wheels">-</td></tr>
+        <tr><td>distance</td><td id="s2-dist">-</td></tr>
+        <tr><td>heading (wheel odometry)</td><td id="s2-head">-</td></tr>
+        <tr><td>fault bits</td><td id="s2-faults">-</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="panel" id="p-s3">
+    <h2>S3 line and barcodes <span class="age" id="age-s3"></span></h2>
+    <div class="vals">
+      <div class="bigline"><span id="s3-state">-</span>
+        <span id="s3-letter" class="letter">-</span></div>
+      <table class="kv">
+        <tr><td>outer sensors</td><td><span id="s3-outer">-</span>
+          <div class="bar"><i id="s3-outer-bar"></i></div></td></tr>
+        <tr><td>centre sensors</td><td><span id="s3-centre">-</span>
+          <div class="bar"><i id="s3-centre-bar"></i></div></td></tr>
+        <tr><td>steering</td><td id="s3-steer">-</td></tr>
+        <tr><td>OUTER rule</td><td id="s3-over">-</td></tr>
+        <tr><td>last barcode</td><td id="s3-bc">none yet</td></tr>
+        <tr><td>last junction</td><td id="s3-junc">none yet</td></tr>
+        <tr><td>robot counts</td><td id="s3-counts">-</td></tr>
+      </table>
+      <h2>Barcodes accepted, by letter</h2>
+      <div class="tally" id="s3-tally">none yet</div>
+      <div class="muted">rejected: <b id="s3-rejected">0</b> (S3 sends a
+        count, not the letter)</div>
+      <h2>Timeline</h2>
+      <div id="timeline"></div>
+    </div>
+  </div>
+  <div class="panel" id="p-s4">
+    <h2>S4 motion sensor <span class="age" id="age-s4"></span></h2>
+    <div class="vals">
+      <div class="impact" id="s4-impact">NO IMPACT</div>
+      <div class="muted" id="s4-impacts">impacts seen: 0</div>
+      <table class="kv">
+        <tr><td>pitch / roll</td><td id="s4-angles">-</td></tr>
+        <tr><td>turn rate</td><td id="s4-turn">-</td></tr>
+        <tr><td>motion class</td><td id="s4-class">-</td></tr>
+        <tr><td>hump</td><td id="s4-hump">-</td></tr>
+        <tr><td>humps / peak height</td><td id="s4-humps">-</td></tr>
+        <tr><td>IMU</td><td id="s4-imu">-</td></tr>
+      </table>
+      <svg id="imu" viewBox="0 0 240 90" preserveAspectRatio="none"
+        role="img" aria-label="pitch and roll, last 60 seconds">
+        <line x1="0" y1="45" x2="240" y2="45"></line>
+        <polyline id="g-pitch" points=""></polyline>
+        <polyline id="g-roll" points=""></polyline>
+      </svg>
+      <div class="note muted">pitch (solid) and roll (dashed), last 60 s,
+        scale +/-32 degrees</div>
+    </div>
+  </div>
+  <div class="panel" id="p-s5">
+    <h2>S5 controller <span class="age" id="age-s5"></span></h2>
+    <div class="vals">
+      <div class="bigline" id="s5-state">-</div>
+      <table class="kv">
+        <tr><td>calibration</td><td id="s5-cal">-</td></tr>
+        <tr><td>fault bits</td><td id="s5-faults">-</td></tr>
+        <tr><td>closest obstacle</td><td id="s5-closest">-</td></tr>
+        <tr><td>gap width</td><td id="s5-width">-</td></tr>
+        <tr><td>clear left / right</td><td id="s5-clear">-</td></tr>
+      </table>
+    </div>
+  </div>
 </section>
 <section class="panel full">
   <h2>Event log</h2>
@@ -1552,7 +2094,7 @@ function setHeartbeat(h, ageMs) {
   el("connect").textContent = h.connect_count;
   el("reject").textContent = h.cmd_reject;
   el("rssi").textContent = h.rssi_text;
-  el("drops").textContent = h.tel_drop + " / " + h.evt_drop;
+  el("drops").textContent = h.tel_drop_text + " / " + h.evt_drop;
   el("lost").textContent = h.lost_total;
 }
 
@@ -1609,20 +2151,150 @@ function addLog(kind, d) {
   }
 }
 
-function setTelemetry(t) {
-  const box = el("telemetry");
-  if (!t) {
-    box.textContent = "No telemetry frames yet (Stage 4b).";
-    return;
-  }
-  box.textContent = "";
-  const table = document.createElement("table");
-  Object.keys(t).sort().forEach((k) => {
-    const tr = table.insertRow();
-    tr.insertCell().textContent = k;
-    tr.insertCell().textContent = JSON.stringify(t[k]);
+const STALE_S = 2;
+const IMPACT_HOLD_S = 3;
+const IMU_KEEP = 120;
+const feedAt = {live: null, tel: null};
+const PANELS = [["p-s2", ["live", "tel"], "age-s2"],
+                ["p-s3", ["live"], "age-s3"],
+                ["p-s4", ["tel"], "age-s4"],
+                ["p-s5", ["tel"], "age-s5"]];
+let impactAt = null;
+let imu = [];
+let liveSeen = false;
+const msgLost = {tel: 0, live: 0};
+
+function markFeed(feed, ageMs) {
+  feedAt[feed] = (ageMs === null || ageMs === undefined) ? null
+    : performance.now() - ageMs;
+}
+
+function text(id, value) { el(id).textContent = value; }
+
+function num(v, unit, digits) {
+  return (typeof v === "number") ? v.toFixed(digits || 0) + (unit ? " " + unit : "")
+    : "-";
+}
+
+function list(names) { return names.length ? names.join(", ") : "none"; }
+
+function paintAges() {
+  const now = performance.now();
+  PANELS.forEach(([panel, feeds, ageId]) => {
+    const marks = feeds.map((f) => feedAt[f]);
+    let stale = true;
+    let label = "no data yet";
+    if (marks.every((m) => m !== null)) {
+      const age = (now - Math.min(...marks)) / 1000;
+      stale = age > STALE_S;
+      label = stale ? "no data for " + age.toFixed(1) + " s"
+        : "updated " + age.toFixed(1) + " s ago";
+    }
+    el(panel).classList.toggle("stale", stale);
+    text(ageId, label);
   });
-  box.appendChild(table);
+  const hot = impactAt !== null && (now - impactAt) / 1000 < IMPACT_HOLD_S;
+  el("s4-impact").className = hot ? "impact hot" : "impact";
+  text("s4-impact", hot ? "IMPACT" : "NO IMPACT");
+}
+setInterval(paintAges, 200);
+
+function drawImu() {
+  const x = (i) => 240 - (imu.length - 1 - i) * 2;
+  const y = (v) => 45 - Math.max(-32, Math.min(32, v)) * 45 / 32;
+  [["g-pitch", 0], ["g-roll", 1]].forEach(([id, k]) => {
+    el(id).setAttribute("points", imu.map((p, i) =>
+      x(i).toFixed(1) + "," + y(p[k]).toFixed(1)).join(" "));
+  });
+}
+
+function setMsgLost() {
+  text("msg-lost", msgLost.tel + " / " + msgLost.live);
+}
+
+function setTelemetry(t, ageMs) {
+  if (!t) { return; }
+  markFeed("tel", ageMs);
+  msgLost.tel = t.lost_total;
+  setMsgLost();
+  if (!liveSeen) { text("s2-state", t.motion_name); }
+  text("s2-speed", num(t.speed_mms, "mm/s"));
+  text("s2-wheels", num(t.speed_l_mms) + " / " + num(t.speed_r_mms)
+       + " mm/s");
+  text("s2-dist", num(t.dist_mm, "mm") + " (" + num(t.dist_mm / 1000, "m", 2)
+       + ")");
+  text("s2-faults", list(t.faults));
+  el("s2-faults").className = t.faults.length ? "bad" : "";
+  el("s2-stall").hidden = !t.faults.includes("stall");
+  el("s4-impacts").textContent = "impacts seen: " + t.impact_count
+    + (t.impact_at ? " (last at " + t.impact_at.slice(11, 19) + ")" : "");
+  if (t.b_impact) { impactAt = performance.now() - (ageMs || 0); }
+  text("s4-angles", num(t.pitch_deg, "°", 1) + " / "
+       + num(t.roll_deg, "°", 1));
+  text("s4-turn", num(t.turn_dps, "deg/s"));
+  text("s4-class", t.class_name);
+  text("s4-hump", t.hump_name);
+  text("s4-humps", t.hump_count + " / " + num(t.peak_mm, "mm"));
+  text("s4-imu", t.b_imu_ok ? "ok" : "NOT OK");
+  el("s4-imu").className = t.b_imu_ok ? "" : "bad";
+  text("s5-state", t.ctrl_name);
+  text("s5-cal", t.b_cal_done ? "done" : "not done");
+  text("s5-faults", list(t.faults));
+  el("s5-faults").className = t.faults.length ? "bad" : "";
+  text("s5-closest", t.closest_mm ? num(t.closest_mm, "mm") + " at "
+       + num(t.angle_idx * 7.5, "\u00b0", 1) + " (servo)" : "none");
+  text("s5-width", t.width_mm ? num(t.width_mm, "mm") : "-");
+  text("s5-clear", (t.width_mm || t.clear_l_mm || t.clear_r_mm)
+       ? num(t.clear_l_mm) + " / " + num(t.clear_r_mm) + " mm" : "-");
+}
+
+function setLive(l, ageMs) {
+  if (!l) { return; }
+  markFeed("live", ageMs);
+  msgLost.live = l.lost_total;
+  setMsgLost();
+  liveSeen = true;
+  text("s2-state", l.motion_name);
+  el("s2-estop").hidden = !l.b_estop;
+  text("s2-cmd", num(l.cmd_speed_mms, "mm/s"));
+  text("s2-head", num(l.heading_deg, "°", 1));
+  text("s3-state", l.line_name);
+  el("s3-state").className = (l.line_name === "LOST") ? "bad" : "";
+  text("s3-letter", l.bc_char || "-");
+  text("s3-outer", num(l.outer_ir) + " of 255");
+  el("s3-outer-bar").style.width = (l.outer_ir * 100 / 255) + "%";
+  text("s3-centre", num(l.centre_ir) + " of 255");
+  el("s3-centre-bar").style.width = (l.centre_ir * 100 / 255) + "%";
+  text("s3-steer", num(l.steer_dv_mms, "mm/s"));
+  text("s3-over", l.b_overshoot ? "on" : "off");
+  text("s3-bc", l.bc_char ? l.bc_char + ": " + l.bc_cmd_name + ", read "
+       + (l.b_bc_rev ? "backwards" : "forwards") : "none yet");
+  text("s3-junc", l.junctions ? "turn " + l.junc_name : "none yet");
+  text("s3-counts", "barcodes " + l.barcodes + ", rejected " + l.rejects
+       + " (wraps at 16), junctions " + l.junctions + ", lost " + l.losts);
+}
+
+function addTimeline(entry) {
+  const div = document.createElement("div");
+  div.className = "tl-" + entry.kind;
+  div.textContent = entry.t.slice(11, 21) + "  " + entry.text;
+  el("timeline").prepend(div);
+  while (el("timeline").children.length > 100) {
+    el("timeline").lastElementChild.remove();
+  }
+}
+
+function setTally(tally, rejected) {
+  const box = el("s3-tally");
+  box.textContent = "";
+  const symbols = Object.keys(tally).sort();
+  if (symbols.length === 0) { box.textContent = "none yet"; }
+  symbols.forEach((k) => {
+    const chip = document.createElement("span");
+    chip.textContent = k + " × " + tally[k];
+    box.appendChild(chip);
+  });
+  text("s3-rejected", rejected);
 }
 
 const banner = {state: "ok", why: "", entries: new Map()};
@@ -1670,7 +2342,17 @@ function applySnapshot(s) {
   s.log.forEach((e) => addLog(e.kind, {t: e.t, log: e.text}));
   el("sim-panel").hidden = !sim;
   el("car-state").textContent = s.car_state || "-";
-  setTelemetry(s.telemetry);
+  liveSeen = false;
+  imu = s.imu_history.slice();
+  drawImu();
+  setTelemetry(s.telemetry, s.tel_age_ms);
+  setLive(s.live, s.live_age_ms);
+  if (!s.telemetry) { markFeed("tel", null); }
+  if (!s.live) { markFeed("live", null); }
+  el("timeline").textContent = "";
+  s.s3_timeline.forEach(addTimeline);
+  setTally(s.s3_tally, s.s3_rejected);
+  paintAges();
   banner.state = s.banner;
   banner.why = s.banner_why || "";
   banner.entries = new Map(s.retained_cmd.map((e) => [e.topic_suffix, e]));
@@ -1700,7 +2382,19 @@ on("no_ack", (d) => { upsertRow(d); addLog("no_ack", d); });
 on("cmd_failed", (d) => { upsertRow(d); addLog("cmd_failed", d); });
 on("cmd_seen", (d) => addLog("cmd_seen", d));
 on("decode_error", (d) => addLog("decode_error", d));
-on("telemetry", setTelemetry);
+on("telemetry", (d) => {
+  setTelemetry(d, 0);
+  addLog("telemetry", d);
+  imu.push([d.pitch_deg, d.roll_deg]);
+  if (imu.length > IMU_KEEP) { imu.shift(); }
+  drawImu();
+  paintAges();
+});
+on("live", (d) => { setLive(d, 0); paintAges(); });
+on("s3_events", (d) => {
+  d.entries.forEach(addTimeline);
+  setTally(d.tally, d.rejected);
+});
 on("event", (d) => addLog("event", d));
 on("note", (d) => addLog("note", d));
 on("retained_cmd", (d) => {
@@ -1818,9 +2512,10 @@ def run_server(args, settings, scrub):
 FAKE_HOST = "203.0.113.77"      # TEST-NET-3: a documentation address.
 FAKE_USER = "u-s1u16-login"
 FAKE_PASSWORD = "p-s1u16-secret"
+FAKE_DIGITS = "1234"            # A login of digits only (A12).
 FAKE_PORT = 1884
 FAKE_PREFIX = "s1u16"
-ALL_STEPS = ["A%d" % number for number in range(1, 14)]
+ALL_STEPS = ["A%d" % number for number in range(1, 15)]
 
 
 def http_call(port, method, path, body=None, headers=None, host=None):
@@ -2362,6 +3057,44 @@ def live_probe():
     return {"sim_status": status, "error_text": sink.getvalue()}
 
 
+def digit_password_probe(tmpdir):
+    """A login of digits only (A12): a number that holds it must stay a
+    number, every event and log line must stay valid JSON, and the login
+    must still be masked where it appears as text."""
+    settings = Settings(None, 1883, "probe", "", FAKE_DIGITS, "check")
+    log_path = os.path.join(tmpdir, "digits_log.jsonl")
+    dash = Dashboard(settings, Scrubber(settings), "live", ACK_TIMEOUT_S,
+                     log_path)
+    dash.attach(_StubLink())
+    client = dash.subscribe()
+    with contextlib.redirect_stdout(io.StringIO()):
+        dash.on_line(sub_line(False, "probe/telemetry",
+                              pack(s1_decode.TELEMETRY, {"count_l": 12345})))
+        dash.on_link_error("refused, password %s" % FAKE_DIGITS)
+    second = dash.subscribe()
+    messages = []
+    for queued in (client, second):
+        while not queued.empty():
+            messages.append(queued.get())
+    dash.close()
+    found = {"json": True, "number": False, "masked": False}
+    try:
+        with open(log_path, encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+        rows = [json.loads(line)["data"] for line in lines]
+        rows += [json.loads(message.split("\ndata: ", 1)[1])
+                 for message in messages]
+    except ValueError:
+        found["json"] = False
+        return found
+    found["number"] = any(row.get("count_l") == 12345 for row in rows)
+    logs = [row.get("log", "") for row in rows if "refused" in row.get(
+        "log", "")]
+    found["masked"] = bool(logs) and all(
+        ("<password>" in text) and (FAKE_DIGITS not in text) for text in logs)
+    return found
+
+
 def check_a13(ctx):
     sink = io.StringIO()
     with contextlib.redirect_stdout(sink):
@@ -2385,6 +3118,224 @@ def check_a13(ctx):
                 % ("PASS" if b_self else "FAIL", golden.get("op"),
                    golden.get("cmd_id"), golden.get("label"), len(labels),
                    b_labels, len(texts), ", ".join(words) or "none"))
+
+
+def probe_dash():
+    """An in-process dashboard in live mode, and a way to feed it."""
+    settings = Settings(None, 1883, "probe", "", "", "check")
+    dash = Dashboard(settings, Scrubber(settings), "live", ACK_TIMEOUT_S,
+                     None)
+    dash.attach(_StubLink())
+
+    def feed(msg_type, values):
+        dash.on_line(sub_line(False, "probe/telemetry",
+                              pack(msg_type, values)))
+
+    return dash, feed
+
+
+def tel_drop_snapshot_probe():
+    """What a newly loaded page receives for tel_drop: connect to the real
+    event stream of an in-process dashboard at each value and read the
+    heartbeat in its first event (A14)."""
+    dash, feed = probe_dash()
+    server = make_server(dash, 0)
+    port = server.server_address[1]
+    threading.Thread(target=server.serve_forever,
+                     kwargs={"poll_interval": 0.1}, daemon=True).start()
+    found = {}
+    for value in (254, 255):
+        feed(s1_decode.HEARTBEAT, {"seq": value, "uptime_s": value,
+                                   "tel_drop": value})
+        snap = Stream(port).wait_for("snapshot", None, 3.0)
+        beat = snap[2].get("heartbeat") if snap else None
+        found[value] = beat if beat else {}
+    server.shutdown()
+    server.server_close()
+    dash.close()
+    return ((found[254].get("tel_drop_text") == "254")
+            and (found[254].get("tel_drop") == 254)
+            and (found[255].get("tel_drop_text") == "255 or more")
+            and (found[255].get("tel_drop") == 255))
+
+
+def telemetry_probe():
+    """Feed crafted live, telemetry and heartbeat messages to a dashboard
+    and report what the S3 timeline, the letter tally and the IMPACT count
+    did (A14). No broker and no page are involved."""
+    dash, feed = probe_dash()
+    letter = {name: s1_decode.CODE39.index(name) for name in "CD"}
+    base = {"letter": letter["C"], "barcodes": 5, "rejects": 3,
+            "junctions": 2, "losts": 1, "turn": 0}
+
+    def live(**changes):
+        now = dict(base, **changes)
+        feed(s1_decode.LIVE, {
+            "seq": now.setdefault("seq", 0), "bc_letter": now["letter"],
+            "bc_cmd": 1, "junc_turn": now["turn"],
+            "barcodes": now["barcodes"], "rejects": now["rejects"],
+            "junctions": now["junctions"], "losts": now["losts"]})
+        base.update(now)
+
+    def kinds():
+        return [entry["kind"] for entry in dash.s3_timeline]
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        live()
+        b_first = len(dash.s3_timeline) == 0
+        live(barcodes=6, letter=letter["C"])
+        live(barcodes=8, letter=letter["D"])
+        b_tally = dash.s3_tally == {"C": 1, "D": 1, "?": 1}
+        live(rejects=4)
+        live(junctions=3, turn=2)
+        live(losts=3)
+        texts = [entry["text"] for entry in dash.s3_timeline]
+        b_kinds = kinds() == ["barcode", "barcode", "reject", "junction",
+                              "lost"]
+        b_texts = (("barcode C accepted" in texts[0])
+                   and ("and 1 more" in texts[1])
+                   and ("turn right" in texts[3])
+                   and ("2 times" in texts[4]) and (dash.s3_rejected == 1))
+        before = len(dash.s3_timeline)
+        live(barcodes=106)
+        b_jump = ((kinds()[before:] == ["note"])
+                  and (dash.s3_tally == {"C": 1, "D": 1, "?": 1}))
+        live(barcodes=107)
+        b_rebase = len(dash.s3_timeline) == before + 1
+        for uptime in (100, 5):
+            feed(s1_decode.HEARTBEAT, {"seq": uptime, "uptime_s": uptime})
+        b_hb_restart = dash.lost_total == 0
+        for seq in (7, 10):
+            feed(s1_decode.HEARTBEAT, {"seq": seq, "uptime_s": seq})
+        b_hb_gap = dash.lost_total == 2
+        feed(s1_decode.HEARTBEAT, {"seq": 11, "uptime_s": 11, "tel_drop": 254})
+        b_below = dash.heartbeat["tel_drop_text"] == "254"
+        feed(s1_decode.HEARTBEAT, {"seq": 12, "uptime_s": 12, "tel_drop": 255})
+        b_clamped = ((dash.heartbeat["tel_drop_text"] == "255 or more")
+                     and (dash.heartbeat["tel_drop"] == 255))
+        live(barcodes=0, rejects=0, junctions=0, losts=0)
+        b_restart = ((kinds()[-1] == "note")
+                     and ("restarted" in dash.s3_timeline[-1]["text"])
+                     and (len(dash.s3_timeline) == before + 2))
+        for klass in (6, 6, 0, 6):
+            feed(s1_decode.TELEMETRY, {"motion_class": klass})
+        live_lost, tel_lost = dash.live_lost_total, dash.tel_lost_total
+        live(seq=1)
+        live(seq=4)
+        for seq in (20, 24):
+            feed(s1_decode.TELEMETRY, {"seq": seq})
+        b_lost = ((dash.live_lost_total - live_lost == 2)
+                  and (dash.tel_lost_total - tel_lost == 3 + 19))
+        before = len(dash.s3_timeline)
+        live(seq=100, barcodes=base["barcodes"] + 1)
+        feed(s1_decode.TELEMETRY, {"seq": 200})
+        b_gap = ((kinds()[before:] == ["note"])
+                 and (dash.live_lost_total - live_lost == 2)
+                 and (dash.tel_lost_total - tel_lost == 3 + 19))
+        low, feed_low = probe_dash()
+        feed_low(s1_decode.LIVE, {"seq": 1, "rejects": 12, "bc_letter": 63})
+        feed_low(s1_decode.LIVE, {"seq": 0, "rejects": 0, "bc_letter": 63})
+        b_low = ((low.s3_rejected == 0)
+                 and ([entry["kind"] for entry in low.s3_timeline]
+                      == ["note"]))
+    b_impact = dash.impact_count == 2
+    return {"first": b_first, "tally": b_tally, "kinds": b_kinds,
+            "texts": b_texts, "jump": b_jump, "rebase": b_rebase,
+            "restart": b_restart, "impact": b_impact, "lost": b_lost,
+            "hb_restart": b_hb_restart, "hb_gap": b_hb_gap, "seq_gap": b_gap,
+            "low_counter": b_low, "tel_drop_clamp": b_below and b_clamped,
+            "snapshot_text": tel_drop_snapshot_probe()}
+
+
+def check_a14(ctx):
+    """The telemetry panels: both messages reach the page at their rates,
+    the IMPACT flag counts once per rising edge, S3's counters become
+    timeline entries and a letter tally, and the odd cases (a counter
+    jump, a robot restart) restart the timeline instead of faking events."""
+    since = ctx.stream.mark()
+    time.sleep(2.0)
+    tel = len(ctx.stream.all_of("telemetry", since))
+    live = len(ctx.stream.all_of("live", since))
+    b_rates = (3 <= tel <= 6) and (8 <= live <= 13)
+    _, text = http_call(ctx.port, "GET", "/api/state")
+    state = json.loads(text)
+    b_state = (bool(state["telemetry"]) and bool(state["live"])
+               and bool(state["imu_history"])
+               and (state["tel_age_ms"] is not None)
+               and (state["tel_age_ms"] < 2000)
+               and (state["live_age_ms"] is not None)
+               and (state["live_age_ms"] < 2000))
+    count = state["telemetry"]["impact_count"] if state["telemetry"] else -1
+    mark = ctx.stream.mark()
+    post_json(ctx, "/api/sim", {"action": "s4_impact"})
+    hit = ctx.stream.wait_for(
+        "telemetry", lambda d: d.get("b_impact") and ("IMPACT" in d.get(
+            "log", "")), 3.0, mark)
+    time.sleep(1.5)
+    _, text = http_call(ctx.port, "GET", "/api/state")
+    after = json.loads(text)["telemetry"]["impact_count"]
+    b_impact = (hit is not None) and (after == count + 1) and (
+        hit[2]["class_name"] == "IMPACT")
+    mark = ctx.stream.mark()
+    for action in ("s3_barcode", "s3_reject", "s3_junction", "s3_lost"):
+        post_json(ctx, "/api/sim", {"action": action})
+        time.sleep(0.5)
+    entries = [entry for data in ctx.stream.all_of("s3_events", mark)
+               for entry in data["entries"]]
+    seen = {entry["kind"] for entry in entries}
+    last = ctx.stream.all_of("s3_events", mark)
+    b_s3 = ({"barcode", "reject", "junction", "lost"} <= seen) and bool(
+        last) and (last[-1]["rejected"] >= 1) and (
+        sum(last[-1]["tally"].values()) >= 1)
+    ids = ("p-s2", "p-s3", "p-s4", "p-s5", "s4-impact", "g-pitch", "g-roll",
+           "timeline", "s3-tally")
+    b_page = all(('id="%s"' % name) in ctx.page for name in ids) and (
+        "Stage 4b)" not in ctx.page) and ("h.tel_drop_text" in ctx.page)
+    probe = telemetry_probe()
+    b_probe = all(probe.values())
+    drop_ok, drop_text = check_tel_drop_shown(ctx)
+    ok = (b_rates and b_state and b_impact and b_s3 and b_page and b_probe
+          and drop_ok)
+    return ok, ("%d telemetry and %d live events in 2 s (about 4 and 10): "
+                "%s; state holds both with ages under 2 s: %s; one S4 impact "
+                "counted once (%d -> %d): %s; S3 sim events give barcode, "
+                "reject, junction and lost entries and a tally: %s; page "
+                "has the four panels: %s; %s; in-process probe %s"
+                % (tel, live, b_rates, b_state, count, after, b_impact,
+                   b_s3, b_page, drop_text, ", ".join(
+                       "%s %s" % (name, "ok" if good else "FAIL")
+                       for name, good in probe.items())))
+
+
+def check_tel_drop_shown(ctx):
+    """The fake car's tel_drop is 0 until it has run for 5 s, then above 0
+    in a heartbeat, in /api/state and in a new page's snapshot."""
+    _, text = http_call(ctx.port, "GET", "/api/state")
+    before = json.loads(text)["heartbeat"]["tel_drop"]
+    mark = ctx.stream.mark()
+    b_running = False
+    # In FINISHED the first START only returns to READY, so allow a second.
+    for _ in range(3):
+        post_json(ctx, "/api/cmd", {"op": "start"})
+        time.sleep(0.4)
+        _, text = http_call(ctx.port, "GET", "/api/state")
+        if json.loads(text)["car_state"] == FakeCar.RUNNING:
+            b_running = True
+            break
+    beat = ctx.stream.wait_for("heartbeat", lambda d: d["tel_drop"] > 0, 8.0,
+                               mark)
+    _, text = http_call(ctx.port, "GET", "/api/state")
+    in_state = json.loads(text)["heartbeat"]["tel_drop"]
+    snap = Stream(ctx.port).wait_for("snapshot", None, 3.0)
+    in_snapshot = snap[2]["heartbeat"]["tel_drop"] if snap else None
+    text_snapshot = snap[2]["heartbeat"]["tel_drop_text"] if snap else None
+    ok = (b_running and (before == 0) and (beat is not None)
+          and (in_state > 0) and (in_snapshot is not None)
+          and (in_snapshot > 0) and (text_snapshot == str(in_snapshot)))
+    return ok, ("tel_drop %d before the run, then %s in a heartbeat, %d in "
+                "/api/state, %s (text %r) in a new page's snapshot: %s"
+                % (before, beat[2]["tel_drop"] if beat else "never", in_state,
+                   in_snapshot, text_snapshot, ok))
 
 
 def options_files(tmpdir):
@@ -2445,12 +3396,16 @@ def check_a12(ctx, state_text):
     b_handler = ((line.count("\n") == 1) and ("Traceback" not in line)
                  and ("<broker>" in line) and ("<user>" in line)
                  and ("<password>" in line))
-    ok = (hits == 0) and b_masked and b_config and b_handler
+    b_digits = all(ctx.digits.values())
+    ok = (hits == 0) and b_masked and b_config and b_handler and b_digits
     return ok, ("%d hits of the host, user or password in the page, the "
                 "stream, /api/state, the log, stdout, stderr and a request "
                 "handler's error; error line masked: %s; handler error one "
                 "masked line, no traceback: %s; port and prefix from the "
-                "file: %s" % (hits, b_masked, b_handler, b_config))
+                "file: %s; digit-only login: %s"
+                % (hits, b_masked, b_handler, b_config, ", ".join(
+                    "%s %s" % (name, "ok" if good else "FAIL")
+                    for name, good in ctx.digits.items())))
 
 
 class CheckContext:
@@ -2481,6 +3436,7 @@ def run_check(args):
         if ctx.stream.wait_for("snapshot", None, 5.0) is None:
             raise RuntimeError("no event stream")
         ctx.live = live_probe()
+        ctx.digits = digit_password_probe(tmpdir)
         record("A1", check_a1(ctx))
         options_live = check_options_live(ctx)
         record("A3", check_a3(ctx))
@@ -2498,6 +3454,7 @@ def run_check(args):
         args_list = json.loads(state_text).get("publish_args", [])
         record("A2", check_a2(ctx))
         record("A13", check_a13(ctx))
+        record("A14", check_a14(ctx))
         run.stop()
         record("A11", check_a11(ctx, args_list, options_live))
         record("A12", check_a12(ctx, state_text))
