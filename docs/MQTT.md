@@ -10,10 +10,10 @@ Every number below comes from the code or a test log, named in the
 Source column by symbol (so the reference survives line changes) or by
 TEST_LOG row. A rule that comes from the MQTT 3.1.1 standard or from the
 mosquitto tools is marked *standard* or *tool*. Anything not built yet
-is marked **planned**. Checked on 27 Oct 2026 against commit `5d23dbf`
-on branch `buddy1-mqtt-port`, and the Stage 3 statements on 30 Oct 2026
-against the adapter commit on `buddy1-mqtt-stage3`; lwIP is the Pico
-SDK's copy, `STABLE-2_2_1_RELEASE`.
+is marked **planned**. Checked on 27 Oct 2026 against commit `5d23dbf`,
+and the Stage 3 statements on 30 Oct 2026 against the adapter commit
+`4cddb49`; both commits are on `main`. lwIP is the Pico SDK's copy,
+`STABLE-2_2_1_RELEASE`.
 
 ## 1. Status
 
@@ -23,8 +23,8 @@ SDK's copy, `STABLE-2_2_1_RELEASE`.
 | Message codec (`msg_codec`) | Built, host-tested and timed on the Pico | `app_program/subsystem1/`; TEST_LOG S1-U05, S1-U08 |
 | Dashboard decoder (`s1_decode.py`) | Built and host-tested | `app_program/subsystem1/dashboard/`; TEST_LOG S1-U11, S1-U12 |
 | Stage 3: the radio service task calls `mqtt_link_poll()` | Adapter written: `mqtt_utk_start()` calls `mqtt_link_poll(netif_default)`. Instructor approval 27 Oct 2026; team agreement in person 29 Oct 2026. On the robot: S1-U13 PASS at `9a01717`, 31 Oct 2026 | `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c`; TEAM.md section 3 ("WiFi and MQTT are special"); TEST_LOG S1-U13 |
-| `telemetry_task`, Stage 4a: START, STOP and RESET forwarded to S5 with an ack, and the 1 Hz heartbeat | Written on the local branch `buddy1-integration` (main plus Stage 3) and host-tested (S1-U14). Not run on the robot yet (S1-U06). The 2 Hz telemetry frame and the 5 Hz live message are written in the same task (7 Nov 2026) and host-tested (S1-U05, S1-U11, S1-U14, S1-U16 part A), not run on the robot yet; each goes only under the queue rule of section 1.1. Fault bit 4 is written (8 Nov 2026, section 1.1) and host-tested (S1-U14), not run on the robot yet. Events are Stage 4b | `app_program/subsystem1/telemetry_task.c`, `s1_telem.c`; section 1.1; TEST_LOG S1-U14, S1-U06 |
-| Laptop dashboard (`s1_dashboard.py`) | Written on `buddy1-integration`: START, STOP and RESET with each ack matched by cmd_id, the online light and heartbeat, the retained-command banner, and `--simulate` (a fake car). Test S1-U16: part A automated in simulate mode, part B on the robot after S1-U06 | `testing/subsystem1/s1_dashboard.py`; [S1_dashboard.md](S1_dashboard.md); TEST_LOG S1-U16 |
+| `telemetry_task`, Stage 4a: START, STOP and RESET forwarded to S5 with an ack, and the 1 Hz heartbeat | On `main` and host-tested (S1-U14). Not run on the robot yet (S1-U06). The 2 Hz telemetry frame and the 5 Hz live message are written in the same task (7 Nov 2026) and host-tested (S1-U05, S1-U11, S1-U14, S1-U16 part A), not run on the robot yet; each goes only under the queue rule of section 1.1. Fault bit 4 is implemented (8 Nov 2026, PR #5, section 1.1) and host-tested (S1-U14), not run on the robot yet. Events are Stage 4b | `app_program/subsystem1/telemetry_task.c`, `s1_telem.c`; section 1.1; TEST_LOG S1-U14, S1-U06 |
+| Laptop dashboard (`s1_dashboard.py`) | On `main`: START, STOP and RESET with each ack matched by cmd_id, the online light and heartbeat, the retained-command banner, and `--simulate` (a fake car). Test S1-U16: part A automated in simulate mode, part B on the robot after S1-U06 | `testing/subsystem1/s1_dashboard.py`; [S1_dashboard.md](S1_dashboard.md); TEST_LOG S1-U16 |
 
 Stage 3 replaced the template's demo client in `mqtt_utk.c` (a text
 heartbeat on `MQTT_TOPIC`, 60 s keep-alive) with the adapter, and the
@@ -65,11 +65,11 @@ adds nothing to a STOP's round trip (NFR15).
 - **Heartbeat.** 9 bytes on the telemetry topic at QoS 0, once a second
   on absolute deadlines, and only while the session is up and the driver
   snapshot is fresh, so an outage does not fill the publish queue that
-  the acks need. rssi is 0 ("not measured": no RSSI can be read outside
-  the radio service task yet), evt_drop is 0 (no `mbf_event` yet), tel_drop
-  is the periodic messages skipped or refused (next point), and cmd_reject
-  is the codec rejections plus the post failures plus the driver's
-  `command_dropped`.
+  the acks need. rssi and evt_drop are always 0 for now: rssi because no
+  RSSI can be read outside the radio service task yet ("not measured"),
+  evt_drop because there is no `mbf_event` yet. tel_drop is the periodic
+  messages skipped or refused (next point), and cmd_reject is the codec
+  rejections plus the post failures plus the driver's `command_dropped`.
 - **Keeping room for the acks.** The publish queue is first in, first out
   and the driver sends one message at a time, so a periodic message delays
   any ack queued behind it. Before each periodic message `telemetry_task`
@@ -352,7 +352,8 @@ size (`tk_ref_mbf`); it counts the queue only, not the message being sent.
 The heartbeat carries the robot-side drops to the dashboard. `tel_drop` is
 `telemetry_task`'s `periodic_skipped` (the queue rule, section 1.1) plus
 `periodic_failed` and `hb_publish_failed` (refused by the driver).
-`cmd_reject` is section 1.1's sum. `evt_drop` is 0 until `mbf_event` exists.
+`cmd_reject` is section 1.1's sum. `evt_drop` is always 0 for now, until
+`mbf_event` exists.
 Messages not sent because the session is down are not drops: nothing is
 built for them. A message the driver refuses also shows as a seq gap on the
 dashboard; one the queue rule skips does not.
@@ -414,7 +415,9 @@ sh testing/subsystem1/run_link_test.sh       # S1-U09: PASS (needs PICO_SDK_PATH
 sh testing/subsystem1/run_decoder_test.sh    # S1-U11: PASS
 ```
 
-and the offline check of section 11: 18 JSON lines, no errors.
+and the offline check of section 11: 18 JSON lines, no errors. That was
+the vector count on that date; there are 21 since `75f20da` (LIV-1 to
+LIV-3), and the same check now prints 21 lines.
 
 **Local broker, dashboard side only** (the robot is not in it):
 
@@ -436,7 +439,8 @@ printf '\024\205' | mosquitto_pub -h 127.0.0.1 -q 1 -t 'robocar/car1/cmd/ui' -s
 
 Result: PASS on 27 Oct 2026 at `f2e2f54`: the 18 golden vectors decoded
 through the broker as directly, 0 error lines; STOP id 5 from both
-topics received on `robocar/car1/cmd/#` at QoS 1. TEST_LOG S1-U12.
+topics received on `robocar/car1/cmd/#` at QoS 1. With the 21 vectors:
+PASS on 8 Nov 2026 at `ba81b3d`, 21 lines, 0 error lines. TEST_LOG S1-U12.
 
 **On the robot: S1-U13, PASS on 31 Oct 2026 at `9a01717`** (TEST_LOG
 S1-U13; section 9 for the times). Steps 1 to 3 and 6 below ran, with
@@ -494,8 +498,8 @@ STOP round trip under 300 ms) and of the NFR14 test.
 - S1-U13 done (31 Oct 2026): sections 1, 9 and 12 carry its results.
 - Stage 4a written (1 Nov 2026): sections 1, 1.1, 8 and 13. S1-U06 adds
   the measured heartbeat rate and STOP round trip.
-- Fault bit 4 written (8 Nov 2026): sections 1 and 1.1. S1-U06 checks it on
-  the robot.
+- Fault bit 4 implemented (8 Nov 2026, PR #5): sections 1 and 1.1. S1-U06
+  checks it on the robot.
 - With Stage 4b (events, S5's verdict in the ack): the planned values in
   sections 5 and 8 become code, and the measured rates are added.
 - After the car measurements: decide whether a QoS 0 publish should count
