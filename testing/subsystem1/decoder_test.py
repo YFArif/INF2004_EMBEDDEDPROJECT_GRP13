@@ -1,7 +1,7 @@
 """S1-U11: host test of the dashboard decoder.
 
 Tests app_program/subsystem1/dashboard/s1_decode.py against the layout in
-docs/S1_binary_frame.md. The 18 golden vectors are not copied here: their
+docs/S1_binary_frame.md. The 21 golden vectors are not copied here: their
 bytes and the values msg_codec_get_*() must return ("out") are read from
 testing/subsystem1/codec_vectors.c, the file the C test S1-U05 uses, and
 golden.py --check (stage 1 of run_decoder_test.sh) confirms that file
@@ -34,10 +34,11 @@ LAYOUT_H = ROOT / "app_program" / "subsystem1" / "msg_layout.h"
 sys.path.insert(0, str(DECODER_DIR))
 import s1_decode as dec  # noqa: E402 (the path is set just above)
 
-GOLDEN_COUNT = 18
+GOLDEN_COUNT = 21
 
 # The C arrays in codec_vectors.c and the message type of each.
-ARRAYS = (("g_tel", dec.TELEMETRY), ("g_hb", dec.HEARTBEAT),
+ARRAYS = (("g_tel", dec.TELEMETRY), ("g_liv", dec.LIVE),
+          ("g_hb", dec.HEARTBEAT),
           ("g_evt", dec.EVENT), ("g_cmd", dec.COMMAND), ("g_ack", dec.ACK))
 
 TOKEN = re.compile(r'\s*(?:("(?:[^"\\]|\\.)*")|(\.[A-Za-z_]\w*)|([{}=,])'
@@ -187,7 +188,7 @@ class Malformed(unittest.TestCase):
 
     def test_type(self):
         data = vector("TEL-1")[2]
-        for msg_type in (0, 6, 15):
+        for msg_type in (0, 7, 15):
             with self.subTest(msg_type=msg_type):
                 bad = bytes([0x10 | msg_type]) + data[1:]
                 self.assertEqual(self.reason(bad), "type")
@@ -206,8 +207,8 @@ class Padding(unittest.TestCase):
     """Padding bits are ignored (rule 5 of section 2)."""
 
     def test_padding_ignored(self):
-        for label, offset, width in (("TEL-1", 196, 4), ("HB-1", 71, 1),
-                                     ("ACK-1", 18, 6)):
+        for label, offset, width in (("TEL-1", 196, 4), ("LIV-1", 110, 2),
+                                     ("HB-1", 71, 1), ("ACK-1", 18, 6)):
             with self.subTest(label=label):
                 data = vector(label)[2]
                 padded = set_field(data, offset, width, (1 << width) - 1)
@@ -256,11 +257,88 @@ class LostFrames(unittest.TestCase):
         again = session.feed(self.frame("TEL-1", 3))
         self.assertTrue(again["duplicate"])
         self.assertEqual(again["lost_before"], 0)
+        # Live messages keep their own counter.
+        self.assertEqual(session.feed(self.frame("LIV-1", 254))
+                         ["lost_before"], 0)
+        self.assertEqual(session.feed(self.frame("LIV-1", 1))
+                         ["lost_before"], 2)
         # Heartbeats keep their own counter.
         self.assertEqual(session.feed(self.frame("HB-1", 42))
                          ["lost_before"], 0)
         self.assertEqual(session.feed(self.frame("HB-1", 45))
                          ["lost_before"], 2)
+
+
+class LiveCounters(unittest.TestCase):
+    """S3's wrapping counters become per-message differences."""
+
+    def live(self, **fields):
+        data = vector("LIV-1")[2]
+        for name, value in fields.items():
+            _, offset, width, _ = field_offset(dec.LIVE, name)
+            data = set_field(data, offset, width, value)
+        return data
+
+    def test_differences(self):
+        session = dec.Session()
+        first = session.feed(self.live())
+        for name in ("barcodes", "junctions", "losts", "rejects"):
+            self.assertEqual(first["d_" + name], 0, name)
+        second = session.feed(self.live(barcodes=7, junctions=45, losts=1,
+                                        rejects=3))
+        self.assertEqual(second["d_barcodes"], 2)
+        self.assertEqual(second["d_junctions"], 1)
+        self.assertEqual(second["d_losts"], 0)
+        self.assertEqual(second["d_rejects"], 0)
+
+    def test_wrap(self):
+        session = dec.Session()
+        session.feed(self.live(barcodes=254, junctions=255, losts=250,
+                               rejects=15))
+        wrapped = session.feed(self.live(barcodes=1, junctions=0, losts=2,
+                                         rejects=1))
+        self.assertEqual(wrapped["d_barcodes"], 3)
+        self.assertEqual(wrapped["d_junctions"], 1)
+        self.assertEqual(wrapped["d_losts"], 8)
+        self.assertEqual(wrapped["d_rejects"], 2)
+
+    def test_rebase(self):
+        """After rebase_live() the next message is a first one again: a
+        robot that restarted and counts from 0 gives no burst of events."""
+        session = dec.Session()
+        session.feed(self.live(barcodes=7, junctions=45, losts=1, rejects=3,
+                               seq=10))
+        session.rebase_live()
+        again = session.feed(self.live(barcodes=0, junctions=0, losts=0,
+                                       rejects=0, seq=3))
+        for name in ("barcodes", "junctions", "losts", "rejects"):
+            self.assertEqual(again["d_" + name], 0, name)
+        self.assertEqual(again["lost_before"], 0)
+        self.assertFalse(again["duplicate"])
+        after = session.feed(self.live(barcodes=1, junctions=0, losts=0,
+                                       rejects=0, seq=4))
+        self.assertEqual(after["d_barcodes"], 1)
+        self.assertEqual(after["lost_before"], 0)
+
+    def test_rebase_robot(self):
+        """After rebase_robot() every message type starts again: no lost
+        frames counted across a restart, and encoder counts anchored anew."""
+        session = dec.Session()
+        session.feed(self.live(barcodes=7, junctions=0, losts=0, rejects=0,
+                               seq=200))
+        heartbeat = bytes.fromhex("12" + "c8" + "00" * 7)
+        session.feed(heartbeat)
+        session.feed(vector("TEL-1")[2])
+        session.rebase_robot()
+        self.assertEqual(session.feed(bytes.fromhex("12" + "00" * 8))
+                         ["lost_before"], 0)
+        again = session.feed(self.live(barcodes=0, junctions=0, losts=0,
+                                       rejects=0, seq=0))
+        self.assertEqual(again["lost_before"], 0)
+        self.assertEqual(again["d_barcodes"], 0)
+        frame = session.feed(vector("TEL-1")[2])
+        self.assertEqual(frame["lost_before"], 0)
+        self.assertFalse(frame["counts_anchored"])
 
 
 class Describe(unittest.TestCase):
@@ -275,8 +353,47 @@ class Describe(unittest.TestCase):
         self.assertEqual(shown["faults"], ["imu"])
         self.assertNotIn("faults", msg)
 
+    def test_telemetry_names(self):
+        shown = dec.describe(dec.decode(vector("TEL-1")[2]))
+        self.assertEqual(shown["ctrl_name"], "LINE_FOLLOWING")
+        self.assertEqual(shown["motion_name"], "FOLLOWING")
+        self.assertEqual(shown["line_name"], "FOLLOW")
+        self.assertEqual(shown["bc_char"], "B")
+        self.assertEqual(shown["hump_name"], "descending")
+        self.assertEqual(shown["class_name"], "climbing hump")
+        self.assertFalse(shown["b_impact"])
+        # TEL-3 is all ones: class 7 is not in the table and stays a number.
+        shown = dec.describe(dec.decode(vector("TEL-3")[2]))
+        self.assertEqual(shown["class_name"], "7")
+        self.assertEqual(shown["bc_char"], "")
+
+    def test_live(self):
+        shown = dec.describe(dec.decode(vector("LIV-1")[2]))
+        self.assertEqual(shown["motion_name"], "FOLLOWING")
+        self.assertEqual(shown["heading_deg"], 46.0)
+        self.assertEqual(shown["line_name"], "JUNCTION")
+        self.assertEqual(shown["bc_char"], "B")
+        self.assertEqual(shown["bc_cmd_name"], "right")
+        self.assertEqual(shown["junc_name"], "right")
+        minimum = dec.describe(dec.decode(vector("LIV-2")[2]))
+        self.assertEqual(minimum["heading_deg"], -256.0)
+        maximum = dec.describe(dec.decode(vector("LIV-3")[2]))
+        self.assertEqual(maximum["bc_char"], "")
+        self.assertEqual(maximum["bc_cmd_name"], "7")
+
+    def test_letter_table(self):
+        # The symbol order of s3_code39.c g_c39_table, by index.
+        for index, char in ((0, "0"), (9, "9"), (10, "A"), (35, "Z"),
+                            (36, "-"), (37, "."), (38, " "), (39, "*"),
+                            (40, "$"), (41, "/"), (42, "+"), (43, "%")):
+            with self.subTest(index=index):
+                self.assertEqual(dec.letter_of(index), char)
+        self.assertEqual(len(dec.CODE39), 44)
+        for index in (44, 62, dec.LETTER_NONE):
+            self.assertEqual(dec.letter_of(index), "")
+
     def test_fault_bits(self):
-        expected = ("stall", "bit1", "imu", "bit3", "wifi")
+        expected = ("stall", "encoder", "imu", "no echo", "wifi")
         for bit, name in enumerate(expected):
             with self.subTest(bit=bit):
                 msg = dec.decode(vector("TEL-F%d" % bit)[2])
@@ -287,7 +404,7 @@ class Describe(unittest.TestCase):
                                  ("CMD-2", "opcode_name", "START"),
                                  ("CMD-3", "opcode_name", "RESET"),
                                  ("CMD-4", "opcode_name", "INVALID"),
-                                 ("ACK-1", "result_name", "accepted"),
+                                 ("ACK-1", "result_name", "queued"),
                                  ("ACK-2", "result_name", "rejected")):
             with self.subTest(label=label):
                 shown = dec.describe(dec.decode(vector(label)[2]))
@@ -319,14 +436,25 @@ class LayoutHeader(unittest.TestCase):
             "connect_count": "HB_CONNECT", "tel_drop": "HB_TEL_DROP",
             "evt_drop": "HB_EVT_DROP", "cmd_reject": "HB_CMD_REJ",
         },
+        dec.LIVE: {
+            "seq": "LIV_SEQ", "motion_state": "LIV_MOTION",
+            "b_estop": "LIV_ESTOP", "cmd_speed_mms": "LIV_CMD_SPEED",
+            "heading_hdeg": "LIV_HEADING", "line_state": "LIV_LINE",
+            "steer_dv_mms": "LIV_STEER", "outer_ir": "LIV_OUTER",
+            "centre_ir": "LIV_CENTRE", "b_overshoot": "LIV_OVERSHOOT",
+            "bc_letter": "LIV_LETTER", "bc_cmd": "LIV_BC_CMD",
+            "b_bc_rev": "LIV_BC_REV", "junc_turn": "LIV_JUNC_TURN",
+            "rejects": "LIV_REJECTS", "junctions": "LIV_JUNCTIONS",
+            "losts": "LIV_LOSTS", "barcodes": "LIV_BARCODES",
+        },
         dec.EVENT: {"code": "EVT_CODE", "args": "EVT_ARGS",
                     "t_ms": "EVT_TIME"},
         dec.COMMAND: {"opcode": "CMD_OPCODE", "cmd_id": "CMD_ID"},
         dec.ACK: {"opcode": "ACK_OPCODE", "cmd_id": "ACK_ID",
                   "result": "ACK_RESULT"},
     }
-    SHORT = {dec.TELEMETRY: "TEL", dec.HEARTBEAT: "HB", dec.EVENT: "EVT",
-             dec.COMMAND: "CMD", dec.ACK: "ACK"}
+    SHORT = {dec.TELEMETRY: "TEL", dec.LIVE: "LIV", dec.HEARTBEAT: "HB",
+             dec.EVENT: "EVT", dec.COMMAND: "CMD", dec.ACK: "ACK"}
 
     @classmethod
     def setUpClass(cls):
@@ -386,7 +514,7 @@ class CommandLine(unittest.TestCase):
             input=text, capture_output=True, text=True, timeout=60)
 
     def test_golden_lines(self):
-        lines = ["# the 18 golden vectors", ""]
+        lines = ["# the 21 golden vectors", ""]
         lines += [data.hex(" ").upper() for _, _, data, _, _ in VECTORS]
         lines[-1] = lines[-1].replace(" ", ":")
         result = self.run_cli("\n".join(lines) + "\n")

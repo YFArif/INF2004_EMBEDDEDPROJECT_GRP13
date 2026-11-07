@@ -22,7 +22,16 @@
  * - the heartbeat bytes, its cmd_reject sum and its saturation;
  * - the absolute 1 Hz schedule: no drift, no burst after a stall, and the
  *   32-bit clock wrap;
- * - the heartbeat is published only while the session is up and fresh.
+ * - the heartbeat is published only while the session is up and fresh;
+ * - the telemetry frame and the live message are filled from the S2, S3,
+ *   S4 and S5 values as section 3.4 and 3A of the document say: mean of
+ *   the wheel set-points, heading in half-degrees, servo angle to
+ *   angle_idx, the defaults when S3 cannot be read, the latched impact,
+ *   and the 5 Hz schedule;
+ * - the publish queue rules (telemetry and live with at most 1 record
+ *   queued, the heartbeat with at most 3) and tel_drop in the heartbeat;
+ * - the three schedules, started with their offsets, never have two
+ *   messages due in the same millisecond.
  *
  * @par How
  * Expected bytes are written out by hand from the document's tables,
@@ -68,6 +77,34 @@
 #define ACK_BYTE2_QUEUED        0x00U
 #define ACK_BYTE2_REJECTED      0x40U
 
+/** One servo angle and the angle_idx it must give. */
+typedef struct
+{
+    int16_t     servo_deg;
+    uint8_t     idx;
+} angle_case_t;
+
+/** Free slots in the publish queue and what each rule must say. */
+typedef struct
+{
+    uint32_t    free_slots;
+    bool        b_tel_allowed;
+    bool        b_live_allowed;
+    bool        b_hb_allowed;
+} queue_case_t;
+
+/* test_period_schedule(): 10 s of 10 ms polls. */
+#define PERIOD_TEST_START_MSEC  1000U
+#define PERIOD_TEST_END_MSEC    11000U
+#define PERIOD_TEST_STEP_MSEC   10U
+
+/* test_schedule_stagger(): 10 s of 1 ms steps. */
+#define STAGGER_TEST_START_MSEC 1000U
+#define STAGGER_TEST_SPAN_MSEC  10000U
+#define STAGGER_TEST_END_MSEC   (STAGGER_TEST_START_MSEC + \
+                                 STAGGER_TEST_SPAN_MSEC)
+#define STAGGER_TEST_STEP_MSEC  1U
+
 static uint32_t g_checks;
 static uint32_t g_failures;
 static uint32_t g_group_failures;
@@ -97,6 +134,13 @@ static void test_schedule_steady(void);
 static void test_schedule_jitter(void);
 static void test_schedule_stall(void);
 static void test_should_publish(void);
+static void test_fill_live(void);
+static void test_fill_frame(void);
+static void test_period_schedule(void);
+static void test_queue_rules(void);
+static void test_heartbeat_tel_drop(void);
+static void test_schedule_stagger(void);
+static s1_telem_src_t make_src(void);
 
 /*!
  * @brief Count one check; print it if it failed.
@@ -529,6 +573,7 @@ main (void)
     group_begin("heartbeat");
     test_heartbeat_bytes();
     test_heartbeat_saturation();
+    test_heartbeat_tel_drop();
     group_end();
 
     group_begin("schedule");
@@ -536,6 +581,14 @@ main (void)
     test_schedule_jitter();
     test_schedule_stall();
     test_should_publish();
+    test_queue_rules();
+    test_schedule_stagger();
+    group_end();
+
+    group_begin("fill");
+    test_fill_live();
+    test_fill_frame();
+    test_period_schedule();
     group_end();
 
     if (0U == g_failures)
@@ -550,6 +603,415 @@ main (void)
     }
 
     return (result);
+}
+
+/*!
+ * @brief A source with distinctive values in every field, S3 readable.
+ *
+ * @return The filled-in source.
+ */
+static s1_telem_src_t
+make_src (void)
+{
+    s1_telem_src_t src = {0U};
+
+    src.motion_state    = 2U;
+    src.b_estop         = false;
+    src.target_l_mms    = 300;
+    src.target_r_mms    = 201;
+    src.count_l         = 70000U;
+    src.count_r         = 65535U;
+    src.dist_mm         = -1234;
+    src.speed_l_mms     = 290;
+    src.speed_r_mms     = -120;
+    src.heading_cdeg    = -4575;
+    src.b_s3_ok         = true;
+    src.line_state      = 1U;
+    src.steer_dv_mms    = -87;
+    src.outer_ir        = 12U;
+    src.centre_ir       = 230U;
+    src.b_overshoot     = true;
+    src.last_ch         = 11U;
+    src.last_cmd        = 4U;
+    src.b_last_rev      = true;
+    src.junc_turn       = 3U;
+    src.rejects         = 3U;
+    src.junctions       = 44U;
+    src.losts           = 1U;
+    src.barcodes        = 5U;
+    src.pitch_hdeg      = -2;
+    src.roll_hdeg       = 1;
+    src.turn_rate_dps   = -45;
+    src.peak_mm         = 37U;
+    src.hump_state      = 2U;
+    src.motion_class    = 4U;
+    src.hump_count      = 3U;
+    src.b_imu_ok        = true;
+    src.b_cal_done      = true;
+    src.b_impact        = false;
+    src.ctrl_state      = 3U;
+    src.fault_mask      = 0x1E5U;
+    src.b_range_valid   = true;
+    src.range_mm        = 350U;
+    src.servo_deg       = 90;
+    src.b_profile_valid = true;
+    src.width_mm        = 210U;
+    src.clear_left_mm   = 400U;
+    src.clear_right_mm  = 2000U;
+    return (src);
+}
+
+/*!
+ * @brief The live message: every field comes from the right source.
+ */
+static void
+test_fill_live (void)
+{
+    s1_telem_src_t   src = make_src();
+    msg_codec_live_t live;
+    uint8_t          buf[MSG_LIV_BYTES] = {0U};
+
+    s1_telem_fill_live(&src, 9U, &live);
+    check(9U == live.seq, "live: seq", live.seq);
+    check(2U == live.motion_state, "live: motion state", live.motion_state);
+    check(!live.b_estop, "live: estop clear", 0U);
+    /* (300 + 201) / 2 = 250, rounded toward zero. The casts here only pass
+     * a signed value to check()'s number for the failure message.
+     */
+    check(250 == live.cmd_speed_mms, "live: mean of set-points",
+          (uint32_t)live.cmd_speed_mms);
+
+    /* -4575 cdeg = -91.5 hdeg, half away from zero = -92. */
+    check(-92 == live.heading_hdeg, "live: heading",
+          (uint32_t)live.heading_hdeg);
+    check(1U == live.line_state, "live: line state", live.line_state);
+    check(-87 == live.steer_dv_mms, "live: steer", 0U);
+    check((12U == live.outer_ir) && (230U == live.centre_ir),
+          "live: sensors", live.outer_ir);
+    check(live.b_overshoot, "live: overshoot", 0U);
+    check((11U == live.bc_letter) && (4U == live.bc_cmd) && (live.b_bc_rev),
+          "live: barcode", live.bc_letter);
+    check(3U == live.junc_turn, "live: junction turn", live.junc_turn);
+    check((3U == live.rejects) && (44U == live.junctions)
+          && (1U == live.losts) && (5U == live.barcodes),
+          "live: counters", live.barcodes);
+    check(MSG_LIV_BYTES == msg_codec_put_live(&live, buf, sizeof(buf)),
+          "live: packs", 0U);
+
+    /* Negative set-points average toward zero as well: (-301 - 200) / 2. */
+    src.target_l_mms = -301;
+    src.target_r_mms = -200;
+    s1_telem_fill_live(&src, 0U, &live);
+    /* The cast only passes a signed value to check()'s number for the
+     * failure message.
+     */
+    check(-250 == live.cmd_speed_mms, "live: negative mean",
+          (uint32_t)live.cmd_speed_mms);
+
+    src.b_estop = true;
+    s1_telem_fill_live(&src, 0U, &live);
+    check(live.b_estop, "live: estop set", 0U);
+
+    /* S3 unreadable: UNCAL, no letter, every other S3 field 0; the S2
+     * fields are still sent.
+     */
+    src.b_s3_ok = false;
+    s1_telem_fill_live(&src, 1U, &live);
+    check((S1_TELEM_LINE_UNCAL == live.line_state)
+          && (MSG_BC_LETTER_NONE == live.bc_letter),
+          "live: S3 unreadable defaults", live.line_state);
+    check((0 == live.steer_dv_mms) && (0U == live.outer_ir)
+          && (0U == live.centre_ir) && (!live.b_overshoot)
+          && (0U == live.bc_cmd) && (!live.b_bc_rev)
+          && (0U == live.junc_turn) && (0U == live.rejects)
+          && (0U == live.junctions) && (0U == live.losts)
+          && (0U == live.barcodes),
+          "live: S3 unreadable, rest zero", 0U);
+    check((2U == live.motion_state) && (live.b_estop),
+          "live: S2 still sent", live.motion_state);
+
+    s1_telem_fill_live(NULL, 0U, &live);
+    s1_telem_fill_live(&src, 0U, NULL);
+    check(true, "live: NULL arguments survive", 0U);
+}
+
+/*!
+ * @brief The 2 Hz frame: every field comes from the right source.
+ */
+static void
+test_fill_frame (void)
+{
+    static const angle_case_t angles[] =
+    {
+        { -5, 0U }, { 0, 0U }, { 7, 0U }, { 8, 1U }, { 90, 12U },
+        { 172, 22U }, { 173, 23U }, { 180, 24U }, { 181, 24U },
+        { 32767, 24U },
+    };
+    s1_telem_src_t            src = make_src();
+    msg_codec_telemetry_t     tel;
+    uint8_t                   buf[MSG_TEL_BYTES] = {0U};
+    uint32_t                  idx;
+
+    s1_telem_fill_frame(&src, 7U, &tel);
+    check(7U == tel.seq, "frame: seq", tel.seq);
+    check(3U == tel.ctrl_state, "frame: controller state", tel.ctrl_state);
+    check(2U == tel.motion_state, "frame: motion state", tel.motion_state);
+    /* 0x1E5 & 0x1F = 0x05: stall and IMU. */
+    check(0x05U == tel.fault_mask, "frame: fault mask keeps 5 bits",
+          tel.fault_mask);
+    check(1U == tel.line_state, "frame: line state", tel.line_state);
+    check((11U == tel.bc_letter) && (tel.b_bc_dir) && (0U == tel.bc_cmd),
+          "frame: barcode letter and direction, command left to live",
+          tel.bc_letter);
+    check((290 == tel.speed_l_mms) && (-120 == tel.speed_r_mms),
+          "frame: wheel speeds", 0U);
+    check((70000U == tel.count_l) && (65535U == tel.count_r)
+          && (-1234 == tel.dist_mm), "frame: counts and distance", 0U);
+    check((-2 == tel.pitch_hdeg) && (1 == tel.roll_hdeg)
+          && (-45 == tel.turn_dps), "frame: terrain angles", 0U);
+    check((2U == tel.hump_state) && (37U == tel.peak_mm)
+          && (3U == tel.hump_count) && (4U == tel.motion_class),
+          "frame: hump fields", tel.motion_class);
+    check((tel.b_imu_ok) && (tel.b_cal_done), "frame: IMU flags", 0U);
+    check(350U == tel.closest_mm, "frame: closest is the live ping",
+          tel.closest_mm);
+    check(12U == tel.angle_idx, "frame: angle index", tel.angle_idx);
+    check((210U == tel.width_mm) && (400U == tel.clear_l_mm)
+          && (2000U == tel.clear_r_mm), "frame: profile", 0U);
+    check(MSG_TEL_BYTES == msg_codec_put_telemetry(&tel, buf, sizeof(buf)),
+          "frame: packs", 0U);
+
+    for (idx = 0U; idx < (sizeof(angles) / sizeof(angles[0])); idx++)
+    {
+        src.servo_deg = angles[idx].servo_deg;
+        s1_telem_fill_frame(&src, 0U, &tel);
+        /* The cast only passes a signed value to check()'s number for the
+         * failure message, and the mask keeps its low 16 bits.
+         */
+        check(angles[idx].idx == tel.angle_idx, "frame: servo angle to index",
+              ((uint32_t)angles[idx].servo_deg) & 0xFFFFU);
+    }
+
+    src          = make_src();
+    src.b_impact = true;
+    s1_telem_fill_frame(&src, 0U, &tel);
+    check(S1_TELEM_CLASS_IMPACT == tel.motion_class,
+          "frame: latched impact forces class IMPACT", tel.motion_class);
+
+    src                 = make_src();
+    src.b_range_valid   = false;
+    src.b_profile_valid = false;
+    s1_telem_fill_frame(&src, 0U, &tel);
+    check((0U == tel.closest_mm) && (0U == tel.width_mm)
+          && (0U == tel.clear_l_mm) && (0U == tel.clear_r_mm),
+          "frame: no echo and no profile give 0", tel.closest_mm);
+
+    src         = make_src();
+    src.b_s3_ok = false;
+    s1_telem_fill_frame(&src, 0U, &tel);
+    check((S1_TELEM_LINE_UNCAL == tel.line_state)
+          && (MSG_BC_LETTER_NONE == tel.bc_letter) && (!tel.b_bc_dir),
+          "frame: S3 unreadable defaults", tel.line_state);
+
+    s1_telem_fill_frame(NULL, 0U, &tel);
+    s1_telem_fill_frame(&src, 0U, NULL);
+    check(true, "frame: NULL arguments survive", 0U);
+}
+
+/*!
+ * @brief The absolute schedule for the 2 Hz and 5 Hz messages.
+ */
+static void
+test_period_schedule (void)
+{
+    uint32_t next_live = PERIOD_TEST_START_MSEC;
+    uint32_t next_tel = PERIOD_TEST_START_MSEC;
+    uint32_t n_live = 0U;
+    uint32_t n_tel = 0U;
+    uint32_t now;
+
+    /* 10 s of 10 ms polls: exactly 50 live messages and 20 frames, with
+     * no drift.
+     */
+    for (now = PERIOD_TEST_START_MSEC; now < PERIOD_TEST_END_MSEC;
+         now += PERIOD_TEST_STEP_MSEC)
+    {
+        if (s1_telem_due(now, S1_TELEM_LIVE_PERIOD_MSEC, &next_live))
+        {
+            n_live++;
+        }
+
+        if (s1_telem_due(now, S1_TELEM_TEL_PERIOD_MSEC, &next_tel))
+        {
+            n_tel++;
+        }
+    }
+
+    check(50U == n_live, "period: 5 Hz count in 10 s", n_live);
+    check(20U == n_tel, "period: 2 Hz count in 10 s", n_tel);
+    check(PERIOD_TEST_END_MSEC == next_live,
+          "period: live deadline stays on the grid",
+          next_live);
+
+    /* A stall of 1 s gives one message, not five, and stays on the grid. */
+    next_live = 1000U;
+    check(s1_telem_due(2000U, S1_TELEM_LIVE_PERIOD_MSEC, &next_live),
+          "period: due after a stall", 0U);
+    check(2200U == next_live, "period: next deadline after a stall",
+          next_live);
+    check(!s1_telem_due(2000U, S1_TELEM_LIVE_PERIOD_MSEC, &next_live),
+          "period: not due twice", 0U);
+
+    /* The clock wraps. */
+    next_live = 0xFFFFFF00U;
+    check(s1_telem_due(0x00000010U, S1_TELEM_LIVE_PERIOD_MSEC, &next_live),
+          "period: due across the clock wrap", 0U);
+    check(0x00000090U == next_live, "period: deadline across the wrap",
+          next_live);
+
+    next_live = 0U;
+    check(!s1_telem_due(100U, 0U, &next_live), "period: 0 is never due", 0U);
+    check(!s1_telem_due(100U, S1_TELEM_LIVE_PERIOD_MSEC, NULL),
+          "period: NULL deadline", 0U);
+}
+
+/*!
+ * @brief tel_drop is the skipped and the refused periodic messages.
+ */
+static void
+test_heartbeat_tel_drop (void)
+{
+    /* tel_drop 9 is bits 47-54: byte 5 bit 0 is 0, byte 6 bits 7-1 are
+     * 0001001. Everything else is 0.
+     */
+    static const uint8_t   want[9] = {HDR_HEARTBEAT, 0x00U, 0x00U, 0x00U,
+                                      0x00U, 0x00U, 0x12U, 0x00U, 0x00U};
+    const s1_telem_hb_in_t hb_in = {0U, 0U, 0U};
+    s1_telem_stats_t       stats;
+    s1_telem_pub_t         hb_msg;
+
+    /* The cast discards memset()'s return value, which is only its first
+     * argument.
+     */
+    (void)memset(&stats, 0, sizeof(stats));
+    stats.periodic_skipped   = 2U;
+    stats.periodic_failed    = 3U;
+    stats.hb_publish_failed  = 4U;
+    /* These do not count: no session, or not a periodic message. */
+    stats.hb_skipped         = 50U;
+    stats.ack_publish_failed = 60U;
+
+    check((s1_telem_heartbeat(0U, &hb_in, &stats, &hb_msg))
+          && (bytes_equal(hb_msg.payload, want, 9U)),
+          "tel_drop: skipped + refused telemetry, live and heartbeats", 0U);
+
+    /* 260 saturates at 255: byte 5 bit 0 and byte 6 bits 7-1 all set. */
+    stats.periodic_skipped  = 200U;
+    stats.periodic_failed   = 50U;
+    stats.hb_publish_failed = 10U;
+    check((s1_telem_heartbeat(0U, &hb_in, &stats, &hb_msg))
+          && (0x01U == (hb_msg.payload[5] & 0x01U))
+          && (0xFEU == hb_msg.payload[6]), "tel_drop: 260 -> 255", 0U);
+
+    /* A sum that would wrap 32 bits must not read as a small count. */
+    stats.periodic_skipped  = UINT32_MAX;
+    stats.periodic_failed   = 1U;
+    stats.hb_publish_failed = 1U;
+    check((s1_telem_heartbeat(0U, &hb_in, &stats, &hb_msg))
+          && (0xFEU == hb_msg.payload[6]), "tel_drop: no 32-bit wrap", 0U);
+}
+
+/*!
+ * @brief Telemetry and live each join the queue only with at most 1 record
+ *        in it, the heartbeat only with at most 3. Depth 8, so 8 free is
+ *        empty.
+ */
+static void
+test_queue_rules (void)
+{
+    static const queue_case_t cases[] =
+    {
+        { 8U, true, true, true }, { 7U, true, true, true },
+        { 6U, false, false, true }, { 5U, false, false, true },
+        { 4U, false, false, false }, { 1U, false, false, false },
+        { 0U, false, false, false }, { 9U, true, true, true },
+        { UINT32_MAX, true, true, true },
+    };
+    uint32_t                  idx;
+
+    check(8U == MQTT_LINK_QUEUE_DEPTH, "queue: rules assume depth 8", 0U);
+
+    for (idx = 0U; idx < (sizeof(cases) / sizeof(cases[0])); idx++)
+    {
+        check(cases[idx].b_tel_allowed
+              == s1_telem_queue_allows(cases[idx].free_slots,
+                                       S1_TELEM_TEL_QUEUED_MAX),
+              "queue: telemetry rule", cases[idx].free_slots);
+        check(cases[idx].b_live_allowed
+              == s1_telem_queue_allows(cases[idx].free_slots,
+                                       S1_TELEM_LIVE_QUEUED_MAX),
+              "queue: live rule", cases[idx].free_slots);
+        check(cases[idx].b_hb_allowed
+              == s1_telem_queue_allows(cases[idx].free_slots,
+                                       S1_TELEM_HB_QUEUED_MAX),
+              "queue: heartbeat rule", cases[idx].free_slots);
+    }
+}
+
+/*!
+ * @brief The three schedules, started the way telemetry_task starts them,
+ *        never have two messages due in the same millisecond.
+ */
+static void
+test_schedule_stagger (void)
+{
+    uint32_t next_hb = STAGGER_TEST_START_MSEC;
+    uint32_t next_tel = STAGGER_TEST_START_MSEC + S1_TELEM_TEL_OFFSET_MSEC;
+    uint32_t next_live = STAGGER_TEST_START_MSEC + S1_TELEM_LIVE_OFFSET_MSEC;
+    uint32_t n_hb = 0U;
+    uint32_t n_tel = 0U;
+    uint32_t n_live = 0U;
+    uint32_t n_due = 0U;
+    uint32_t n_together = 0U;
+    uint32_t now;
+
+    for (now = STAGGER_TEST_START_MSEC; now < STAGGER_TEST_END_MSEC;
+         now += STAGGER_TEST_STEP_MSEC)
+    {
+        n_due = 0U;
+
+        if (s1_telem_due(now, S1_TELEM_HB_PERIOD_MSEC, &next_hb))
+        {
+            n_hb++;
+            n_due++;
+        }
+
+        if (s1_telem_due(now, S1_TELEM_TEL_PERIOD_MSEC, &next_tel))
+        {
+            n_tel++;
+            n_due++;
+        }
+
+        if (s1_telem_due(now, S1_TELEM_LIVE_PERIOD_MSEC, &next_live))
+        {
+            n_live++;
+            n_due++;
+        }
+
+        if (n_due > 1U)
+        {
+            n_together++;
+        }
+    }
+
+    check(0U == n_together, "stagger: two or more due in one millisecond",
+          n_together);
+    check((STAGGER_TEST_SPAN_MSEC / S1_TELEM_HB_PERIOD_MSEC) == n_hb,
+          "stagger: 1 Hz count in 10 s", n_hb);
+    check((STAGGER_TEST_SPAN_MSEC / S1_TELEM_TEL_PERIOD_MSEC) == n_tel,
+          "stagger: 2 Hz count in 10 s", n_tel);
+    check((STAGGER_TEST_SPAN_MSEC / S1_TELEM_LIVE_PERIOD_MSEC) == n_live,
+          "stagger: 5 Hz count in 10 s", n_live);
 }
 
 /*** end of file ***/

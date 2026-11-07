@@ -14,7 +14,7 @@ Usage, from the repository root:
         testing/subsystem1/codec_vectors.c
         Compare three copies of each vector: this script's own packing, the
         hex in the document's 10.2 table and the bytes in codec_vectors.c.
-        Exit 0 only if all three agree for all 18 vectors.
+        Exit 0 only if all three agree for all 21 vectors.
 
 TEL-INDEP is a second independent calculation from the section 3 table;
 its bytes in the document were not produced by this script, which only
@@ -33,7 +33,7 @@ if not (CHECK or (len(ARGS) == 1 and not ARGS[0].startswith("-"))):
     sys.exit(2)
 DOC = ARGS[1] if CHECK else ARGS[0]
 VERSION = 1
-GOLDEN_COUNT = 18
+GOLDEN_COUNT = 21
 
 
 def table(section_start, section_end, name_col, bits_col, off_col):
@@ -87,6 +87,7 @@ def hdeg(cdeg):
 
 
 tel = table("## 3. TELEMETRY", "### 3.1", 1, 4, 5)
+live = table("## 3A. LIVE", "### 3A.1", 0, 2, 3)
 hb = table("## 4. HEARTBEAT", "## 5. COMMAND", 0, 2, 3)
 cmd = table("COMMAND:", "ACK, published", 0, 2, 3)
 ack = table("ACK, published", "### 5.1", 0, 2, 3)
@@ -156,6 +157,49 @@ out.append(("TEL-INDEP",
             telemetry(165, 9, 5, 0x01, 6, 37, 2, 1, -400, 400, 0x00071234,
                       0x0009ABCD, -1500, 75, -25, 2, 60, 3, 4, -90, 1, 0,
                       1023, 12, 250, 0, 1023)))
+def heading_hdeg(cdeg):
+    """Section 3A.1: limit to +/-18000, round half away from zero."""
+    lim = max(-18000, min(18000, cdeg))
+    h = (abs(lim) + 25) // 50
+    return -h if lim < 0 else h
+
+
+def live_values(seq, motion, estop, cmd_speed, heading_h, line, steer,
+                outer, centre, overshoot, letter, bccmd, rev, junc, rejects,
+                junctions, losts, barcodes):
+    return {
+        "seq": seq % 256, "motion_state": motion, "estop": estop,
+        "cmd_speed_mms": off(cmd_speed, 10),
+        "heading": off(heading_h, 10),
+        "line_state": line, "steer_dv": off(steer, 10),
+        "n_outer": outer, "n_centre": centre, "overshoot": overshoot,
+        "bc_letter": letter, "bc_cmd": bccmd, "bc_rev": rev,
+        "junc_turn": junc, "rejects": rejects % 16,
+        "junctions": junctions % 256, "losts": losts % 256,
+        "barcodes": barcodes % 256,
+    }
+
+
+out.append(("LIV-1 typical",
+            "seq 9, motion 1 (FOLLOWING), estop 0, cmd_speed +300, heading "
+            "+4575 cdeg (+92 hdeg, rounds up), line_state 1, steer_dv -87, "
+            "n_outer 12, n_centre 230, overshoot 1, bc_letter 11 ('B'), "
+            "bc_cmd 2 (RIGHT), bc_rev 1, junc_turn 2, rejects 3, junctions "
+            "300 (sent 44), losts 1, barcodes 5",
+            pack(live, live_values(9, 1, 0, 300, heading_hdeg(4575), 1, -87,
+                                   12, 230, 1, 11, 2, 1, 2, 3, 300, 1, 5),
+                 6, 14)))
+out.append(("LIV-2 all minimum",
+            "every unsigned field 0, flags 0, every signed field at its "
+            "minimum (cmd_speed -512, heading -512 hdeg, steer_dv -512)",
+            pack(live, live_values(0, 0, 0, -512, -512, 0, -512, 0, 0, 0,
+                                   0, 0, 0, 0, 0, 0, 0, 0), 6, 14)))
+out.append(("LIV-3 all maximum",
+            "every field at its largest stored value (cmd_speed 511, "
+            "heading 511 hdeg, steer_dv 511, bc_letter 63, bc_cmd 7)",
+            pack(live, live_values(255, 7, 1, 511, 511, 7, 511, 255, 255,
+                                   1, 63, 7, 1, 3, 15, 255, 255, 255), 6,
+                 14)))
 out.append(("HB-1",
             "seq 42, uptime 1234 s, rssi -67 dBm (sent 67), connect 3, "
             "tel_drop 1, evt_drop 0, cmd_reject 2",

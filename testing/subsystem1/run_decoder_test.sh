@@ -15,16 +15,16 @@
 #         | tee testing/subsystem1/logs/YYYY-MM-DD_host_test_decoder.txt
 #
 # Stages; the run stops at the first stage that fails:
-#   1  golden.py --check: the 18 vectors in codec_vectors.c, which the
+#   1  golden.py --check: the 21 vectors in codec_vectors.c, which the
 #      decoder test reads, still agree with the document's 10.2 table and
 #      with golden.py's own packing.
-#   2  decoder_test.py: the 18 golden vectors decode to exactly the values
+#   2  decoder_test.py: the 21 golden vectors decode to exactly the values
 #      msg_codec_get_*() must return; malformed input (empty, every type
-#      one byte short and one byte long, versions 0, 2 and 15, types 0, 6
+#      one byte short and one byte long, versions 0, 2 and 15, types 0, 7
 #      and 15); padding ignored; count reconstruction (10.1); lost frames
 #      from seq; describe(); the field table against msg_layout.h; the
-#      command line.
-#   3  Four mutations, each on a copy of s1_decode.py in a temporary
+#      command line; the counter baseline restart (rebase_live).
+#   3  Six mutations, each on a copy of s1_decode.py in a temporary
 #      folder; each must make stage 2 fail. Each mutation matches on text
 #      and the copy is compared with the original ("mutation did not
 #      apply" if nothing changed; exactly one changed line is required).
@@ -140,13 +140,17 @@ mutate M3 's/if version != LAYOUT_VERSION:/if version > LAYOUT_VERSION:/' \
     "version 0 accepted"
 mutate M4 's/len(data) != LENGTHS/len(data) < LENGTHS/' \
     "longer messages accepted"
+mutate M5 's/self\._full\.pop("live_" + name, None)/pass/' \
+    "rebase_live() keeps the counter baseline"
+mutate M6 's/self\._last_seq\.clear()/pass/' \
+    "rebase_robot() keeps the seq baselines"
 
-echo "stage 3: $CAUGHT/4 mutations caught"
-if [ "$CAUGHT" -ne 4 ] || [ "$MISSED" -ne 0 ]
+echo "stage 3: $CAUGHT/6 mutations caught"
+if [ "$CAUGHT" -ne 6 ] || [ "$MISSED" -ne 0 ]
 then
     fail "3: mutations"
 fi
 
 echo "S1-U11: PASS (golden.py --check ok, $TESTS decoder tests passed," \
-     "$CAUGHT/4 mutations caught)"
+     "$CAUGHT/6 mutations caught)"
 exit 0

@@ -18,10 +18,11 @@
 #   1  Build s1_telem_test.c, s1_telem.c and msg_codec.c with strict
 #      warnings as errors, UBSan and ASan.
 #   2  Run the test; it must end with "RESULT: all passed".
-#   3  Eight mutations, each on a copy of s1_telem in a temporary folder;
+#   3  Eighteen mutations, each on a copy of s1_telem in a temporary folder;
 #      every one must be caught. One must stop the build at a compile-time
-#      check; seven must build and make the test fail. Each mutation
-#      matches on text, and exactly one line must change.
+#      check; seventeen must build and make the test fail. Each mutation
+#      matches on text, and exactly one line must change, except M17, which
+#      sets both schedule offsets and so changes two.
 #   4  If arm-none-eabi-gcc is on the PATH, compile s1_telem.c for the
 #      target with the profile's code-generation flags; any warning fails.
 #      Otherwise the stage is skipped.
@@ -100,9 +101,10 @@ echo "== stage 3: mutations"
 CAUGHT=0
 MISSED=0
 
-# mutate ID KIND FILE SED_SCRIPT DESCRIPTION
+# mutate ID KIND FILE SED_SCRIPT DESCRIPTION [LINES]
 #   KIND is "compile" (the build must stop at a compile-time check) or
-#   "run" (the mutant must build and the test must fail).
+#   "run" (the mutant must build and the test must fail). LINES is how many
+#   lines the mutation must change; the default is 1.
 mutate ()
 {
     dir="$WORK/$1"
@@ -116,9 +118,9 @@ mutate ()
         return
     fi
     changed=$(diff "$SRC_DIR/$3" "$dir/$3" | grep -c '^>')
-    if [ "$changed" -ne 1 ]
+    if [ "$changed" -ne "${6:-1}" ]
     then
-        echo "$1 $5: changed $changed lines, expected 1"
+        echo "$1 $5: changed $changed lines, expected ${6:-1}"
         MISSED=$((MISSED + 1))
         return
     fi
@@ -178,7 +180,7 @@ mutate M3 run s1_telem.c \
     's/^            p_in->command_dropped);/            0U);/' \
     "command_dropped left out of cmd_reject"
 mutate M4 run s1_telem.c \
-    's/\*p_next_msec += ((late_msec \/ S1_TELEM_HB_PERIOD_MSEC) + 1U)/*p_next_msec = now_msec + ((0U * late_msec) + 1U)/' \
+    's/\*p_next_msec += ((late_msec \/ period_msec) + 1U) \* period_msec;/*p_next_msec = now_msec + period_msec;/' \
     "relative heartbeat deadline instead of absolute"
 mutate M5 run s1_telem.c \
     's/p_ack->topic = MQTT_LINK_TOPIC_ACK;/p_ack->topic = MQTT_LINK_TOPIC_EVENT;/' \
@@ -190,8 +192,40 @@ mutate M7 run s1_telem.c \
     's/p_hb->qos = MQTT_LINK_QOS_0;/p_hb->qos = MQTT_LINK_QOS_1;/' \
     "heartbeat sent at QoS 1"
 
-echo "stage 3: $CAUGHT/8 mutations caught"
-if [ "$CAUGHT" -ne 8 ] || [ "$MISSED" -ne 0 ]
+mutate M8 run s1_telem.c \
+    's/p_live->cmd_speed_mms = (p_src->target_l_mms + p_src->target_r_mms)/p_live->cmd_speed_mms = (p_src->target_l_mms - p_src->target_r_mms)/' \
+    "commanded speed uses the difference of the set-points"
+mutate M9 run s1_telem.c \
+    's/p_tel->motion_class = p_src->b_impact ? S1_TELEM_CLASS_IMPACT/p_tel->motion_class = p_src->b_impact ? p_src->motion_class/' \
+    "latched impact not shown as class IMPACT"
+mutate M10 run s1_telem.c \
+    's/p_live->line_state    = S1_TELEM_LINE_UNCAL;/p_live->line_state    = 0U;/' \
+    "line state FOLLOW when S3 is unreadable"
+mutate M11 run s1_telem.c \
+    's/s1_telem_sat_add(p_stats->periodic_skipped,/s1_telem_sat_add(0U,/' \
+    "skipped messages left out of tel_drop"
+mutate M12 run s1_telem.c \
+    's/^            p_stats->hb_publish_failed);/            0U);/' \
+    "refused heartbeats left out of tel_drop"
+mutate M13 run s1_telem.h \
+    's/\(#define S1_TELEM_TEL_QUEUED_MAX  *\)1U/\12U/' \
+    "telemetry allowed with 2 records queued"
+mutate M16 run s1_telem.h \
+    's/\(#define S1_TELEM_LIVE_QUEUED_MAX  *\)1U/\12U/' \
+    "live allowed with 2 records queued"
+mutate M14 run s1_telem.h \
+    's/\(#define S1_TELEM_HB_QUEUED_MAX  *\)3U/\14U/' \
+    "heartbeat allowed with 4 records queued"
+mutate M15 run s1_telem.c \
+    's/return (queued <= max_queued);/return (queued < max_queued);/' \
+    "queue rule off by one"
+mutate M17 run s1_telem.h \
+    's/\(#define S1_TELEM_TEL_OFFSET_MSEC  *\)250U/\10U/
+s/\(#define S1_TELEM_LIVE_OFFSET_MSEC  *\)100U/\10U/' \
+    "both schedule offsets 0" 2
+
+echo "stage 3: $CAUGHT/18 mutations caught"
+if [ "$CAUGHT" -ne 18 ] || [ "$MISSED" -ne 0 ]
 then
     fail "3: mutations"
 fi
@@ -223,6 +257,6 @@ else
     echo "stage 4 skipped (arm-none-eabi-gcc is not on the PATH)"
 fi
 
-echo "S1-U14: PASS ($CHECKS checks, $CAUGHT/8 mutations caught," \
+echo "S1-U14: PASS ($CHECKS checks, $CAUGHT/18 mutations caught," \
      "target compile $STAGE4)"
 exit 0

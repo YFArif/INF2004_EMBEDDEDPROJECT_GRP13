@@ -9,9 +9,10 @@
  * @par What it tests
  * app_program/subsystem1/msg_codec.c and msg_layout.h, through the public
  * API only, against docs/S1_binary_frame.md:
- * - the 18 golden vectors of section 10.2 (encode and decode), and the
+ * - the 21 golden vectors of section 10.2 (encode and decode), and the
  *   MSG_FAULT_xxx constants against the one-hot vectors;
- * - the 17 pitch/roll rounding cases of section 3.3;
+ * - the 17 pitch/roll rounding cases of section 3.3 and the heading
+ *   cases of section 3A.1;
  * - every field at its minimum and maximum;
  * - the wrap, reconstruction, clamp and reject cases of section 10.1.
  *
@@ -53,12 +54,15 @@
 #define MARK_BYTE               0xA5U
 
 /* Number of golden vectors in section 10.2 of the document. */
-#define GOLDEN_COUNT            18U
+#define GOLDEN_COUNT            21U
 
 /* Version nibble values used by the reject cases. */
 #define BAD_VERSION_LOW         0U
 #define BAD_VERSION_HIGH        2U
-#define RESERVED_TYPE           6U
+#define RESERVED_TYPE           7U
+
+/* Message types in test_rejects(). */
+#define MSG_DESC_COUNT          6U
 
 /** Telemetry fields, so that tests can set or read one by number. */
 typedef enum
@@ -106,6 +110,7 @@ typedef struct
 typedef union
 {
     msg_codec_telemetry_t   tel;
+    msg_codec_live_t        live;
     msg_codec_heartbeat_t   hb;
     msg_codec_event_t       evt;
     msg_codec_command_t     cmd;
@@ -130,6 +135,36 @@ typedef struct
     const void *        p_valid_in;
     const uint8_t *     p_valid_bytes;
 } msg_desc_t;
+
+/** One heading in centidegrees and the half-degrees it must give. */
+typedef struct
+{
+    int32_t     cdeg;
+    int16_t     hdeg;
+} heading_case_t;
+
+/** Which live message field a clamp case sets. */
+typedef enum
+{
+    LIVE_FIELD_MOTION,
+    LIVE_FIELD_LINE,
+    LIVE_FIELD_LETTER,
+    LIVE_FIELD_BC_CMD,
+    LIVE_FIELD_JUNC,
+    LIVE_FIELD_CMD_SPEED,
+    LIVE_FIELD_STEER,
+    LIVE_FIELD_HEADING,
+    LIVE_FIELD_REJECTS
+} live_field_t;
+
+/** One live field, the value set and the value that must come back. */
+typedef struct
+{
+    const char *    p_label;
+    live_field_t    field;
+    int32_t         value_in;
+    int32_t         value_out;
+} live_clamp_case_t;
 
 /* Pitch/roll rounding, section 3.3 of the document: input, half-degrees
  * after rounding and clamping, and the 7-bit stored value.
@@ -245,6 +280,18 @@ static const codec_vectors_tel_t * tel_find(const char * p_label);
 static bool     tel_round_trip(const msg_codec_telemetry_t * p_in,
                                msg_codec_telemetry_t * p_out,
                                uint8_t * p_bytes);
+static bool     live_round_trip(const msg_codec_live_t * p_in,
+                                msg_codec_live_t * p_out);
+static bool     live_same(const msg_codec_live_t * p_first,
+                          const msg_codec_live_t * p_second);
+static bool     get_liv(const uint8_t * p_buf, uint32_t len, void * p_out);
+static uint32_t put_liv(const void * p_in, uint8_t * p_buf,
+                        uint32_t buf_len);
+static void     set_live_field(msg_codec_live_t * p_msg, live_field_t field,
+                               int32_t value);
+static void     test_live_clamps(void);
+static void     test_live_heading(void);
+static void     test_live_seq(void);
 static bool     hb_round_trip(const msg_codec_heartbeat_t * p_in,
                               msg_codec_heartbeat_t * p_out);
 static bool     evt_round_trip(const msg_codec_event_t * p_in,
@@ -331,6 +378,12 @@ main (void)
     test_tel_cases(g_tel_clamps,
                    (uint32_t)(sizeof(g_tel_clamps) / sizeof(g_tel_clamps[0])));
     test_clamps_other();
+    group_end();
+
+    group_begin("live");
+    test_live_clamps();
+    test_live_heading();
+    test_live_seq();
     group_end();
 
     group_begin("rejects");
@@ -712,6 +765,239 @@ hb_round_trip (const msg_codec_heartbeat_t * p_in,
 }
 
 /*!
+ * @brief Live round trip through an exactly sized buffer.
+ *
+ * @param[in]  p_in  Fields to encode.
+ * @param[out] p_out Receives the decoded fields.
+ *
+ * @return True if both calls succeeded.
+ */
+static bool
+live_round_trip (const msg_codec_live_t * p_in, msg_codec_live_t * p_out)
+{
+    bool            b_ok = false;
+    uint8_t * const p_buf = alloc_copy(NULL, MSG_LIV_BYTES, 0U);
+
+    if (NULL != p_buf)
+    {
+        b_ok = ((MSG_LIV_BYTES
+                 == msg_codec_put_live(p_in, p_buf, MSG_LIV_BYTES))
+                && (msg_codec_get_live(p_buf, MSG_LIV_BYTES, p_out)));
+        free(p_buf);
+    }
+
+    return (b_ok);
+}
+
+/*!
+ * @brief Compare two live messages field by field.
+ *
+ * @param[in] p_first  First.
+ * @param[in] p_second Second.
+ *
+ * @return True if every field is equal.
+ */
+static bool
+live_same (const msg_codec_live_t * p_first, const msg_codec_live_t * p_second)
+{
+    return ((p_first->seq == p_second->seq)
+            && (p_first->motion_state == p_second->motion_state)
+            && (p_first->b_estop == p_second->b_estop)
+            && (p_first->cmd_speed_mms == p_second->cmd_speed_mms)
+            && (p_first->heading_hdeg == p_second->heading_hdeg)
+            && (p_first->line_state == p_second->line_state)
+            && (p_first->steer_dv_mms == p_second->steer_dv_mms)
+            && (p_first->outer_ir == p_second->outer_ir)
+            && (p_first->centre_ir == p_second->centre_ir)
+            && (p_first->b_overshoot == p_second->b_overshoot)
+            && (p_first->bc_letter == p_second->bc_letter)
+            && (p_first->bc_cmd == p_second->bc_cmd)
+            && (p_first->b_bc_rev == p_second->b_bc_rev)
+            && (p_first->junc_turn == p_second->junc_turn)
+            && (p_first->rejects == p_second->rejects)
+            && (p_first->junctions == p_second->junctions)
+            && (p_first->losts == p_second->losts)
+            && (p_first->barcodes == p_second->barcodes));
+}
+
+/*!
+ * @brief Adapter: live get with an untyped output pointer.
+ *
+ * @param[in]  p_buf The received bytes.
+ * @param[in]  len   Number of received bytes.
+ * @param[out] p_out Receives the fields; points to a msg_codec_live_t.
+ *
+ * @return True if len, version and type are right.
+ */
+static bool
+get_liv (const uint8_t * p_buf, uint32_t len, void * p_out)
+{
+    msg_codec_live_t * const p_live = p_out;
+
+    return (msg_codec_get_live(p_buf, len, p_live));
+}
+
+/*!
+ * @brief Adapter: live put with an untyped input pointer.
+ *
+ * @param[in]  p_in    Field values; points to a msg_codec_live_t.
+ * @param[out] p_buf   Receives MSG_LIV_BYTES bytes.
+ * @param[in]  buf_len Size of p_buf.
+ *
+ * @return MSG_LIV_BYTES, or 0 if a pointer is NULL or p_buf is too small.
+ */
+static uint32_t
+put_liv (const void * p_in, uint8_t * p_buf, uint32_t buf_len)
+{
+    const msg_codec_live_t * const p_live = p_in;
+
+    return (msg_codec_put_live(p_live, p_buf, buf_len));
+}
+
+/*!
+ * @brief Set one field of a live message.
+ *
+ * @param[in,out] p_msg The message.
+ * @param[in]     field Which field.
+ * @param[in]     value The value; the table holds values each field's type
+ *                      can store, so the casts below keep them.
+ */
+static void
+set_live_field (msg_codec_live_t * p_msg, live_field_t field, int32_t value)
+{
+    switch (field)
+    {
+        case LIVE_FIELD_MOTION:
+            p_msg->motion_state = (uint8_t)value;
+        break;
+        case LIVE_FIELD_LINE:
+            p_msg->line_state = (uint8_t)value;
+        break;
+        case LIVE_FIELD_LETTER:
+            p_msg->bc_letter = (uint8_t)value;
+        break;
+        case LIVE_FIELD_BC_CMD:
+            p_msg->bc_cmd = (uint8_t)value;
+        break;
+        case LIVE_FIELD_JUNC:
+            p_msg->junc_turn = (uint8_t)value;
+        break;
+        case LIVE_FIELD_CMD_SPEED:
+            p_msg->cmd_speed_mms = value;
+        break;
+        case LIVE_FIELD_STEER:
+            p_msg->steer_dv_mms = value;
+        break;
+        case LIVE_FIELD_HEADING:
+            p_msg->heading_hdeg = (int16_t)value;
+        break;
+        case LIVE_FIELD_REJECTS:
+            p_msg->rejects = (uint8_t)value;
+        break;
+        default:
+            /* Every field above is in the table; nothing to set. */
+        break;
+    }
+}
+
+/*!
+ * @brief Live message: the clamps and the rejects wrap, each on top of the
+ *        LIV-1 vector so every other field must stay as it was.
+ */
+static void
+test_live_clamps (void)
+{
+    static const live_clamp_case_t cases[] =
+    {
+        { "motion_state 8 clamps to 7", LIVE_FIELD_MOTION, 8, 7 },
+        { "line_state 8 clamps to 7", LIVE_FIELD_LINE, 8, 7 },
+        { "bc_letter 64 clamps to 63", LIVE_FIELD_LETTER, 64, 63 },
+        { "bc_cmd 8 clamps to 7", LIVE_FIELD_BC_CMD, 8, 7 },
+        { "junc_turn 4 clamps to 3", LIVE_FIELD_JUNC, 4, 3 },
+        { "cmd_speed 100000 clamps to 511", LIVE_FIELD_CMD_SPEED, 100000, 511 },
+        { "cmd_speed -100000 clamps to -512", LIVE_FIELD_CMD_SPEED, -100000,
+          -512 },
+        { "steer_dv 512 clamps to 511", LIVE_FIELD_STEER, 512, 511 },
+        { "steer_dv -513 clamps to -512", LIVE_FIELD_STEER, -513, -512 },
+        { "heading 512 clamps to 511", LIVE_FIELD_HEADING, 512, 511 },
+        { "heading -513 clamps to -512", LIVE_FIELD_HEADING, -513, -512 },
+        { "rejects keeps its low 4 bits", LIVE_FIELD_REJECTS, 0xF5, 5 },
+    };
+    const codec_vectors_liv_t *    p_base = NULL;
+    uint32_t                       vec_count = 0U;
+    msg_codec_live_t               fields_in;
+    msg_codec_live_t               expect;
+    msg_codec_live_t               fields_out;
+    uint32_t                       idx;
+
+    p_base = codec_vectors_liv(&vec_count);
+    check(3U == vec_count, "live vector count is 3", "LIV");
+
+    for (idx = 0U; idx < (sizeof(cases) / sizeof(cases[0])); idx++)
+    {
+        fields_in = p_base[0].in;
+        expect    = p_base[0].out;
+        set_live_field(&fields_in, cases[idx].field, cases[idx].value_in);
+        set_live_field(&expect, cases[idx].field, cases[idx].value_out);
+        check((live_round_trip(&fields_in, &fields_out))
+              && (live_same(&fields_out, &expect)),
+              cases[idx].p_label, "live");
+    }
+}
+
+/*!
+ * @brief Live message: the heading conversion of section 3A.1.
+ */
+static void
+test_live_heading (void)
+{
+    static const heading_case_t heading_cases[] =
+    {
+        { 0, 0 }, { 24, 0 }, { -24, 0 }, { 25, 1 }, { -25, -1 },
+        { 4575, 92 }, { -4575, -92 }, { 17974, 359 }, { 17975, 360 },
+        { 18000, 360 }, { -17999, -360 }, { -18000, -360 },
+        { 90000, 360 }, { -90000, -360 }, { INT32_MAX, 360 },
+        { INT32_MIN, -360 },
+    };
+    uint32_t                    idx;
+
+    for (idx = 0U; idx < (sizeof(heading_cases) / sizeof(heading_cases[0]));
+         idx++)
+    {
+        check(heading_cases[idx].hdeg
+              == msg_codec_heading_to_hdeg(heading_cases[idx].cdeg),
+              "heading cdeg to half-degrees", "3A.1 row");
+    }
+}
+
+/*!
+ * @brief Live message: seq 255 round-trips and the counter wraps to 0.
+ */
+static void
+test_live_seq (void)
+{
+    const codec_vectors_liv_t * p_base = NULL;
+    uint32_t                    vec_count = 0U;
+    msg_codec_live_t            fields_in;
+    msg_codec_live_t            fields_out;
+
+    p_base    = codec_vectors_liv(&vec_count);
+    fields_in = p_base[0].in;
+
+    fields_in.seq = 255U;
+    check((live_round_trip(&fields_in, &fields_out))
+          && (255U == fields_out.seq),
+          "live seq 255", "seq");
+    /* seq is 255, so seq + 1 is 256 and the counter wraps to 0 when it is
+     * narrowed back to uint8_t, as on the robot.
+     */
+    fields_in.seq = (uint8_t)(fields_in.seq + 1U);
+    check((live_round_trip(&fields_in, &fields_out))
+          && (0U == fields_out.seq),
+          "live seq after 255 is 0", "seq");
+}
+
+/*!
  * @brief Event round trip through an exactly sized buffer.
  *
  * @param[in]  p_in  Fields to encode.
@@ -1042,21 +1328,37 @@ test_golden_tel (void)
 static void
 test_golden_other (void)
 {
-    uint32_t                    n_hb = 0U;
-    uint32_t                    n_evt = 0U;
-    uint32_t                    n_cmd = 0U;
-    uint32_t                    n_ack = 0U;
-    uint32_t                    n_tel = 0U;
-    const codec_vectors_hb_t *  p_hb = codec_vectors_hb(&n_hb);
-    const codec_vectors_evt_t * p_evt = codec_vectors_evt(&n_evt);
-    const codec_vectors_cmd_t * p_cmd = codec_vectors_cmd(&n_cmd);
-    const codec_vectors_ack_t * p_ack = codec_vectors_ack(&n_ack);
-    any_out_t                   out;
-    uint32_t                    idx;
+    uint32_t                          n_hb = 0U;
+    uint32_t                          n_evt = 0U;
+    uint32_t                          n_cmd = 0U;
+    uint32_t                          n_ack = 0U;
+    uint32_t                          n_tel = 0U;
+    uint32_t                          n_liv = 0U;
+    const codec_vectors_liv_t * const p_liv = codec_vectors_liv(&n_liv);
+    const codec_vectors_hb_t *        p_hb = codec_vectors_hb(&n_hb);
+    const codec_vectors_evt_t *       p_evt = codec_vectors_evt(&n_evt);
+    const codec_vectors_cmd_t *       p_cmd = codec_vectors_cmd(&n_cmd);
+    const codec_vectors_ack_t *       p_ack = codec_vectors_ack(&n_ack);
+    any_out_t                         out;
+    uint32_t                          idx;
 
     (void)codec_vectors_tel(&n_tel);
-    check(GOLDEN_COUNT == (n_tel + n_hb + n_evt + n_cmd + n_ack),
-          "18 golden vectors in total", "all");
+    check(GOLDEN_COUNT == (n_tel + n_liv + n_hb + n_evt + n_cmd + n_ack),
+          "21 golden vectors in total", "all");
+
+    for (idx = 0U; idx < n_liv; idx++)
+    {
+        check((put_matches(put_liv, &p_liv[idx].in, MSG_LIV_BYTES,
+                           p_liv[idx].bytes))
+              && (get_exact(get_liv, p_liv[idx].bytes, MSG_LIV_BYTES, &out))
+              && (live_same(&out.live, &p_liv[idx].out)),
+              "bytes and fields match", p_liv[idx].p_label);
+        check((!p_liv[idx].b_uses_cdeg)
+              || (p_liv[idx].in.heading_hdeg
+                  == msg_codec_heading_to_hdeg(p_liv[idx].heading_cdeg)),
+              "heading_hdeg is the conversion of heading_cdeg",
+              p_liv[idx].p_label);
+    }
 
     for (idx = 0U; idx < n_hb; idx++)
     {
@@ -1518,22 +1820,26 @@ test_rejects_one (const msg_desc_t * p_msg)
 }
 
 /*!
- * @brief Reject cases for all five message types, plus a command with
+ * @brief Reject cases for all six message types, plus a command with
  *        opcode 0 (rejected, but its cmd_id is still returned).
  */
 static void
 test_rejects (void)
 {
     uint32_t                    n = 0U;
-    const codec_vectors_tel_t * p_tel = codec_vectors_tel(&n);
-    const codec_vectors_hb_t *  p_hb = codec_vectors_hb(&n);
-    const codec_vectors_evt_t * p_evt = codec_vectors_evt(&n);
-    const codec_vectors_cmd_t * p_cmd = codec_vectors_cmd(&n);
-    const codec_vectors_ack_t * p_ack = codec_vectors_ack(&n);
-    const msg_desc_t            msgs[5] =
+
+    const codec_vectors_tel_t *       p_tel = codec_vectors_tel(&n);
+    const codec_vectors_liv_t * const p_liv = codec_vectors_liv(&n);
+    const codec_vectors_hb_t *        p_hb = codec_vectors_hb(&n);
+    const codec_vectors_evt_t *       p_evt = codec_vectors_evt(&n);
+    const codec_vectors_cmd_t *       p_cmd = codec_vectors_cmd(&n);
+    const codec_vectors_ack_t *       p_ack = codec_vectors_ack(&n);
+    const msg_desc_t                  msgs[MSG_DESC_COUNT] =
     {
         { "telemetry", MSG_TEL_BYTES, MSG_TYPE_TELEMETRY, get_tel, put_tel,
           false, &p_tel[0].in, p_tel[0].bytes },
+        { "live", MSG_LIV_BYTES, MSG_TYPE_LIVE, get_liv, put_liv,
+          false, &p_liv[0].in, p_liv[0].bytes },
         { "heartbeat", MSG_HB_BYTES, MSG_TYPE_HEARTBEAT, get_hb, put_hb,
           false, &p_hb[0].in, p_hb[0].bytes },
         { "event", MSG_EVT_BYTES, MSG_TYPE_EVENT, get_evt, put_evt,
@@ -1543,11 +1849,11 @@ test_rejects (void)
         { "ack", MSG_ACK_BYTES, MSG_TYPE_ACK, get_ack, put_ack,
           false, &p_ack[0].in, p_ack[0].bytes },
     };
-    static const uint8_t        op0[MSG_CMD_BYTES] = { 0x14U, 0x05U };
-    msg_codec_command_t         cmd;
-    uint32_t                    idx;
+    static const uint8_t              op0[MSG_CMD_BYTES] = { 0x14U, 0x05U };
+    msg_codec_command_t               cmd;
+    uint32_t                          idx;
 
-    for (idx = 0U; idx < 5U; idx++)
+    for (idx = 0U; idx < MSG_DESC_COUNT; idx++)
     {
         test_rejects_one(&msgs[idx]);
     }

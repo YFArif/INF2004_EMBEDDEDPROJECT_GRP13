@@ -338,6 +338,23 @@ int32_t mqtt_link_publish(mqtt_link_topic_t topic, const uint8_t * p_payload,
                           bool b_retain);
 
 /**
+ * @brief Read how many more messages the publish queue can take now.
+ *
+ * Safe from any task on either core. It never blocks. A sender that wants
+ * to leave room for later messages uses this before mqtt_link_publish():
+ * the queue is first in, first out, so every message in it delays the ones
+ * queued after it.
+ *
+ * NOTE: It counts the queue only. The message the radio service is sending
+ * has already left the queue, so one more message can be ahead of a new one
+ * than MQTT_LINK_QUEUE_DEPTH minus this value says.
+ *
+ * @return Free records, 0 to MQTT_LINK_QUEUE_DEPTH. 0 too if the queue does
+ *         not exist yet or the kernel call fails.
+ */
+uint32_t mqtt_link_publish_free(void);
+
+/**
  * @brief Take the next command received from the broker.
  *
  * Called by the application dispatcher task only. Commands arrive on the

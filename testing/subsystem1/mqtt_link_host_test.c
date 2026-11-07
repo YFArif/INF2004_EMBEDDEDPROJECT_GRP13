@@ -139,6 +139,7 @@ static int32_t              g_stub_put_calls = 0;
 static int32_t              g_stub_command_result = 0;
 static uint32_t             g_stub_command_timeout = 0U;
 static uint32_t             g_stub_full_count = 0U;
+static uint32_t             g_stub_free_bytes = 0U;
 static uint32_t             g_stub_now_msec = 0U;
 static mqtt_queue_publish_t g_stub_last_msg;
 static mqtt_link_status_t   g_stub_snapshot;
@@ -197,6 +198,7 @@ static void expect_ok(mqtt_link_topic_t topic, int line);
 static void make_in_topic(const char * p_suffix);
 static void test_publish_rejections(void);
 static void test_publish_accepted(void);
+static void test_publish_free(void);
 static void test_get_status(void);
 static void test_receive_command(void);
 static void test_incoming_commands(void);
@@ -291,6 +293,17 @@ uint32_t
 mqtt_queue_full_count (void)
 {
     return (g_stub_full_count);
+}
+
+/*!
+ * @brief Stub: the free bytes the test chose.
+ *
+ * @return g_stub_free_bytes.
+ */
+uint32_t
+mqtt_queue_publish_free_bytes (void)
+{
+    return (g_stub_free_bytes);
 }
 
 uint32_t
@@ -1017,6 +1030,7 @@ main (int argc, char * * pp_argv)
     {
         test_publish_rejections();
         test_publish_accepted();
+        test_publish_free();
         test_get_status();
         test_receive_command();
         test_incoming_commands();
@@ -1042,6 +1056,38 @@ main (int argc, char * * pp_argv)
     }
 
     return (exit_code);
+}
+
+/*!
+ * @brief mqtt_link_publish_free() gives whole free records from free bytes.
+ */
+static void
+test_publish_free (void)
+{
+    say("-- publish queue free slots\n");
+
+    /* One record costs its 32 bytes plus the kernel's 4-byte header. */
+    check(36U == MQTT_QUEUE_PUBLISH_COST_BYTES, __LINE__);
+
+    /* Empty: the whole buffer is free. */
+    g_stub_free_bytes = MQTT_LINK_QUEUE_DEPTH * 36U;
+    check(MQTT_LINK_QUEUE_DEPTH == mqtt_link_publish_free(), __LINE__);
+
+    /* One and two records in the queue. */
+    g_stub_free_bytes = (MQTT_LINK_QUEUE_DEPTH - 1U) * 36U;
+    check((MQTT_LINK_QUEUE_DEPTH - 1U) == mqtt_link_publish_free(), __LINE__);
+    g_stub_free_bytes = (MQTT_LINK_QUEUE_DEPTH - 2U) * 36U;
+    check((MQTT_LINK_QUEUE_DEPTH - 2U) == mqtt_link_publish_free(), __LINE__);
+
+    /* Room for exactly one record, and one byte too little for it. */
+    g_stub_free_bytes = 36U;
+    check(1U == mqtt_link_publish_free(), __LINE__);
+    g_stub_free_bytes = 35U;
+    check(0U == mqtt_link_publish_free(), __LINE__);
+
+    /* Full, or the queue cannot be read: the stub's 0 means both. */
+    g_stub_free_bytes = 0U;
+    check(0U == mqtt_link_publish_free(), __LINE__);
 }
 
 /*** end of file ***/

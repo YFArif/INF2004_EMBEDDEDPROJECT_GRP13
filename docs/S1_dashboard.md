@@ -1,8 +1,9 @@
 # S1 laptop dashboard
 
 `testing/subsystem1/s1_dashboard.py` is a one-file dashboard for the
-robot: START, STOP and RESET, the ack for each command, an online light
-and the 1 Hz heartbeat. It runs on the laptop that runs the broker,
+robot: START, STOP and RESET, the ack for each command, an online light,
+the 1 Hz heartbeat and four telemetry panels (S2 motion, S3 line and
+barcodes, S4 motion sensor, S5 controller). It runs on the laptop that runs the broker,
 serves one page on `http://127.0.0.1:8765/` (that laptop only), and talks
 to the broker through `mosquitto_sub` and `mosquitto_pub`. Python
 standard library only. Test: S1-U16 in `testing/subsystem1/TEST_LOG.md`.
@@ -17,9 +18,11 @@ standard library only. Test: S1-U16 in `testing/subsystem1/TEST_LOG.md`.
 - Commands are never published retained (section 11).
 - An ack with result 0 is labelled **queued**: S1 handed the command to
   S5, which decides on its own. S5's verdict is on the robot's USB
-  console only (`[S5] EVT 0x65 a=<opcode> b=<1 or 0>`) until Stage 4b.
-- No telemetry frames, events or RSSI yet (Stage 4b). The telemetry
-  panel stays empty.
+  console only (`[S5] EVT 0x65 a=<opcode> b=<1 or 0>`) until the event
+  channel is built. The S5 panel does show the state change.
+- Telemetry (section 8.1) is shown, read-only. Events (EVT codes) and
+  RSSI are not sent yet, so the event log shows none and RSSI reads
+  "not measured".
 - The page, the log and the console never show the broker address, the
   WiFi details or a login.
 - The page loads nothing from anywhere else. Its Content-Security-Policy
@@ -229,9 +232,10 @@ green light.
 | Uptime | The robot's time since power-up, h:mm:ss (16 bits: wraps after 18.2 h) |
 | connect_count | Broker sessions since power-up; it rises by 1 at each reconnect |
 | cmd_reject | Commands S1 refused: codec rejections, post failures (S5's queue full) and commands the driver dropped |
-| rssi | "not measured": Stage 4a cannot read the signal strength yet |
-| tel_drop / evt_drop | 0 in Stage 4a |
-| Heartbeats lost | Gaps in the heartbeat sequence since the dashboard started (heartbeats use QoS 0, so a few can go missing) |
+| rssi | "not measured": the signal strength cannot be read yet |
+| tel_drop / evt_drop | tel_drop: telemetry, live and heartbeat messages the robot did not send since power-up, because its publish queue was too full (it keeps room for acks) or the driver refused them. It should stay 0; if it climbs, the link is too slow for 8 messages a second. It stops at 255, shown as "255 or more": from there the page cannot show new drops until the robot restarts. evt_drop: 0, no events yet |
+| Heartbeats lost | Gaps in the heartbeat sequence since the dashboard started (heartbeats use QoS 0, so a few can go missing). A robot restart does not count |
+| Telemetry / live lost | Gaps in each message's sequence since the dashboard started: messages the robot handed to the driver that never arrived. A gap of more than 25 is read as a restart and not counted |
 | Red banner | A retained command is stored on `<prefix>/cmd/...` (section 11) |
 | Amber banner | That retained command was cleared |
 | "banner unavailable" (top bar) | The banner is off: `--banner-off`, an old `mosquitto_sub`, or a broker without MQTT v5 |
@@ -242,9 +246,9 @@ START (or RESET) stays disabled until the ack of the previous one
 arrives, so a double click cannot run the robot from FINISHED. An
 enabled START or RESET is lit (white text, visible border); a disabled
 one is dimmed and shows the reason underneath, for example "online,
-waiting for a heartbeat". The dashboard cannot see S5's state, so it
-never shows "calibrating": a START sent while the robot calibrates is
-acked "queued" and refused by S5 (section 9).
+waiting for a heartbeat". The buttons are decided by the robot light only, not by the S5
+panel: a START sent while the robot calibrates is acked "queued" and
+refused by S5 (section 9).
 
 **Command results** (the "Last commands" table and the event log).
 "queued" is shown in blue, not green: it means the command reached the
@@ -264,6 +268,51 @@ Each ack is matched to its command by cmd_id, which counts 0 to 63 and
 wraps. The round trip runs from just before `mosquitto_pub` starts to
 the ack's arrival, both on the laptop's clock, so it includes
 `mosquitto_pub`'s own start-up.
+
+### 8.1 The telemetry panels
+
+Two messages on `<prefix>/telemetry` feed them (layouts in
+`docs/S1_binary_frame.md`): the 2 Hz telemetry frame (type 1, 25 bytes)
+and the 5 Hz live message (type 6, 14 bytes). Each panel says how long
+ago its data arrived and greys out after 2 s without any (robot off,
+WiFi gone, or a panel's owner not sending); a page opened late shows
+what the dashboard last saw. The dashboard only reads: nothing here
+sends a command.
+
+| Panel | Shows |
+|---|---|
+| S2 motion | Motion state (IDLE, FOLLOWING, MOVING, TURNING, ESTOP), red E-STOP and STALL tags, commanded speed (mean of the two wheel targets), measured speed (mean of the two wheels), left and right wheel speed, distance, heading from wheel odometry, fault bits |
+| S3 line and barcodes | Line state (FOLLOW, JUNCTION, LOST, DISABLED, SEARCH, UNCAL) and the last barcode letter, outer and centre sensor bars (0 white to 255 black), steering, OUTER rule, the last barcode with its command and direction, the last junction turn, S3's own counters, a tally of accepted barcodes per letter, the rejected total, and a timeline with a time on each entry |
+| S4 motion sensor | A large red IMPACT box (held for 3 s after the last flagged frame, so a short impact is not missed) and a count of impacts seen, pitch, roll, turn rate, motion class, hump state, hump count and peak height, IMU ok, and a pitch and roll graph of the last 60 s (scale +/-32 degrees) |
+| S5 controller | Controller state (INIT to FINISHED), calibration, fault bits, closest obstacle, and the scan's gap width and clearances when a scan is valid |
+
+How to read the S3 timeline and tally. S3 reports counters, not events,
+so the dashboard turns a counter that moved into a timeline entry
+(barcode, rejected, junction, line lost). Each entry is dated by when its
+message arrived on the laptop, so the times are good to about 0.2 s. The
+letter comes from S3's last-barcode field: if two barcodes land inside one
+0.2 s message gap (or a message is lost), the extra ones are counted under
+`?`. S3 sends only a count of rejected barcodes, not which letter was
+rejected, so the rejected figure is one total, not per letter. If a counter
+jumps by more than a believable amount for 0.2 s (rejected 3, the others 4),
+or the live sequence jumps by more than 25, or the heartbeat's uptime goes
+back, the dashboard assumes a restart or lost messages, writes a note in
+the timeline and counts again from the next message. A burst of more than
+that many real events inside one gap is therefore noted, not listed.
+
+One case can still fool it: a restart when the rejected count was 13 to 15
+(or another counter 252 to 255) and the live sequence was within 25 of its
+own wrap. The counter going back to 0 then looks like a small rise, so one
+wrong timeline entry can appear until the next heartbeat shows the restart.
+A reboot during an outage longer than the previous run also shows no uptime
+drop; the counters and the live sequence are then the only signs.
+
+Fault bits are copied as S5 sets them (stall, encoder, IMU, no echo, WiFi);
+the S2 and S5 panels show the same field. Heading is in degrees from the
+wheel encoders, so it drifts and starts from 0 at power-up.
+
+The `--log` file records every telemetry and live message as it arrives,
+so it grows by roughly 20 MB an hour while the robot runs.
 
 ## 9. Operator rules
 
@@ -325,10 +374,14 @@ python3 -I -B testing/subsystem1/s1_dashboard.py --simulate
 ```
 
 No broker and no robot: a fake car answers with S5's rules and
-telemetry_task's acks and heartbeat. Its state (CALIBRATING, READY,
-LINE_FOLLOWING, FINISHED, FAULT) shows in the Simulator panel only; a
-real robot's state is not visible until Stage 4b. It calibrates for 3 s
-first.
+telemetry_task's acks, heartbeat, telemetry and live message. Its state
+(CALIBRATING, READY, LINE_FOLLOWING, FINISHED, FAULT) shows in the
+Simulator panel and, as for a real robot, in the S5 panel. It calibrates
+for 3 s first. Press START: while it runs it follows a line, reads a
+barcode every 7 s (letters A to D), takes a junction every 11 s, rejects
+a barcode every 19 s, crosses a hump every 17 s and loses the line every
+29 s, and tel_drop rises by 3 every 5 s, to show that field working. The
+values are made up; only the formats and rates are real.
 
 | Simulator button | What it does |
 |---|---|
@@ -341,6 +394,9 @@ first.
 | Delay next ack 3 s | "no ack", then a late ack |
 | Send next ack twice | The second copy is logged as a duplicate |
 | Retained command, Clear retained | Another client stores a retained RESET on `<prefix>/cmd/test`, then clears it |
+| S4 impact | A 1 s IMPACT flag (motion class 6) in the telemetry |
+| S4 hump | A 3 s hump: climbing, then descending |
+| S3 barcode, S3 barcode rejected, S3 junction, S3 line lost | One S3 event now, even when the car is not running |
 
 ## 13. Troubleshooting
 
@@ -357,8 +413,15 @@ first.
 
 ## 14. Limits
 
-- S5's verdict, telemetry frames and events: Stage 4b.
+- S5's verdict and events: not sent yet (the event channel is the next
+  step); the S5 panel shows the state only.
 - RSSI: not measured yet.
+- S3 rejected barcodes are one total, not per letter (section 8.1).
+- A restart can leave one wrong S3 timeline entry in a rare case (section
+  8.1).
+- Barcode command names follow S3's current command numbering
+  (`s3_cmd_t`): if S3 renumbers it, `BC_CMD_NAMES` in
+  `app_program/subsystem1/dashboard/s1_decode.py` must follow.
 - A repeated command with the same cmd_id is not filtered on the robot
   yet (Stage 4b).
 - One dashboard per robot. A second client's commands are logged as

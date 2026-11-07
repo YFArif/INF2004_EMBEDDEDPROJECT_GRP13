@@ -477,6 +477,17 @@ mqtt_link_publish (mqtt_link_topic_t topic, const uint8_t * p_payload,
 }
 
 /*!
+ * @brief Read how many more messages the publish queue can take now.
+ *
+ * @return Free records, 0 to MQTT_LINK_QUEUE_DEPTH.
+ */
+uint32_t
+mqtt_link_publish_free (void)
+{
+    return (mqtt_queue_publish_free_bytes() / MQTT_QUEUE_PUBLISH_COST_BYTES);
+}
+
+/*!
  * @brief Take the next command received from the broker.
  *
  * @param[out] p_command   Receives the command.

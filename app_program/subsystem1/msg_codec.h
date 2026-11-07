@@ -79,6 +79,30 @@ typedef struct
     uint16_t    clear_r_mm;     /* 0-1023 mm.                           */
 } msg_codec_telemetry_t;
 
+/** Live message fields (S2 motion and S3 line), in wire units. */
+typedef struct
+{
+    uint8_t     seq;            /* Message counter, modulo 256.         */
+    uint8_t     motion_state;   /* S2 motion state, 0-7.                */
+    bool        b_estop;        /* S2 E-stop latch set.                 */
+    int32_t     cmd_speed_mms;  /* Commanded speed, -512 to 511 mm/s.   */
+    int16_t     heading_hdeg;   /* Half-degrees, -512 to 511; from      */
+                                /* msg_codec_heading_to_hdeg().         */
+    uint8_t     line_state;     /* S3 line state, 0-7.                  */
+    int32_t     steer_dv_mms;   /* Line steering, -512 to 511 mm/s.     */
+    uint8_t     outer_ir;       /* 0 white to 255 black.                */
+    uint8_t     centre_ir;      /* 0 white to 255 black.                */
+    bool        b_overshoot;    /* S3 OUTER rule on.                    */
+    uint8_t     bc_letter;      /* S3 Code 39 index; 63 = none yet.     */
+    uint8_t     bc_cmd;         /* MSG_BC_CMD_xxx, 0-7.                 */
+    bool        b_bc_rev;       /* Barcode read backwards.              */
+    uint8_t     junc_turn;      /* MSG_JUNC_xxx, 0-3.                   */
+    uint8_t     rejects;        /* Rejected barcodes, modulo 16.        */
+    uint8_t     junctions;      /* Junction count, modulo 256.          */
+    uint8_t     losts;          /* Line-lost count, modulo 256.         */
+    uint8_t     barcodes;       /* Barcode count, modulo 256.           */
+} msg_codec_live_t;
+
 /** Heartbeat fields. */
 typedef struct
 {
@@ -134,6 +158,20 @@ uint32_t msg_codec_put_telemetry(const msg_codec_telemetry_t * p_in,
  */
 bool     msg_codec_get_telemetry(const uint8_t * p_buf, uint32_t len,
                                  msg_codec_telemetry_t * p_out);
+
+/** @brief Convert a heading from centidegrees to half-degrees: limit to
+ *         +/-18000, round half away from zero. The result is -360 to 360,
+ *         inside the 10-bit field. Any int32_t input is safe.
+ */
+int16_t  msg_codec_heading_to_hdeg(int32_t cdeg);
+
+/** @brief Pack a live message (MSG_LIV_BYTES). */
+uint32_t msg_codec_put_live(const msg_codec_live_t * p_in,
+                            uint8_t * p_buf, uint32_t buf_len);
+
+/** @brief Unpack a live message; for tests and tools. */
+bool     msg_codec_get_live(const uint8_t * p_buf, uint32_t len,
+                            msg_codec_live_t * p_out);
 
 /** @brief Pack a heartbeat (MSG_HB_BYTES). */
 uint32_t msg_codec_put_heartbeat(const msg_codec_heartbeat_t * p_in,
