@@ -1,0 +1,81 @@
+Gate (5) rule, positive control on the committed S1-U13 console
+(logs/2026-10-31_s1u13_console.txt, 2 boots; drops numbered by the S1-U13 markers)
+    boot 1: status -1 at 21:58:38.018, next joining 22:02:11.358: 213.340 s  FAIL (over 10 s)
+    boot 2: status -3 at 22:31:39.074, cancelled by a status of 0 or more; link up 22:31:49.114, 10.040 s later: not a failure (reported)
+    expected: boot 1 FAIL -> FAIL, as expected; drop 3 (hotspot-off 22:30:30.440) not FAIL -> not FAIL, as expected
+    control: PASSED (the rule fails boot 1 and passes drop 3)
+
+S1-U15 analysis of rig run 2026-11-08_174546, from the masked logs logs/2026-11-08_s1u15_*.txt
+commit b2f6653, image mtk3pico_smp1_usb_cdc_wifi_lwip_mqtt.uf2 sha256 a6488a8379b80d91 (first 16 hex digits), client robocar-buddy1, topic robot/status
+markers 16, recorder lines 12, robot online PUBLISH lines 6, console lines 7863, boot banners 5
+Times: markers, console and late subscriber to the ms; recorder to the ns (shown to the ms); broker log and ip.txt to the second; all on the Mac clock.
+
+Gate (1): online on each power-up, no reset, BOOTSEL or extra power cycle; late subscriber r=1
+    power-up 1 17:46:38.411: banners 1, online (recorder) 17:46:44.119, late subscriber 17:47:05.357 'r=1 online'  PASS
+    power-up 2 17:48:56.001: banners 1, online (recorder) 17:49:02.433, late subscriber 17:49:11.242 'r=1 online'  PASS
+    power-up 3 17:49:56.601: banners 1, online (recorder) 17:50:02.434, late subscriber 17:50:14.904 'r=1 online'  PASS
+    power-up 4 17:50:50.336: banners 1, online (recorder) 17:50:56.425, late subscriber 17:51:02.827 'r=1 online'  PASS
+    power-up 5 17:51:55.461: banners 1, online (recorder) 17:52:00.988, late subscriber 17:52:12.578 'r=1 online'  PASS
+    GATE (1) PASS (5 of 5 power-ups)
+
+Reported per power-up (not gated): from the power-up marker to
+    pu  banner     wifi: link up   online (broker log, 1 s)   online (recorder)
+    1     1.479 s    5.615 s         5.6 s                      5.708 s
+    2     1.926 s    5.848 s         6.0 s                      6.433 s
+    3     1.401 s    5.686 s         5.4 s                      5.834 s
+    4     1.354 s    5.831 s         5.7 s                      6.090 s
+    5     1.334 s    5.433 s         4.5 s                      5.527 s
+    (banner = when the console capture attached; the first lines arrive together)
+
+Gate (2): online again after the broker restart (power-up 5), no reset
+    broker-stop 17:52:25.675, broker-start 17:52:55.631 (down 30.0 s); online PUBLISH 17:52:57 (broker log), recorder 17:52:57.408; banners in between 0
+    REPORTED broker-start -> online: 1.4 s (broker log, 1 s resolution), 1.777 s (recorder); NFR14's 15 s resume clause, one sample, indicative
+    GATE (2) PASS
+
+Gate (3): three valid hotspot drops; offline within 10 s of hotspot-off; online again with no reset
+  drop 1: hotspot-off marker 17:53:47.393, hotspot-on marker 17:54:03.622, next marker 18:01:28.276
+    timeline:
+      17:53:26.714  console: radio link status -> 1
+      17:53:26.734  console: S1: wifi fault set link=1 mqtt=3 stale=0 mask=0x14
+      17:53:33  broker: Client robocar-buddy1 [<ROBOT_ADDR>:54597] disconnected: exceeded timeout.
+      17:53:33.486  recorder: offline
+      17:53:40  ip.txt: the Mac loses its address
+      17:53:47.393  marker: hotspot-off
+      17:54:03.622  marker: hotspot-on
+      17:54:16  ip.txt: the Mac's address back, label A; LAN listener reachable yes after 0.0 s
+      none  recorder: online again
+      18:01:43.777  last console line (robot still printing; banners after the drop: 0; last wifi: line 17:53:26.714)
+    EXTRA radio event -> offline: 6.773 s (from the robot's own detection; the real switch-off time is unknown and at or before 17:53:26.714)
+    marker lateness: hotspot-off marker 20.679 s after the radio event; offline came 13.906 s before the marker
+    drop length: at least 36.9 s (radio event to hotspot-on marker), not about 10 s
+    validity: the Mac's address came back as A 12.4 s after hotspot-on, LAN listener reachable yes after 0.0 s: VALID (TEST_LOG rule: address unchanged; the rig's 60 s check also holds)
+    offline sub-gate: not measurable from the marker (offline came before the late marker); see EXTRA
+    online again with no reset: FAIL (no online on robot/status between hotspot-on and the next marker, 444.7 s; no banner)
+    drops run: 1 of 3; drops 2 and 3 not run
+    GATE (3) FAIL
+
+Gate (4): offline within 10 s of each power-cut marker
+    cut 1 17:47:13.771: offline 17:47:22.470, 8.699 s  PASS
+    cut 2 17:49:24.819: offline 17:49:32.520, 7.701 s  PASS
+    cut 3 17:50:23.864: offline 17:50:32.488, 8.624 s  PASS
+    cut 4 17:51:09.682: offline 17:51:18.486, 8.804 s  PASS
+    cut 5 18:01:28.276: NOT TESTED: the robot had been offline since 17:53:33.486 (no transition to measure); last console line 18:01:43.777, 15.5 s after the marker (the cable came out late)
+    GATE (4) NOT MET (cuts 1 to 4 pass; cut 5 tested nothing)
+
+Gate (5): negative link status -> next joining line <= 10 s, every power-up (same rule as the control above)
+    boot 1 (banner 17:46:39.890): no negative link status
+    boot 2 (banner 17:48:57.927): no negative link status
+    boot 3 (banner 17:49:58.002): no negative link status
+    boot 4 (banner 17:50:51.690): no negative link status
+    boot 5 (banner 17:51:56.795): no negative link status
+    GATE (5) PASS (no negative link status on any power-up; nothing to time)
+
+Observation, not a gate: the S1 WiFi fault bit 4 lines
+    17:52:25.714  S1: wifi fault set link=3 mqtt=4 stale=0 mask=0x14
+    17:52:57.394  S1: wifi fault clear link=3 mqtt=3 stale=0 mask=0x04
+    17:53:26.734  S1: wifi fault set link=1 mqtt=3 stale=0 mask=0x14
+
+No 'monitor: alarm' line: yes
+
+Result: FAIL on gate (3); gate (4) also not met, only because cut 5 tested nothing (cuts 1 to 4 pass)
+Positive control for gate (5): passed
