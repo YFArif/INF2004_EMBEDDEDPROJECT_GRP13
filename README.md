@@ -249,7 +249,10 @@ Each option goes through the same steps:
 
 The makefile also has `NET=lwip` and `MQTT=1` (TCP/IP and MQTT over WiFi).
 They need the SDK's `lib/lwip` submodule and a `config/wifi_secrets.h`
-(copy `config/wifi_secrets.example.h`). This guide does not cover them.
+(copy `config/wifi_secrets.example.h`); `MQTT=1` also needs
+`app_program/subsystem1/mqtt_config.h` (copy `mqtt_config.example.h` in
+the same folder). This guide does not cover them: see
+`docs/S1_handover.md` and `docs/S1_dashboard.md` section 5.
 
 ---
 

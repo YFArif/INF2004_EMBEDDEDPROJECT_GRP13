@@ -33,8 +33,8 @@ standard library only. Test: S1-U16 in `testing/subsystem1/TEST_LOG.md`.
 
 | Item | Version | Notes |
 |---|---|---|
-| Python | 3.8 or later | Tested with 3.13. No packages to install. Windows: use `py -3` (section 15) |
-| mosquitto (broker and clients) | 2.0 or later | Tested with 2.1.2. macOS: `brew install mosquitto`. Windows: section 15. Check with `mosquitto_sub --help \| head -2` |
+| Python | 3.9 or later | Tested with 3.9 and 3.13. No packages to install. Windows: use `py -3` (section 15) |
+| mosquitto (broker and clients) | 2.0 or later | Tested with 2.1.2. macOS: `brew install mosquitto`. Windows: section 15. Check with `mosquitto_sub --help \| head -2`. Not needed for `--simulate` (section 12) |
 | This repository | branch `main` | It must contain `app_program/subsystem1/telemetry_task.c` (Stage 4a). Pull `main` if your clone does not have it |
 | Pico SDK and ARM compiler | as in `README.md` section 1 | Only to build the robot image (section 5) |
 | A phone hotspot | 2.4 GHz, WPA2 | Section 3 |
@@ -141,8 +141,9 @@ not add `TEST=1`: test images ignore START, STOP and RESET.
 
 ### 5.4 Flash
 
-1. Hold the **BOOTSEL** button and plug the Pico W into USB, then
-   release. A drive called **RPI-RP2** appears.
+1. On the car, switch the battery off first. Hold the **BOOTSEL** button
+   and plug the Pico W into USB, then release. A drive called
+   **RPI-RP2** appears.
 2. Copy the image onto it. On macOS, from the repository root:
 
    ```bash
@@ -153,8 +154,18 @@ not add `TEST=1`: test images ignore START, STOP and RESET.
 3. The Pico restarts by itself. A "disk not ejected properly" notice is
    harmless.
 
-To see S5's verdicts, open the robot's USB serial console
-(`/dev/cu.usbmodem*` on macOS) in any serial terminal.
+To see S5's verdicts, read the robot's USB serial console. On macOS,
+with the robot plugged in (Ctrl-C to stop):
+
+```bash
+cat /dev/cu.usbmodem*
+```
+
+`README.md` section 2.4 has `screen` and the Linux and Windows ports.
+The console drops output nobody reads (everything printed before you
+open it) and can drop bytes under load, so open it before powering the
+robot, and take the robot's state from the S5 panel (telemetry
+`ctrl_state`), not from the console.
 
 ## 6. Start the broker
 
@@ -197,12 +208,17 @@ python3 -I -B testing/subsystem1/s1_dashboard.py
 
 It reads the broker host, port and prefix from
 `app_program/subsystem1/mqtt_config.h`. On the broker laptop itself this
-also works, and keeps working when the hotspot address changes (the
-robot still needs the current address in its image):
+also works, keeps working when the hotspot address changes (the robot
+still needs the current address in its image), and needs no
+`mqtt_config.h` at all, so it also suits a laptop that has not built an
+image:
 
 ```bash
-python3 -I -B testing/subsystem1/s1_dashboard.py --host 127.0.0.1
+python3 -I -B testing/subsystem1/s1_dashboard.py --host 127.0.0.1 --prefix robot
 ```
+
+Without `mqtt_config.h`, `--host` alone stops with "no topic prefix":
+give `--prefix` too.
 
 Then open http://127.0.0.1:8765/ in a browser on the same laptop. Ctrl-C
 in the terminal quits.
@@ -321,8 +337,17 @@ These are S5's rules (`s5_mission_command()` in
 
 - START runs the robot only from READY. In FINISHED, START only returns
   to READY; the next START runs.
+- In READY, START is refused until S3's line sensors are calibrated: the
+  console prints `RUN refused: line sensors not calibrated, press Button
+  2 on the line`. Put the robot on the line and press Button 2 (GP21),
+  releasing it within 2 s: it turns left, right and back on the spot and
+  prints `CAL line sensors calibrated: YES` (or `NO`: press again). The
+  calibration is lost at every power-up. On a stand the sweep returns NO,
+  because the sensors see no floor (readings of 3700 or more are
+  ignored).
 - START is refused while running, while calibrating (up to 3 s after
-  power-up, or after Button 2) and in FAULT (send RESET first).
+  power-up, and during the Button 2 sweep) and in FAULT (send RESET
+  first).
 - STOP is always accepted: it ends a run in FINISHED, and does nothing
   when the robot is not running. The STOP button, the Escape key and the
   GP20 button all stop the robot.
@@ -333,7 +358,8 @@ These are S5's rules (`s5_mission_command()` in
 - `TEST=1` images ignore START, STOP and RESET until an S5 test step arms
   the controller.
 - A command sent while the robot is offline is lost: it gets no ack and
-  never runs.
+  never runs. That includes a command sent during a reconnect. Resend
+  it if there is no ack.
 
 ## 10. A session, step by step
 
@@ -341,9 +367,11 @@ These are S5's rules (`s5_mission_command()` in
 2. Hotspot, broker and dashboard as in sections 3, 6 and 7.
 3. Power the robot. Wait for the green light and a heartbeat age under
    1.5 s.
-4. START: "queued", and the wheels turn (the console shows `b=1`).
-5. STOP: "queued", and the wheels stop (FINISHED).
-6. START once more: "queued", but the wheels stay still (back to READY).
+4. Calibrate the line sensors (section 9). This needs the robot on the
+   line: on the stand every START is refused (`b=0`).
+5. START: "queued", and the wheels turn (the console shows `b=1`).
+6. STOP: "queued", and the wheels stop (FINISHED).
+7. START once more: "queued", but the wheels stay still (back to READY).
    START again to run.
 
 ## 11. Clearing a retained command
@@ -377,7 +405,8 @@ No broker and no robot: a fake car answers with S5's rules and
 telemetry_task's acks, heartbeat, telemetry and live message. Its state
 (CALIBRATING, READY, LINE_FOLLOWING, FINISHED, FAULT) shows in the
 Simulator panel and, as for a real robot, in the S5 panel. It calibrates
-for 3 s first. Press START: while it runs it follows a line, reads a
+for 3 s first. It does not model the line-sensor check of section 9: it
+accepts START without Button 2. Press START: while it runs it follows a line, reads a
 barcode every 7 s (letters A to D), takes a junction every 11 s, rejects
 a barcode every 19 s, crosses a hump every 17 s and loses the line every
 29 s, and tel_drop rises by 3 every 5 s, to show that field working. The
@@ -402,12 +431,13 @@ values are made up; only the formats and rates are real.
 
 | What you see | Check |
 |---|---|
-| "no broker host" when starting | Create `mqtt_config.h` (section 5.2), or give `--host` |
+| "no broker host" or "no topic prefix" when starting | Create `mqtt_config.h` (section 5.2), or give `--host` and `--prefix` |
 | Broker light red | Is mosquitto running? Same port? |
 | Robot light grey | The robot has not connected since the broker started: hotspot, the address in the image (section 4), the robot's console |
 | Robot light red, "no heartbeat" | WiFi dropped, or an image without `telemetry_task` (before Stage 4a) |
 | No acks | Robot offline; or the dashboard's prefix differs from the image's |
-| Acks "queued" but nothing moves | S5 refused it (section 9; read the console), or a `TEST=1` image |
+| Acks "queued" but nothing moves | S5 refused it (section 9; read the console): most often the line sensors are not calibrated. Or a `TEST=1` image |
+| Console loops `waiting for IP (1)` then `FAILED: authentication rejected` | Restart the hotspot with only the broker laptop and the robot on it (section 3) |
 | START greyed out | The robot light is not green, or START is waiting for its ack |
 | "Address already in use" | Another dashboard is running; quit it or use `--http-port` |
 
