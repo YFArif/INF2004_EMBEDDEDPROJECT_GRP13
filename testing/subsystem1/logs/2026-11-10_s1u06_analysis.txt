@@ -1,0 +1,213 @@
+S1-U06 analysis: Stage 4a on the robot (START, STOP, RESET, ack, heartbeat)
+Session 2026-11-10, rig run 2026-11-10_202328. Sources: the masked logs
+2026-11-10_s1u06_*.txt (read from a hash-checked local snapshot of the run
+folder), window D's ack and telemetry recording decoded with s1_decode.py,
+and a packet capture of TCP port 1883 on the Mac's WiFi interface covering
+step 4 runs 2 and 3 only, 20:32:08.151 to 20:33:58.717 (local only, never
+committed; read here for times, ports and counts). All times are the Mac
+clock: markers, console and recorders to the ms, broker log to the second.
+
+Image: make NET=lwip MQTT=1 at b2f6653, UF2 sha256
+a6488a8379b80d9100374235c2efadb953e20c09b3370b655ef9b8ec4c182126 (a clean
+build of main at d63276e gives the same file), flashed from a copy kept
+outside the repository. Confirmed from the tester's shell history: the
+baseline copy at 20:22, no copy of the stage B UF2 at all; the car booted
+at 20:23:10. The rig's run.env names the stage B UF2 (ec8e3e7a) because
+build_make held it when "rig new" ran; it is not the image that was
+flashed. The console cannot tell the two apart here: stage B's one
+"S1: wifi pm off" line would fall in the boot output the USB console
+dropped. Robot on a stand, wheels off the ground; mosquitto 2.1.2 on the
+Mac over the phone hotspot.
+
+VERDICTS (one per gate of the definition)
+  (3)  PASS     heartbeats, NFR9
+  (4)  FAIL     NFR15, run 1: 31 of 50 under 300 ms (62.0 %)
+  (5)  NOT RUN  line sensors not calibrated, no line available at the time
+  (6)  PASS     bad commands
+  (7)  NOT RUN  line sensors not calibrated, no line available at the time
+  (8)  NOT RUN  line sensors not calibrated, no line available at the time
+  (9)  PASS     hotspot drop (one sub-check could not be made, below)
+  (10) NOT RUN  stack-report image not built
+
+Session timeline
+  ~20:23:10     boot, from the heartbeat uptime (uptime 64 at 20:24:14.239;
+                heartbeats at 20:24, 20:52 and 21:21 give the same boot time
+                within 0.4 s, so the robot's clock ran at the right rate)
+  20:23:36.389  marker broker-start
+  20:23:38      broker: robot connected (session 1, local port A)
+  20:24:13.706  window D's first message
+  20:24:36.967  marker power-up. Not a boot: uptime and broker session 1
+                run straight through it.
+  20:24:41.784  console attached: the buffered boot lines arrive at once,
+                ending at "waiting for IP (1)" and S4's calibration lines;
+                everything after the first 4 KB was dropped while no host
+                was reading (tm_usb_console_put() drops output when its
+                ring is full), including the boot's "wifi: link up".
+  20:29:43      step 4 run 1 (broker: STOPs 20:29:43 to 20:30:08)
+  20:31:08.219  tel_drop reaches 255 (8 bits, saturated from here on)
+  20:31:43      broker: the robot's traffic stops, but for one packet at
+                20:31:47
+  20:31:48.888  S1: wifi fault set link=3 mqtt=4 stale=0 mask=0x10
+  20:31:49      broker: session 1 closed by client; offline will
+  20:31:53      broker: robot connected (session 2, local port A+1)
+  20:31:53.928  S1: wifi fault clear link=3 mqtt=3 stale=0 mask=0x00
+  20:32:23      step 4 run 2 (STOPs 20:32:23 to 20:32:48)
+  20:33:21      step 4 run 3, car near the phone (STOPs 20:33:21 to 20:33:46)
+  20:41:40      step 5, first series (to 20:43:47)
+  20:45:54      step 5, second series (to 20:46:35)
+  20:59:16      step 6 (to 21:01:07)
+  21:10:24.391  marker hotspot-off
+  21:10:29      broker: robot's last PUBLISH (window D: 21:10:29.499)
+  21:10:37      broker: session 2, exceeded timeout; offline will
+                (recorder 21:10:37.172)
+  21:10:38.848  S1: wifi fault set link=3 mqtt=4 stale=0 mask=0x10
+  21:10:39.048  wifi: link status -> joined AP, waiting for IP (1)
+  21:10:55      broker: step 9's STOP published on robot/cmd/dash
+  21:11:38.042  marker hotspot-on
+  21:11:46.266  wifi: link up
+  21:11:49      broker: robot connected (session 3, local port A+2);
+                online at 21:11:49.261
+  21:11:49.283  S1: wifi fault clear link=3 mqtt=3 stale=0 mask=0x00
+  21:30:13.928  marker broker-stop
+  Three broker sessions, consecutive local ports: one boot all session.
+
+(3) Heartbeats, PASS
+  329 heartbeats from 20:24:14 to the start of step 4, uptime 64 to 392
+  with no value missing, seq +1 each time. Every 60 s of uptime holds 60
+  heartbeats (269 windows). By the Mac's clock a 60 s window holds 59 to
+  62, because delivery came in bunches (gaps up to 3.4 s). rssi 0,
+  evt_drop 0, cmd_reject 0. tel_drop 7 at the first heartbeat, 136 at the
+  start of step 4, reported as the 7 Nov 2026 change asks (the queue rule
+  held messages back).
+
+(4) NFR15, FAIL (run 1 is the result; runs 2 and 3 are supplementary)
+  run  sent acked missing dup  under 300 ms  min    median p95     max (ms)
+  1    50   50    0       0    31 (62.0 %)   40.9   203.5  2892.9  3889.3
+  2    50   44    6       0    20 (40.0 %)   45.0   335.9  6252.2  6998.5
+  3    50   47    3       0    32 (64.0 %)   45.1   66.6   3222.2  4201.7
+  Every ack: result 0, opcode STOP, the id sent. Run 3 had the car near the
+  phone. cmd_rtt.py printed FAIL for all three. tel_drop was saturated at
+  255 during runs 2 and 3.
+  Capture, runs 2 and 3 (and the gap between them): 15 robot silences of
+  1 s or more, 1.28 to 4.58 s; 5 fall in run 2, none in run 3, 10
+  between the runs. Each ends with the robot sending new data; none starts with a
+  retransmission of a segment the Mac had already acknowledged (the bare
+  Pico pattern of S1-U21). The Mac acknowledged the robot's last data
+  before each silence within 0 ms. During the silences the robot still
+  received and processed STOPs: the console shows S5 command lines inside
+  them (6 inside the 4.58 s silence 3), while the robot's TCP
+  acknowledgements and data reached the Mac only at the end of the
+  silence.
+  No sign of CPU starvation: S4's console lines (imu_task, core 0,
+  priority 10) ran at 5.04 per second inside the silences and 5.00 per
+  second over the whole capture, and the console printed 9 to 13 lines a
+  second throughout.
+  The 9 missing acks: every STOP reached S5 (an S5 command line 28 to
+  103 ms after the Mac sent it) and the robot TCP-acknowledged it; the acks never left the robot.
+  Run 2's six (ids 35 to 38, 40, 41) fall in silences 3 and 4
+  (20:32:38.414 to 20:32:44.564); run 3's three (ids 38 to 40) fall in no
+  silence of 1 s or more. Run 3's slow trials: the robot's TCP
+  acknowledgement came 111 to 898 ms after the STOP, the ack 0.3 to 4.2 s
+  after it, with 2 to 9 robot data segments in between: the ack waited
+  inside the robot behind other messages (S1's publish path sends one
+  message at a time and waits for each to be acknowledged). No MQTT
+  session was lost during runs 2 and 3; the 20:31:49 loss was between
+  runs 1 and 2, with no command in flight.
+
+(5) State changes, NOT RUN
+  Reason: line sensors not calibrated, no line available at the time.
+  S5 refuses START in READY until S3's line sensors are calibrated, a
+  check that postdates the definition; on the stand the sensors see no
+  floor. Recorded, not judged: 12 commands in two series of 6 (START,
+  STOP, START, START, STOP, RESET), 12 acks, all result 0 ("queued").
+  S5's verdicts on the console: all 6 STARTs refused ("RUN refused: line
+  sensors not calibrated", EVT 0x65 a=1 b=0), all 4 STOPs accepted
+  (a=2 b=1), both RESETs refused (a=3 b=0; S5 accepts RESET only in FAULT
+  or FINISHED). No EVT 0x60 after boot; ctrl_state READY (2) in all 5545
+  telemetry frames of the session. Ack round trips, for information:
+  57.3, 134.7, 449.4, 414.8, 77.5, 51.5, 86.1, 50.6, 1463.2, 72.9, 61.7,
+  66.9 ms.
+
+(6) Bad commands, PASS
+  1409   -> ack result 1, opcode 0 (INVALID), id 9, after 75.7 ms
+  1585   -> ack result 1, opcode 0, id 0, after 53.3 ms
+  14     -> ack result 1, opcode 0, id 0, after 76.4 ms
+  148500 -> no ack within 2.0 s, sent twice
+  cmd_reject in the heartbeats: 0 -> 1 at 20:59:16, -> 2 at 20:59:22,
+  -> 3 at 20:59:26, -> 4 at 20:59:31, -> 5 at 21:01:07: one per command
+  sent. The definition's "rises by 4" assumes one send each; the second
+  148500 adds the fifth. 148500 is 3 bytes: the driver drops any command
+  over MQTT_LINK_COMMAND_MAX (2 bytes) and counts it in command_dropped,
+  with no ack. The rise for each send shows the robot received both and
+  dropped them by design.
+
+(7) Latched fault, NOT RUN; (8) GP20, NOT RUN
+  Reason for both: line sensors not calibrated, no line available at the
+  time. Neither needs a run that S5 refused. No EVT 0x63 in the session.
+
+(9) Hotspot drop, PASS
+  Hotspot off for 73.7 s (at least 15 s: yes); console kept.
+  Heartbeats: none built at uptime 2842 to 2919 (while offline); they
+  resumed with uptime 2920 at 21:11:50.129, connect_count 3. Two
+  heartbeats built before the robot noticed the loss (uptime 2840 and
+  2841, about 21:10:30) stayed in the queue through the drop and arrived
+  at 21:11:49.5, about 79 s old, with 1 telemetry frame and 2 live
+  messages just ahead of them.
+  The offline command: step 9's STOP was published at 21:10:55, 18 s after
+  the broker ended the robot's session; the robot reconnected with a clean
+  session, so the broker never delivered it. No ack (s1u06_step9.txt), and
+  no S5 command line after 20:46:35: the car did not act on it.
+  Fault lines: one set and clear pair for the drop, exactly the expected
+  "session ends first" text: set link=3 mqtt=4 stale=0 mask=0x10, then
+  "waiting for IP (1)", then clear link=3 mqtt=3 stale=0 mask=0x00 after
+  "wifi: link up". Set first, clear last; 0x10 on the set, not on the
+  clear. No EVT 0x63; ctrl_state READY throughout.
+  The pair at 20:31:48.888 and 20:31:53.928 is outside the planned drop
+  (the session loss between runs 1 and 2): recorded, not failed.
+  Not checkable: "no S1: wifi fault line before the first online". The
+  car was online at 20:23:38, but the console attached at 20:24:41 and
+  the boot output after its first 4 KB was dropped.
+
+Hotspot drop timings (n = 1, one drop)
+  hotspot-off -> robot's last packet at the broker      5.1 s
+  hotspot-off -> offline will (recorder)               12.8 s
+  robot's last packet -> offline will                   7.7 s
+  hotspot-off -> wifi fault set                        14.5 s
+  hotspot-on  -> wifi: link up                          8.2 s
+  hotspot-on  -> online (recorder)                     11.2 s
+  hotspot-on  -> wifi fault clear                      11.2 s
+  hotspot-on  -> first message after the reconnect     11.4 s
+  hotspot-on  -> first fresh heartbeat                 12.1 s
+  NFR14 sets two limits. Telemetry resumes within 15 s of the access
+  point's return: 12.1 s to the first fresh heartbeat, within the limit.
+  Offline within 10 s of link loss: 7.7 s after the robot's last packet,
+  within the limit. From the hotspot-off marker it is 12.8 s, but the
+  hotspot carried the robot's traffic for 5.1 s after the marker, so the
+  marker is not the moment the link was lost. One drop only (n = 1). The
+  fault set and clear times are reported, not gated (no requirement sets
+  a limit).
+  Status 1 lasted 67.2 s (21:10:39.048 to 21:11:46.266), 59.0 s of it with
+  the hotspot off, and the link came up 8.2 s after the hotspot returned,
+  with no power-cycle: uptime runs on (2841 to 2920 over 79 s), no boot
+  banner after 20:24:41, connect_count 2 to 3, the next local port. This
+  differs from S1-U15 gate (3), where status 1 never recovered; one
+  recovery does not show that the stuck case cannot happen.
+
+Step 2 (no gate)
+  The only boot of the session was at about 20:23:10, before "rig new";
+  the power-up marker at 20:24:36.967 marks no boot. Whether that boot
+  was a cold one cannot be told from these files.
+
+Logs: the run's masked copies, written from a hash-checked snapshot of the
+run folder with the rig's mask.py substitutions (the hotspot SSID is
+<HOTSPOT_SSID>, the broker host <BROKER_HOST>, the macOS user name <user>),
+then every IPv4 address other than 127.0.0.1 masked in Python (the
+device's address is <ROBOT_ADDR>); no other edits. The cmd_rtt.py outputs
+are renamed: s1u06_step4_stop50.txt, _run2.txt and _run3_near.txt are
+step4_run1, step4_run2 and step4_run3. This file was written by hand from
+those logs, the decoded recording and the capture.
+
+Not covered: S5's verdict in the ack (Stage 4b); the state changes, the
+latched fault and GP20 (NOT RUN); the stack high-water mark (NOT RUN,
+NFR11); the boot-to-online console check; the cause of the robot's
+silences and of the acks held inside the robot.

@@ -1,0 +1,48 @@
+trial  0 id  0 START:    57.3 ms, queued
+sent 1, acked 1 (queued 1), missing 0, duplicate acks 0
+round trip ms: min 57.3, median 57.3, p95 57.3, max 57.3
+NFR15: 1 of 1 under 300 ms (100.0 %): PASS
+trial  0 id  0 STOP:   134.7 ms, queued
+sent 1, acked 1 (queued 1), missing 0, duplicate acks 0
+round trip ms: min 134.7, median 134.7, p95 134.7, max 134.7
+NFR15: 1 of 1 under 300 ms (100.0 %): PASS
+trial  0 id  0 START:   449.4 ms, queued
+sent 1, acked 1 (queued 1), missing 0, duplicate acks 0
+round trip ms: min 449.4, median 449.4, p95 449.4, max 449.4
+NFR15: 0 of 1 under 300 ms (0.0 %): FAIL
+trial  0 id  0 START:   414.8 ms, queued
+sent 1, acked 1 (queued 1), missing 0, duplicate acks 0
+round trip ms: min 414.8, median 414.8, p95 414.8, max 414.8
+NFR15: 0 of 1 under 300 ms (0.0 %): FAIL
+trial  0 id  0 STOP:    77.5 ms, queued
+sent 1, acked 1 (queued 1), missing 0, duplicate acks 0
+round trip ms: min 77.5, median 77.5, p95 77.5, max 77.5
+NFR15: 1 of 1 under 300 ms (100.0 %): PASS
+trial  0 id  0 RESET:    51.5 ms, queued
+sent 1, acked 1 (queued 1), missing 0, duplicate acks 0
+round trip ms: min 51.5, median 51.5, p95 51.5, max 51.5
+NFR15: 1 of 1 under 300 ms (100.0 %): PASS
+trial  0 id  0 START:    86.1 ms, queued
+sent 1, acked 1 (queued 1), missing 0, duplicate acks 0
+round trip ms: min 86.1, median 86.1, p95 86.1, max 86.1
+NFR15: 1 of 1 under 300 ms (100.0 %): PASS
+trial  0 id  0 STOP:    50.6 ms, queued
+sent 1, acked 1 (queued 1), missing 0, duplicate acks 0
+round trip ms: min 50.6, median 50.6, p95 50.6, max 50.6
+NFR15: 1 of 1 under 300 ms (100.0 %): PASS
+trial  0 id  0 START:  1463.2 ms, queued
+sent 1, acked 1 (queued 1), missing 0, duplicate acks 0
+round trip ms: min 1463.2, median 1463.2, p95 1463.2, max 1463.2
+NFR15: 0 of 1 under 300 ms (0.0 %): FAIL
+trial  0 id  0 START:    72.9 ms, queued
+sent 1, acked 1 (queued 1), missing 0, duplicate acks 0
+round trip ms: min 72.9, median 72.9, p95 72.9, max 72.9
+NFR15: 1 of 1 under 300 ms (100.0 %): PASS
+trial  0 id  0 STOP:    61.7 ms, queued
+sent 1, acked 1 (queued 1), missing 0, duplicate acks 0
+round trip ms: min 61.7, median 61.7, p95 61.7, max 61.7
+NFR15: 1 of 1 under 300 ms (100.0 %): PASS
+trial  0 id  0 RESET:    66.9 ms, queued
+sent 1, acked 1 (queued 1), missing 0, duplicate acks 0
+round trip ms: min 66.9, median 66.9, p95 66.9, max 66.9
+NFR15: 1 of 1 under 300 ms (100.0 %): PASS
