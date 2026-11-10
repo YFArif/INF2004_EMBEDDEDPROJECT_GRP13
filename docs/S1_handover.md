@@ -157,7 +157,7 @@ line-sensor check: it accepts START without calibration.
   (62, 40 and 64 %). The cause on the car is not established. To measure
   it: `python3 -I -B
   testing/subsystem1/cmd_rtt.py --prefix robot --op stop --count 50`
-  (macOS or Linux only).
+  (Windows: `py -3` instead of `python3`, not yet tried there).
 - On a phone hotspot telemetry arrives in bursts, and acks can lag by
   seconds.
 - S5's verdict is not in the ack yet, and RSSI reads "not measured"

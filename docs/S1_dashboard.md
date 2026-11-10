@@ -647,10 +647,13 @@ that stays running, each with the PATH line of 15.1.
 
 ### 15.6 Not available on Windows
 
-`s1_dashboard.py --check` and `testing/subsystem1/cmd_rtt.py` stop their
-`mosquitto` helpers with SIGINT, which Windows does not support, and
-`--check` tests file modes. Read from the code, not run on Windows: run
-them on macOS or Linux.
+`s1_dashboard.py --check` stops its `mosquitto` helpers with SIGINT,
+which Windows does not support, and tests file modes: run it on macOS
+or Linux. `testing/subsystem1/cmd_rtt.py` stops its `mosquitto_sub` with
+`terminate()` on Windows instead, so it can run there as `py -3 -I -B
+testing/subsystem1/cmd_rtt.py ...` with the PATH line of 15.1, but it
+has not been run on Windows yet. Its `--raw` refuses the bytes `0a`, `0d`
+and `1a` there.
 
 ### 15.7 Windows troubleshooting
 

@@ -30,10 +30,12 @@ Run from the repository root, with the broker the robot uses:
     python3 -I -B testing/subsystem1/cmd_rtt.py --prefix robot --op stop
 
 Needs mosquitto_sub and mosquitto_pub on the PATH. It prints no address.
+On Windows, run it as py -3 with the same arguments.
 """
 
 import argparse
 import datetime
+import os
 import shutil
 import signal
 import statistics
@@ -93,7 +95,12 @@ def start_subscriber(args):
 
 
 def stop_subscriber(sub):
-    sub.send_signal(signal.SIGINT)
+    if os.name == "nt":
+        # Windows cannot send SIGINT to a child. mosquitto_sub flushes
+        # each line, so the stamped lines are already in the pipe.
+        sub.terminate()
+    else:
+        sub.send_signal(signal.SIGINT)
     out, _ = sub.communicate(timeout=10)
     acks = []
     for line in out.splitlines():
@@ -167,6 +174,10 @@ def run_timing(args):
 
 def run_raw(args):
     payload = bytes.fromhex(args.raw)
+    # On Windows mosquitto_pub -s reads stdin in text mode, which changes
+    # 0d 0a and stops at 1a. Commands built by --op never hold them.
+    if (os.name == "nt") and any(b in payload for b in (0x0A, 0x0D, 0x1A)):
+        sys.exit("cmd_rtt: on Windows --raw cannot send 0a, 0d or 1a")
     sub = start_subscriber(args)
     t_sent = datetime.datetime.now()
     publish(args, payload)
