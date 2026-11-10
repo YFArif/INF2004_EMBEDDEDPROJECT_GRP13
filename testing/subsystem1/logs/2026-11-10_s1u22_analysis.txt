@@ -1,0 +1,99 @@
+S1-U22 analysis: NFR15 on the car, radio power save off (stage B)
+Session 2026-11-10, rig run 2026-11-10_214034. Sources: a hash-checked
+local snapshot of the run folder (broker log, console, markers, status
+recorder, window D's ack and telemetry recording, the three cmd_rtt.py
+outputs) and the session's packet capture of TCP port 1883 on the Mac's
+WiFi interface. None of these is committed (tester's decision); this file
+was written by hand from them and gives times, counts and ports only.
+All times are the Mac clock: markers, console and recorders to the ms,
+broker log to the second. The console was still being captured when the
+snapshot was taken; the snapshot holds it up to 21:49:39.214.
+
+VERDICT: NOT RUN, reason "power-save state not confirmed" (the NOT RUN
+rule in the S1-U22 definition). The "S1: wifi pm off" line never
+appeared, and after the one power-cycle the hotspot rejected the join
+(status 1, then -3, repeating), so the robot never came online again and
+all 150 STOPs went to an offline robot. The runs hold no NFR15 data:
+this is not an NFR15 fail. The pass rule was not reached. Under the merge
+rule, 0ad813a stays unmerged on the local branch s1-pm-off. No re-run on
+10 Nov 2026 (tester's decision).
+
+Image: the stage B UF2 (0ad813a, sha256 ec8e3e7a...) as the definition
+sets, flashed from the local copy (tester's procedure). The console does
+not confirm it: the only line that tells stage B from main, "S1: wifi pm
+off", never appeared. The rig's run.env names the UF2 that was in
+build_make when "rig new" ran, not the file flashed.
+
+Session timeline
+  21:40:41.008  marker broker-start
+  21:40:41      broker: the car connects, still running the S1-U06 main
+                image (heartbeat uptime gives its boot at 20:23:10, the
+                S1-U06 boot)
+  21:41:44      broker: that session ends, exceeded timeout (the flash)
+  ~21:41:59     boot 1 of stage B (from the heartbeat uptime); online at
+                21:42:03.980
+  21:42:29.181  console: boot 1's buffered output arrives at once and
+                ends at "waiting for IP (1)"; the rest was dropped
+  ~21:42:36     boot 2 (heartbeat uptime); the broker replaces the session
+                at 21:42:41 (offline 21:42:41.203, online 21:42:41.284)
+  21:42:57.435  console: boot 2's buffered output, again ending at
+                "waiting for IP (1)"
+  21:42:59.499  marker power-up
+  21:44:43.352  marker power-cut (the one power-cycle of the NOT RUN rule)
+  21:44:48.95   capture and window D: the robot's last packet
+  21:44:56      broker: exceeded timeout; offline will at 21:44:56.016
+  21:45:12.646  marker power-up (boot 3)
+  21:46:08      run 1 (broker: 50 STOPs on robot/cmd/dash to 21:46:33)
+  21:46:09.5    the capture ends
+  21:46:28.449  console: boot 3's buffered output; from here the console
+                is live
+  21:46:28.819  wifi: joining; 21:46:29.079 status 1 (joined AP, waiting
+                for IP)
+  21:46:51      run 2 (to 21:47:17)
+  21:46:54.118  status -3, authentication rejected; joining 5.02 s later
+                (21:46:59.138), status 1 at 21:46:59.378
+  21:47:47      run 3 (to 21:48:13)
+  21:48:20.617  status -3 again; joining at 21:48:25.635
+  21:48:28.331  marker broker-stop
+  21:49:18.914  status -3 again; joining at 21:49:23.934, still not
+                joined when the snapshot ends
+
+The "S1: wifi pm off" line
+  Not in the console for any of the three stage B boots, so there is no
+  result or mode to quote.
+  Boots 1 and 2 were online (21:42:03 and 21:42:41), but the console was
+  read only 30 s and 21 s after those boots, and the USB console drops
+  output once its 4 KB ring is full and nobody reads it: each boot's
+  buffered output stops at "waiting for IP (1)", and the line, printed
+  just after the link comes up, fell in the dropped part.
+  Boot 3, after the one power-cycle, never joined the hotspot, so the line
+  was never printed: stage B prints it from mqtt_utk_start(), which the
+  radio task calls only while the link is up.
+
+The three runs
+  run  sent acked missing dup  under 300 ms  min / median / p95 / max
+  1    50   0     50      0    0 (0.0 %)     none (no ack)
+  2    50   0     50      0    0 (0.0 %)     none
+  3    50   0     50      0    0 (0.0 %)     none
+  cmd_rtt.py printed FAIL for all three. The robot had no broker session
+  for any of the 150 STOPs: its last session ended at 21:44:56 and it never
+  connected again, and the broker sent nothing to it. Window D's last
+  message is at 21:44:48.95. The capture's last packet from the robot is
+  at 21:44:48.95; after it there are only 8 packets from the Mac to the
+  dead connection, and the capture ends at 21:46:09.5, in the first
+  seconds of run 1. With no robot traffic during the runs there are no
+  silences, retransmissions or acknowledgement delays to analyse, and all
+  150 misses fall where the robot was offline.
+
+The join failures
+  Status 1 then -3 ("authentication rejected"), each followed by a new
+  join 5.02 s later, the same pattern as in S1-U21, which cleared after
+  the tester restarted the hotspot and disconnected other devices. The
+  cause is not established.
+
+Not committed: the broker log, console, recorders, cmd_rtt.py outputs and
+the capture (tester's decision); they stay in the local snapshot.
+
+Not covered: NFR15 with the radio power save off (no data); whether the
+power-save setting survives a rejoin (S1-U20); why the hotspot rejected
+the join.
