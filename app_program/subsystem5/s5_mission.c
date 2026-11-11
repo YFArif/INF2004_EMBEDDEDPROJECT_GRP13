@@ -12,8 +12,9 @@
  * - Lifting the robot ends the run the same way (EV_LIFTED from S4): in
  *   the demo it is the signal for the end of the run (brief feedback,
  *   2026-11-11, which also drops collision detection by the IMU). The
- *   robot tipped over (EV_OVERTURNED) is a FAULT. Both are acted on only
- *   while running; S4 brakes the motors itself (MF_ESTOP).
+ *   robot tipped over (EV_OVERTURNED) is a FAULT. Both are acted on while
+ *   running and during the Button 2 sweep (lifted cancels it, back to
+ *   READY); S4 brakes the motors itself (MF_ESTOP).
  * - A barcode command waits until EV_JUNCTION, or at most
  *   S5_JUNCTION_MAX_MM of travel (assumption A11). A newer barcode
  *   replaces an unexecuted one.
@@ -400,7 +401,20 @@ step_calibrating (uint32_t events, uint32_t now_ms)
 {
     bool b_timeout = ((now_ms - g_mission.wait_start_ms) >= CAL_TIMEOUT_MS);
 
-    if (0u != g_mission.cal_step)
+    if (0u != (events & EV_LIFTED))
+    {
+        // Picked up during the sweep: S4 has already braked. Without
+        // this the turn never finishes and ends in MOTION_TIMEOUT.
+        s5_links_motion_stop();
+        s5_event_trace("CAL cancelled: robot lifted, press Button 2 again "
+                       "0 0", 0, 0);
+        enter_ready();
+    }
+    else if (0u != (events & EV_OVERTURNED))
+    {
+        enter_fault(S5_CTRL_FAULT_OVERTURNED);
+    }
+    else if (0u != g_mission.cal_step)
     {
         step_cal_sweep(events, now_ms);
     }

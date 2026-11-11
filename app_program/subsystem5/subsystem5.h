@@ -66,9 +66,9 @@
 #define EV_LINE_LOST        (0x00000040u)   /* S3: no line for 40 mm.    */
 #define EV_LINE_FOUND       (0x00000080u)   /* S3: a search found it.    */
 #define EV_MOTION_DONE      (0x00000100u)   /* S2: MOVE or TURN done.    */
-#define EV_IMPACT           (0x00000200u)   /* S4: collision. Being      */
-                                            /* removed from the brief    */
-                                            /* (2026-11-11): EV_LIFTED.  */
+/* 0x00000200u unused: was EV_IMPACT (S4 collision), dropped from the
+ * brief on 2026-11-11 in favour of EV_LIFTED and EV_OVERTURNED below.
+ */
 #define EV_FAULT            (0x00000400u)   /* Any: see flg_fault.       */
 #define EV_OBSTACLE_NEAR    (0x00000800u)   /* S5: under 35 cm, slow.    */
 #define EV_OBSTACLE_CLEAR   (0x00001000u)   /* S5: path clear again.     */
