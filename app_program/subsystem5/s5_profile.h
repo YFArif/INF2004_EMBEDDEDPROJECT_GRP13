@@ -40,7 +40,13 @@
                                         /* (2026-11-06).                 */
 #define S5_SENSOR_SETBACK_MM    (75)    /* Sensor face behind the front, */
                                         /* measured 7-8 cm (2026-11-05). */
-#define S5_PATH_MARGIN_MM       (50)    /* Gap kept from the obstacle.   */
+#define S5_PATH_MARGIN_MM       (70)    /* Gap kept from the obstacle.   */
+                                        /* 50 hit a box after a 5 degree */
+                                        /* drift (S4 heading, log        */
+                                        /* 2026-11-11_1732_track_2); 80  */
+                                        /* cleared but went wide (logs   */
+                                        /* 2026-11-11_1744/1746); 60     */
+                                        /* touched (log 1752).           */
 
 /* Scan thresholds (Week 6 report 6.4, preliminary until S5-U04). */
 #define S5_HIT_RANGE_MM         (400)   /* Closer than this is a hit.    */
@@ -82,6 +88,8 @@ typedef struct
     uint16_t    shift_left_mm;  /* Sideways move to pass on the left.    */
     uint16_t    shift_right_mm; /* Sideways move to pass on the right.   */
     uint16_t    depth_mm;       /* Length along the track; 0 = unknown.  */
+    uint16_t    pass_ahead_mm;  /* Side watch: obstacle's end still this */
+                                /* far ahead of the sensor when passed.  */
 } s5_profile_t;
 
 bool s5_profile_is_hit(s5_profile_point_t const * p_point);

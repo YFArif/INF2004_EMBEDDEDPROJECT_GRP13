@@ -64,6 +64,12 @@
 #define SPEED_MMS           (70u)       /* Moves and turns going round:  */
                                         /* slow for accuracy and for S3  */
                                         /* to see the line.              */
+#define REVERSE_MMS         (40u)       /* Backwards: gentle, as S4 takes*/
+                                        /* a jolt over 2.0 g as an impact*/
+                                        /* (imu_task.c IMPACT_MG). At 70 */
+                                        /* the reverse after the stop    */
+                                        /* read 2.2 and 2.6 g (logs      */
+                                        /* 2026-11-11_1727).             */
 #define REVERSE_MM          (100)       /* Week 6 report 6.4.            */
 #define RETRIES_MAX         (2u)        /* Then NO_PATH.                 */
 #define WATCH_MAX_MM        (800)       /* Longest obstacle expected.    */
@@ -88,14 +94,14 @@ typedef struct
     uint32_t                profile_seq;
     subsystem5_ctrl_fault_t fault;
     bool                    b_squared;      /* Squared up already.       */
-    bool                    b_passed_early; /* Passed while turning back.*/
+    int32_t                 tail_from_mm;   /* Odometry: the tail began. */
 } avoid_t;
 
 static avoid_t       g_avoid       = {S5_AVOID_IDLE,
                                       {S5_PLAN_CONTINUE, 0, 0, 0u, 0u, 0u,
                                        0u, 0u},
                                       0u, 0u, 0u, 0u, S5_CTRL_FAULT_NONE,
-                                      false, false};
+                                      false, 0};
 static volatile bool g_b_bypass_on = true;
 
 static s5_avoid_result_t step_scanning(uint32_t events, uint32_t now_ms);
@@ -106,6 +112,7 @@ static s5_avoid_result_t step_bypass(uint32_t events, uint32_t now_ms);
 static s5_avoid_result_t next_leg(uint32_t now_ms);
 static s5_avoid_result_t step_return(uint32_t events, uint32_t now_ms);
 static s5_avoid_result_t hand_over(void);
+static int32_t           tail_mm(bool b_passed);
 static void              request_scan(uint32_t now_ms);
 static void              start_move(int32_t dist_mm, uint32_t now_ms);
 static void              start_turn(int32_t angle_deg, uint32_t now_ms);
@@ -370,12 +377,6 @@ step_bypass (uint32_t events, uint32_t now_ms)
     bool              b_done = (0u != (events & EV_MOTION_DONE));
     bool              b_pass = (0u != (events & EV_OBST_PASSED));
 
-    // Passed while still turning back parallel: acted on when it ends.
-    if ((S5_AVOID_TURN_PARALLEL == g_avoid.state) && b_pass)
-    {
-        g_avoid.b_passed_early = true;
-    }
-
     if ((S5_AVOID_TURN_IN == g_avoid.state)
         && ((0u != (events & EV_LINE_FOUND)) || s5_links_line_is_locked()))
     {
@@ -384,12 +385,24 @@ step_bypass (uint32_t events, uint32_t now_ms)
     }
     else if ((S5_AVOID_PASSING == g_avoid.state) && (b_pass || b_done))
     {
-        // Passed (or drove the longest expected obstacle): the far end is
-        // level with the sensor; the tail puts it behind the rear axle.
+        // Passed (or drove the longest expected obstacle): the tail puts
+        // the obstacle's end behind the rear axle. The side watch goes
+        // on during the tail.
         s5_links_motion_stop();
-        subsystem5_obst_request(OB_HOLD);
-        start_move(g_avoid.plan.tail_mm, now_ms);
+        g_avoid.tail_from_mm = s5_links_odom_dist_mm();
+        start_move(tail_mm(b_pass), now_ms);
         enter(S5_AVOID_TAIL);
+    }
+    else if ((S5_AVOID_TAIL == g_avoid.state)
+             && (0u != (events & EV_OBST_AGAIN))
+             && (s5_math_abs(s5_links_odom_dist_mm() - g_avoid.tail_from_mm)
+                 < WATCH_MAX_MM))
+    {
+        // The obstacle echoed again: its end is further on. Drive the
+        // whole tail again from here (at most WATCH_MAX_MM in all).
+        s5_event_trace("AVOID obstacle still there: tail again 0 0", 0, 0);
+        s5_links_motion_stop();
+        start_move(tail_mm(true), now_ms);
     }
     else if (b_done)
     {
@@ -439,31 +452,24 @@ next_leg (uint32_t now_ms)
         break;
 
         case S5_AVOID_MOVE_OUT:
-            // Start the side watch now, so the servo is already pointing
-            // sideways when passing begins (a small obstacle is passed
-            // within its 0.4 s swing). Going round on the left leaves the
-            // obstacle on the right.
-            g_avoid.b_passed_early = false;
-            subsystem5_obst_request((p_plan->turn_deg > 0) ? OB_WATCH_RIGHT
-                                                           : OB_WATCH_LEFT);
             start_turn(-p_plan->turn_deg, now_ms);
             enter(S5_AVOID_TURN_PARALLEL);
         break;
 
         case S5_AVOID_TURN_PARALLEL:
-            if (g_avoid.b_passed_early)
-            {
-                start_move(p_plan->tail_mm, now_ms);
-                enter(S5_AVOID_TAIL);
-            }
-            else
-            {
-                start_move(WATCH_MAX_MM, now_ms);
-                enter(S5_AVOID_PASSING);
-            }
+            // Straight now: start the side watch. Not during the turn: the
+            // sensor then still looks ahead, and far echoes from there
+            // would read as "past the obstacle" (log 2026-11-06_1707).
+            // Going round on the left leaves the obstacle on the right.
+            subsystem5_obst_request((p_plan->turn_deg > 0) ? OB_WATCH_RIGHT
+                                                           : OB_WATCH_LEFT);
+            start_move(WATCH_MAX_MM, now_ms);
+            enter(S5_AVOID_PASSING);
         break;
 
         case S5_AVOID_TAIL:
+            // Side watch off: the obstacle is behind the rear axle.
+            subsystem5_obst_request(OB_HOLD);
             start_turn(-p_plan->in_deg, now_ms);
             enter(S5_AVOID_TURN_IN);
         break;
@@ -539,6 +545,37 @@ step_return (uint32_t events, uint32_t now_ms)
 }
 
 /*!
+ * @brief Tail before turning in: the plan's (sensor to rear axle plus
+ *        the margin), plus how far the obstacle's end was still ahead of
+ *        the sensor when the side watch reported it passed (the sensor
+ *        looks diagonally forward, obstacle_task.c "Side watch").
+ *
+ * @param[in] b_passed true if the side watch reported the pass; false if
+ *                     the longest expected obstacle was driven instead.
+ *
+ * @return Tail length in mm.
+ */
+static int32_t
+tail_mm (bool b_passed)
+{
+    s5_profile_t profile = {0};
+    int32_t      tail    = (int32_t) g_avoid.plan.tail_mm;
+
+    if (b_passed)
+    {
+        subsystem5_profile_get(&profile);
+
+        // NOTE: The cast widens uint16_t, so no value is lost.
+        tail += (int32_t) profile.pass_ahead_mm;
+    }
+
+    s5_event_trace("AVOID tail_mm plan_tail_mm", tail,
+                   (int32_t) g_avoid.plan.tail_mm);
+
+    return (tail);
+}
+
+/*!
  * @brief S3 has the line: stop here and let its line following take
  *        over (see "Finding the line again" above).
  *
@@ -577,7 +614,8 @@ request_scan (uint32_t now_ms)
 }
 
 /*!
- * @brief Send a MOVE and start its time limit.
+ * @brief Send a MOVE and start its time limit. Backwards is slower
+ *        (REVERSE_MMS).
  *
  * @param[in] dist_mm Distance; negative = reverse.
  * @param[in] now_ms  Current time.
@@ -585,12 +623,14 @@ request_scan (uint32_t now_ms)
 static void
 start_move (int32_t dist_mm, uint32_t now_ms)
 {
-    uint32_t dist = (dist_mm < 0) ? (uint32_t) -dist_mm : (uint32_t) dist_mm;
+    uint32_t dist  = (dist_mm < 0) ? (uint32_t) -dist_mm : (uint32_t) dist_mm;
+    uint32_t speed = (dist_mm < 0) ? REVERSE_MMS : SPEED_MMS;
 
-    // NOTE: The casts above are safe: |dist_mm| is at most a few metres.
-    s5_links_motion_move(dist_mm, SPEED_MMS);
+    // NOTE: The casts above are safe: |dist_mm| is at most a few metres,
+    // and both speeds fit the uint16_t speed argument.
+    s5_links_motion_move(dist_mm, (uint16_t) speed);
     g_avoid.wait_start_ms = now_ms;
-    g_avoid.wait_limit_ms = ((dist * MS_PER_S) / SPEED_MMS) + MOTION_SLACK_MS;
+    g_avoid.wait_limit_ms = ((dist * MS_PER_S) / speed) + MOTION_SLACK_MS;
 }
 
 /*!

@@ -3,7 +3,11 @@
  * @brief Coarse-then-fine servo scan of an obstacle.
  *
  * @par Method
- * 1. Coarse scan at 30, 60, 90, 120 and 150 degrees.
+ * 1. Coarse scan at five angles across the sensor's reach (drv_servo.h):
+ *    50, 70, 90, 110 and 130 degrees. It was 30 ... 150, but a box on the
+ *    robot stops the servo at about 40 degrees either side, so readings
+ *    taken "at 30 degrees" were really taken at its end (log
+ *    2026-11-05_0211: identical readings from 0 to 60 degrees).
  * 2. The hit nearest straight ahead is the obstacle. Neighbouring coarse
  *    hits at a similar range belong to it as well.
  * 3. One fine sweep per side, in 5 degree steps, from the outermost hit
@@ -22,23 +26,29 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "drv_servo.h"      /* The sensor's reach only.                 */
 #include "s5_math.h"
 #include "s5_profile.h"
 #include "s5_scan.h"
 
-#define COARSE_STEP_DEG     (30)
+#define COARSE_STEP_DEG     (20)
 #define FINE_STEP_DEG       (5)
 #define HALF_STEP_DEG       (2)     /* Bisection step, rounded down.     */
 #define AHEAD_DEG           (90)
-#define SERVO_RIGHT_END_DEG (0)
-#define SERVO_LEFT_END_DEG  (180)
+#define SERVO_RIGHT_END_DEG (DRV_SERVO_RIGHT_LIMIT_DEG)
+#define SERVO_LEFT_END_DEG  (DRV_SERVO_LEFT_LIMIT_DEG)
 #define NO_INDEX            (-1)
 #define DIR_RIGHT           (-1)    /* Angles decrease toward the right. */
 #define DIR_LEFT            (1)
 
+/* NOTE: The casts are safe: every angle is 0 ... 180. */
 static const int16_t g_coarse_deg[S5_SCAN_COARSE_COUNT] =
 {
-    30, 60, 90, 120, 150
+    (int16_t) SERVO_RIGHT_END_DEG,
+    (int16_t) ((SERVO_RIGHT_END_DEG + AHEAD_DEG) / 2),
+    (int16_t) AHEAD_DEG,
+    (int16_t) ((SERVO_LEFT_END_DEG + AHEAD_DEG) / 2),
+    (int16_t) SERVO_LEFT_END_DEG
 };
 
 static s5_scan_step_t coarse_scan(s5_scan_measure_fn_t p_measure,
@@ -237,9 +247,9 @@ extend_sector (s5_scan_result_t const * p_result, int32_t start_idx,
  *
  * @return S5_SCAN_STEP_OK, or the first abort or fault.
  *
- * NOTE: The sweep stops at the next coarse angle. If that is the servo's
- * end (0 or 180 degrees) and the obstacle still has not ended, the edge
- * is out of reach and p_edge->b_found is false.
+ * NOTE: The sweep stops at the next coarse angle, or at the end of the
+ * sensor's reach. If it reaches that end and the obstacle still has not
+ * ended, the edge is out of reach and p_edge->b_found is false.
  */
 static s5_scan_step_t
 fine_sweep (s5_scan_measure_fn_t p_measure, s5_scan_result_t * p_result,
@@ -253,8 +263,21 @@ fine_sweep (s5_scan_measure_fn_t p_measure, s5_scan_result_t * p_result,
                                   + (dir * FINE_STEP_DEG);
     bool               b_on_obj = true;
 
-    // NOTE: The two casts above widen int16_t; coarse angles are 30 to
-    // 150, so limit is always inside the servo's 0 to 180 degree range.
+    // NOTE: The two casts above widen int16_t. Never sweep past the
+    // sensor's reach.
+    if (limit < SERVO_RIGHT_END_DEG)
+    {
+        limit = SERVO_RIGHT_END_DEG;
+    }
+    else if (limit > SERVO_LEFT_END_DEG)
+    {
+        limit = SERVO_LEFT_END_DEG;
+    }
+    else
+    {
+        // Inside the reach.
+    }
+
     while ((S5_SCAN_STEP_OK == step) && b_on_obj
            && ((dir * (limit - angle)) >= 0))
     {

@@ -61,7 +61,7 @@
 #define RANGE_MIN_VALID     (18u)       /* Of RANGE_SAMPLES.             */
 #define RANGE_SPREAD_MM     (20)        /* Max - min, a still target.    */
 #define SCAN_WAIT_MS        (8000u)     /* Scan budget ~2.5 s, x 3.      */
-#define CAL_WAIT_MS         (18000u)    /* 7 x (2 s hold + move + ping). */
+#define CAL_WAIT_MS         (14000u)    /* 5 x (2 s hold + move + ping). */
 #define POLL_MS             (50u)
 #define FLOOR_RUNS          (3u)
 #define STOP_RUN_MS         (30000u)    /* 1 m at 150 mm/s, plus scan.   */
@@ -72,15 +72,17 @@
 #define MS_PER_S            (1000u)
 
 /* S5-U06 fixture: the readings of a simulated 150 mm box 150 mm ahead,
- * with a wall 310 mm to its left (15 degree beam), in scan order.
+ * with a wall 250 mm to the left of the sensor (15 degree beam), in scan
+ * order, within the sensor's reach of 50 ... 130 degrees.
  */
-#define FIXTURE_COUNT       (9u)
+#define FIXTURE_COUNT       (13u)
 
 static const s5_profile_point_t g_fixture[FIXTURE_COUNT] =
 {
-    {  30, S5_PROFILE_NO_ECHO }, {  60, 162u }, {  90, 150u },
-    { 120, 162u }, { 150, 336u }, {  55, S5_PROFILE_NO_ECHO },
-    {  58, 165u }, { 125, 460u }, { 122, 165u }
+    {  50, S5_PROFILE_NO_ECHO }, {  70, 160u }, {  90, 150u },
+    { 110, 160u }, { 130, 389u }, {  65, 166u }, {  60, 162u },
+    {  55, S5_PROFILE_NO_ECHO }, {  58, 165u }, { 115, 166u },
+    { 120, 162u }, { 125, 436u }, { 122, 165u }
 };
 
 static bool                    math_is_right(void);
@@ -130,7 +132,7 @@ subsystem5_test (void)
     TEST_CHECK("S5-U06a", math_is_right(),
                "sin/cos, isqrt and Q15 multiply");
     TEST_CHECK("S5-U06b", fixture_scan_is_right(),
-               "fixture scan visits 9 angles, finds both edges");
+               "fixture scan visits 13 angles, finds both edges");
     TEST_CHECK("S5-U06c", fixture_profile_is_right(),
                "fixture profile: width within 10 %, wall on the left");
     TEST_CHECK("S5-U09", plan_is_right(),
@@ -393,7 +395,8 @@ scan_publishes_profile (void)
 }
 
 /*!
- * @brief S5-U03: slow sweep holding 0 ... 180 degrees for 2 s each.
+ * @brief S5-U03: slow sweep holding 50 ... 130 degrees (the sensor's
+ *        reach) for 2 s each.
  *
  * @return true if the sweep finished and the task went back to HOLD.
  */

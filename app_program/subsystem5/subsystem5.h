@@ -66,7 +66,9 @@
 #define EV_LINE_LOST        (0x00000040u)   /* S3: no line for 40 mm.    */
 #define EV_LINE_FOUND       (0x00000080u)   /* S3: a search found it.    */
 #define EV_MOTION_DONE      (0x00000100u)   /* S2: MOVE or TURN done.    */
-#define EV_IMPACT           (0x00000200u)   /* S4: collision.            */
+#define EV_IMPACT           (0x00000200u)   /* S4: collision. Being      */
+                                            /* removed from the brief    */
+                                            /* (2026-11-11): EV_LIFTED.  */
 #define EV_FAULT            (0x00000400u)   /* Any: see flg_fault.       */
 #define EV_OBSTACLE_NEAR    (0x00000800u)   /* S5: under 35 cm, slow.    */
 #define EV_OBSTACLE_CLEAR   (0x00001000u)   /* S5: path clear again.     */
@@ -74,7 +76,13 @@
 #define EV_PROFILE_READY    (0x00004000u)   /* S5: profile published.    */
 #define EV_OBST_PASSED      (0x00008000u)   /* S5: side watch finished.  */
 #define EV_COMMAND          (0x00010000u)   /* S1: a command is queued.  */
-#define EV_ALL              (0x0001FFFFu)
+#define EV_LIFTED           (0x00020000u)   /* S4: lifted off the ground:*/
+                                            /* the run ends (FINISHED).  */
+#define EV_OVERTURNED       (0x00040000u)   /* S4: tipped over: FAULT.   */
+#define EV_OBST_AGAIN       (0x00080000u)   /* S5: side watch heard the  */
+                                            /* obstacle again after it   */
+                                            /* was passed: longer tail.  */
+#define EV_ALL              (0x000FFFFFu)
 
 /* ---------------------------------------------------------------------
  *  flg_fault: latched fault causes. Bit n is fault n, the numbering of
@@ -127,7 +135,8 @@ typedef enum
     S5_CTRL_FAULT_LINE_NOT_FOUND,   /* Line not found again.             */
     S5_CTRL_FAULT_MOTION_TIMEOUT,   /* A MOVE or TURN never finished.    */
     S5_CTRL_FAULT_SCAN_TIMEOUT,     /* No profile after a scan request.  */
-    S5_CTRL_FAULT_OTHER
+    S5_CTRL_FAULT_OTHER,
+    S5_CTRL_FAULT_OVERTURNED        /* S4: the robot tipped over.        */
 } subsystem5_ctrl_fault_t;
 
 /* ---------------------------------------------------------------------

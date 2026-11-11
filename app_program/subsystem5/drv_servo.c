@@ -26,7 +26,8 @@
 
 static int32_t g_angle_deg = DRV_SERVO_AHEAD_DEG;
 
-static int32_t clamp_angle(int32_t angle_deg);
+static int32_t clamp_angle(int32_t angle_deg, int32_t low_deg,
+                           int32_t high_deg);
 
 /*!
  * @brief Start the 50 Hz servo signal pointing straight ahead.
@@ -61,7 +62,8 @@ drv_servo_init (void)
 /*!
  * @brief Command a new angle.
  *
- * @param[in] angle_deg Target angle; clamped to 0 ... 180 degrees.
+ * @param[in] angle_deg Target angle; clamped to the sensor's reach,
+ *                      DRV_SERVO_RIGHT_LIMIT_DEG ... DRV_SERVO_LEFT_LIMIT_DEG.
  *
  * @return Milliseconds to wait before the servo has settled and a ping
  *         at the new angle can be trusted.
@@ -69,9 +71,11 @@ drv_servo_init (void)
 uint32_t
 drv_servo_move (int32_t angle_deg)
 {
-    int32_t target  = clamp_angle(angle_deg);
+    int32_t target  = clamp_angle(angle_deg, DRV_SERVO_RIGHT_LIMIT_DEG,
+                                  DRV_SERVO_LEFT_LIMIT_DEG);
     int32_t travel  = target - g_angle_deg;
-    int32_t trimmed = clamp_angle(target + TRIM_DEG);
+    int32_t trimmed = clamp_angle(target + TRIM_DEG, DRV_SERVO_RIGHT_DEG,
+                                  DRV_SERVO_LEFT_DEG);
 
     if (travel < 0)
     {
@@ -104,24 +108,26 @@ drv_servo_angle (void)
 }
 
 /*!
- * @brief Limit an angle to the servo's range.
+ * @brief Limit an angle to a range.
  *
  * @param[in] angle_deg Any angle.
+ * @param[in] low_deg   Lowest allowed angle.
+ * @param[in] high_deg  Highest allowed angle.
  *
- * @return The angle limited to 0 ... 180 degrees.
+ * @return The angle limited to low_deg ... high_deg.
  */
 static int32_t
-clamp_angle (int32_t angle_deg)
+clamp_angle (int32_t angle_deg, int32_t low_deg, int32_t high_deg)
 {
     int32_t limited = angle_deg;
 
-    if (limited < DRV_SERVO_RIGHT_DEG)
+    if (limited < low_deg)
     {
-        limited = DRV_SERVO_RIGHT_DEG;
+        limited = low_deg;
     }
-    else if (limited > DRV_SERVO_LEFT_DEG)
+    else if (limited > high_deg)
     {
-        limited = DRV_SERVO_LEFT_DEG;
+        limited = high_deg;
     }
     else
     {

@@ -7,6 +7,14 @@
  * 90 degrees looks straight ahead, 0 degrees to the robot's right and
  * 180 degrees to its left (Week 6 report 6.4, checked in S5-U03).
  *
+ * @par Reach
+ * A box on the robot stops the sensor about 40 degrees either side of
+ * straight ahead (Anna, 2026-11-11, from photos). drv_servo_move() never
+ * goes past DRV_SERVO_RIGHT_LIMIT_DEG ... DRV_SERVO_LEFT_LIMIT_DEG, so the
+ * servo does not strain against the box and every angle the code records
+ * is where the sensor really points.
+ * TODO: Measure the right side; 40 degrees is the left side's estimate.
+ *
  * @par
  * Only obstacle_task calls this driver (TEAM.md section 3).
  */
@@ -20,6 +28,8 @@
 #define DRV_SERVO_RIGHT_DEG     (0)
 #define DRV_SERVO_AHEAD_DEG     (90)
 #define DRV_SERVO_LEFT_DEG      (180)
+#define DRV_SERVO_RIGHT_LIMIT_DEG   (50)    /* Furthest it can turn: */
+#define DRV_SERVO_LEFT_LIMIT_DEG    (130)   /* see "Reach" above.    */
 
 uint32_t drv_servo_init(void);
 uint32_t drv_servo_move(int32_t angle_deg);

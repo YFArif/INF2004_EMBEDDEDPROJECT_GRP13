@@ -9,6 +9,11 @@
  *   (MF_ESTOP set, motors braked). Only RESET (Button 1 held 2 s, or the
  *   dashboard) leaves FAULT, back to READY with the motors still braked.
  * - EV_STOP ends the run in FINISHED, with a run summary.
+ * - Lifting the robot ends the run the same way (EV_LIFTED from S4): in
+ *   the demo it is the signal for the end of the run (brief feedback,
+ *   2026-11-11, which also drops collision detection by the IMU). The
+ *   robot tipped over (EV_OVERTURNED) is a FAULT. Both are acted on only
+ *   while running; S4 brakes the motors itself (MF_ESTOP).
  * - A barcode command waits until EV_JUNCTION, or at most
  *   S5_JUNCTION_MAX_MM of travel (assumption A11). A newer barcode
  *   replaces an unexecuted one.
@@ -463,8 +468,19 @@ step_running (uint32_t events, uint32_t now_ms)
         fault = fault_from_flags();
     }
 
-    if (0u != (events & EV_IMPACT))
+    if (0u != (events & EV_LIFTED))
     {
+        // The demo's end-of-run signal, not a fault.
+        s5_event_trace("RUN ended: robot lifted 0 0", 0, 0);
+        finish_run(now_ms);
+    }
+    else if (0u != (events & EV_OVERTURNED))
+    {
+        enter_fault(S5_CTRL_FAULT_OVERTURNED);
+    }
+    else if (0u != (events & EV_IMPACT))
+    {
+        // TODO: Remove once S4 no longer detects collisions.
         enter_fault(S5_CTRL_FAULT_IMPACT);
     }
     else if (S5_CTRL_FAULT_NONE != fault)
