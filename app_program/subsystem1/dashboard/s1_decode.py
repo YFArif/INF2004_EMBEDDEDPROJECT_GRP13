@@ -162,7 +162,7 @@ JUNC_NAMES = {0: "straight", 1: "left", 2: "right", 3: "u-turn"}
 HUMP_NAMES = {0: "flat", 1: "climbing", 2: "descending"}
 CLASS_NAMES = {0: "stationary", 1: "moving", 2: "accelerating",
                3: "turning", 4: "climbing hump", 5: "descending hump",
-               6: "IMPACT"}
+               6: "LIFTED_OVERTURNED"}
 CLASS_IMPACT = 6
 # S5: subsystem5_ctrl_state_t.
 CTRL_NAMES = {0: "INIT", 1: "CALIBRATING", 2: "READY",

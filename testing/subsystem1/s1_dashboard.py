@@ -1169,7 +1169,7 @@ class Dashboard:
             self.impact_at = now_text()
         view = self.telemetry_view()
         if b_new:
-            view["log"] = "IMPACT reported by S4 (number %d)" % (
+            view["log"] = "Lifted/overturned reported by S4 (number %d)" % (
                 self.impact_count)
         self.emit("telemetry", view)
 
@@ -1911,7 +1911,7 @@ li { margin-bottom: 4px; }
         </button>
       <button type="button" data-sim="retained_clear">Clear retained
         </button>
-      <button type="button" data-sim="s4_impact">S4 impact</button>
+      <button type="button" data-sim="s4_impact">S4 lifted/overturned</button>
       <button type="button" data-sim="s4_hump">S4 hump</button>
       <button type="button" data-sim="s3_barcode">S3 barcode</button>
       <button type="button" data-sim="s3_reject">S3 barcode rejected
@@ -1965,8 +1965,8 @@ li { margin-bottom: 4px; }
   <div class="panel" id="p-s4">
     <h2>S4 motion sensor <span class="age" id="age-s4"></span></h2>
     <div class="vals">
-      <div class="impact" id="s4-impact">NO IMPACT</div>
-      <div class="muted" id="s4-impacts">impacts seen: 0</div>
+      <div class="impact" id="s4-impact">OK</div>
+      <div class="muted" id="s4-impacts">lift/overturn stops: 0</div>
       <table class="kv">
         <tr><td>pitch / roll</td><td id="s4-angles">-</td></tr>
         <tr><td>turn rate</td><td id="s4-turn">-</td></tr>
@@ -2195,7 +2195,7 @@ function paintAges() {
   });
   const hot = impactAt !== null && (now - impactAt) / 1000 < IMPACT_HOLD_S;
   el("s4-impact").className = hot ? "impact hot" : "impact";
-  text("s4-impact", hot ? "IMPACT" : "NO IMPACT");
+  text("s4-impact", hot ? "LIFTED / OVERTURNED" : "OK");
 }
 setInterval(paintAges, 200);
 
@@ -2226,7 +2226,7 @@ function setTelemetry(t, ageMs) {
   text("s2-faults", list(t.faults));
   el("s2-faults").className = t.faults.length ? "bad" : "";
   el("s2-stall").hidden = !t.faults.includes("stall");
-  el("s4-impacts").textContent = "impacts seen: " + t.impact_count
+  el("s4-impacts").textContent = "lift/overturn stops: " + t.impact_count
     + (t.impact_at ? " (last at " + t.impact_at.slice(11, 19) + ")" : "");
   if (t.b_impact) { impactAt = performance.now() - (ageMs || 0); }
   text("s4-angles", num(t.pitch_deg, "°", 1) + " / "
@@ -3272,13 +3272,13 @@ def check_a14(ctx):
     mark = ctx.stream.mark()
     post_json(ctx, "/api/sim", {"action": "s4_impact"})
     hit = ctx.stream.wait_for(
-        "telemetry", lambda d: d.get("b_impact") and ("IMPACT" in d.get(
+        "telemetry", lambda d: d.get("b_impact") and ("Lifted/overturned" in d.get(
             "log", "")), 3.0, mark)
     time.sleep(1.5)
     _, text = http_call(ctx.port, "GET", "/api/state")
     after = json.loads(text)["telemetry"]["impact_count"]
     b_impact = (hit is not None) and (after == count + 1) and (
-        hit[2]["class_name"] == "IMPACT")
+        hit[2]["class_name"] == "LIFTED_OVERTURNED")
     mark = ctx.stream.mark()
     for action in ("s3_barcode", "s3_reject", "s3_junction", "s3_lost"):
         post_json(ctx, "/api/sim", {"action": action})

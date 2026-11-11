@@ -110,7 +110,7 @@ one-to-one copy of it.
 | 16 | hump_state | S4 | 0 to 3 | 2 | 122 | guess | Week 6 hump states: FLAT, CLIMBING, DESCENDING, REPORT. |
 | 17 | peak_mm | S4 | 0 to 255 mm | 8 | 124 | from Version B | Run peak hump height. Clamped. |
 | 18 | hump_count | S4 | 0 to 15, saturates | 4 | 132 | guess | Number of humps on the course not given in the brief. |
-| 19 | motion_class | S4 | 0 to 6 used, 0 to 7 | 3 | 136 | guess | 7 classes in FR19: STATIONARY, MOVING, ACCELERATING, TURNING, CLIMBING_HUMP, DESCENDING_HUMP, IMPACT. |
+| 19 | motion_class | S4 | 0 to 6 used, 0 to 7 | 3 | 136 | guess | 7 classes in FR19: STATIONARY, MOVING, ACCELERATING, TURNING, CLIMBING_HUMP, DESCENDING_HUMP, LIFTED_OVERTURNED (shown as IMPACT before 2026-11-12). |
 | 20 | turn_rate | S4 | -512 to 511 deg/s -> 0 to 1023 | 10 | 139 | from Version B | Width from Version B. Unit 1 deg/s, as FR20 states (IF-08's name `turn_rate_cdps` disagrees; 10 bits in cdeg/s would only reach 5 deg/s, and an in-place turn is about 200 deg/s). Derived from the wheel difference, which this frame already carries; it may be dropped (section 7). |
 | 21 | imu_ok | S4 | 0 or 1 | 1 | 149 | guess | IF-08 flag. |
 | 22 | cal_done | S4 | 0 or 1 | 1 | 150 | guess | IF-08 flag. |

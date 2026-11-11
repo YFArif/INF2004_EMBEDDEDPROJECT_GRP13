@@ -1158,7 +1158,7 @@ imu_class (subsystem2_odom_t const * p_odom)
     if (g_imu.b_impact && !subsystem2_estop_is_set())
     {
         g_imu.b_impact = false;
-        tm_printf((UB *) "S4 IMPACT cleared (MF_ESTOP cleared)\n");
+        tm_printf((UB *) "S4 LIFT/OVERTURN STOP cleared (MF_ESTOP cleared)\n");
     }
 
     if (g_imu.b_impact)
@@ -1226,13 +1226,14 @@ imu_impact_follow_up (void)
 
         if (s2.estop_brake_us != g_imu.brake_us_before)
         {
-            tm_printf((UB *) "S4 IMPACT braked %d us after the sample\n",
+            tm_printf((UB *) "S4 LIFT/OVERTURN STOP braked %d us after the"
+                      " sample\n",
                       (INT) (s2.estop_brake_us - g_imu.impact_us));
             g_imu.latency_wait = 0u;
         }
         else if (0u == g_imu.latency_wait)
         {
-            tm_printf((UB *) "S4 IMPACT no brake time from S2\n");
+            tm_printf((UB *) "S4 LIFT/OVERTURN STOP no brake time from S2\n");
         }
         else
         {
@@ -1395,7 +1396,7 @@ class_name (subsystem4_class_t cls)
     static char const * const names[] =
     {
         "STATIONARY", "MOVING", "ACCELERATING", "TURNING",
-        "CLIMBING_HUMP", "DESCENDING_HUMP", "IMPACT"
+        "CLIMBING_HUMP", "DESCENDING_HUMP", "LIFTED_OVERTURNED"
     };
     uint32_t idx = (uint32_t) cls;
 
