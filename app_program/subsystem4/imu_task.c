@@ -77,10 +77,19 @@
 #define DRIVE_LOG_CYCLES    (400u)      /* Log every cycle for 8 s.       */
 #define HUMP_STILL_MMS      (10)
 
-/* ---- Impact (A18, preliminary, S4-U03). */
-#define IMPACT_ENABLE       (0 == DRIVE_TEST)   /* Off in the hump drive  */
-                                                /* test: hitting a strip  */
-                                                /* edge read 2.1 g.       */
+/* ---- Impact (A18, preliminary, S4-U03).
+ * Switched off 2026-11-11 (by S5, Anna, with the lecturer's update): the
+ * brief no longer asks for IMU collision detection, only for stopping the
+ * motors when the robot is lifted or overturned. Its 2.0 g limit also
+ * stopped obstacle bypasses on normal jolts (S5 logs 2026-11-11: reverse
+ * 2.2-2.6 g, floor bump 2.7 g, stop-and-go 2.15 g).
+ * TODO(S4): Remove the impact code and add lifted / overturned detection
+ * (EV_LIFTED / EV_OVERTURNED in subsystem5.h).
+ */
+#define IMPACT_ENABLE       (0)                 /* Was (0 == DRIVE_TEST): */
+                                                /* off in the hump drive  */
+                                                /* test only (a strip     */
+                                                /* edge read 2.1 g).      */
 #define IMPACT_MG           (2000)      /* Was 2500. 2026-11-06 (S4-U03): */
                                         /* wall hits at 150 mm/s read     */
                                         /* 2.07-2.50 g and 2.17/2.43 g    */
