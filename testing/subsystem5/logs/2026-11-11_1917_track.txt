@@ -1,0 +1,36 @@
+
+
+microT-Kernel Version 3.00
+
+
+=== micro T-Kernel on Raspberry Pi Pico W (spec 0x6300, product 0x0003) ===
+dual-core (SMP) build, usermain on core 0
+encoder: GP16/GP17 edge interrupt on core 1
+motion_task: core 1, period 20 ms
+all subsystems started
+
+[S5] EVT 0x60 a=1 b=0
+wifi: cyw43_utk_task starting (proc 1)
+S3 RUN: barcode DOUT=GP7 AOUT=ADC2, Left IR=ADC0 (GP26), Centre=ADC1 (GP27), line sensors: single edge, GP27 on the LEFT edge, GP26 guard RIGHT
+wifi: cyw43_init() ...
+wifi: cyw43_init() returned, bringing interface up ...
+S3 TIME line step max 154 us, period -1-0 us, sampler isr max 51 us
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 208-208  GP26 192-192
+[S5] EVT 0x60 a=2 b=1
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 200-208  GP26 188-192
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 199-208  GP26 181-192
+S3 LINE  GP27=WHITE    0  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 199-208  GP26 181-192
+S3 LINE  GP27=WHITE    0  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 197-208  GP26 181-192
+S3 LINE  GP27=WHITE    0  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 196-208  GP26 181-192
+S3 LINE  GP27=WHITE    0  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 196-208  GP26 181-192
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  785  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 196-208  GP26 181-195
+S3 LINE  GP27=WHITE    0  GP26=BLACK  785  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 196-208  GP26 181-195
+S3 LINE  GP27=WHITE    0  GP26=BLACK  785  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 194-208  GP26 181-195
+S3 LINE  GP27=WHITE   58  GP26=BLACK  785  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 191-208  GP26 181-195
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  785  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 191-208  GP26 181-195
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 191-208  GP26 181-195
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  785  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 191-208  GP26 181-195
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  785  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 191-208  GP26 181-195
+
+S4 IMU: LSM303DLHC on I2C0 SDA=GP4 SCL=GP5
+S4 terrain stored in 8 B (43 bits); unpacked 14 B
