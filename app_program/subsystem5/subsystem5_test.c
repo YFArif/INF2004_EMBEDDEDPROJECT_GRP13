@@ -3,7 +3,8 @@
  * @brief On-target tests for subsystem 5. Built only with: make TEST=1
  *
  * @par What runs (S5_TEST_MODE, set for one build by s5_test.ps1)
- * - 0 auto  : S5-U06, U07, U09, U10. No set-up; the motors stay still.
+ * - 0 auto  : S5-U06, U07, U09, U10, U11. No set-up; the motors stay
+ *             still.
  * - 1 bench : auto, then S5-U01, U04, U03. Robot on blocks, a flat box
  *             about 30 cm straight ahead.
  * - 2 stop  : auto, then S5-U08 x3 on the floor: drive at a box, stop,
@@ -25,6 +26,7 @@
 #include <stdint.h>
 
 #include "../test_report.h"
+#include "drv_s5_hw.h"
 #include "s5_event.h"
 #include "s5_math.h"
 #include "s5_plan.h"
@@ -71,6 +73,23 @@
 #define COUNTDOWN_S         (3u)
 #define MS_PER_S            (1000u)
 
+/* S5-U11, the fault flag stress test (Tribunal 1, Version C): one task
+ * on each core sets and clears its own bit STRESS_ROUNDS times, first in
+ * a plain shared word with a slow read-modify-write, then in an event
+ * flag made like flg_fault and changed only by tk_set_flg / tk_clr_flg.
+ * The plain word must lose bits (else the test could not see a race at
+ * all); the event flag must lose none.
+ */
+#define STRESS_ROUNDS       (10000u)
+#define STRESS_WINDOW_US    (2u)        /* Read-to-write gap.            */
+#define STRESS_PRI          (20)        /* Below every real task.        */
+#define STRESS_START_MS     (50u)       /* Both workers up and waiting.  */
+#define STRESS_WAIT_MS      (5000u)     /* Per round; ~0.5 s expected.   */
+#define STRESS_WORKERS      (2u)
+#define STRESS_GO_PLAIN     (1u)
+#define STRESS_GO_FLAG      (2u)
+#define STRESS_ABORT        (3u)
+
 /* S5-U06 fixture: the readings of a simulated 150 mm box 150 mm ahead,
  * with a wall 250 mm to the left of the sensor (15 degree beam), in scan
  * order, within the sensor's reach of 50 ... 130 degrees.
@@ -85,6 +104,16 @@ static const s5_profile_point_t g_fixture[FIXTURE_COUNT] =
     { 120, 162u }, { 125, 436u }, { 122, 165u }
 };
 
+/* S5-U11 shared data. Only the test task writes g_stress_go; each
+ * worker writes only its own slot of the arrays.
+ */
+static volatile uint32_t g_stress_go                         = 0u;
+static volatile uint32_t g_stress_word                       = 0u;
+static volatile uint32_t g_stress_done[STRESS_WORKERS]       = {0u, 0u};
+static volatile uint32_t g_stress_lost_plain[STRESS_WORKERS] = {0u, 0u};
+static volatile uint32_t g_stress_lost_flag[STRESS_WORKERS]  = {0u, 0u};
+static ID                g_stress_flg                        = 0;
+
 static bool                    math_is_right(void);
 static bool                    fixture_scan_is_right(void);
 static bool                    fixture_profile_is_right(void);
@@ -94,6 +123,17 @@ static s5_scan_step_t          fixture_measure(int16_t angle_deg,
                                                uint16_t * p_dist_mm);
 static bool                    is_between(int32_t value, int32_t low,
                                           int32_t high);
+static bool                    stress_run(uint32_t * p_lost_plain,
+                                          uint32_t * p_lost_flag);
+static bool                    stress_wait(uint32_t round);
+static void                    stress_core0_task(INT stacd,
+                                                 void * p_exinf);
+static void                    stress_core1_task(INT stacd,
+                                                 void * p_exinf);
+static void                    stress_worker(uint32_t idx);
+static uint32_t                stress_plain(uint32_t bit);
+static uint32_t                stress_flag(uint32_t bit);
+static void                    stress_spin(uint32_t us);
 #if WITH_BENCH
 static bool                    range_is_steady(void);
 static bool                    scan_publishes_profile(void);
@@ -147,6 +187,15 @@ subsystem5_test (void)
                "OB_RESUME starts monitoring");
     TEST_CHECK("S5-U07b", S5_OBST_HOLD == state_after_request(OB_HOLD),
                "OB_HOLD stops monitoring");
+
+    uint32_t lost_plain = 0u;
+    uint32_t lost_flag  = 0u;
+    bool     b_stressed = stress_run(&lost_plain, &lost_flag);
+
+    TEST_CHECK("S5-U11a", b_stressed && (lost_plain > 0u),
+               "plain word, slow read-modify-write on 2 cores: loses bits");
+    TEST_CHECK("S5-U11b", b_stressed && (0u == lost_flag),
+               "event flag as flg_fault, 2 cores x 10000: no bit lost");
 
 #if (MODE_BENCH == S5_TEST_MODE)
     TEST_CHECK("S5-U01", range_is_steady(),
@@ -314,7 +363,8 @@ state_after_request (uint32_t request)
     subsystem5_delay_ms(STATE_WAIT_MS);
     subsystem5_obst_status_get(&status);
 
-    return (status.state);
+    // NOTE: The cast is safe: the field only ever holds a state value.
+    return ((subsystem5_obst_state_t) status.state);
 }
 
 #if WITH_BENCH
@@ -391,7 +441,8 @@ scan_publishes_profile (void)
         subsystem5_profile_get(&after);
     } while ((after.seq == before.seq) && (waited < SCAN_WAIT_MS));
 
-    return ((after.b_valid) && (after.seq == (before.seq + 1u)));
+    return ((after.b_valid)
+            && (after.seq == s5_profile_next_seq(before.seq)));
 }
 
 /*!
@@ -644,6 +695,274 @@ static bool
 is_between (int32_t value, int32_t low, int32_t high)
 {
     return ((value >= low) && (value <= high));
+}
+
+/*!
+ * @brief S5-U11: run the fault flag stress test on both cores.
+ *
+ * @param[out] p_lost_plain Bits lost or brought back in the plain word.
+ * @param[out] p_lost_flag  Bits lost or brought back in the event flag.
+ *
+ * @return true if both workers finished both rounds in time.
+ */
+static bool
+stress_run (uint32_t * p_lost_plain, uint32_t * p_lost_flag)
+{
+    T_CFLG cflg   = {0};
+    bool   b_done = false;
+
+    // Made like flg_fault (subsystem5.c, create_flag()), so the kernel
+    // object and its calls are the same as the real fault bits use.
+    cflg.flgatr  = TA_TFIFO | TA_WSGL;
+    cflg.iflgptn = 0u;
+
+    g_stress_go   = 0u;
+    g_stress_word = 0u;
+
+    for (uint32_t idx = 0u; idx < STRESS_WORKERS; idx++)
+    {
+        g_stress_done[idx]       = 0u;
+        g_stress_lost_plain[idx] = 0u;
+        g_stress_lost_flag[idx]  = 0u;
+    }
+
+    g_stress_flg = tk_cre_flg(&cflg);
+
+    if (g_stress_flg >= E_OK)
+    {
+        ID tid_0 = app_start_task(stress_core0_task, STRESS_PRI, TP_PRC1,
+                                  "s5_stress_core0");
+        ID tid_1 = app_start_task(stress_core1_task, STRESS_PRI, TP_PRC2,
+                                  "s5_stress_core1");
+
+        if ((tid_0 >= E_OK) && (tid_1 >= E_OK))
+        {
+            // Both workers are spinning on g_stress_go: start them
+            // together, one round at a time.
+            subsystem5_delay_ms(STRESS_START_MS);
+            g_stress_go = STRESS_GO_PLAIN;
+            b_done      = stress_wait(STRESS_GO_PLAIN);
+
+            if (b_done)
+            {
+                g_stress_go = STRESS_GO_FLAG;
+                b_done      = stress_wait(STRESS_GO_FLAG);
+            }
+        }
+    }
+
+    if (b_done)
+    {
+        CHECK(tk_del_flg(g_stress_flg), "s5 stress flag");
+    }
+    else
+    {
+        // A worker may still be running: leave the flag; it exits.
+        g_stress_go = STRESS_ABORT;
+    }
+
+    *p_lost_plain = g_stress_lost_plain[0] + g_stress_lost_plain[1];
+    *p_lost_flag  = g_stress_lost_flag[0] + g_stress_lost_flag[1];
+
+    // NOTE: The casts are safe: each count is at most 4 x STRESS_ROUNDS.
+    s5_event_trace("S5-U11 lost bits: plain_word event_flag",
+                   (int32_t) *p_lost_plain, (int32_t) *p_lost_flag);
+
+    return (b_done);
+}
+
+/*!
+ * @brief Wait until both workers have finished a round.
+ *
+ * @param[in] round STRESS_GO_PLAIN or STRESS_GO_FLAG.
+ *
+ * @return true if both finished within STRESS_WAIT_MS.
+ */
+static bool
+stress_wait (uint32_t round)
+{
+    uint32_t waited = 0u;
+
+    while (((round != g_stress_done[0]) || (round != g_stress_done[1]))
+           && (waited < STRESS_WAIT_MS))
+    {
+        subsystem5_delay_ms(POLL_MS);
+        waited += POLL_MS;
+    }
+
+    return ((round == g_stress_done[0]) && (round == g_stress_done[1]));
+}
+
+/*!
+ * @brief S5-U11 worker on core 0 (owns bit 0).
+ *
+ * @param[in] stacd   Unused start code.
+ * @param[in] p_exinf Unused extended information.
+ */
+static void
+stress_core0_task (INT stacd, void * p_exinf)
+{
+    // The casts mark the kernel's start-up arguments as unused.
+    (void) stacd;
+    (void) p_exinf;
+
+    stress_worker(0u);
+}
+
+/*!
+ * @brief S5-U11 worker on core 1 (owns bit 1).
+ *
+ * @param[in] stacd   Unused start code.
+ * @param[in] p_exinf Unused extended information.
+ */
+static void
+stress_core1_task (INT stacd, void * p_exinf)
+{
+    // The casts mark the kernel's start-up arguments as unused.
+    (void) stacd;
+    (void) p_exinf;
+
+    stress_worker(1u);
+}
+
+/*!
+ * @brief One worker: the plain round, then the event flag round, then
+ *        exit and delete itself.
+ *
+ * @param[in] idx Worker number, 0 or 1; it owns bit (1 << idx).
+ *
+ * NOTE: Each worker writes only its own g_stress_done and lost counts
+ * (one aligned 32-bit store each, atomic on the M0+); only the test task
+ * writes g_stress_go.
+ */
+static void
+stress_worker (uint32_t idx)
+{
+    uint32_t bit = 1u << idx;
+
+    while ((STRESS_GO_PLAIN != g_stress_go) && (STRESS_ABORT != g_stress_go))
+    {
+        // Wait for the start (lowest priority: nothing else is held up).
+    }
+
+    if (STRESS_ABORT != g_stress_go)
+    {
+        g_stress_lost_plain[idx] = stress_plain(bit);
+        g_stress_done[idx]       = STRESS_GO_PLAIN;
+    }
+
+    while ((STRESS_GO_FLAG != g_stress_go) && (STRESS_ABORT != g_stress_go))
+    {
+        // Wait for the second round.
+    }
+
+    if (STRESS_ABORT != g_stress_go)
+    {
+        g_stress_lost_flag[idx] = stress_flag(bit);
+        g_stress_done[idx]      = STRESS_GO_FLAG;
+    }
+
+    tk_exd_tsk();
+}
+
+/*!
+ * @brief The broken way: set and clear one bit in a plain shared word
+ *        with a slow read-modify-write, STRESS_ROUNDS times.
+ *
+ * @param[in] bit This worker's bit.
+ *
+ * @return How often the bit was lost after a set, or back after a clear.
+ *
+ * WARNING: Deliberately unsafe; the gap between the read and the write
+ * lets the other core's write-back undo this one. Never do this with
+ * shared fault bits.
+ */
+static uint32_t
+stress_plain (uint32_t bit)
+{
+    uint32_t lost = 0u;
+
+    for (uint32_t round = 0u; round < STRESS_ROUNDS; round++)
+    {
+        uint32_t word = g_stress_word;      // Read ...
+
+        stress_spin(STRESS_WINDOW_US);
+        g_stress_word = word | bit;         // ... and write back later.
+        stress_spin(STRESS_WINDOW_US);
+
+        if (0u == (g_stress_word & bit))
+        {
+            lost++;                         // The other core erased it.
+        }
+
+        word = g_stress_word;
+        stress_spin(STRESS_WINDOW_US);
+        g_stress_word = word & ~bit;
+        stress_spin(STRESS_WINDOW_US);
+
+        if (0u != (g_stress_word & bit))
+        {
+            lost++;                         // The other core restored it.
+        }
+    }
+
+    return (lost);
+}
+
+/*!
+ * @brief The flg_fault way: set and clear one bit with tk_set_flg and
+ *        tk_clr_flg, STRESS_ROUNDS times.
+ *
+ * @param[in] bit This worker's bit.
+ *
+ * @return How often the bit was lost after a set, or back after a clear
+ *         (a failed kernel call also counts).
+ */
+static uint32_t
+stress_flag (uint32_t bit)
+{
+    uint32_t lost = 0u;
+
+    for (uint32_t round = 0u; round < STRESS_ROUNDS; round++)
+    {
+        T_RFLG rflg = {0};
+
+        if ((E_OK != tk_set_flg(g_stress_flg, bit))
+            || (E_OK != tk_ref_flg(g_stress_flg, &rflg))
+            || (0u == (rflg.flgptn & bit)))
+        {
+            lost++;
+        }
+
+        stress_spin(STRESS_WINDOW_US);
+
+        if ((E_OK != tk_clr_flg(g_stress_flg, ~bit))
+            || (E_OK != tk_ref_flg(g_stress_flg, &rflg))
+            || (0u != (rflg.flgptn & bit)))
+        {
+            lost++;
+        }
+
+        stress_spin(STRESS_WINDOW_US);
+    }
+
+    return (lost);
+}
+
+/*!
+ * @brief Busy-wait a few microseconds.
+ *
+ * @param[in] us How long.
+ */
+static void
+stress_spin (uint32_t us)
+{
+    uint32_t start_us = drv_s5_hw_now_us();
+
+    while ((drv_s5_hw_now_us() - start_us) < us)
+    {
+        // Busy wait: keeps the read-modify-write window open.
+    }
 }
 
 #endif /* APP_TEST */

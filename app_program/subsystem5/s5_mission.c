@@ -119,36 +119,43 @@ static const recovery_step_t g_search[SEARCH_STEPS] =
  */
 static const int16_t g_cal_sweep_deg[CAL_SWEEP_STEPS] = {45, -90, 45};
 
-/** Everything the mission remembers between steps. */
+/** Everything the mission remembers between steps. The state and the
+ *  flags share one word at the end (minimum-bit requirement); times and
+ *  odometry stay 32-bit, as they are counters that wrap.
+ */
 typedef struct
 {
-    subsystem5_ctrl_state_t state;
     uint32_t                run_start_ms;
     uint32_t                barcodes;
     uint32_t                speed_mms;      /* Current FOLLOW speed.     */
-    bool                    b_nav_pending;
     uint8_t                 nav_cmd;        /* subsystem5_nav_cmd_t.     */
     int32_t                 mark_mm;        /* Odometry at a reference.  */
     uint32_t                recovery_step;  /* Next g_search step.       */
     int32_t                 recovery_dir;   /* +1 left first, -1 right.  */
     int32_t                 recovery_back_mm;   /* Reverse still to do.  */
     s5_links_side_t         search_side;    /* Robot's side of the line. */
-    bool                    b_confirming;   /* Found line not yet sure.  */
     int32_t                 confirm_mm;     /* Odometry where it was.    */
     uint32_t                rejects;        /* Not-the-line finds.       */
     int32_t                 follow_mm;      /* Odometry when FOLLOW began*/
     int32_t                 line_mark_mm;   /* Odometry: line last seen. */
     int32_t                 black_from_mm;  /* Odometry: black began.    */
-    bool                    b_black;        /* A sensor sees black now.  */
     uint32_t                cal_step;       /* Sweep turns started; 0 =  */
                                             /* waiting for the IMU.      */
     uint32_t                wait_start_ms;  /* Current TURN, or the      */
     uint32_t                wait_limit_ms;  /* calibration, started.     */
+    unsigned int            state         : 4;  /* ..._ctrl_state_t.     */
+    unsigned int            b_nav_pending : 1;  /* Barcode not acted on. */
+    unsigned int            b_confirming  : 1;  /* Found line not sure.  */
+    unsigned int            b_black       : 1;  /* A sensor sees black.  */
 } mission_t;
 
-static mission_t g_mission = {S5_CTRL_INIT, 0u, 0u, 0u, false,
-                              0u, 0, 0u, 1, 0, S5_LINKS_SIDE_NONE, false,
-                              0, 0u, 0, 0, 0, false, 0u, 0u, 0u};
+/* The state enum must fit its field; a misfit stops the build here. */
+typedef char mission_state_check[(S5_CTRL_FINISHED <= S5_CTRL_STATE_MASK)
+                                 ? 1 : -1];
+
+static mission_t g_mission = {0u, 0u, 0u, 0u, 0, 0u, 1, 0,
+                              S5_LINKS_SIDE_NONE, 0, 0u, 0, 0, 0, 0u, 0u,
+                              0u, S5_CTRL_INIT, false, false, false};
 
 /* In test images the controller ignores events until a test arms it, so
  * the S2 tests that run first are never disturbed.
@@ -258,7 +265,8 @@ bool
 s5_mission_command (uint8_t opcode, uint32_t now_ms)
 {
     bool                    b_ok  = false;
-    subsystem5_ctrl_state_t state = g_mission.state;
+    // NOTE: The cast is safe: the field only ever holds a state value.
+    subsystem5_ctrl_state_t state = (subsystem5_ctrl_state_t) g_mission.state;
 
     if (!g_b_armed)
     {
@@ -363,7 +371,7 @@ set_state (subsystem5_ctrl_state_t state)
                            (uint32_t) g_mission.state);
     }
 
-    g_mission.state = state;
+    g_mission.state = (uint32_t) state & S5_CTRL_STATE_MASK;
     subsystem5_ctrl_state_put(state);
 }
 
@@ -516,7 +524,7 @@ step_route (uint32_t events, uint32_t now_ms)
 {
     int32_t travelled = s5_links_odom_dist_mm() - g_mission.mark_mm;
 
-    switch (g_mission.state)
+    switch ((subsystem5_ctrl_state_t) g_mission.state)
     {
         case S5_CTRL_LINE_FOLLOWING:
             adjust_speed(events);

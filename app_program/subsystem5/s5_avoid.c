@@ -83,25 +83,36 @@
 #define MS_PER_S            (1000u)
 #define MM_PER_CM           (10u)
 
-/** Everything the avoidance remembers between steps. */
+/** Everything the avoidance remembers between steps. The state, fault,
+ *  retry count, profile sequence and flag share one word (minimum-bit
+ *  requirement); times and odometry stay 32-bit, as they are counters
+ *  that wrap.
+ */
 typedef struct
 {
-    s5_avoid_state_t        state;
     s5_plan_t               plan;
-    uint32_t                retries;
     uint32_t                wait_start_ms;
     uint32_t                wait_limit_ms;
-    uint32_t                profile_seq;
-    subsystem5_ctrl_fault_t fault;
-    bool                    b_squared;      /* Squared up already.       */
     int32_t                 tail_from_mm;   /* Odometry: the tail began. */
+    unsigned int            state       : 4;    /* s5_avoid_state_t.     */
+    unsigned int            fault       : 4;    /* ..._ctrl_fault_t.     */
+    unsigned int            profile_seq : 5;    /* Last profile planned. */
+    unsigned int            retries     : 2;    /* 0 ... RETRIES_MAX + 1.*/
+    unsigned int            b_squared   : 1;    /* Squared up already.   */
 } avoid_t;
 
-static avoid_t       g_avoid       = {S5_AVOID_IDLE,
-                                      {S5_PLAN_CONTINUE, 0, 0, 0u, 0u, 0u,
+/* The enums and counts must fit their fields; a misfit stops the build
+ * here (an array of size -1).
+ */
+typedef char avoid_state_check[((S5_AVOID_FAILED <= S5_AVOID_STATE_MASK)
+                                && (S5_CTRL_FAULT_OVERTURNED
+                                    <= S5_CTRL_FAULT_MASK)
+                                && ((RETRIES_MAX + 1u) <= 3u)) ? 1 : -1];
+
+static avoid_t       g_avoid       = {{S5_PLAN_CONTINUE, 0, 0, 0u, 0u, 0u,
                                        0u, 0u},
-                                      0u, 0u, 0u, 0u, S5_CTRL_FAULT_NONE,
-                                      false, 0};
+                                      0u, 0u, 0, S5_AVOID_IDLE,
+                                      S5_CTRL_FAULT_NONE, 0u, 0u, false};
 static volatile bool g_b_bypass_on = true;
 
 static s5_avoid_result_t step_scanning(uint32_t events, uint32_t now_ms);
@@ -160,7 +171,7 @@ s5_avoid_step (uint32_t events, uint32_t now_ms)
 {
     s5_avoid_result_t result = S5_AVOID_BUSY;
 
-    switch (g_avoid.state)
+    switch ((s5_avoid_state_t) g_avoid.state)
     {
         case S5_AVOID_SCANNING:
             result = step_scanning(events, now_ms);
@@ -208,7 +219,8 @@ s5_avoid_passed_left (void)
 subsystem5_ctrl_fault_t
 s5_avoid_fault (void)
 {
-    return (g_avoid.fault);
+    // NOTE: The cast is safe: the field only ever holds a fault value.
+    return ((subsystem5_ctrl_fault_t) g_avoid.fault);
 }
 
 /*!
@@ -261,7 +273,7 @@ static bool
 square_up (s5_profile_t const * p_profile, uint32_t now_ms)
 {
     bool    b_turning = false;
-    int32_t off_deg   = (int32_t) p_profile->closest_deg - AHEAD_DEG;
+    int32_t off_deg   = s5_profile_angle(p_profile) - AHEAD_DEG;
 
     if (off_deg > SQUARE_MAX_DEG)
     {
@@ -281,7 +293,7 @@ square_up (s5_profile_t const * p_profile, uint32_t now_ms)
     {
         // Servo angles above 90 are to the left, as are positive turns.
         s5_event_trace("AVOID squaring up: turn_deg closest_deg", off_deg,
-                       (int32_t) p_profile->closest_deg);
+                       s5_profile_angle(p_profile));
         g_avoid.b_squared = true;
         s5_links_motion_release();
         start_turn(off_deg, now_ms);
@@ -433,7 +445,7 @@ next_leg (uint32_t now_ms)
     s5_avoid_result_t result = S5_AVOID_BUSY;
     s5_plan_t const * p_plan = &g_avoid.plan;
 
-    switch (g_avoid.state)
+    switch ((s5_avoid_state_t) g_avoid.state)
     {
         case S5_AVOID_REVERSING:
         // Squared up: scan again, now facing the obstacle.
@@ -677,7 +689,7 @@ fail (subsystem5_ctrl_fault_t fault)
     s5_links_motion_stop();
     s5_links_line_search(S5_LINKS_SIDE_NONE);
     subsystem5_obst_request(OB_HOLD);
-    g_avoid.fault = fault;
+    g_avoid.fault = (uint32_t) fault & S5_CTRL_FAULT_MASK;
     enter(S5_AVOID_FAILED);
 
     return (S5_AVOID_FAILURE);
@@ -691,9 +703,8 @@ fail (subsystem5_ctrl_fault_t fault)
 static void
 enter (s5_avoid_state_t state)
 {
-    g_avoid.state = state;
-
-    // NOTE: The cast is safe: the state is a small enum value.
+    // NOTE: The casts are safe: the state is a small enum value.
+    g_avoid.state = (uint32_t) state & S5_AVOID_STATE_MASK;
     s5_event_post_args(S5_EVENT_AVOID_STEP, (uint32_t) state, 0u);
 }
 

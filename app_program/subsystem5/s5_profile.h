@@ -55,8 +55,35 @@
 #define S5_CLEAR_DEPTH_MM       (300)   /* Look this far past the edge.  */
 #define S5_CLEAR_OPEN_MM        (1000)  /* Clearance with nothing seen.  */
 
-/* Range value of a point at which nothing answered. */
+/* Range value of a scan point at which nothing answered. */
 #define S5_PROFILE_NO_ECHO      (0xFFFFu)
+
+/* Packed profile fields (minimum-bit requirement, Tribunal 1).
+ * - Distances: 10 bits, whole mm, 0 to 1023. Every value is clamped
+ *   before it is stored; 1023 means "1023 mm or more" (nothing near).
+ *   Sensor accuracy is +/-1 cm (NFR7), so whole mm loses nothing.
+ * - Angle: 7 bits, the servo angle minus S5_PROFILE_ANGLE_MIN_DEG, in
+ *   1 degree steps. The servo only reaches 50 ... 130 degrees (a box on
+ *   the robot stops it, drv_servo.h), so 81 values. Not the Tribunal's
+ *   5-bit 7.5 degree step: the fine sweep finds edges to 1 degree and
+ *   squaring up acts on an 8 degree offset. The 5-bit step is kept on
+ *   the MQTT wire only (S1, angle_idx).
+ * - seq: 5 bits, wrapping. Readers only check whether it changed, and a
+ *   profile takes seconds to build, so 32 values never alias.
+ * Each assignment masks the clamped value (& S5_PROFILE_xxx_MASK): the
+ * mask changes nothing, but it shows the compiler the value fits the
+ * field, so -Wconversion stays quiet.
+ */
+#define S5_PROFILE_MM_BITS      (10u)
+#define S5_PROFILE_MM_MAX       (1023)
+#define S5_PROFILE_MM_MASK      (0x3FFu)
+#define S5_PROFILE_STEP_BITS    (7u)
+#define S5_PROFILE_STEP_MASK    (0x7Fu)
+#define S5_PROFILE_ANGLE_MIN_DEG (50)   /* DRV_SERVO_RIGHT_LIMIT_DEG.    */
+#define S5_PROFILE_ANGLE_MAX_DEG (130)  /* DRV_SERVO_LEFT_LIMIT_DEG.     */
+#define S5_PROFILE_SEQ_BITS     (5u)
+#define S5_PROFILE_SEQ_MASK     (0x1Fu)
+#define S5_PROFILE_BYTES        (12u)   /* Was 26 B before packing.      */
 
 /** One ultrasonic reading at one servo angle. */
 typedef struct
@@ -72,24 +99,34 @@ typedef struct
     s5_profile_point_t  last_hit;   /* Outermost point on the obstacle.  */
 } s5_profile_edge_t;
 
-/** The obstacle profile (interface IF-09). Distances are in mm. */
+/** The obstacle profile (interface IF-09), packed into three 32-bit
+ *  words: 96 bits, 12 B. Distances are in mm (see "Packed profile
+ *  fields" above). Read the angle with s5_profile_angle(); never take
+ *  the address of a field. The field order fills each word exactly, so
+ *  the compiler adds no padding (checked in s5_profile.c).
+ */
 typedef struct
 {
-    uint32_t    seq;            /* Profiles built since power-up.        */
-    bool        b_valid;        /* False until the first scan.           */
-    bool        b_on_path;      /* Something blocks the robot's path.    */
-    bool        b_left_edge;    /* Left edge found inside servo range.   */
-    bool        b_right_edge;   /* Right edge found inside servo range.  */
-    uint16_t    closest_mm;     /* Nearest point of the obstacle.        */
-    int16_t     closest_deg;    /* Servo angle of that point.            */
-    uint16_t    width_mm;       /* Edge to edge, after beam correction.  */
-    uint16_t    clear_left_mm;  /* Free gap beside the left edge.        */
-    uint16_t    clear_right_mm; /* Free gap beside the right edge.       */
-    uint16_t    shift_left_mm;  /* Sideways move to pass on the left.    */
-    uint16_t    shift_right_mm; /* Sideways move to pass on the right.   */
-    uint16_t    depth_mm;       /* Length along the track; 0 = unknown.  */
-    uint16_t    pass_ahead_mm;  /* Side watch: obstacle's end still this */
-                                /* far ahead of the sensor when passed.  */
+    /* Word 1. */
+    unsigned int closest_mm     : 10;   /* Nearest point of the obstacle.*/
+    unsigned int width_mm       : 10;   /* Edge to edge, beam corrected. */
+    unsigned int clear_left_mm  : 10;   /* Free gap beside the left edge.*/
+    unsigned int b_valid        : 1;    /* False until the first scan.   */
+    unsigned int b_on_path      : 1;    /* Something blocks the path.    */
+    /* Word 2. */
+    unsigned int clear_right_mm : 10;   /* Free gap beside right edge.   */
+    unsigned int shift_left_mm  : 10;   /* Sideways move to pass left.   */
+    unsigned int shift_right_mm : 10;   /* Sideways move to pass right.  */
+    unsigned int b_left_edge    : 1;    /* Left edge inside servo range. */
+    unsigned int b_right_edge   : 1;    /* Right edge inside servo range.*/
+    /* Word 3. */
+    unsigned int depth_mm       : 10;   /* Length along track; 0 unknown.*/
+    unsigned int pass_ahead_mm  : 10;   /* Side watch: obstacle's end    */
+                                        /* still this far ahead of the   */
+                                        /* sensor when passed.           */
+    unsigned int closest_step   : 7;    /* Angle of the nearest point,   */
+                                        /* minus ANGLE_MIN_DEG.          */
+    unsigned int seq            : 5;    /* Profiles built, wrapping.     */
 } s5_profile_t;
 
 bool s5_profile_is_hit(s5_profile_point_t const * p_point);
@@ -102,6 +139,11 @@ void s5_profile_build(s5_profile_point_t const * p_points, uint32_t count,
                       s5_profile_edge_t const * p_right,
                       s5_profile_t * p_out);
 void s5_profile_set_clear(s5_profile_t * p_out);
+
+uint32_t s5_profile_mm(int32_t value_mm);
+void     s5_profile_set_angle(s5_profile_t * p_profile, int32_t angle_deg);
+int32_t  s5_profile_angle(s5_profile_t const * p_profile);
+uint32_t s5_profile_next_seq(uint32_t seq);
 
 #endif /* S5_PROFILE_H */
 

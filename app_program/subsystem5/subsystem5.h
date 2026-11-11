@@ -85,9 +85,21 @@
 #define EV_ALL              (0x000FFFFFu)
 
 /* ---------------------------------------------------------------------
- *  flg_fault: latched fault causes. Bit n is fault n, the numbering of
- *  S1's telemetry fault_mask (msg_layout.h MSG_FAULT_xxx), so S1 copies
- *  it with no remapping. Only vehicle_ctrl_task clears latched bits.
+ *  flg_fault: fault causes. Bit n is fault n, the numbering of S1's
+ *  telemetry fault_mask (msg_layout.h MSG_FAULT_xxx), so S1 copies it
+ *  with no remapping. Kernel event flag: tk_set_flg and tk_clr_flg are
+ *  atomic on both cores, so no bit is lost (Tribunal 1). Nobody waits on
+ *  it with TWF_CLR, which would clear every bit.
+ *
+ *  Bit  Name      Set by                    Kind     Cleared by
+ *  0    STALL     S2 motion_task            latched  vehicle_ctrl_task
+ *  1    ENCODER   S2 (reserved)             latched  vehicle_ctrl_task
+ *  2    IMU       S4 imu_task               latched  vehicle_ctrl_task
+ *  3    NO_ECHO   S5 obstacle_task          latched  vehicle_ctrl_task
+ *                 (3 unanswered pings)               (RESET)
+ *  4    WIFI      S1 telemetry_task         level    S1 itself
+ *  Latched bits are cleared only on RESET (s5_mission.c FAULTS_LATCHED),
+ *  one mask at a time with tk_clr_flg.
  * --------------------------------------------------------------------- */
 #define S5_FAULT_STALL      (0x01u)     /* S2: wheel stall, latched.     */
 #define S5_FAULT_ENCODER    (0x02u)     /* S2: reserved.                 */
@@ -124,6 +136,10 @@ typedef enum
     S5_CTRL_FINISHED
 } subsystem5_ctrl_state_t;
 
+/* Stored widths (minimum-bit requirement): 11 states need 4 bits. */
+#define S5_CTRL_STATE_BITS  (4u)
+#define S5_CTRL_STATE_MASK  (0xFu)
+
 /** Why the controller entered FAULT (S5_EVENT_CTRL_FAULT). */
 typedef enum
 {
@@ -138,6 +154,10 @@ typedef enum
     S5_CTRL_FAULT_OTHER,
     S5_CTRL_FAULT_OVERTURNED        /* S4: the robot tipped over.        */
 } subsystem5_ctrl_fault_t;
+
+/* 10 fault reasons need 4 bits. */
+#define S5_CTRL_FAULT_BITS  (4u)
+#define S5_CTRL_FAULT_MASK  (0xFu)
 
 /* ---------------------------------------------------------------------
  *  IF-01: barcode commands, converted from S3's mbf_nav messages by
@@ -179,15 +199,27 @@ typedef enum
     S5_OBST_FAULT           /* Ultrasonic failed; waiting for OB_RESUME. */
 } subsystem5_obst_state_t;
 
-/** Live ultrasonic status, updated after every ping. */
+/* 6 states need 3 bits. */
+#define S5_OBST_STATE_BITS  (3u)
+#define S5_OBST_STATE_MASK  (0x7u)
+
+/** Live ultrasonic status, updated after every ping. Packed into one
+ *  32-bit word (minimum-bit requirement; was 12 B). Read the fields by
+ *  name and never take their address. servo_deg stays in plain degrees
+ *  (8 bits, 0 ... 180) so S1 copies it without an offset.
+ */
 typedef struct
 {
-    subsystem5_obst_state_t state;
-    bool                    b_range_valid;  /* False: no echo.           */
-    uint16_t                range_mm;       /* Last range if valid.      */
-    int16_t                 servo_deg;      /* Servo angle of the ping.  */
-    uint32_t                ping_count;     /* Pings since power-up.     */
+    unsigned int state         : 3;     /* subsystem5_obst_state_t.      */
+    unsigned int b_range_valid : 1;     /* False: no echo.               */
+    unsigned int range_mm      : 10;    /* Last range if valid, 0 ...    */
+                                        /* 1023 (1023: that far or more).*/
+    unsigned int servo_deg     : 8;     /* Servo angle of the ping.      */
+    unsigned int ping_count    : 10;    /* Pings, wrapping at 1024.      */
 } subsystem5_obst_status_t;
+
+#define S5_OBST_DEG_MASK    (0xFFu)
+#define S5_OBST_COUNT_MASK  (0x3FFu)
 
 /* Public functions: any task may call these. */
 void     subsystem5_mission_signal(uint32_t events);

@@ -34,11 +34,24 @@
 #include "s5_profile.h"
 
 #define HALF_PATH_MM    ((S5_ROBOT_WIDTH_MM / 2) + S5_PATH_MARGIN_MM)
-#define MM_MAX          (0xFFFE)    /* Largest storable range in mm.      */
 #define AHEAD_DEG       (90)
 
+/* The packed profile must be exactly three words (no padding), and the
+ * field widths must hold their largest values. A wrong size stops the
+ * build here (an array of size -1).
+ */
+typedef char s5_profile_size_check[(S5_PROFILE_BYTES
+                                    == sizeof(s5_profile_t)) ? 1 : -1];
+typedef char s5_profile_mm_check[(S5_PROFILE_MM_MASK
+                                  == ((1u << S5_PROFILE_MM_BITS) - 1u))
+                                 && (S5_CLEAR_OPEN_MM <= S5_PROFILE_MM_MAX)
+                                 ? 1 : -1];
+typedef char s5_profile_step_check[((uint32_t) (S5_PROFILE_ANGLE_MAX_DEG
+                                                - S5_PROFILE_ANGLE_MIN_DEG)
+                                    <= S5_PROFILE_STEP_MASK) ? 1 : -1];
+
 static bool     point_has_echo(s5_profile_point_t const * p_point);
-static uint16_t clamp_mm(int32_t value_mm, int32_t max_mm);
+static uint32_t clamp_mm(int32_t value_mm, int32_t max_mm);
 static void     correct_edges(s5_profile_edge_t const * p_left,
                               s5_profile_edge_t const * p_right,
                               s5_profile_point_t * p_left_pt,
@@ -48,7 +61,7 @@ static void     find_closest(s5_profile_point_t const * p_points,
                              int32_t left_deg, s5_profile_t * p_out);
 static bool     is_path_blocked(s5_profile_point_t const * p_points,
                                 uint32_t count);
-static uint16_t side_clearance(s5_profile_point_t const * p_points,
+static uint32_t side_clearance(s5_profile_point_t const * p_points,
                                uint32_t count,
                                s5_profile_point_t const * p_edge,
                                int32_t edge_raw_deg, bool b_left);
@@ -146,7 +159,8 @@ s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
     // is never negative and stays below 2^31, so its root is below 2^16.
     uint32_t sum_sq  = (uint32_t) ((dx_mm * dx_mm) + (dy_mm * dy_mm));
 
-    p_out->width_mm = clamp_mm((int32_t) s5_math_isqrt(sum_sq), MM_MAX);
+    p_out->width_mm = s5_profile_mm((int32_t) s5_math_isqrt(sum_sq))
+                      & S5_PROFILE_MM_MASK;
 
     // Step 3: Closest point and whether anything blocks the path.
     find_closest(p_points, count, p_right->last_hit.angle_deg,
@@ -165,20 +179,24 @@ s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
     {
         p_out->clear_left_mm = side_clearance(p_points, count, &left_pt,
                                               p_left->last_hit.angle_deg,
-                                              true);
+                                              true)
+                               & S5_PROFILE_MM_MASK;
 
         // The robot's right side must end up left of the left edge.
-        p_out->shift_left_mm = clamp_mm(HALF_PATH_MM - left_x, MM_MAX);
+        p_out->shift_left_mm = s5_profile_mm(HALF_PATH_MM - left_x)
+                               & S5_PROFILE_MM_MASK;
     }
 
     if (p_right->b_found)
     {
         p_out->clear_right_mm = side_clearance(p_points, count, &right_pt,
                                                p_right->last_hit.angle_deg,
-                                               false);
+                                               false)
+                                & S5_PROFILE_MM_MASK;
 
         // The robot's left side must end up right of the right edge.
-        p_out->shift_right_mm = clamp_mm(HALF_PATH_MM + right_x, MM_MAX);
+        p_out->shift_right_mm = s5_profile_mm(HALF_PATH_MM + right_x)
+                                & S5_PROFILE_MM_MASK;
     }
 
     p_out->depth_mm = 0u;
@@ -198,14 +216,84 @@ s5_profile_set_clear (s5_profile_t * p_out)
     p_out->b_on_path      = false;
     p_out->b_left_edge    = false;
     p_out->b_right_edge   = false;
-    p_out->closest_mm     = S5_PROFILE_NO_ECHO;
-    p_out->closest_deg    = AHEAD_DEG;
+    p_out->closest_mm     = S5_PROFILE_MM_MASK;     // 1023: nothing near.
     p_out->width_mm       = 0u;
     p_out->clear_left_mm  = S5_CLEAR_OPEN_MM;
     p_out->clear_right_mm = S5_CLEAR_OPEN_MM;
     p_out->shift_left_mm  = 0u;
     p_out->shift_right_mm = 0u;
     p_out->depth_mm       = 0u;
+    s5_profile_set_angle(p_out, AHEAD_DEG);
+}
+
+/*!
+ * @brief Limit a millimetre value to what a profile distance field holds.
+ *
+ * @param[in] value_mm The value; negative values become 0.
+ *
+ * @return 0 ... S5_PROFILE_MM_MAX (1023 means 1023 mm or more).
+ */
+uint32_t
+s5_profile_mm (int32_t value_mm)
+{
+    return (clamp_mm(value_mm, S5_PROFILE_MM_MAX));
+}
+
+/*!
+ * @brief Store the angle of the nearest point.
+ *
+ * @param[out] p_profile The profile.
+ * @param[in]  angle_deg Servo angle; limited to the servo's reach
+ *                       (S5_PROFILE_ANGLE_MIN_DEG ... _MAX_DEG).
+ */
+void
+s5_profile_set_angle (s5_profile_t * p_profile, int32_t angle_deg)
+{
+    int32_t limited = angle_deg;
+
+    if (limited < S5_PROFILE_ANGLE_MIN_DEG)
+    {
+        limited = S5_PROFILE_ANGLE_MIN_DEG;
+    }
+    else if (limited > S5_PROFILE_ANGLE_MAX_DEG)
+    {
+        limited = S5_PROFILE_ANGLE_MAX_DEG;
+    }
+    else
+    {
+        // Inside the servo's reach.
+    }
+
+    // NOTE: The cast is safe: limited - ANGLE_MIN_DEG is 0 ... 80 here.
+    p_profile->closest_step = (uint32_t) (limited - S5_PROFILE_ANGLE_MIN_DEG)
+                              & S5_PROFILE_STEP_MASK;
+}
+
+/*!
+ * @brief Read the angle of the nearest point.
+ *
+ * @param[in] p_profile The profile.
+ *
+ * @return Servo angle in degrees, S5_PROFILE_ANGLE_MIN_DEG ... _MAX_DEG.
+ */
+int32_t
+s5_profile_angle (s5_profile_t const * p_profile)
+{
+    // NOTE: The cast is safe: the field is 7 bits, at most 127.
+    return ((int32_t) p_profile->closest_step + S5_PROFILE_ANGLE_MIN_DEG);
+}
+
+/*!
+ * @brief The sequence number after seq, wrapping in the 5-bit field.
+ *
+ * @param[in] seq The current sequence number.
+ *
+ * @return (seq + 1) modulo 32.
+ */
+uint32_t
+s5_profile_next_seq (uint32_t seq)
+{
+    return ((seq + 1u) & S5_PROFILE_SEQ_MASK);
 }
 
 /*!
@@ -225,11 +313,11 @@ point_has_echo (s5_profile_point_t const * p_point)
  * @brief Limit a millimetre value to 0 ... max_mm.
  *
  * @param[in] value_mm The value.
- * @param[in] max_mm   Upper limit, at most MM_MAX.
+ * @param[in] max_mm   Upper limit, never negative.
  *
  * @return The limited value.
  */
-static uint16_t
+static uint32_t
 clamp_mm (int32_t value_mm, int32_t max_mm)
 {
     int32_t limited = value_mm;
@@ -247,8 +335,8 @@ clamp_mm (int32_t value_mm, int32_t max_mm)
         // Already inside the range.
     }
 
-    // NOTE: limited is 0 ... MM_MAX here, so it fits in uint16_t.
-    return ((uint16_t) limited);
+    // NOTE: The cast is safe: limited is 0 ... max_mm here.
+    return ((uint32_t) limited);
 }
 
 /*!
@@ -303,14 +391,15 @@ correct_edges (s5_profile_edge_t const * p_left,
  * @param[in]  count     Number of readings.
  * @param[in]  right_deg Right edge angle (lower bound).
  * @param[in]  left_deg  Left edge angle (upper bound).
- * @param[out] p_out     closest_mm and closest_deg are written.
+ * @param[out] p_out     closest_mm and the angle are written; with no
+ *                       echo between the edges, 1023 mm straight ahead.
  */
 static void
 find_closest (s5_profile_point_t const * p_points, uint32_t count,
               int32_t right_deg, int32_t left_deg, s5_profile_t * p_out)
 {
-    p_out->closest_mm  = S5_PROFILE_NO_ECHO;
-    p_out->closest_deg = 0;
+    uint32_t best_mm  = S5_PROFILE_NO_ECHO;
+    int32_t  best_deg = AHEAD_DEG;
 
     for (uint32_t idx = 0u; idx < count; idx++)
     {
@@ -319,12 +408,16 @@ find_closest (s5_profile_point_t const * p_points, uint32_t count,
         if ((point_has_echo(p_pt))
             && (p_pt->angle_deg >= right_deg)
             && (p_pt->angle_deg <= left_deg)
-            && (p_pt->dist_mm < p_out->closest_mm))
+            && (p_pt->dist_mm < best_mm))
         {
-            p_out->closest_mm  = p_pt->dist_mm;
-            p_out->closest_deg = p_pt->angle_deg;
+            best_mm  = p_pt->dist_mm;
+            best_deg = p_pt->angle_deg;
         }
     }
+
+    // NOTE: The cast is safe: best_mm is at most 0xFFFF.
+    p_out->closest_mm = s5_profile_mm((int32_t) best_mm) & S5_PROFILE_MM_MASK;
+    s5_profile_set_angle(p_out, best_deg);
 }
 
 /*!
@@ -372,7 +465,7 @@ is_path_blocked (s5_profile_point_t const * p_points, uint32_t count)
  *
  * @return The gap in mm, at most S5_CLEAR_OPEN_MM.
  */
-static uint16_t
+static uint32_t
 side_clearance (s5_profile_point_t const * p_points, uint32_t count,
                 s5_profile_point_t const * p_edge, int32_t edge_raw_deg,
                 bool b_left)

@@ -27,6 +27,9 @@ Define a test here before running it. Test IDs never change.
 | S5-U08 | Drive at a box: slow, stop, scan, plan (no bypass) | FR9, NFR6, NFR7, FR16 | auto + manual | `-Test stop`, 3 runs: robot 1 m from a box; START; bypass switched off. The script asks: gap at stop, slowed?, touched?, plan on the roomier side? | `[TEST] S5-U08 PASS` x3; gap ≥ 50 mm; never touches |
 | S5-U09 | Avoidance planner decisions | FR11 | auto | Every test image: fixed profiles give RIGHT (wall left), LEFT (bigger gap), REVERSE (both narrow), CONTINUE (off path); with the face 150 mm ahead, a 197 mm shift turns out 33–37° on a 330–355 mm leg (rear wheels 160 mm behind the front), returns the same way, no reverse first. | `[TEST] S5-U09 PASS` |
 | S5-U10 | vehicle_ctrl_task reaches READY after power-up | Section 5 statechart | auto | Every test image: controller state after the boot wait. | `[TEST] S5-U10 PASS` |
+| S5-U11 | Fault flag stress test: no bit lost across the two cores | Tribunal 1 (minimum-bit), flg_fault | auto | Every test image: one task on each core sets and clears its own bit 10,000 times, first in a plain shared word with a slow read-modify-write (deliberately broken), then in an event flag made like `flg_fault` (`tk_set_flg` / `tk_clr_flg`). Prints `S5-U11 lost bits: plain_word event_flag`. | `[TEST] S5-U11a PASS` (the plain word loses bits, so the test can see a race) and `S5-U11b PASS` (the event flag loses none) |
+| S5-U12 | Dead sensor stops the robot | Tribunal 1 Version C, NFR6 | manual | Robot following the line; unplug the HC-SR04's ECHO wire. | Motors stop within 3 pings (about 180 ms); state FAULT; `[S5] EVT 0x58` (sensor fault) in the log |
+| S5-U13 | S5 RAM before and after minimum-bit packing | Tribunal 1 (Week 13 evidence) | manual | After `make`: `python testing/subsystem5/s5_ram.py build_make/mtk3pico_smp1_usb_cdc_wifi.map`. Compare with the "before" row below. | Static RAM lower than before; packed structs: profile 26 → 12 B, obstacle status 12 → 4 B |
 
 *Method:* **auto** = `TEST_CHECK` in code, result printed on the console;
 **manual** = a person observes the result (LED, scope, meter, phone app…).
@@ -38,3 +41,4 @@ Add a new row for every run. Never edit or delete old rows.
 | Date | Test ID | Commit | Tester | Result | Log / evidence | Notes |
 |---|---|---|---|---|---|---|
 | 2026-10-22 | S5-U01, U03, U04 | `c7e29ef` | Anna | not run | `logs/2026-10-22_unit.txt` | Output lost while S2-U06 drove the motors on USB power; mostly "no echo" (sensor tilted, since fixed). Rerun with `-Test bench`. |
+| 2026-11-11 | S5-U13 (before) | `15300f7` | map file | baseline | `build_make/mtk3pico_smp1_usb_cdc_wifi.map` (build of 18:09, no source newer) | Before minimum-bit packing: S5 static RAM 410 B (obstacle_task 192, s5_mission 77, subsystem5 61, s5_avoid 45, drv_button 16, s5_ranger 14, drv_servo 4, s5_links 1), flash 15,498 B. Task stacks not included (kernel-allocated). |

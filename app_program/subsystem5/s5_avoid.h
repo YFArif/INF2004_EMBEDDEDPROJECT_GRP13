@@ -38,6 +38,10 @@ typedef enum
     S5_AVOID_FAILED
 } s5_avoid_state_t;
 
+/* Stored width (minimum-bit requirement): 15 states need 4 bits. */
+#define S5_AVOID_STATE_BITS (4u)
+#define S5_AVOID_STATE_MASK (0xFu)
+
 /** What s5_avoid_step() reports. */
 typedef enum
 {

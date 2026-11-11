@@ -27,7 +27,10 @@
 #define POLL_MS             (10u)       /* One kernel tick.              */
 #define ECHO_MAX_US         (25000u)    /* About 4.3 m.                  */
 #define MIN_RANGE_MM        (20u)       /* Datasheet minimum, 2 cm.      */
-#define FAULT_PINGS         (5u)        /* Unanswered pings in a row.    */
+#define FAULT_PINGS         (3u)        /* Unanswered pings in a row:    */
+                                        /* 180 ms (Tribunal 1, Version C)*/
+                                        /* Was 5. A missed echo does not */
+                                        /* count: ECHO still goes high.  */
 #define STUCK_US            (300000u)   /* Echo high this long: stuck.   */
 #define US_PER_MS           (1000u)
 

@@ -119,7 +119,6 @@
 #define CAL_HOLD_MS         (2000u)
 
 #define NO_RANGE            (-1)        /* Trace value for "no echo".    */
-#define DEPTH_MAX_MM        (0xFFFE)
 
 /* Per-ping console log: servo angle and range. While monitoring, only
  * every LOG_MONITOR_EVERY-th ping is printed (about 3 lines a second);
@@ -136,23 +135,36 @@
  */
 #define BOOT_MONITORING     (0)
 
-static subsystem5_obst_state_t  g_state          = S5_OBST_HOLD;
+/** obstacle_task's state and flags, packed into one word (minimum-bit
+ *  requirement).
+ */
+typedef struct
+{
+    unsigned int state          : 3;    /* subsystem5_obst_state_t.      */
+    unsigned int b_track        : 1;    /* Following a near echo.        */
+    unsigned int b_watch_seen   : 1;    /* Side watch heard the obstacle.*/
+    unsigned int b_watch_passed : 1;    /* Passed; watching the tail.    */
+} obst_flags_t;
+
+/* The state enum must fit its field; a misfit stops the build here. */
+typedef char obst_state_check[(S5_OBST_FAULT <= S5_OBST_STATE_MASK)
+                              ? 1 : -1];
+
+static obst_flags_t             g_obst           = {S5_OBST_HOLD, false,
+                                                    false, false};
 static subsystem5_obst_status_t g_status         = {0};
 static uint32_t                 g_near_run       = 0u;
 static uint32_t                 g_clear_run      = 0u;
 static uint32_t                 g_stop_run       = 0u;
-static bool                     g_b_track        = false;
 static int32_t                  g_track_mm       = 0;   /* Last near echo. */
 static int32_t                  g_track_odom_mm  = 0;   /* Odom at it.     */
 static s5_profile_t             g_profile        = {0};
 static s5_scan_result_t         g_scan           = {0};
-static bool                     g_b_watch_seen   = false;
 static int32_t                  g_watch_start_mm = 0;
 static int32_t                  g_watch_deg      = DRV_SERVO_AHEAD_DEG;
 static int32_t                  g_watch_beam_mm  = 0;   /* Rules 2, 3:   */
                                                         /* end ahead.    */
 static uint32_t                 g_watch_far_run  = 0u;
-static bool                     g_b_watch_passed = false;
 static int32_t                  g_watch_end_mm   = 0;   /* Odometry of   */
                                                         /* the end, as   */
                                                         /* the sensor's. */
@@ -231,8 +243,8 @@ obstacle_task (INT stacd, void * p_exinf)
     for (;;)
     {
         // Block while idle; poll between pings while monitoring.
-        bool b_idle = (S5_OBST_HOLD == g_state)
-                      || (S5_OBST_FAULT == g_state);
+        bool b_idle = (S5_OBST_HOLD == g_obst.state)
+                      || (S5_OBST_FAULT == g_obst.state);
 
         handle_requests(subsystem5_obst_take(b_idle));
         step_state();
@@ -269,7 +281,7 @@ handle_requests (uint32_t requests)
     {
         // No job requested.
     }
-    else if (S5_OBST_FAULT == g_state)
+    else if (S5_OBST_FAULT == g_obst.state)
     {
         // In FAULT only OB_HOLD and OB_RESUME are accepted.
     }
@@ -301,7 +313,7 @@ handle_requests (uint32_t requests)
 static void
 step_state (void)
 {
-    switch (g_state)
+    switch ((subsystem5_obst_state_t) g_obst.state)
     {
         case S5_OBST_MONITORING:
         // SLOW pings in the same way as MONITORING.
@@ -333,7 +345,7 @@ monitor_step (void)
     {
         enter_fault();
     }
-    else if ((S5_RANGER_CLEAR == reading.status) && g_b_track)
+    else if ((S5_RANGER_CLEAR == reading.status) && g_obst.b_track)
     {
         // The obstacle was close a moment ago: the beam has lost it, so
         // this ping says nothing about the path being clear.
@@ -370,14 +382,14 @@ update_monitor (s5_ranger_reading_t const * p_reading)
     {
         stop_robot(p_reading->dist_mm);
     }
-    else if ((S5_OBST_MONITORING == g_state) && (g_near_run >= NEAR_PINGS))
+    else if ((S5_OBST_MONITORING == g_obst.state) && (g_near_run >= NEAR_PINGS))
     {
         set_state(S5_OBST_SLOW);
         subsystem5_mission_signal(EV_OBSTACLE_NEAR);
         s5_event_post(S5_EVENT_OBST_NEAR, p_reading->dist_mm,
                       DRV_SERVO_AHEAD_DEG);
     }
-    else if ((S5_OBST_SLOW == g_state) && (g_clear_run >= CLEAR_PINGS))
+    else if ((S5_OBST_SLOW == g_obst.state) && (g_clear_run >= CLEAR_PINGS))
     {
         set_state(S5_OBST_MONITORING);
         subsystem5_mission_signal(EV_OBSTACLE_CLEAR);
@@ -399,10 +411,10 @@ update_monitor (s5_ranger_reading_t const * p_reading)
 static void
 update_track (s5_ranger_reading_t const * p_reading)
 {
-    g_b_track = (S5_OBST_SLOW == g_state)
+    g_obst.b_track = (S5_OBST_SLOW == g_obst.state)
                 && s5_ranger_is_within(p_reading, SLOW_EXIT_MM);
 
-    if (g_b_track)
+    if (g_obst.b_track)
     {
         // NOTE: The cast widens uint16_t, so no value is lost.
         g_track_mm      = (int32_t) p_reading->dist_mm;
@@ -486,15 +498,15 @@ run_scan (void)
 static void
 publish_scan_profile (void)
 {
-    uint32_t seq = g_profile.seq + 1u;
+    uint32_t seq = s5_profile_next_seq(g_profile.seq);
 
     s5_profile_build(g_scan.points, g_scan.count, &g_scan.left,
                      &g_scan.right, &g_profile);
-    g_profile.seq = seq;
+    g_profile.seq = seq & S5_PROFILE_SEQ_MASK;
     subsystem5_profile_put(&g_profile);
 
     s5_event_post(S5_EVENT_PROFILE, g_profile.width_mm,
-                  g_profile.closest_deg);
+                  s5_profile_angle(&g_profile));
     s5_event_trace("PROFILE closest_mm width_mm", g_profile.closest_mm,
                    g_profile.width_mm);
     s5_event_trace("PROFILE clear_left_mm clear_right_mm",
@@ -512,10 +524,10 @@ publish_scan_profile (void)
 static void
 publish_clear_profile (void)
 {
-    uint32_t seq = g_profile.seq + 1u;
+    uint32_t seq = s5_profile_next_seq(g_profile.seq);
 
     s5_profile_set_clear(&g_profile);
-    g_profile.seq = seq;
+    g_profile.seq = seq & S5_PROFILE_SEQ_MASK;
     subsystem5_profile_put(&g_profile);
     s5_event_post(S5_EVENT_SCAN_CLEAR, 0u, DRV_SERVO_AHEAD_DEG);
 
@@ -569,14 +581,14 @@ scan_measure (int16_t angle_deg, uint16_t * p_dist_mm)
 static void
 start_watch (int32_t side_deg)
 {
-    g_b_watch_seen          = false;
+    g_obst.b_watch_seen     = false;
     g_watch_start_mm        = s5_links_odom_dist_mm();
     g_watch_begin_mm        = g_watch_start_mm;
     g_watch_last_mm         = g_watch_start_mm;
     g_watch_ahead_mm        = 0;
     g_watch_deg             = side_deg;
     g_watch_far_run         = 0u;
-    g_b_watch_passed        = false;
+    g_obst.b_watch_passed   = false;
     g_profile.pass_ahead_mm = 0u;
 
     // Where the beam crosses the obstacle's side line, ahead of the
@@ -632,7 +644,7 @@ watch_step (void)
 
         g_watch_far_run = count_run(g_watch_far_run, b_ok && (!b_near));
 
-        if (g_b_watch_passed)
+        if (g_obst.b_watch_passed)
         {
             // On the tail: only an echo of the obstacle matters.
             if (b_near)
@@ -644,24 +656,24 @@ watch_step (void)
         {
             // Beside the robot. The depth is measured from the first
             // sight.
-            if (!g_b_watch_seen)
+            if (!g_obst.b_watch_seen)
             {
-                g_b_watch_seen   = true;
-                g_watch_start_mm = odom;
+                g_obst.b_watch_seen = true;
+                g_watch_start_mm    = odom;
             }
 
             g_watch_last_mm  = odom;
             g_watch_ahead_mm = ahead;
         }
-        else if (g_b_watch_seen && (unseen >= WATCH_GONE_MM))
+        else if (g_obst.b_watch_seen && (unseen >= WATCH_GONE_MM))
         {
             watch_passed(RULE_ECHO_GONE, g_watch_ahead_mm - unseen, driven);
         }
-        else if ((!g_b_watch_seen) && (g_watch_far_run >= WATCH_FAR_PINGS))
+        else if ((!g_obst.b_watch_seen) && (g_watch_far_run >= WATCH_FAR_PINGS))
         {
             watch_passed(RULE_CORNER, g_watch_beam_mm, driven);
         }
-        else if ((!g_b_watch_seen) && (driven >= WATCH_LIMIT_MM))
+        else if ((!g_obst.b_watch_seen) && (driven >= WATCH_LIMIT_MM))
         {
             watch_passed(RULE_LIMIT, g_watch_beam_mm, driven);
         }
@@ -691,14 +703,13 @@ watch_passed (int32_t rule, int32_t end_ahead_mm, int32_t driven_mm)
         end_ahead = 0;
     }
 
-    // NOTE: The cast is safe: end_ahead is 0 ... a few hundred mm.
-    g_profile.pass_ahead_mm = (uint16_t) end_ahead;
+    g_profile.pass_ahead_mm = s5_profile_mm(end_ahead) & S5_PROFILE_MM_MASK;
     g_watch_end_mm          = s5_links_odom_dist_mm() + end_ahead;
     s5_event_trace("WATCH passed: rule (1 echo, 2 corner, 3 limit) "
                    "driven_mm", rule, driven_mm);
     s5_event_trace("WATCH end ahead of sensor: mm 0", end_ahead, 0);
 
-    if (!g_b_watch_seen)
+    if (!g_obst.b_watch_seen)
     {
         g_watch_start_mm = s5_links_odom_dist_mm();
     }
@@ -718,20 +729,14 @@ finish_watch (void)
     int32_t depth_mm = s5_math_abs(s5_links_odom_dist_mm()
                                    - g_watch_start_mm);
 
-    if (depth_mm > DEPTH_MAX_MM)
-    {
-        depth_mm = DEPTH_MAX_MM;
-    }
-
-    // NOTE: The cast is safe: depth_mm is 0 ... DEPTH_MAX_MM here.
-    g_profile.depth_mm = (uint16_t) depth_mm;
+    g_profile.depth_mm = s5_profile_mm(depth_mm) & S5_PROFILE_MM_MASK;
     subsystem5_profile_put(&g_profile);
 
     // NOTE: The cast is safe: depth_mm is never negative here.
     s5_event_post(S5_EVENT_OBST_PASSED, (uint32_t) depth_mm, g_watch_deg);
 
     // Keep watching on the tail (see "Side watch" above).
-    g_b_watch_passed = true;
+    g_obst.b_watch_passed = true;
     subsystem5_mission_signal(EV_OBST_PASSED);
 }
 
@@ -751,8 +756,8 @@ watch_again (int32_t ahead_mm)
     {
         g_watch_end_mm = end_mm;
 
-        // NOTE: The cast is safe: ahead_mm is 0 ... a few hundred mm.
-        g_profile.pass_ahead_mm = (uint16_t) ahead_mm;
+        g_profile.pass_ahead_mm = s5_profile_mm(ahead_mm)
+                                  & S5_PROFILE_MM_MASK;
         subsystem5_profile_put(&g_profile);
         s5_event_trace("WATCH obstacle again on the tail: ahead_mm 0",
                        ahead_mm, 0);
@@ -796,10 +801,10 @@ static void
 enter_monitoring (void)
 {
     point_servo(DRV_SERVO_AHEAD_DEG);
-    g_near_run  = 0u;
-    g_clear_run = 0u;
-    g_stop_run  = 0u;
-    g_b_track   = false;
+    g_near_run     = 0u;
+    g_clear_run    = 0u;
+    g_stop_run     = 0u;
+    g_obst.b_track = false;
     set_state(S5_OBST_MONITORING);
 }
 
@@ -835,14 +840,15 @@ enter_fault (void)
 static void
 set_state (subsystem5_obst_state_t state)
 {
-    if (state != g_state)
+    if (state != g_obst.state)
     {
         // NOTE: The casts are safe: both states are small enum values.
-        s5_event_trace("STATE from to", (int32_t) g_state, (int32_t) state);
+        s5_event_trace("STATE from to", (int32_t) g_obst.state,
+                       (int32_t) state);
     }
 
-    g_state        = state;
-    g_status.state = state;
+    g_obst.state   = (uint32_t) state & S5_OBST_STATE_MASK;
+    g_status.state = g_obst.state;
     subsystem5_obst_status_put(&g_status);
 }
 
@@ -856,12 +862,14 @@ take_reading (s5_ranger_reading_t * p_reading)
 {
     s5_ranger_measure(p_reading);
 
-    // NOTE: The cast is safe: the servo angle is 0 ... 180.
-    g_status.state         = g_state;
+    // NOTE: The casts are safe: the servo angle is 0 ... 180 and the
+    // range at most 0xFFFF; both are clamped or masked to their fields.
+    g_status.state         = g_obst.state;
     g_status.b_range_valid = (S5_RANGER_OK == p_reading->status);
-    g_status.range_mm      = p_reading->dist_mm;
-    g_status.servo_deg     = (int16_t) drv_servo_angle();
-    g_status.ping_count++;
+    g_status.range_mm      = s5_profile_mm((int32_t) p_reading->dist_mm)
+                             & S5_PROFILE_MM_MASK;
+    g_status.servo_deg     = (uint32_t) drv_servo_angle() & S5_OBST_DEG_MASK;
+    g_status.ping_count    = (g_status.ping_count + 1u) & S5_OBST_COUNT_MASK;
     subsystem5_obst_status_put(&g_status);
     log_ping(p_reading);
 }
@@ -876,8 +884,8 @@ static void
 log_ping (s5_ranger_reading_t const * p_reading)
 {
 #if LOG_PINGS
-    bool b_monitoring = (S5_OBST_MONITORING == g_state)
-                        || (S5_OBST_SLOW == g_state);
+    bool b_monitoring = (S5_OBST_MONITORING == g_obst.state)
+                        || (S5_OBST_SLOW == g_obst.state);
 
     if ((!b_monitoring)
         || (0u == (g_status.ping_count % LOG_MONITOR_EVERY)))

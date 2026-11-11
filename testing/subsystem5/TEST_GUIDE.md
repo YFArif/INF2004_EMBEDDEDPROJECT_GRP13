@@ -42,7 +42,8 @@ Each test image also runs everyone's automatic checks first (including your S2 u
 - **Setup:** none.
 - **Takes:** about 1 minute after flashing.
 - **You do:** nothing. The servo turns to straight ahead once.
-- **Good result:** `Done: 7 passed, 0 failed` (S5-U06a, b, c, U09, U10, U07a, b).
+- **Good result:** `Done: 9 passed, 0 failed` (S5-U06a, b, c, U09, U10, U07a, b, U11a, b).
+- **S5-U11** (the fault flag stress test) takes under a second. Its line `S5-U11 lost bits: plain_word event_flag` should show a number above 0 for the plain word (the broken way really loses bits) and **0** for the event flag (the way the fault bits work).
 
 ### Test 2: `bench`. Robot on a box, wheels free.
 
