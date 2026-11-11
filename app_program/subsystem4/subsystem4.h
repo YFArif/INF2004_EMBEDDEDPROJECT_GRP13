@@ -11,11 +11,12 @@
  * @par Task
  * imu_task (priority 10, core 0, every 20 ms): owns I2C0 and the
  * LSM303DLHC (GP4 SDA, GP5 SCL, Grove 3). Calibration, pitch with the
- * drive acceleration removed, hump detection and peak height, impact
- * detection, turn rate, motion class (Week 6 report 6.5).
+ * drive acceleration removed, hump detection and peak height, lifted /
+ * overturned stop, turn rate, motion class (Week 6 report 6.5).
  *
  * @par Links to the other subsystems
- * - S2: reads odometry (subsystem2_odom_get); on an impact sets MF_ESTOP
+ * - S2: reads odometry (subsystem2_odom_get); when lifted or overturned
+ *   sets MF_ESTOP
  *   (subsystem2_estop_set).
  * - S5: when lifted signals EV_LIFTED, when overturned EV_OVERTURNED
  *   (subsystem5_mission_signal, after MF_ESTOP); on an
@@ -74,7 +75,7 @@ typedef enum
     S4_CLASS_TURNING,
     S4_CLASS_CLIMBING_HUMP,
     S4_CLASS_DESCENDING_HUMP,
-    S4_CLASS_IMPACT
+    S4_CLASS_IMPACT             /* Stopped: lifted / overturned.  */
 } subsystem4_class_t;
 
 /** Terrain, unpacked for the reader. Resolution is what is stored. */
@@ -89,7 +90,7 @@ typedef struct
     uint8_t hump_count;     /* Humps passed, 0 ... 7 (saturates).        */
     bool    b_imu_ok;       /* false: IMU_DEGRADED, the rest is stale.   */
     bool    b_cal_done;     /* Offsets measured (S5 CALIBRATING).        */
-    bool    b_impact;       /* Impact latched until MF_ESTOP is cleared. */
+    bool    b_impact;       /* Lift stop latched until MF_ESTOP clears.  */
 } subsystem4_terrain_t;
 
 /** imu_task's health and timing, for the tests and telemetry. */
@@ -104,7 +105,7 @@ typedef struct
     uint32_t late_max_us;   /* Latest start after its due time.          */
     uint32_t fifo_overruns; /* Cycles that found the FIFO full.          */
     uint32_t i2c_errors;
-    uint32_t impacts;
+    uint32_t impacts;       /* Lift / overturn stops.                    */
 } subsystem4_status_t;
 
 /* Public functions: any task may call these. */

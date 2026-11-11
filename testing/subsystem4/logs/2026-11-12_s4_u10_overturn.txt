@@ -1,0 +1,30 @@
+S4-U10 rerun: lifted vs overturned, 2026-11-12, tester Kessler
+Build: main 8d97a7e + overturn fix (tilt/drop in "up" stops at once, then 500 ms to see if it reaches 60 deg), DRIVE_TEST 1
+Excerpts from the console (COM3, 115200).
+
+=== Run 1: tipped onto its side while driving ===
+S4 DRIVE TEST: go
+S4 CLASS MOVING t=17055 ms
+S4 D 117 -895 1459 325 -22
+S4 D 118 -1006 1974 328 -27
+S4 CLASS IMPACT t=19016 ms
+S4 IMPACT braked 120 us after the sample
+S4 D 124 -1707 5693 335 -39
+S4 D 128 -1287 7215 336 -41
+S4 OVERTURNED: up=68 mg (rest 868) p=-1344 r=7582 cdeg -> MF_ESTOP, EV_OVERTURNED
+S4 D 129 -1344 7582 336 -41
+(distance frozen at ~337 mm: motors stopped)
+
+=== Run 2: quick lift straight up while driving ===
+S4 DRIVE TEST: go
+S4 CLASS MOVING t=15615 ms
+S4 D 59 107 88 158 0
+S4 LIFTED: up=1438 mg (rest 868) p=-108 r=63 cdeg -> MF_ESTOP, EV_LIFTED
+S4 CLASS IMPACT t=16337 ms
+S4 IMPACT braked 343 us after the sample
+S4 D 60 -108 63 161 0
+(distance frozen at 168 mm: motors stopped)
+
+Note: a slow nose-up lift (no upward jolt) stops only once tilt passes 25 deg (~1.5 s in one try).
+
+Result: PASS

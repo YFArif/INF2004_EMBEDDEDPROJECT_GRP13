@@ -49,7 +49,7 @@
                                         /* up (2026-11-01 drive test).    */
 
 /* ---- Hump drive test (S4-U02): 10 s after calibration, drive straight
- * DRIVE_TEST_MM at DRIVE_TEST_MMS with S2's MOVE, with impact detection
+ * DRIVE_TEST_MM at DRIVE_TEST_MMS with S2's MOVE, with the lift stop on
  * off. Keep 0 in the shared code: with 1 the car drives off by itself. */
 #define DRIVE_TEST          (0)
 #define DRIVE_TEST_MM       (800)
@@ -95,6 +95,8 @@
 #define LIFT_TILT_CYCLES    (3u)        /* ... for 60 ms = held in hand.  */
 #define OVERTURN_CDEG       (6000)      /* > 60 deg or upside down ...    */
 #define OVERTURN_CYCLES     (5u)        /* ... for 100 ms = overturned.   */
+#define TILT_WAIT_CYCLES    (25u)       /* Tilt stop: 500 ms to see if it */
+                                        /* rolls over before EV_LIFTED.   */
 
 /* ---- Motion class (preliminary, S4-U05). */
 #define CLASS_STILL_MMS     (10)
@@ -157,7 +159,7 @@ typedef struct
     uint32_t empty_cycles;
     uint32_t down_cycles;
 
-    /* Impact. */
+    /* Stop latch (lift / overturn) and jolt log. */
     int32_t  lp_fwd;
     int32_t  lp_left;
     bool     b_lp_ready;
@@ -172,6 +174,7 @@ typedef struct
     uint32_t lift_up_cycles;
     uint32_t lift_tilt_cycles;
     uint32_t over_cycles;
+    uint32_t tilt_wait;             /* Cycles left before EV_LIFTED.      */
 
     /* Motion. */
     int32_t  speed_hist[SPEED_HISTORY];
@@ -240,6 +243,8 @@ static void     imu_side_hump(subsystem2_odom_t const * p_odom);
 static void     imu_class(subsystem2_odom_t const * p_odom);
 static void     imu_impact_follow_up(void);
 static void     imu_lift_check(void);
+static void     imu_lift_stop(void);
+static void     imu_lift_signal(uint32_t ev);
 static void     imu_degrade(char const * p_why);
 static void     imu_publish(void);
 static void     imu_log(void);
@@ -456,7 +461,7 @@ imu_cycle (uint32_t events)
 }
 
 /*!
- * @brief Read all new samples, check each for an impact, average them.
+ * @brief Read all new samples, log the largest jolt, average them.
  *
  * @param[in] start_us Cycle start, to date the samples.
  *
@@ -554,7 +559,7 @@ imu_read_samples (uint32_t start_us)
 }
 
 /*!
- * @brief Impact test on one sample (A18): the forward/left acceleration
+ * @brief Jolt log on one sample (was the A18 impact test): forward/left
  *        minus its low-pass. z is left out: hump edges jolt vertically.
  *
  * @param[in] p_s       The sample in robot axes.
@@ -594,8 +599,10 @@ imu_impact_check (body_t const * p_s, uint32_t sample_us)
  * @brief Lifted / overturned stop. Overturned: |pitch| or |roll| > 60 deg,
  *        or upside down, for 100 ms -> EV_OVERTURNED (FAULT). Lifted:
  *        "up" moves LIFT_UP_MG from its value at rest for 100 ms (picked
- *        up), or |pitch| or |roll| > 25 deg for 60 ms (held in the hand)
- *        -> EV_LIFTED (run ends). Course humps are about 5-10 deg, one
+ *        up, "up" higher) -> EV_LIFTED (run ends). "up" lower (tipping:
+ *        gravity leaves the up axis) or |pitch| or |roll| > 25 deg for
+ *        60 ms stops the motors at once, then waits 500 ms: EV_OVERTURNED
+ *        if it reaches 60 deg, else EV_LIFTED (held in the hand). Course humps are about 5-10 deg, one
  *        wheel up 19 deg (2026-11-01). MF_ESTOP is set first, so the
  *        motors stop before the controller is told.
  */
@@ -606,8 +613,6 @@ imu_lift_check (void)
     bool                b_up   = false;
     bool                b_tilt = false;
     bool                b_over = false;
-    uint32_t            ev     = 0u;
-    subsystem2_status_t s2     = {0};
 
     if (0 == g_imu.up0_mg)
     {
@@ -628,41 +633,92 @@ imu_lift_check (void)
     g_imu.lift_tilt_cycles = b_tilt ? (g_imu.lift_tilt_cycles + 1u) : 0u;
     g_imu.over_cycles      = b_over ? (g_imu.over_cycles + 1u) : 0u;
 
+    if (0 == LIFT_ENABLE)
+    {
+        return;
+    }
+
+    // Tipped past 25 deg: motors already stopped, waiting to see whether
+    // it ends up overturned (a roll passes 25 deg before 60 deg).
+    if (g_imu.tilt_wait > 0u)
+    {
+        if (g_imu.over_cycles >= OVERTURN_CYCLES)
+        {
+            g_imu.tilt_wait = 0u;
+            imu_lift_signal(EV_OVERTURNED);
+        }
+        else if (--g_imu.tilt_wait == 0u)
+        {
+            imu_lift_signal(EV_LIFTED);
+        }
+        else
+        {
+            // Keep waiting.
+        }
+        return;
+    }
+
+    if (g_imu.b_impact)
+    {
+        return;     // Already stopped and signalled.
+    }
+
     if (g_imu.over_cycles >= OVERTURN_CYCLES)
     {
-        ev = EV_OVERTURNED;
+        imu_lift_stop();
+        imu_lift_signal(EV_OVERTURNED);
+    }
+    else if ((g_imu.lift_up_cycles >= LIFT_UP_CYCLES)
+             && (g_imu.mean.up > g_imu.up0_mg))
+    {
+        // Pushed upward: picked up.
+        imu_lift_stop();
+        imu_lift_signal(EV_LIFTED);
     }
     else if ((g_imu.lift_up_cycles >= LIFT_UP_CYCLES)
              || (g_imu.lift_tilt_cycles >= LIFT_TILT_CYCLES))
     {
-        ev = EV_LIFTED;
+        imu_lift_stop();
+        g_imu.tilt_wait = TILT_WAIT_CYCLES;
     }
     else
     {
         // Still on the ground.
     }
+}
 
-    if ((0 != LIFT_ENABLE) && (0u != ev) && !g_imu.b_impact)
-    {
-        subsystem2_status_get(&s2);
-        g_imu.brake_us_before = s2.estop_brake_us;
+/*!
+ * @brief Stop the motors at once (MF_ESTOP), before S5 is told.
+ */
+static void
+imu_lift_stop (void)
+{
+    subsystem2_status_t s2 = {0};
 
-        // Brake first, then tell the controller.
-        subsystem2_estop_set();
-        subsystem5_mission_signal(ev);
+    subsystem2_status_get(&s2);
+    g_imu.brake_us_before = s2.estop_brake_us;
+    subsystem2_estop_set();
 
-        g_imu.b_impact     = true;      // Latched until MF_ESTOP clears.
-        g_imu.impact_us    = now_us();
-        g_imu.latency_wait = LATENCY_CYCLES;
-        g_imu.status.impacts++;
+    g_imu.b_impact     = true;      // Latched until MF_ESTOP clears.
+    g_imu.impact_us    = now_us();
+    g_imu.latency_wait = LATENCY_CYCLES;
+    g_imu.status.impacts++;
+}
 
-        tm_printf((UB *) "S4 %s: up=%d mg (rest %d) p=%d r=%d cdeg"
-                  " -> MF_ESTOP, %s\n",
-                  (EV_LIFTED == ev) ? "LIFTED" : "OVERTURNED",
-                  (INT) g_imu.mean.up, (INT) g_imu.up0_mg,
-                  (INT) g_imu.pitch_cdeg, (INT) g_imu.roll_cdeg,
-                  (EV_LIFTED == ev) ? "EV_LIFTED" : "EV_OVERTURNED");
-    }
+/*!
+ * @brief Tell S5 why the robot stopped: EV_LIFTED or EV_OVERTURNED.
+ */
+static void
+imu_lift_signal (uint32_t ev)
+{
+    subsystem5_mission_signal(ev);
+
+    tm_printf((UB *) "S4 %s: up=%d mg (rest %d) p=%d r=%d cdeg"
+              " -> MF_ESTOP, %s\n",
+              (EV_LIFTED == ev) ? "LIFTED" : "OVERTURNED",
+              (INT) g_imu.mean.up, (INT) g_imu.up0_mg,
+              (INT) g_imu.pitch_cdeg, (INT) g_imu.roll_cdeg,
+              (EV_LIFTED == ev) ? "EV_LIFTED" : "EV_OVERTURNED");
 }
 
 /*!
@@ -813,6 +869,7 @@ imu_cal_step (void)
     g_imu.b_calibrating = false;
     g_imu.b_cal_done    = true;
     g_imu.up0_mg        = 0;    // Taken on the first cycle after CAL.
+    g_imu.tilt_wait     = 0u;
     g_imu.pitch_cdeg    = 0;    // Start the low-pass level, not from the
     g_imu.roll_cdeg     = 0;    // pre-calibration angle (false hump).
     g_imu.b_side        = false;
@@ -1089,7 +1146,7 @@ imu_side_hump (subsystem2_odom_t const * p_odom)
 
 /*!
  * @brief Motion class; a new class must hold for 5 cycles (100 ms)
- *        before it is reported, except IMPACT, reported at once.
+ *        before it is reported, except IMPACT (lift stop), reported at once.
  *
  * @param[in] p_odom This cycle's odometry.
  */
@@ -1154,7 +1211,8 @@ imu_class (subsystem2_odom_t const * p_odom)
 }
 
 /*!
- * @brief After an impact, report how long after the sample S2 braked.
+ * @brief After a lift / overturn stop, report how long after the
+ *        sample S2 braked.
  */
 static void
 imu_impact_follow_up (void)

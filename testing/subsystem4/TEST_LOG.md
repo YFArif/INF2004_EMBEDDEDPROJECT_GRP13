@@ -44,3 +44,4 @@ Add a new row for every run. Never edit or delete old rows.
 | 2026-11-06 | S4-U08 | `4f96fb3` | Kessler | PASS | `logs/2026-11-06_s4_auto.txt` | `make TEST=1`: packed fields clamp at their limits. |
 | 2026-11-06 | S4-U09 | `4f96fb3` | Kessler | PASS | `logs/2026-11-06_s4_auto.txt` | `make TEST=1`: packed terrain round trip. |
 | 2026-11-11 | S4-U10 | `15300f7` + lift patch v4 | Kessler | PASS | `logs/2026-11-11_s4_u10_lift.txt` | Hump: one wheel, 9 mm, drove 798 mm, no stop. Lift: up=1194 mg (rest 864), MF_ESTOP, braked 321 us after the sample, stopped at 172 mm. v3 (120 mg / 40 ms) false-stopped on floor tape, so v4 uses 150 mg / 100 ms. |
+| 2026-11-12 | S4-U10 | `8d97a7e` + overturn fix | Kessler | PASS | `logs/2026-11-12_s4_u10_overturn.txt` | Rerun after the overturn fix. Tipped over: stopped at once (braked 120 us), then EV_OVERTURNED. Quick lift: EV_LIFTED at once, braked 343 us. Stop conditions unchanged from the 2026-11-11 hump pass (150 mg / 25 deg). |
