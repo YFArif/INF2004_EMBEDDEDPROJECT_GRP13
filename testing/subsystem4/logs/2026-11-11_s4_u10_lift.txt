@@ -1,0 +1,36 @@
+S4-U10 lifted / overturned stop, 2026-11-11, tester Kessler
+Build: 15300f7 + lift patch v4 (LIFT_UP_MG 150, LIFT_UP_CYCLES 5, LIFT_TILT_CDEG 2500), DRIVE_TEST 1
+Excerpts from the console (COM3, 115200). S3 lines and most S4 D lines removed.
+
+=== Run 1: drive over the hump, untouched ===
+S4 DRIVE TEST: go
+S4 CLASS ACCELERATING t=15336 ms
+S4 CLASS MOVING t=15556 ms
+S4 HUMP one wheel up (right side)
+S4 p=-329 r=-648 f=32 l=-98 u=904 af=30 h=-40 pk=0 hs=0 cl=1 w=102 hd=1 n=8 dxy=416 run=2620 late=1313 ok=1 cal=1
+S4 HUMP #1 (one wheel) peak=9 mm roll_avg=459 roll_max=897 cdeg over 127 mm (run peak 9 mm)
+S4 CLASS ACCELERATING t=20655 ms
+S4 CLASS STATIONARY t=20815 ms
+S4 D 290 32 -6 798 0
+(no LIFTED / OVERTURNED line; drove the full 798 mm)
+
+Earlier v3 build (LIFT_UP_MG 120, 2 cycles) stopped on floor tape -> raised to v4.
+
+=== Run 2: lift to head height while driving ===
+S4 DRIVE TEST: go
+S4 CLASS ACCELERATING t=15775 ms
+S4 CLASS MOVING t=15995 ms
+S4 D 58 -623 -61 151 0
+S4 D 59 -674 -158 154 -3
+S4 D 60 -514 -288 158 -7
+S4 D 61 -453 -423 161 -9
+S4 LIFTED: up=1194 mg (rest 864) p=-521 r=-555 cdeg -> MF_ESTOP, EV_LIFTED
+S4 CLASS IMPACT t=16816 ms
+S4 IMPACT braked 321 us after the sample
+S4 D 62 -521 -555 165 -13
+S4 D 66 -342 -286 172 -19
+S4 D 67 -148 -243 172 0
+S3 LINE ... DISABLED (LF_ENABLE clear)
+(distance frozen at 172 mm from here on: motors stopped)
+
+Result: PASS

@@ -17,7 +17,8 @@
  * @par Links to the other subsystems
  * - S2: reads odometry (subsystem2_odom_get); on an impact sets MF_ESTOP
  *   (subsystem2_estop_set).
- * - S5: on an impact signals EV_IMPACT (subsystem5_mission_signal); on an
+ * - S5: when lifted signals EV_LIFTED, when overturned EV_OVERTURNED
+ *   (subsystem5_mission_signal, after MF_ESTOP); on an
  *   IMU fault sets S5_FAULT_IMU (subsystem5_fault_set), a warning only.
  *   S5 reads subsystem4_cal_done() while CALIBRATING.
  * - S1: reads subsystem4_terrain_get() for telemetry.

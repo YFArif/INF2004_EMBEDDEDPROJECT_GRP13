@@ -5,7 +5,7 @@
  * @par Rules taken from the Week 6 report
  * - READY: motors braked, line following off, obstacle_task idle. A run
  *   starts only with START (Button 1 or the dashboard).
- * - While running, EV_IMPACT, a stall or a sensor fault enters FAULT
+ * - While running, overturning, a stall or a sensor fault enters FAULT
  *   (MF_ESTOP set, motors braked). Only RESET (Button 1 held 2 s, or the
  *   dashboard) leaves FAULT, back to READY with the motors still braked.
  * - EV_STOP ends the run in FINISHED, with a run summary.
@@ -477,11 +477,6 @@ step_running (uint32_t events, uint32_t now_ms)
     else if (0u != (events & EV_OVERTURNED))
     {
         enter_fault(S5_CTRL_FAULT_OVERTURNED);
-    }
-    else if (0u != (events & EV_IMPACT))
-    {
-        // TODO: Remove once S4 no longer detects collisions.
-        enter_fault(S5_CTRL_FAULT_IMPACT);
     }
     else if (S5_CTRL_FAULT_NONE != fault)
     {
