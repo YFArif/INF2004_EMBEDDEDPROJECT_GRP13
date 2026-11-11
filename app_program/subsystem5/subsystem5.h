@@ -144,7 +144,7 @@ typedef enum
 typedef enum
 {
     S5_CTRL_FAULT_NONE = 0,
-    S5_CTRL_FAULT_IMPACT,           /* S4 collision.                     */
+    S5_CTRL_FAULT_IMPACT,           /* Unused (collision check removed). */
     S5_CTRL_FAULT_STALL,            /* S2 wheel stall.                   */
     S5_CTRL_FAULT_SENSOR,           /* Ultrasonic failed.                */
     S5_CTRL_FAULT_NO_PATH,          /* No side clear after 2 retries.    */

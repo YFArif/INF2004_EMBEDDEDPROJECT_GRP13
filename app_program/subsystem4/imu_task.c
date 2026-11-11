@@ -5,8 +5,8 @@
  * @par Every 20 ms (cyc_imu)
  * 1. Read every new accelerometer sample from the FIFO (400 Hz, about 8
  *    per cycle) and turn it into robot axes: forward, left, up (mg).
- * 2. Impact: per sample, |a_xy - a_xy_lp| > 1.0 g (forward and left only,
- *    gravity and slow changes removed) sets MF_ESTOP and EV_IMPACT.
+ * 2. Lifted / overturned (2026-11-11 brief, replaces impact): sets
+ *    MF_ESTOP, then EV_LIFTED (run ends) or EV_OVERTURNED (FAULT).
  * 3. Pitch = atan2(a_fwd_measured - a_fwd_drive, sqrt(left^2 + up^2)),
  *    minus the calibration offset. a_fwd_drive comes from S2's speed
  *    over the last 100 ms, so speeding up or braking is not read as tilt.
@@ -77,26 +77,24 @@
 #define DRIVE_LOG_CYCLES    (400u)      /* Log every cycle for 8 s.       */
 #define HUMP_STILL_MMS      (10)
 
-/* ---- Impact (A18, preliminary, S4-U03).
- * Switched off 2026-11-11 (by S5, Anna, with the lecturer's update): the
- * brief no longer asks for IMU collision detection, only for stopping the
- * motors when the robot is lifted or overturned. Its 2.0 g limit also
- * stopped obstacle bypasses on normal jolts (S5 logs 2026-11-11: reverse
- * 2.2-2.6 g, floor bump 2.7 g, stop-and-go 2.15 g).
- * TODO(S4): Remove the impact code and add lifted / overturned detection
- * (EV_LIFTED / EV_OVERTURNED in subsystem5.h).
+/* ---- Jolt log (was impact, S4-U03). IMU collision detection was dropped
+ *      from the brief (2026-11-11); only the largest jolt is still logged
+ *      as dxy= in the status line.
  */
-#define IMPACT_ENABLE       (0)                 /* Was (0 == DRIVE_TEST): */
-                                                /* off in the hump drive  */
-                                                /* test only (a strip     */
-                                                /* edge read 2.1 g).      */
-#define IMPACT_MG           (2000)      /* Was 2500. 2026-11-06 (S4-U03): */
-                                        /* wall hits at 150 mm/s read     */
-                                        /* 2.07-2.50 g and 2.17/2.43 g    */
-                                        /* were missed at 2.5 g. Hump     */
-                                        /* runs peaked ~1.7 g.            */
 #define IMPACT_LP_DIV       (16)        /* Low-pass: 1/16 per sample.     */
 #define LATENCY_CYCLES      (10u)       /* Look for S2's brake time.      */
+
+/* ---- Lifted / overturned stop (2026-11-11 brief: lifting the robot ends
+ *      the demo run, the motors must stop at once). Off in TEST=1 images:
+ *      the bench tests run with the robot on blocks.
+ */
+#define LIFT_ENABLE         (0 == APP_TEST)
+#define LIFT_UP_MG          (150)       /* |up - up at rest| this big ... */
+#define LIFT_UP_CYCLES      (5u)        /* ... for 100 ms = picked up.     */
+#define LIFT_TILT_CDEG      (2500)      /* |pitch| or |roll| > 25 deg ... */
+#define LIFT_TILT_CYCLES    (3u)        /* ... for 60 ms = held in hand.  */
+#define OVERTURN_CDEG       (6000)      /* > 60 deg or upside down ...    */
+#define OVERTURN_CYCLES     (5u)        /* ... for 100 ms = overturned.   */
 
 /* ---- Motion class (preliminary, S4-U05). */
 #define CLASS_STILL_MMS     (10)
@@ -169,6 +167,12 @@ typedef struct
     uint32_t latency_wait;
     uint32_t brake_us_before;
 
+    /* Lifted / overturned. */
+    int32_t  up0_mg;                /* Mean "up" at rest after CAL.       */
+    uint32_t lift_up_cycles;
+    uint32_t lift_tilt_cycles;
+    uint32_t over_cycles;
+
     /* Motion. */
     int32_t  speed_hist[SPEED_HISTORY];
     uint32_t speed_idx;
@@ -235,6 +239,7 @@ static void     imu_hump(subsystem2_odom_t const * p_odom);
 static void     imu_side_hump(subsystem2_odom_t const * p_odom);
 static void     imu_class(subsystem2_odom_t const * p_odom);
 static void     imu_impact_follow_up(void);
+static void     imu_lift_check(void);
 static void     imu_degrade(char const * p_why);
 static void     imu_publish(void);
 static void     imu_log(void);
@@ -398,6 +403,7 @@ imu_cycle (uint32_t events)
         else
         {
             imu_hump(&odom);
+            imu_lift_check();
         }
     }
     else
@@ -581,25 +587,81 @@ imu_impact_check (body_t const * p_s, uint32_t sample_us)
         g_imu.dxy2_max = d2;
     }
 
-    if ((0 != IMPACT_ENABLE) && g_imu.b_cal_done && !g_imu.b_impact
-        && (d2 > (IMPACT_MG * IMPACT_MG)))
+    (void) sample_us;
+}
+
+/*!
+ * @brief Lifted / overturned stop. Overturned: |pitch| or |roll| > 60 deg,
+ *        or upside down, for 100 ms -> EV_OVERTURNED (FAULT). Lifted:
+ *        "up" moves LIFT_UP_MG from its value at rest for 100 ms (picked
+ *        up), or |pitch| or |roll| > 25 deg for 60 ms (held in the hand)
+ *        -> EV_LIFTED (run ends). Course humps are about 5-10 deg, one
+ *        wheel up 19 deg (2026-11-01). MF_ESTOP is set first, so the
+ *        motors stop before the controller is told.
+ */
+static void
+imu_lift_check (void)
+{
+    int32_t             tilt   = 0;
+    bool                b_up   = false;
+    bool                b_tilt = false;
+    bool                b_over = false;
+    uint32_t            ev     = 0u;
+    subsystem2_status_t s2     = {0};
+
+    if (0 == g_imu.up0_mg)
+    {
+        g_imu.up0_mg = g_imu.mean.up;
+    }
+
+    tilt = s4_math_abs(g_imu.pitch_cdeg);
+    if (s4_math_abs(g_imu.roll_cdeg) > tilt)
+    {
+        tilt = s4_math_abs(g_imu.roll_cdeg);
+    }
+
+    b_up   = (s4_math_abs(g_imu.mean.up - g_imu.up0_mg) > LIFT_UP_MG);
+    b_tilt = (tilt > LIFT_TILT_CDEG);
+    b_over = ((tilt > OVERTURN_CDEG) || (g_imu.mean.up < 0));
+
+    g_imu.lift_up_cycles   = b_up ? (g_imu.lift_up_cycles + 1u) : 0u;
+    g_imu.lift_tilt_cycles = b_tilt ? (g_imu.lift_tilt_cycles + 1u) : 0u;
+    g_imu.over_cycles      = b_over ? (g_imu.over_cycles + 1u) : 0u;
+
+    if (g_imu.over_cycles >= OVERTURN_CYCLES)
+    {
+        ev = EV_OVERTURNED;
+    }
+    else if ((g_imu.lift_up_cycles >= LIFT_UP_CYCLES)
+             || (g_imu.lift_tilt_cycles >= LIFT_TILT_CYCLES))
+    {
+        ev = EV_LIFTED;
+    }
+    else
+    {
+        // Still on the ground.
+    }
+
+    if ((0 != LIFT_ENABLE) && (0u != ev) && !g_imu.b_impact)
     {
         subsystem2_status_get(&s2);
         g_imu.brake_us_before = s2.estop_brake_us;
 
         // Brake first, then tell the controller.
         subsystem2_estop_set();
-        subsystem5_mission_signal(EV_IMPACT);
+        subsystem5_mission_signal(ev);
 
-        g_imu.b_impact     = true;
-        g_imu.impact_us    = sample_us;
+        g_imu.b_impact     = true;      // Latched until MF_ESTOP clears.
+        g_imu.impact_us    = now_us();
         g_imu.latency_wait = LATENCY_CYCLES;
         g_imu.status.impacts++;
 
-        // NOTE: The cast is safe: sqrt(5.2e8) < 23000.
-        tm_printf((UB *) "S4 IMPACT dxy=%d mg (threshold %d) -> MF_ESTOP,"
-                  " EV_IMPACT\n",
-                  (INT) s4_math_sqrt((float) d2), (INT) IMPACT_MG);
+        tm_printf((UB *) "S4 %s: up=%d mg (rest %d) p=%d r=%d cdeg"
+                  " -> MF_ESTOP, %s\n",
+                  (EV_LIFTED == ev) ? "LIFTED" : "OVERTURNED",
+                  (INT) g_imu.mean.up, (INT) g_imu.up0_mg,
+                  (INT) g_imu.pitch_cdeg, (INT) g_imu.roll_cdeg,
+                  (EV_LIFTED == ev) ? "EV_LIFTED" : "EV_OVERTURNED");
     }
 }
 
@@ -750,6 +812,7 @@ imu_cal_step (void)
 
     g_imu.b_calibrating = false;
     g_imu.b_cal_done    = true;
+    g_imu.up0_mg        = 0;    // Taken on the first cycle after CAL.
     g_imu.pitch_cdeg    = 0;    // Start the low-pass level, not from the
     g_imu.roll_cdeg     = 0;    // pre-calibration angle (false hump).
     g_imu.b_side        = false;
