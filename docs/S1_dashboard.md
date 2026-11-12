@@ -186,7 +186,10 @@ sys_interval 5
 | `persistence false` | Nothing survives a broker restart, a stray retained command included |
 | `sys_interval 5` | `$SYS/broker/uptime` every 5 s: it keeps the dashboard's broker light green |
 
-Start it, and leave the window open:
+On the manual route, start it in its own window and leave the window
+open. `-v` prints every message there and applies to this route only:
+the launcher of section 7 runs mosquitto without it and writes to a
+broker log file instead.
 
 ```bash
 mosquitto -c ~/s1-broker/mosquitto.conf -v
@@ -222,6 +225,27 @@ laptop's address for section 4); anything after `--` goes to the
 dashboard. Exit status: the dashboard's, or 2 (mosquitto is missing),
 3 (the broker did not start), 4 (a port is in use). On Windows, see
 section 15.
+
+**Watching the broker.** The launcher starts mosquitto without `-v` and
+writes its output to the broker log path it prints, not to a window;
+that log still shows every client that connects. To follow it on
+macOS:
+
+```bash
+tail -f ~/s1-broker/broker-<time>.log
+```
+
+In Windows PowerShell, write the `%USERPROFILE%` that the launcher
+prints as `$env:USERPROFILE`:
+
+```powershell
+Get-Content "$env:USERPROFILE\s1-broker\broker-<time>.log" -Wait -Tail 20
+```
+
+A `New client connected from` line with an address other than
+127.0.0.1 means the car reached the broker. The log holds device
+addresses (and, on macOS, your user name), so never share or commit
+it.
 
 The manual way below is the fallback. From the repository root:
 
@@ -585,7 +609,10 @@ New-Item -ItemType Directory -Force "$HOME\s1-broker" | Out-Null
 Set-Content -Path "$HOME\s1-broker\mosquitto.conf" -Value "listener 1883","allow_anonymous true","persistence false","sys_interval 5" -Encoding ascii
 ```
 
-Start the broker and leave the window open:
+On the manual route, start the broker and leave the window open. `-v`
+applies to this route only: the launcher (section 7) runs mosquitto
+without it and writes to a broker log file, which you follow with
+`Get-Content` as shown there.
 
 ```powershell
 mosquitto -c "$HOME\s1-broker\mosquitto.conf" -v
@@ -593,7 +620,7 @@ mosquitto -c "$HOME\s1-broker\mosquitto.conf" -v
 
 It prints "Opening ipv4 listen socket on port 1883" and "mosquitto version
 2.x.x running". The log's times are seconds since 1970. When the dashboard
-connects, the log shows `New client connected from 127.0.0.1:... as
+connects, the window shows `New client connected from 127.0.0.1:... as
 s1dash-<number>`; the number is the process id of the dashboard's
 `mosquitto_sub`, which changes every time you restart the dashboard.
 

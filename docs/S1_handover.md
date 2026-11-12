@@ -98,6 +98,26 @@ service: `Stop-Service mosquitto` in an administrator PowerShell).
 `--show-address` prints the laptop's address for `mqtt_config.h`; do
 not paste it anywhere.
 
+**Broker log.** The launcher writes the broker's output to the broker
+log path it prints, not to a window. To watch it on macOS, in a
+second terminal:
+
+```bash
+tail -f ~/s1-broker/broker-<time>.log
+```
+
+In Windows PowerShell, write the `%USERPROFILE%` that the launcher
+prints as `$env:USERPROFILE`:
+
+```powershell
+Get-Content "$env:USERPROFILE\s1-broker\broker-<time>.log" -Wait -Tail 20
+```
+
+A `New client connected from` line with an address other than
+127.0.0.1 means the car reached the broker. The log holds device
+addresses (and, on macOS, your user name), so never share or commit
+it.
+
 **Console** (S5's verdicts). With only one Pico plugged in, this waits
 for the car's USB port, then prints the console until Ctrl-C:
 
