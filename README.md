@@ -254,6 +254,10 @@ They need the SDK's `lib/lwip` submodule and a `config/wifi_secrets.h`
 the same folder). This guide does not cover them: see
 `docs/S1_handover.md` and `docs/S1_dashboard.md` section 5.
 
+One command starts the S1 broker and dashboard:
+`python3 -I -B testing/subsystem1/s1_launch.py` (Windows: double-click
+`testing\subsystem1\run_dashboard.bat`).
+
 ---
 
 *micro T-Kernel 3.0 © Ken Sakamura / TRON Forum, distributed under the

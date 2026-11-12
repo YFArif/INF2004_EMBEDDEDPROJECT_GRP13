@@ -79,7 +79,37 @@ harmless. If the hotspot address changes, rebuild and reflash.
 
 ## 3. A session
 
-Hotspot on and the laptop joined first. Use one terminal window per
+Hotspot on and the laptop joined first. Then one command, from the
+repository root, starts the broker and the dashboard and opens the
+page:
+
+```bash
+python3 -I -B testing/subsystem1/s1_launch.py
+```
+
+On Windows, double-click `testing\subsystem1\run_dashboard.bat`, or
+run the same command with `py -3` instead of `python3`. The launcher
+keeps the broker's config and a new log for each session in
+`~/s1-broker`, prints the page address, the log paths and "Ctrl-C to
+quit", warns if the log is still empty after 15 s, and stops both on
+Ctrl-C. It refuses to start while another broker or dashboard is
+running: stop that one first (on Windows it is usually the mosquitto
+service: `Stop-Service mosquitto` in an administrator PowerShell).
+`--show-address` prints the laptop's address for `mqtt_config.h`; do
+not paste it anywhere.
+
+**Console** (S5's verdicts). With only one Pico plugged in, this waits
+for the car's USB port, then prints the console until Ctrl-C:
+
+```bash
+until ls /dev | grep -q '^cu\.usbmodem'; do sleep 0.2; done; cat /dev/cu.usbmodem*
+```
+
+To catch the boot lines, keep this order: start the console command
+first, then plug in USB, then switch the battery on. Then wait for the
+green robot light.
+
+**Without the launcher** (the fallback): use one terminal window per
 command that keeps running, each in the repository root.
 
 **Broker.** Its config lives outside the repository
@@ -104,17 +134,6 @@ mosquitto -c ~/s1-broker/mosquitto.conf -v
 ```bash
 python3 -I -B testing/subsystem1/s1_dashboard.py --host 127.0.0.1 --prefix robot
 ```
-
-**Console** (S5's verdicts). With only one Pico plugged in, this waits
-for the car's USB port, then prints the console until Ctrl-C:
-
-```bash
-until ls /dev | grep -q '^cu\.usbmodem'; do sleep 0.2; done; cat /dev/cu.usbmodem*
-```
-
-To catch the boot lines, keep this order: start the console command
-first, then plug in USB, then switch the battery on. Then wait for the
-green robot light.
 
 ## 4. Calibrate before START
 

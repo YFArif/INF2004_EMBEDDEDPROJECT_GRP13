@@ -200,7 +200,30 @@ mosquitto -c ~/s1-broker/mosquitto.conf -v
 
 ## 7. Start the dashboard
 
-From the repository root:
+**One command** (`testing/subsystem1/s1_launch.py`, test S1-U23) starts
+the broker of section 6 and the dashboard together, from the
+repository root:
+
+```bash
+python3 -I -B testing/subsystem1/s1_launch.py
+```
+
+It finds mosquitto (the PATH, then the Homebrew folders or
+`C:\Program Files\mosquitto`), creates `~/s1-broker/mosquitto.conf`
+with the four lines of section 6 if it is missing (it never changes an
+existing one), and refuses to start while port 1883 or 8765 already
+answers. It then runs the broker and the dashboard with `--host
+127.0.0.1 --prefix robot` and a new `--log` file in `~/s1-broker` for
+every session, and opens the page. It warns if that log is still empty
+15 s after the start and at exit. Ctrl-C stops the dashboard and the
+broker. Options: `--prefix`, `--workdir`, `--http-port`,
+`--no-browser`, `--simulate` (no broker), `--show-address` (prints the
+laptop's address for section 4); anything after `--` goes to the
+dashboard. Exit status: the dashboard's, or 2 (mosquitto is missing),
+3 (the broker did not start), 4 (a port is in use). On Windows, see
+section 15.
+
+The manual way below is the fallback. From the repository root:
 
 ```bash
 python3 -I -B testing/subsystem1/s1_dashboard.py
@@ -467,6 +490,18 @@ This section was tested on one Windows laptop (Python 3, mosquitto 2.1.2)
 with no robot: every check in 15.5 passed. Not tested on Windows: a robot
 connecting through Windows Firewall, building the firmware (`README.md`
 section 1 says to use WSL), and the items in 15.6.
+
+**One command.** Double-click `testing\subsystem1\run_dashboard.bat`,
+or run `py -3 -I -B testing/subsystem1/s1_launch.py` in PowerShell from
+the repository root (section 7). It finds mosquitto in
+`C:\Program Files\mosquitto` without the PATH line of 15.1, refuses to
+start while the mosquitto service holds port 1883 (stop it as in 15.2),
+starts the broker and the dashboard, and opens the page. The window
+stays open only if the launcher stops on an error. Ctrl-C stops both;
+Windows may then ask "Terminate batch job (Y/N)?", and either answer
+is fine. If Windows asks about mosquitto, allow Private networks only
+(15.4). Not yet run on Windows (S1-U23 part C). The manual steps below
+are the fallback.
 
 Run the broker and the dashboard in a normal PowerShell window on
 Windows itself. Every command below is for PowerShell, from the repository
