@@ -56,7 +56,6 @@
 #define CLEAR_WAIT_MS       (100)   /* Let motion_task take the CLEAR.  */
 #define U8_WHITE_BELOW      (64u)   /* s3_line_status_t n_xxx: 0..255.  */
 #define U8_BLACK_ABOVE      (191u)
-#define U8_GREY_MID         (128u)
 #define PERMILLE            (1000u)
 #define U8_FULL             (255u)
 #define U8_FOUND            ((S3_LN_FOUND * U8_FULL) / PERMILLE)
@@ -71,9 +70,13 @@
 #define RECOVERY_BACK_MM    (60)    /* About the distance driven LOST.  */
 #define RECOVERY_MOVE_MS    (10000u)/* One step longer = S2 problem.    */
 #define STOPPED_WAIT_MS     (1000u)
-#define AUTO_SWEEP_DEG      (25)    /* Sensor moves ~20 mm sideways.    */
-#define AUTO_BACK_EXTRA_DEG (20)    /* Last turn may go this much past  */
-                                    /* centre to find the left edge.    */
+#define AUTO_SWEEP_DEG      (15)    /* Sensors ~125 mm ahead move ~33  */
+                                    /* mm: both cross the line.         */
+#define SWEEP_TOL_CDEG      (200)   /* Within 2 deg of the target = done */
+#define SWEEP_TRIES         (3u)    /* Turn, then up to 2 corrections.  */
+#define HALF_TURN_CDEG      (18000)
+#define FULL_TURN_CDEG      (36000)
+#define CDEG_PER_DEG        (100)
 #define DRIVE_JUNC_FWD_MM   (125)   /* Junction seen by the sensors:  */
                                     /* drive this far so the AXLE is  */
                                     /* on the crossing, then turn     */
@@ -84,8 +87,7 @@
                                     /* long for its result (decode    */
                                     /* waits up to 1.5 s of quiet).   */
 #define DRIVE_JUNC_TURN_DEG (90)    /* LEFT +90, RIGHT -90, U-TURN 180 */
-#define DRIVE_BOOST_X100    (250)   /* Curve authority once one sensor   */
-                                    /* is black: e = 800 -> ~95 % lock. */
+#define DRIVE_BOOST_X100    (50)    /* Curve boost past |e| = 500.      */
 #define DRIVE_STEER_MAX_MMS (S3_DRIVE_SPEED_MMS) /* 1x speed: car 5 Nov */
                                     /* 19:09 at 2x = full-lock zig-zag  */
                                     /* and a reversed inner wheel (S2   */
@@ -99,23 +101,14 @@ typedef struct
     int16_t  kd_x100;
     uint16_t speed_mms;
     uint16_t steer_max_mms;
-    uint32_t junc_cmd;      /* s3_cmd_t at a junction with no barcode   */
-                            /* read (S3_CMD_NONE = carry on straight). */
 } drive_preset_t;
 
-/* Gains for the single-edge layout: e reaches +-1000 within a few mm
- * of the edge, so Kp stays low (25) and the curve boost (|e| > 500)
- * adds the rest. steer_max = 1x speed (DRIVE_STEER_MAX_MMS). Car 5 Nov
- * 22:xx: Kp 25 Kd 25 drove the track, all junction turns worked. */
+/* One preset (car 12 Nov). Kp 50 + boost 50 rises evenly (e 500 -> 20
+ * mm/s, 800 -> 44, 1000 -> 60): smoother than Kp 25 + boost 250, which
+ * is flat over the grey band then a cliff to full lock. */
 static drive_preset_t const g_presets[] =
 {
-    /* 0 = normal: barcode decides, no barcode = straight. 1-3 = turn
-     * tests: the turn when no barcode was read (a read barcode wins). */
-    {25,  25, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS, S3_CMD_NONE},
-    {25,  25, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS, S3_CMD_LEFT},
-    {25,  25, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS, S3_CMD_RIGHT},
-    {25,  25, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS, S3_CMD_UTURN},
-    {20,   0, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS, S3_CMD_NONE}
+    {50,  25, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS}
 };
 
 #define N_PRESETS   (sizeof(g_presets) / sizeof(g_presets[0]))
@@ -153,6 +146,7 @@ static void nav_take(s3_line_status_t const * p_st, uint32_t * p_bc_seen,
                      uint32_t * p_nav);
 static void wheels_stop(void);
 static void auto_sweep(void);
+static bool sweep_turn_to(int32_t target_cdeg);
 static void preset_next(void);
 static void preset_apply(void);
 static void wait_start(void);
@@ -282,60 +276,71 @@ cal_countdown (void)
 }
 
 /*!
- * @brief Turn slowly left, right and back on the spot so both sensors
- *        cross the line (line_task learns white and black every step).
- *        The turn back stops when GP27 has crossed the line and is grey
- *        on its LEFT edge again: S2's angle alone ended off-centre (car
- *        5 Nov). Skipped if S2 is E-stopped.
+ * @brief Calibration sweep: left AUTO_SWEEP_DEG, back to the start
+ *        heading, right, back again, so both sensors cross the line (the
+ *        line task learns white and black every step). Each turn is
+ *        steered to a measured heading, so it ends where it started (car
+ *        12 Nov: fixed angles drifted ~1 cm). Skipped if S2 is E-stopped.
  */
 static void
 auto_sweep (void)
 {
-    static int16_t const sweep_deg[] = {AUTO_SWEEP_DEG, -2 * AUTO_SWEEP_DEG,
-                                        AUTO_SWEEP_DEG + AUTO_BACK_EXTRA_DEG};
-    uint32_t const       n_turns = sizeof(sweep_deg) / sizeof(sweep_deg[0]);
-    subsystem2_status_t  s2 = {0};
-    s3_line_status_t     st = {0};
-    uint32_t             i;
-    uint32_t             waited;
-    bool                 b_black;
+    subsystem2_odom_t odom  = {0};
+    int32_t           start;
+    int32_t           target[4];
+    uint32_t          i;
 
-    for (i = 0u; i < n_turns; i++)
+    wheels_stop();
+    subsystem2_odom_get(&odom);
+    start     = odom.heading_cdeg;
+    target[0] = start + (AUTO_SWEEP_DEG * CDEG_PER_DEG);    /* left  */
+    target[1] = start;                                      /* back  */
+    target[2] = start - (AUTO_SWEEP_DEG * CDEG_PER_DEG);    /* right */
+    target[3] = start;                                      /* back  */
+    for (i = 0u; i < 4u; i++)
     {
-        if (subsystem2_estop_is_set())
+        if (subsystem2_estop_is_set() || !sweep_turn_to(target[i]))
         {
-            return;
+            break;
         }
-        wheels_stop();
-        if (E_OK != subsystem2_turn(sweep_deg[i], RECOVERY_SPEED_MMS))
-        {
-            return;
-        }
-        waited  = 0u;
-        b_black = false;
-        do
-        {
-            tk_dly_tsk(POLL_MS);
-            waited += POLL_MS;
-            if (button1_down())
-            {
-                wheels_stop();
-                return;
-            }
-            (void) s3_get_line_status(&st);
-            b_black = b_black || (st.n_centre > U8_BLACK_ABOVE);
-            if (((i + 1u) == n_turns) && b_black &&
-                (st.n_centre < U8_GREY_MID))
-            {
-                wheels_stop();          /* GP27 on the left edge: centred. */
-                return;
-            }
-            subsystem2_status_get(&s2);
-        } while (((waited < (uint32_t) SETTLE_MS) ||
-                  (S2_STATE_TURNING == s2.state)) &&
-                 (waited < RECOVERY_MOVE_MS));
     }
     wheels_stop();
+    subsystem2_odom_get(&odom);
+    tm_printf((UB *) "S3 CAL sweep end: %d (1/100 deg) off the start "
+                     "heading\n", (INT) (odom.heading_cdeg - start));
+}
+
+/*!
+ * @brief Turn on the spot to a wheel heading (S2 odometry, 1/100 deg):
+ *        S2's turns land a few degrees off and differ left / right, so
+ *        measure after each turn and correct, up to SWEEP_TRIES times.
+ *
+ * @return false = GP20, an S2 fault or a command error.
+ */
+static bool
+sweep_turn_to (int32_t target_cdeg)
+{
+    subsystem2_odom_t odom = {0};
+    int32_t           err;
+    uint32_t          k;
+
+    for (k = 0u; k < SWEEP_TRIES; k++)
+    {
+        wheels_stop();          /* Coasting done: the heading is final. */
+        subsystem2_odom_get(&odom);
+        err = target_cdeg - odom.heading_cdeg;
+        err = (err > HALF_TURN_CDEG)  ? (err - FULL_TURN_CDEG) :
+              ((err < -HALF_TURN_CDEG) ? (err + FULL_TURN_CDEG) : err);
+        if ((err < SWEEP_TOL_CDEG) && (err > -SWEEP_TOL_CDEG))
+        {
+            return true;
+        }
+        if (recovery_move(true, (int16_t) (err / CDEG_PER_DEG), false) < 0)
+        {
+            return false;
+        }
+    }
+    return true;
 }
 /*!
  * @brief Only start from a calibrated sensor that can tell which side the
@@ -605,14 +610,7 @@ drive_run (void)
                 }
                 nav_take(&st, &bc_seen, &nav);
             }
-            if ((S3_CMD_NONE == nav) && (S3_CMD_NONE != p_set->junc_cmd))
-            {
-                nav = p_set->junc_cmd;
-                tm_printf((UB *) "S3 DRIVE JUNCTION: no barcode command -> "
-                                 "preset %d default %s\n", (INT) g_preset,
-                          s3_nav_name((s3_nav_cmd_t) nav));
-            }
-            else if (S3_CMD_NONE == nav)
+            if (S3_CMD_NONE == nav)
             {
                 tm_printf((UB *) "S3 DRIVE JUNCTION: no command -> straight\n");
             }
@@ -1143,13 +1141,11 @@ preset_apply (void)
     s3_set_line_gains(p_set->kp_x100, p_set->kd_x100);
     s3_set_line_shape(DRIVE_BOOST_X100);
     s3_set_steer_max(p_set->steer_max_mms);
-    tm_printf((UB *) "S3 DRIVE PRESET %d of %d: %d mm/s, kp=%d kd=%d, steer "
-                     "max %d mm/s, junction without barcode: %s\n",
+    tm_printf((UB *) "S3 DRIVE PRESET %d of %d: %d mm/s, kp=%d kd=%d "
+                     "boost=%d, steer max %d mm/s\n",
               (INT) g_preset, (INT) (N_PRESETS - 1u), (INT) p_set->speed_mms,
               (INT) p_set->kp_x100, (INT) p_set->kd_x100,
-              (INT) p_set->steer_max_mms,
-              (S3_CMD_NONE == p_set->junc_cmd) ? "straight" :
-              s3_nav_name((s3_nav_cmd_t) p_set->junc_cmd));
+              (INT) DRIVE_BOOST_X100, (INT) p_set->steer_max_mms);
 }
 
 static void
