@@ -33,10 +33,10 @@
 /* Line following tuning: S3's drive-test default preset, the settings S3
  * proved on the car for the single-edge layout (task_drive_test.c
  * g_presets[0], 5 Nov): Kp 25, Kd 25, curve boost 250, full lock 1 x the
- * speed, at S3_DRIVE_SPEED_MMS (40 mm/s). At 60 mm/s the robot wobbled
- * (Anna, 2026-11-06).
+ * speed. At 60 mm/s the robot wobbled (Anna, 2026-11-06); S3 car test
+ * 12 Nov: best of 5 gain sets at 40 mm/s, 80 too fast, 50 chosen.
  */
-#define LINE_SPEED_MMS      (40u)
+#define LINE_SPEED_MMS      (50u)
 #define LINE_KP_X100        (25)
 #define LINE_KD_X100        (25)
 #define LINE_BOOST_X100     (250)       /* Curve authority.              */

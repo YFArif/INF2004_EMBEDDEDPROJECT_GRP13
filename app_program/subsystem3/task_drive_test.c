@@ -87,28 +87,33 @@
                                     /* long for its result (decode    */
                                     /* waits up to 1.5 s of quiet).   */
 #define DRIVE_JUNC_TURN_DEG (90)    /* LEFT +90, RIGHT -90, U-TURN 180 */
-#define DRIVE_BOOST_X100    (50)    /* Curve boost past |e| = 500.      */
 #define DRIVE_STEER_MAX_MMS (S3_DRIVE_SPEED_MMS) /* 1x speed: car 5 Nov */
                                     /* 19:09 at 2x = full-lock zig-zag  */
                                     /* and a reversed inner wheel (S2   */
                                     /* spin-out). Sim 60/80 mm/s: 0 %   */
                                     /* flips, every track.              */
 
-/** Preset: Kp x100, Kd x100, speed mm/s, steer_sp at full lock mm/s. */
+/** Preset: Kp x100, Kd x100, curve boost x100 (past |e| = 500), speed
+ *  mm/s, steer_sp at full lock mm/s. */
 typedef struct
 {
     int16_t  kp_x100;
     int16_t  kd_x100;
+    int16_t  boost_x100;
     uint16_t speed_mms;
     uint16_t steer_max_mms;
 } drive_preset_t;
 
-/* One preset (car 12 Nov). Kp 50 + boost 50 rises evenly (e 500 -> 20
- * mm/s, 800 -> 44, 1000 -> 60): smoother than Kp 25 + boost 250, which
- * is flat over the grey band then a cliff to full lock. */
+/* GP21 tap = next. 0 (default) is the integrated S5 set, best of the
+ * car's 12 Nov curve test at 40 mm/s (run at 50); 1-4 are the other
+ * test sets. */
 static drive_preset_t const g_presets[] =
 {
-    {50,  25, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS}
+    {25,  25, 250, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS},
+    {50,  25,  50, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS},
+    {40,  25, 150, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS},
+    {50,  25, 150, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS},
+    {60,  25, 100, S3_DRIVE_SPEED_MMS, DRIVE_STEER_MAX_MMS}
 };
 
 #define N_PRESETS   (sizeof(g_presets) / sizeof(g_presets[0]))
@@ -563,10 +568,11 @@ drive_run (void)
         tm_printf((UB *) "S3 DRIVE command failed (%d); E-stop set.\n", (INT) er);
         return;
     }
-    tm_printf((UB *) "S3 DRIVE GO preset %d: %d mm/s, kp=%d kd=%d, steer max "
-                     "%d mm/s, %s (er=%d). Press BUTTON 1 to stop.\n",
+    tm_printf((UB *) "S3 DRIVE GO preset %d: %d mm/s, kp=%d kd=%d boost=%d, "
+                     "steer max %d mm/s, %s (er=%d). Press BUTTON 1 to stop.\n",
               (INT) g_preset, (INT) p_set->speed_mms, (INT) p_set->kp_x100,
-              (INT) p_set->kd_x100, (INT) p_set->steer_max_mms, S3_LAYOUT_TXT,
+              (INT) p_set->kd_x100, (INT) p_set->boost_x100,
+              (INT) p_set->steer_max_mms, S3_LAYOUT_TXT,
               (INT) er);
     tm_printf((UB *) "S3 DRIVE ISOLATED: S5 disabled, no ultrasonic guard. "
                      "GP20 stops.\n");
@@ -1139,13 +1145,13 @@ preset_apply (void)
     drive_preset_t const * p_set = &g_presets[g_preset];
 
     s3_set_line_gains(p_set->kp_x100, p_set->kd_x100);
-    s3_set_line_shape(DRIVE_BOOST_X100);
+    s3_set_line_shape(p_set->boost_x100);
     s3_set_steer_max(p_set->steer_max_mms);
     tm_printf((UB *) "S3 DRIVE PRESET %d of %d: %d mm/s, kp=%d kd=%d "
                      "boost=%d, steer max %d mm/s\n",
               (INT) g_preset, (INT) (N_PRESETS - 1u), (INT) p_set->speed_mms,
               (INT) p_set->kp_x100, (INT) p_set->kd_x100,
-              (INT) DRIVE_BOOST_X100, (INT) p_set->steer_max_mms);
+              (INT) p_set->boost_x100, (INT) p_set->steer_max_mms);
 }
 
 static void
