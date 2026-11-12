@@ -1,0 +1,47 @@
+S1-U23 part B, 2026-11-12, at d4eab1c (launcher code as in a33dce5), macOS, Python 3.13, mosquitto 2.1.2.
+Each run's output, launcher and dashboard lines together, as captured; the temporary folder is <tmp>.
+
+== B1: python3 -I -B testing/subsystem1/s1_launch.py --simulate --no-browser --workdir <tmp>/partB/w1
+    (default page port 8765); after 17 s SIGINT to its process group, as Ctrl-C in a terminal. Exit 0.
+s1_launch: dashboard: http://127.0.0.1:8765/
+s1_launch: log: <tmp>/partB/w1/run-20261112-221457.jsonl
+s1_launch: broker log: none (--simulate)
+s1_launch: Ctrl-C to quit
+s1_dashboard: simulate mode, broker from simulate, port 1883, prefix robot
+s1_dashboard: retained-command banner on
+s1_dashboard: open http://127.0.0.1:8765/ (Ctrl-C to quit)
+22:14:57.603  fake car console: power-up, CALIBRATING
+22:14:57.604  robot status: online (retained)
+22:14:57.604  broker: connected
+22:14:57.604  robot light grey: online, waiting for a heartbeat
+22:14:59.106  robot light green: online, heartbeat arriving
+22:15:00.606  fake car console: calibrated, READY
+s1_launch: log <tmp>/partB/w1/run-20261112-221457.jsonl: 82501 bytes (15 s after the start)
+s1_dashboard: closed
+s1_launch: log <tmp>/partB/w1/run-20261112-221457.jsonl: 93473 bytes (at exit)
+
+== B2: python3 -I -B testing/subsystem1/s1_launch.py --no-browser --workdir <tmp>/partB/w2
+    (real mosquitto 2.1.2 on port 1883); after 17 s B3 was started, then SIGINT to B2's process group. Exit 0.
+s1_launch: dashboard: http://127.0.0.1:8765/
+s1_launch: log: <tmp>/partB/w2/run-20261112-221515.jsonl
+s1_launch: broker log: <tmp>/partB/w2/broker-20261112-221515.log
+s1_launch: Ctrl-C to quit
+s1_dashboard: live mode, broker from command line, port 1883, prefix robot
+s1_dashboard: retained-command banner on
+s1_dashboard: open http://127.0.0.1:8765/ (Ctrl-C to quit)
+22:15:15.988  broker: connected
+s1_launch: log <tmp>/partB/w2/run-20261112-221515.jsonl: 114 bytes (15 s after the start)
+s1_dashboard: closed
+s1_launch: log <tmp>/partB/w2/run-20261112-221515.jsonl: 114 bytes (at exit)
+
+== B3: the same command with --workdir <tmp>/partB/w3, started while B2 ran. Exit 4.
+s1_launch: port 1883 is already in use, so the broker cannot start. Usually it is the Windows service "mosquitto": stop it in an administrator PowerShell with: Stop-Service mosquitto. On macOS or Linux, quit the other mosquitto first.
+s1_launch: port 8765 already answers: another dashboard is running. Close it first (on Windows two dashboards can share a port, and the page then says "missing or wrong page token"), or use --http-port.
+
+== After B2: mosquitto processes before the session 0; B2's broker (pgrep -f "mosquitto -c <workdir>")
+   1 while it ran, 0 after Ctrl-C; mosquitto processes after the session 0; ports 1883 and 8765 free again.
+== Work folders: w1 mosquitto.conf, run-<time>.jsonl; w2 broker-<time>.log, mosquitto.conf, run-<time>.jsonl;
+   w3 mosquitto.conf only (B3 refused after creating the missing config, as the order a, b, c sets).
+== The broker log itself is not included: mosquitto writes the macOS user name and the config path in it.
+== Browser opening: not run with a real browser (it would open the tester's own); checked in a scratch
+   harness with webbrowser.open replaced: opened once with http://127.0.0.1:<port>/, never with --no-browser.

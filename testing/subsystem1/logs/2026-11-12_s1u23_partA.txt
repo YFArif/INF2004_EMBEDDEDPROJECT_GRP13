@@ -1,0 +1,33 @@
+S1-U23 part A, 2026-11-12, at 2bbc790 (launcher code as in a33dce5):
+sh testing/subsystem1/run_launcher_test.sh on macOS, Python 3.13.
+
+== stage 1: s1_launch_test.py
+L1 PASS: all three on the PATH, no folder added
+L2 PASS: found only in a fallback folder, which is then added
+L3 PASS: one missing: named, with an install hint
+L4 PASS: children's PATH gets the folder; the launcher's does not
+L5 PASS: fallback folders for Windows and macOS
+L6 PASS: created with the four lines
+L7 PASS: never created twice, a changed file is left as it is
+L8 PASS: dummy listener seen, then gone
+L9 PASS: the two refusal texts
+L10 PASS: sc query: RUNNING warns, a missing service or macOS does not
+L11 PASS: timestamped names, no clash in one second
+L12 PASS: dashboard arguments, pass-through, --simulate
+L13 PASS: defaults: robot, 8765, no simulate, no address
+L14 PASS: 0 bytes or no file warns, a log with data does not
+L15 PASS: home folder shown as ~ or %USERPROFILE%
+L16 PASS: a child that ignores SIGTERM is killed after the wait
+L17 PASS: exit codes, 128 + n after a signal
+L18 PASS: page port taken: refused, exit 4, nothing started
+L19 PASS: no mosquitto anywhere: named, exit 2
+L20 PASS: --simulate run: page answers, log 98959 bytes, exit 0
+L21 PASS: no address printed, no broker log in --simulate
+L22 PASS: Ctrl-C to the whole group: exit 0, nothing left
+S1-U23 part A (host): PASS (22 passed)
+stage 1: ok
+== stage 2: mutations
+M1 caught by L7: the config is written over
+M2 caught by L8: a listening port looks free
+stage 2: ok
+S1-U23 part A: PASS (s1_launch_test.py passed, 2/2 mutations caught)
