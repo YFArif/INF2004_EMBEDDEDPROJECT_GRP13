@@ -11,7 +11,7 @@ it is.
   `docs/reference/barr_c_coding_standard_2018.pdf`; it is git-ignored and
   not in the repository.
 - Scope: S1's C files, which are everything in `app_program/subsystem1/`
-  except the course template's files (section 4),
+  except the course template's files and lines (section 4),
   `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c`, and the host tests in
   `testing/subsystem1/`.
 
@@ -33,11 +33,12 @@ The 4 left are all `exinf`, a parameter of the course template's code:
 
 The same branch also aligns declarations and assignments (3.2), adds
 parentheses to `&&` operands (1.4.b), fixes comments (2.1.b, 1.6.a),
-uses `const` for read-only pointer parameters (1.8.b), makes one
-debug-only function private (1.8.a), adds one zero initialiser (7.2.a),
-and fixes one mixed-sign comparison (5.3.c). The image (`objcopy -O
-binary`) of each of the five build profiles is byte-identical before and
-after.
+replaces tabs with spaces and puts braces on their own lines in S1's
+lines of `subsystem1.c` (3.5.a, 1.3.b), uses `const` for read-only
+pointer parameters (1.8.b), makes one debug-only function private
+(1.8.a), adds one zero initialiser (7.2.a), and fixes one mixed-sign
+comparison (5.3.c). The image (`objcopy -O binary`) of each of the five
+build profiles is byte-identical before and after.
 
 ## 3. Readings
 
@@ -63,9 +64,11 @@ Three rules leave room for interpretation. The reading chosen for each:
   keep the template's style (tabs, braces on the same line, no
   end-of-file marker), including the 4 `exinf` hits. Reason: they are
   the course's code, not S1's.
-- **S1's lines inside `subsystem1.c`.** These start the MQTT link and
-  telemetry_task, and follow that file's template style, including two
-  uncommented `(UB*)` casts. Reason: the file is left whole.
+- **Mixed style in `subsystem1.c`.** S1's lines there, which start the
+  MQTT link and telemetry_task, use spaces, braces on their own lines
+  and commented casts; the template lines around them keep their tabs
+  and same-line braces. Reason: template lines are left exactly as they
+  are.
 - **`tid_led` and `cyc_led`.** These globals lack the `g` and `h`
   prefixes. Reason: they are template names, and `tid_led` is interface
   IF-05 (TEAM.md section 5), so a rename needs team agreement.

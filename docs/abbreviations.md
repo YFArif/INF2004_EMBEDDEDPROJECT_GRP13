@@ -101,6 +101,7 @@ standard already accepts, such as `msg` and `buf`, is not repeated here.
 | uint32 | Unsigned 32-bit, C `stdint.h` type | `uint32_t`, `codec_vectors.c` |
 | uint8 | Unsigned 8-bit, C `stdint.h` type | `uint8_t`, `codec_vectors.h` |
 | uncal | Uncalibrated | `S1_TELEM_LINE_UNCAL`, `s1_telem.h` |
+| us | Microseconds; Appendix A has `usec` | `start_us`, `codec_timing_main.c` |
 | utk | Micro T-Kernel (template name) | `cyw43_utk_get_status`, `s1_radio.c` |
 | uturn | U-turn | `MSG_BC_CMD_UTURN`, `msg_layout.h` |
 | vec | Vector | `vec_count`, `codec_test_main.c` |

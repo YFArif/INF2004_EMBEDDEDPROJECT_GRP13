@@ -773,7 +773,8 @@ report_stack (void)
     UB line[REPORT_LINE_MAX];
 
     /* The casts are safe: the format string is ASCII, and both values
-     * are at most 2048, which an unsigned int holds.
+     * are at most 2048, which an unsigned int holds. The (void) drops the
+     * length tm_sprintf() returns, which is not needed.
      */
     (void)tm_sprintf(line, (const UB *)"S1: telemetry_task stack %u of %u B\n",
                      (unsigned int)telemetry_task_stack_used(),
