@@ -8,18 +8,26 @@ standard already accepts, such as `msg` and `buf`, is not repeated here.
 | Abbreviation | Meaning | Where it is used |
 |---|---|---|
 | ack | Acknowledgement | `ack_publish_failed`, `s1_telem_test.c` |
+| addr | Address | `broker_addr`, `mqtt_link.h` |
 | alloc | Allocate | `alloc_copy`, `codec_test_main.c` |
+| arg | Argument | `p_arg`, `mqtt_link.c` |
 | bc | Barcode | `bc_letter`, `msg_codec.h` |
 | bool | Boolean, C `stdbool.h` type | `bool`, `codec_vectors.h` |
 | c39 | Code 39, the barcode symbology | `S3_C39_IDX_NONE`, `telemetry_task.c` |
 | cal | Calibration | `b_cal_done`, `s1_telem.h` |
+| cb | Callback | `dns_found_cb`, `mqtt_link.c` |
 | cdeg | Centidegrees, hundredths of a degree | `heading_cdeg`, `s1_telem.h` |
 | ch | Character, a Code 39 letter | `last_ch`, `s1_telem.h` |
+| cmbf | Message buffer creation packet, `T_CMBF` | `cmbf`, `mqtt_queue.c` |
 | cmd | Command | `last_cmd`, `s1_telem.h` |
+| cnt | Count | `MSG_TEL_HUMP_CNT_POS`, `msg_layout.h` |
 | codec | Coder-decoder | `msg_codec_live_t`, `codec_vectors.h` |
 | ctrl | Controller | `ctrl_state`, `s1_telem.h` |
+| ctsk | Kernel task creation packet, `T_CTSK` | `ctsk`, `telemetry_task.c` |
+| dbm | Decibels relative to one milliwatt | `rssi_dbm`, `msg_codec.h` |
 | deg | Degrees | `servo_deg`, `s1_telem.h` |
 | desc | Descriptor | `msg_desc_t`, `codec_test_main.c` |
+| dest | Destination | `p_dest`, `mqtt_link.c` |
 | dir | Direction | `b_bc_dir`, `s1_telem.c` |
 | dist | Distance | `dist_mm`, `s1_telem.h` |
 | dps | Degrees per second | `turn_rate_dps`, `s1_telem.h` |
@@ -27,9 +35,11 @@ standard already accepts, such as `msg` and `buf`, is not repeated here.
 | e | Error, kernel code prefix | `E_OK`, `telemetry_task.c` |
 | estop | Emergency stop | `b_estop`, `codec_vectors.c` |
 | evt | Event | `evt_drop`, `msg_codec.h` |
+| fn | Function | `s1_telem_post_fn_t`, `s1_telem.h` |
 | frbufsz | Free buffer size, in `T_RMBF` | `frbufsz`, `mqtt_queue.c` |
 | gb | Global Boolean, `g_` plus `b_` | `gb_ready`, `mqtt_queue.c` |
 | gh | Global handle, `g_` plus `h_` | `gh_publish_mbf`, `mqtt_queue.c` |
+| gp | Global pointer, `g_` plus `p_` | `gp_client`, `mqtt_link.c` |
 | hb | Heartbeat | `S1_TELEM_HB_QUEUED_MAX`, `s1_telem.h` |
 | hdeg | Half-degrees | `heading_hdeg`, `msg_codec.h` |
 | hdr | Header | `HDR_HEARTBEAT`, `s1_telem_test.c` |
@@ -44,23 +54,32 @@ standard already accepts, such as `msg` and `buf`, is not repeated here.
 | liv | Live message (type 6) | `MSG_LIV_BYTES`, `msg_layout.h` |
 | losts | Line-lost count, S3's field | `losts`, `msg_codec.h` |
 | mbf | Message buffer | `gh_publish_mbf`, `mqtt_queue.c` |
+| mclass | Motion class | `MSG_TEL_MCLASS_POS`, `msg_layout.h` |
 | memset | C library: set memory | `memset`, `s1_telem_test.c` |
 | mm | Millimetres | `dist_mm`, `s1_telem.h` |
 | mms | Millimetres per second | `cmd_speed_mms`, `msg_codec.h` |
 | mqtt | MQTT messaging protocol | `mqtt_link_publish`, `telemetry_task.c` |
+| ms | Milliseconds; Appendix A spells it `msec` | `t_ms`, `msg_codec.h` |
 | msgs | Messages | `msgs`, `codec_test_main.c` |
 | n | Count; see the note on S3's `n_outer` | `n_cmd`, `codec_test_main.c` |
+| neg | Negated | `rssi_neg`, `msg_codec.c` |
 | obst | Obstacle | `obst`, `telemetry_task.c` |
 | odom | Odometry | `subsystem2_odom_t`, `telemetry_task.c` |
 | ok | Okay, no error | `b_ok`, `msg_codec.c` |
+| op | Opcode | `MSG_OP_START`, `msg_layout.h` |
+| otm | Operating time, from `tk_get_otm()` | `otm`, `telemetry_task.c` |
 | pb | Pointer to Boolean, `p_` plus `b_` | `pb_fault_set`, `s1_telem.c` |
+| ph | Pointer to a handle, `p_` plus `h_` | `ph_mbf`, `mqtt_queue.c` |
 | pos | Bit position | `MSG_LIV_SEQ_POS`, `msg_layout.h` |
 | pub | Publish | `s1_telem_pub_t`, `telemetry_task.c` |
 | qos | MQTT quality of service | `MQTT_LINK_QOS_0`, `telemetry_task.c` |
 | r | Right | `count_r`, `s1_telem.h` |
+| rec | Record | `msg_codec_check_rec_t`, `msg_codec.c` |
 | ref | Reference (read status), kernel call | `tk_ref_mbf`, `mqtt_queue.c` |
+| rej | Reject | `MSG_HB_CMD_REJ_POS`, `msg_layout.h` |
 | rev | Reversed, read backwards | `b_last_rev`, `s1_telem.h` |
 | rmbf | Kernel message buffer status | `rmbf`, `mqtt_queue.c` |
+| rssi | Received signal strength indicator | `rssi_dbm`, `msg_codec.h` |
 | s | Seconds | `uptime_s`, `telemetry_task.c` |
 | s1 | Subsystem 1 | `s1_telem_src_t`, `s1_telem.h` |
 | s16 | Signed 16-bit | `get_s16`, `msg_codec.c` |
@@ -76,11 +95,13 @@ standard already accepts, such as `msg` and `buf`, is not repeated here.
 | tel | Telemetry | `tel_drop`, `msg_codec.h` |
 | telem | Telemetry | `s1_telem_due`, `s1_telem.c` |
 | tk | T-Kernel, kernel call prefix | `tk_ref_mbf`, `mqtt_queue.c` |
+| u16 | Unsigned 16-bit | `get_u16`, `msg_codec.c` |
 | u8 | Unsigned 8-bit | `get_u8`, `msg_codec.c` |
 | uint16 | Unsigned 16-bit, C `stdint.h` type | `uint16_t`, `s1_telem.h` |
 | uint32 | Unsigned 32-bit, C `stdint.h` type | `uint32_t`, `codec_vectors.c` |
 | uint8 | Unsigned 8-bit, C `stdint.h` type | `uint8_t`, `codec_vectors.h` |
 | uncal | Uncalibrated | `S1_TELEM_LINE_UNCAL`, `s1_telem.h` |
+| utk | Micro T-Kernel (template name) | `cyw43_utk_get_status`, `s1_radio.c` |
 | uturn | U-turn | `MSG_BC_CMD_UTURN`, `msg_layout.h` |
 | vec | Vector | `vec_count`, `codec_test_main.c` |
 | wifi | Wi-Fi | `MSG_FAULT_WIFI`, `telemetry_task.c` |
