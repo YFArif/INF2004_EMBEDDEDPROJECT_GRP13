@@ -21,7 +21,7 @@
  * packs every field with masks and shifts.
  *
  * @par Who includes this
- * Any task that sends an event to mbf_event (msg_event_t and
+ * Any task that sends an event to mbf_event (msg_layout_event_t and
  * MSG_EVENT_ARG_BYTES), and msg_codec.c. It holds constants and one type
  * only, so it is not gated on TM_MQTT.
  */
@@ -241,7 +241,7 @@
 #define MSG_ACK_REJECTED            1U
 
 /* ---------------------------------------------------------------------
- * EVENT. Section 6. Inside the robot an event is an msg_event_t record
+ * EVENT. Section 6. Inside the robot an event is an msg_layout_event_t record
  * in mbf_event; on the wire S1 adds the header and a time stamp.
  * ------------------------------------------------------------------- */
 
@@ -281,8 +281,9 @@ typedef struct
 {
     uint8_t     code;                           /* Event code.          */
     uint8_t     args[MSG_EVENT_ARG_BYTES];      /* Per-code arguments.  */
-} msg_event_t;
+} msg_layout_event_t;
 
 #endif /* MSG_LAYOUT_H */
 
 /*** end of file ***/
+

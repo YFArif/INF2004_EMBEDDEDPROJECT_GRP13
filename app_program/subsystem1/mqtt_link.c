@@ -234,29 +234,29 @@ typedef enum
  * must not call publish_status() until mqtt_queue_is_ready() is true,
  * or two tasks could write the seqlock at once.
  */
-static mqtt_link_status_t       g_status = { MQTT_LINK_STATE_IDLE };
+static mqtt_link_status_t          g_status = { MQTT_LINK_STATE_IDLE };
 static volatile mqtt_link_status_t g_published = { MQTT_LINK_STATE_IDLE };
-static volatile uint32_t        g_version = 0U;
-static mqtt_client_t *          gp_client = NULL;
-static ip_addr_t                g_broker_addr;
-static mqtt_queue_publish_t     g_pending;
-static mqtt_link_command_t      g_command;
-static char                     g_status_topic[FULL_TOPIC_BYTES];
-static char                     g_cmd_filter[FULL_TOPIC_BYTES];
-static mqtt_link_inflight_t     g_inflight = INFLIGHT_NONE;
-static mqtt_link_dns_t          g_dns = DNS_IDLE;
-static bool                     gb_pending_valid = false;
-static bool                     gb_sub_sent = false;
-static bool                     gb_sub_failed = false;
-static bool                     gb_birth_done = false;
-static bool                     gb_command_drop = true;
-static uint32_t                 g_pending_attempts = 0U;
-static uint32_t                 g_step_start_msec = 0U;
-static uint32_t                 g_session_start_msec = 0U;
-static uint32_t                 g_backoff_msec = 0U;
+static volatile uint32_t           g_version = 0U;
+static mqtt_client_t *             gp_client = NULL;
+static ip_addr_t                   g_broker_addr;
+static mqtt_queue_publish_t        g_pending;
+static mqtt_link_command_t         g_command;
+static char                        g_status_topic[FULL_TOPIC_BYTES];
+static char                        g_cmd_filter[FULL_TOPIC_BYTES];
+static mqtt_link_inflight_t        g_inflight = INFLIGHT_NONE;
+static mqtt_link_dns_t             g_dns = DNS_IDLE;
+static bool                        gb_pending_valid = false;
+static bool                        gb_sub_sent = false;
+static bool                        gb_sub_failed = false;
+static bool                        gb_birth_done = false;
+static bool                        gb_command_drop = true;
+static uint32_t                    g_pending_attempts = 0U;
+static uint32_t                    g_step_start_msec = 0U;
+static uint32_t                    g_session_start_msec = 0U;
+static uint32_t                    g_backoff_msec = 0U;
 
 /* Suffix of each topic ID, indexed by the ID. */
-static const char * const       g_topic_suffix[] =
+static const char * const       gp_topic_suffix[] =
 {
     [MQTT_LINK_TOPIC_TELEMETRY] = TOPIC_TELEMETRY,
     [MQTT_LINK_TOPIC_EVENT]     = TOPIC_EVENT,
@@ -266,18 +266,20 @@ static const char * const       g_topic_suffix[] =
 /* One suffix for each topic ID: an ID added without a suffix stops the
  * build here.
  */
-typedef uint8_t mqtt_link_check_table_t[((sizeof(g_topic_suffix) \
-    / sizeof(g_topic_suffix[0])) == MQTT_LINK_TOPIC_COUNT) ? 1 : -1];
+typedef uint8_t mqtt_link_check_table_t[((sizeof(gp_topic_suffix) \
+    / sizeof(gp_topic_suffix[0])) == MQTT_LINK_TOPIC_COUNT) ? 1 : -1];
 
 static void publish_status(void);
 static void build_topics(void);
 static int32_t check_config(void);
 static int32_t start_link(void);
-static void run_state(struct netif * p_netif);
-static void step_idle(struct netif * p_netif, uint32_t now_msec);
+static void run_state(const struct netif * p_netif);
+static void step_idle(const struct netif * p_netif, uint32_t now_msec);
 static void step_resolving(uint32_t now_msec);
-static void step_connecting(struct netif * p_netif, uint32_t now_msec);
-static void step_connected(struct netif * p_netif, uint32_t now_msec);
+static void step_connecting(const struct netif * p_netif,
+                            uint32_t now_msec);
+static void step_connected(const struct netif * p_netif,
+                           uint32_t now_msec);
 static void step_backoff(uint32_t now_msec);
 static void step_subscribe(uint32_t now_msec);
 static void step_publish(uint32_t now_msec);
@@ -339,7 +341,7 @@ mqtt_link_init (void)
  * @param[in] p_netif The station netif.
  */
 void
-mqtt_link_poll (struct netif * p_netif)
+mqtt_link_poll (const struct netif * p_netif)
 {
     /* Stamped unconditionally, even before mqtt_link_init() has succeeded
      * or p_netif is usable, so mqtt_link_get_status()'s b_stale always
@@ -468,9 +470,9 @@ mqtt_link_publish (mqtt_link_topic_t topic, const uint8_t * p_payload,
          * MQTT_LINK_QOS_1 by the parameter checks earlier in this
          * function, so the cast to uint8_t cannot lose any bits.
          */
-        msg.qos = (uint8_t)qos;
+        msg.qos      = (uint8_t)qos;
         msg.b_retain = b_retain;
-        result = mqtt_queue_put_publish(&msg);
+        result       = mqtt_queue_put_publish(&msg);
     }
 
     return (result);
@@ -585,7 +587,7 @@ start_link (void)
          * 65535) by the #if near the top of this file, so it fits in
          * uint16_t.
          */
-        g_status.broker_port = (uint16_t)MQTT_LINK_CFG_BROKER_PORT;
+        g_status.broker_port   = (uint16_t)MQTT_LINK_CFG_BROKER_PORT;
         g_status.b_initialised = true;
         publish_status();
 
@@ -598,7 +600,7 @@ start_link (void)
          * this is still safe. Leave the reason where the status shows it.
          */
         g_status.b_initialised = false;
-        g_status.last_error = result;
+        g_status.last_error    = result;
         publish_status();
     }
 
@@ -611,7 +613,7 @@ start_link (void)
  * @param[in] p_netif The station netif.
  */
 static void
-run_state (struct netif * p_netif)
+run_state (const struct netif * p_netif)
 {
     const uint32_t now_msec = sys_now();
 
@@ -648,7 +650,7 @@ run_state (struct netif * p_netif)
  * @brief IDLE: wait for the link and an address, then find the broker.
  */
 static void
-step_idle (struct netif * p_netif, uint32_t now_msec)
+step_idle (const struct netif * p_netif, uint32_t now_msec)
 {
     if (link_ready(p_netif))
     {
@@ -698,7 +700,7 @@ step_resolving (uint32_t now_msec)
  * @brief CONNECTING: wait for the broker, within a time limit.
  */
 static void
-step_connecting (struct netif * p_netif, uint32_t now_msec)
+step_connecting (const struct netif * p_netif, uint32_t now_msec)
 {
     if (!link_ready(p_netif))
     {
@@ -719,7 +721,7 @@ step_connecting (struct netif * p_netif, uint32_t now_msec)
  * @brief CONNECTED: subscribe, announce, then send queued messages.
  */
 static void
-step_connected (struct netif * p_netif, uint32_t now_msec)
+step_connected (const struct netif * p_netif, uint32_t now_msec)
 {
     g_status.connected_msec = now_msec - g_session_start_msec;
 
@@ -815,7 +817,7 @@ resolve_broker (uint32_t now_msec)
     }
     else
     {
-        g_dns = DNS_PENDING;
+        g_dns  = DNS_PENDING;
         result = dns_gethostbyname(MQTT_LINK_CFG_BROKER_HOST, &g_broker_addr,
                                    dns_found_cb, NULL);
 
@@ -831,7 +833,7 @@ resolve_broker (uint32_t now_msec)
         }
         else
         {
-            g_dns = DNS_IDLE;
+            g_dns               = DNS_IDLE;
             g_status.last_error = result;
             enter_backoff(now_msec);
         }
@@ -847,13 +849,13 @@ start_connect (uint32_t now_msec)
     struct mqtt_connect_client_info_t info = { 0 };
     err_t                             result = ERR_OK;
 
-    info.client_id = MQTT_LINK_CFG_CLIENT_ID;
+    info.client_id   = MQTT_LINK_CFG_CLIENT_ID;
     info.client_user = login_or_null(MQTT_LINK_CFG_USERNAME);
     info.client_pass = login_or_null(MQTT_LINK_CFG_PASSWORD);
-    info.keep_alive = KEEPALIVE_SECONDS;
-    info.will_topic = g_status_topic;
-    info.will_msg = MQTT_LINK_STATUS_OFFLINE;
-    info.will_qos = 1U;
+    info.keep_alive  = KEEPALIVE_SECONDS;
+    info.will_topic  = g_status_topic;
+    info.will_msg    = MQTT_LINK_STATUS_OFFLINE;
+    info.will_qos    = 1U;
     info.will_retain = 1U;
 
     /* The port is range-checked at compile time, so it fits 16 bits. */
@@ -863,11 +865,11 @@ start_connect (uint32_t now_msec)
 
     if (ERR_OK == result)
     {
-        gb_sub_sent = false;
+        gb_sub_sent   = false;
         gb_sub_failed = false;
         gb_birth_done = false;
-        g_inflight = INFLIGHT_NONE;
-        g_dns = DNS_IDLE;
+        g_inflight    = INFLIGHT_NONE;
+        g_dns         = DNS_IDLE;
         enter_state(MQTT_LINK_STATE_CONNECTING, now_msec);
     }
     else
@@ -935,7 +937,7 @@ take_pending (void)
     if ((MQTT_LINK_OK == result)
         && (g_pending.topic_id < MQTT_LINK_TOPIC_COUNT))
     {
-        gb_pending_valid = true;
+        gb_pending_valid   = true;
         g_pending_attempts = 0U;
     }
     else if (MQTT_LINK_ERR_TIMEOUT == result)
@@ -965,9 +967,9 @@ submit_pending (uint32_t now_msec)
     err_t result = ERR_OK;
 
     /* take_pending() lets only a topic ID below MQTT_LINK_TOPIC_COUNT into
-     * g_pending, so the index is inside g_topic_suffix.
+     * g_pending, so the index is inside gp_topic_suffix.
      */
-    build_topic(topic, g_topic_suffix[g_pending.topic_id]);
+    build_topic(topic, gp_topic_suffix[g_pending.topic_id]);
 
     /* The retain flag is 0 or 1, so it fits lwIP's 8-bit argument. */
     result = mqtt_publish(gp_client, topic, g_pending.payload,
@@ -1015,7 +1017,7 @@ build_topic (char * p_dest, const char * p_suffix)
 static void
 enter_state (mqtt_link_state_t state, uint32_t now_msec)
 {
-    g_status.state = state;
+    g_status.state    = state;
     g_step_start_msec = now_msec;
 }
 
@@ -1029,17 +1031,17 @@ enter_state (mqtt_link_state_t state, uint32_t now_msec)
 static void
 enter_backoff (uint32_t now_msec)
 {
-    const bool b_stable = (g_status.b_connected
+    const bool b_stable = ((g_status.b_connected)
                            && ((now_msec - g_session_start_msec)
                                >= STABLE_SESSION_MSEC));
 
-    g_status.b_connected = false;
+    g_status.b_connected  = false;
     g_status.b_subscribed = false;
     g_status.disconnect_count++;
     g_inflight = INFLIGHT_NONE;
-    g_dns = DNS_IDLE;
+    g_dns      = DNS_IDLE;
 
-    g_backoff_msec = next_backoff(b_stable);
+    g_backoff_msec        = next_backoff(b_stable);
     g_status.backoff_msec = g_backoff_msec;
     enter_state(MQTT_LINK_STATE_BACKOFF, now_msec);
 }
@@ -1090,8 +1092,11 @@ next_backoff (bool b_stable)
 static bool
 link_ready (const struct netif * p_netif)
 {
-    return ((0U != netif_is_up(p_netif))
-            && (0U != netif_is_link_up(p_netif))
+    /* lwIP's netif_is_up() and netif_is_link_up() yield an int (a ?: of
+     * two u8_t values), so they are compared with a signed 0.
+     */
+    return ((0 != netif_is_up(p_netif))
+            && (0 != netif_is_link_up(p_netif))
             && (!ip4_addr_isany_val(*netif_ip4_addr(p_netif))));
 }
 
@@ -1224,7 +1229,7 @@ finish_command (void)
         g_status.command_dropped++;
     }
 
-    gb_command_drop = true;
+    gb_command_drop       = true;
     g_command.payload_len = 0U;
 }
 
@@ -1303,7 +1308,7 @@ subscribe_done_cb (void * p_arg, err_t result)
          * inside lwIP's receive path.
          */
         g_status.last_error = result;
-        gb_sub_failed = true;
+        gb_sub_failed       = true;
     }
 }
 
@@ -1348,7 +1353,7 @@ incoming_publish_cb (void * p_arg, const char * p_topic, u32_t total_len)
     /* The argument is not needed. */
     (void)p_arg;
 
-    gb_command_drop = true;
+    gb_command_drop       = true;
     g_command.payload_len = 0U;
 
     if (topic_has_prefix(p_topic))
@@ -1390,3 +1395,4 @@ incoming_data_cb (void * p_arg, const u8_t * p_data, u16_t length,
 #endif /* TM_MQTT */
 
 /*** end of file ***/
+

@@ -105,3 +105,4 @@ const codec_vectors_ack_t * codec_vectors_ack(uint32_t * p_count);
 #endif /* CODEC_VECTORS_H */
 
 /*** end of file ***/
+

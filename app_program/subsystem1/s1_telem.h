@@ -235,3 +235,4 @@ void     s1_telem_fill_live(const s1_telem_src_t * p_src, uint8_t seq,
 #endif /* S1_TELEM_H */
 
 /*** end of file ***/
+

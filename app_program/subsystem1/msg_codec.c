@@ -10,10 +10,12 @@
  * put_field() writes a value one bit at a time, most significant bit
  * first, at a bit position counted from the start of the buffer; it only
  * shifts and masks unsigned values (Barr-C 5.3b). get_field() reads it
- * back the same way. The longest message is 200 bits, so a bit loop costs
- * an estimated tens of microseconds per message, to be measured on the
- * Pico; it was chosen because it is plainly correct at every byte
- * boundary.
+ * back the same way. The longest message is 200 bits. A bit loop was
+ * chosen because it is plainly correct at every byte boundary. S1-U08
+ * timed it on the Pico W at 3814f93 (testing/subsystem1/TEST_LOG.md,
+ * 20 Oct 2026): on core 1 the warm mean was 26.778 to 27.444 us to pack a
+ * telemetry frame and 21.173 to 21.283 us to unpack one, and the slowest
+ * calls took 257 us and 231 us.
  *
  * @par Build gate
  * NOTE: The whole body is gated on TM_MQTT (default 0) -- see msg_codec.h.
@@ -168,7 +170,7 @@ typedef uint8_t msg_codec_check_evt_t[((MSG_EVT_CODE_POS == 8U)
 /* 2. The event record has no padding, so its size is exactly the bytes
  *    the layout gives it.
  */
-typedef uint8_t msg_codec_check_rec_t[(sizeof(msg_event_t)
+typedef uint8_t msg_codec_check_rec_t[(sizeof(msg_layout_event_t)
     == MSG_EVENT_RECORD_BYTES) ? 1 : -1];
 
 /* 3. HDEG_MIN and HDEG_MAX are exactly the range of the 7-bit pitch and
@@ -374,59 +376,59 @@ msg_codec_get_telemetry (const uint8_t * p_buf, uint32_t len,
     bool b_ok = false;
 
     if ((NULL != p_out)
-        && header_ok(p_buf, len, MSG_TEL_BYTES, MSG_TYPE_TELEMETRY))
+        && (header_ok(p_buf, len, MSG_TEL_BYTES, MSG_TYPE_TELEMETRY)))
     {
-        p_out->seq = get_u8(p_buf, MSG_TEL_SEQ_POS, MSG_TEL_SEQ_BITS);
-        p_out->ctrl_state = get_u8(p_buf, MSG_TEL_CTRL_POS,
-                                   MSG_TEL_CTRL_BITS);
+        p_out->seq          = get_u8(p_buf, MSG_TEL_SEQ_POS, MSG_TEL_SEQ_BITS);
+        p_out->ctrl_state   = get_u8(p_buf, MSG_TEL_CTRL_POS,
+                                     MSG_TEL_CTRL_BITS);
         p_out->motion_state = get_u8(p_buf, MSG_TEL_MOTION_POS,
                                      MSG_TEL_MOTION_BITS);
-        p_out->fault_mask = get_u8(p_buf, MSG_TEL_FAULT_POS,
-                                   MSG_TEL_FAULT_BITS);
-        p_out->line_state = get_u8(p_buf, MSG_TEL_LINE_POS,
-                                   MSG_TEL_LINE_BITS);
-        p_out->bc_letter = get_u8(p_buf, MSG_TEL_BC_LETTER_POS,
-                                  MSG_TEL_BC_LETTER_BITS);
-        p_out->bc_cmd = get_u8(p_buf, MSG_TEL_BC_CMD_POS,
-                               MSG_TEL_BC_CMD_BITS);
-        p_out->b_bc_dir = get_flag(p_buf, MSG_TEL_BC_DIR_POS);
-        p_out->speed_l_mms = get_signed(p_buf, MSG_TEL_SPEED_L_POS,
-                                        MSG_TEL_SPEED_L_BITS);
-        p_out->speed_r_mms = get_signed(p_buf, MSG_TEL_SPEED_R_POS,
-                                        MSG_TEL_SPEED_R_BITS);
-        p_out->count_l = get_field(p_buf, MSG_TEL_COUNT_L_POS,
-                                   MSG_TEL_COUNT_L_BITS);
-        p_out->count_r = get_field(p_buf, MSG_TEL_COUNT_R_POS,
-                                   MSG_TEL_COUNT_R_BITS);
-        p_out->dist_mm = get_signed(p_buf, MSG_TEL_DIST_POS,
-                                    MSG_TEL_DIST_BITS);
-        p_out->pitch_hdeg = get_s16(p_buf, MSG_TEL_PITCH_POS,
-                                    MSG_TEL_PITCH_BITS);
-        p_out->roll_hdeg = get_s16(p_buf, MSG_TEL_ROLL_POS,
-                                   MSG_TEL_ROLL_BITS);
-        p_out->hump_state = get_u8(p_buf, MSG_TEL_HUMP_ST_POS,
-                                   MSG_TEL_HUMP_ST_BITS);
-        p_out->peak_mm = get_u16(p_buf, MSG_TEL_PEAK_POS,
-                                 MSG_TEL_PEAK_BITS);
-        p_out->hump_count = get_u8(p_buf, MSG_TEL_HUMP_CNT_POS,
-                                   MSG_TEL_HUMP_CNT_BITS);
+        p_out->fault_mask   = get_u8(p_buf, MSG_TEL_FAULT_POS,
+                                     MSG_TEL_FAULT_BITS);
+        p_out->line_state   = get_u8(p_buf, MSG_TEL_LINE_POS,
+                                     MSG_TEL_LINE_BITS);
+        p_out->bc_letter    = get_u8(p_buf, MSG_TEL_BC_LETTER_POS,
+                                     MSG_TEL_BC_LETTER_BITS);
+        p_out->bc_cmd       = get_u8(p_buf, MSG_TEL_BC_CMD_POS,
+                                     MSG_TEL_BC_CMD_BITS);
+        p_out->b_bc_dir     = get_flag(p_buf, MSG_TEL_BC_DIR_POS);
+        p_out->speed_l_mms  = get_signed(p_buf, MSG_TEL_SPEED_L_POS,
+                                         MSG_TEL_SPEED_L_BITS);
+        p_out->speed_r_mms  = get_signed(p_buf, MSG_TEL_SPEED_R_POS,
+                                         MSG_TEL_SPEED_R_BITS);
+        p_out->count_l      = get_field(p_buf, MSG_TEL_COUNT_L_POS,
+                                        MSG_TEL_COUNT_L_BITS);
+        p_out->count_r      = get_field(p_buf, MSG_TEL_COUNT_R_POS,
+                                        MSG_TEL_COUNT_R_BITS);
+        p_out->dist_mm      = get_signed(p_buf, MSG_TEL_DIST_POS,
+                                         MSG_TEL_DIST_BITS);
+        p_out->pitch_hdeg   = get_s16(p_buf, MSG_TEL_PITCH_POS,
+                                      MSG_TEL_PITCH_BITS);
+        p_out->roll_hdeg    = get_s16(p_buf, MSG_TEL_ROLL_POS,
+                                      MSG_TEL_ROLL_BITS);
+        p_out->hump_state   = get_u8(p_buf, MSG_TEL_HUMP_ST_POS,
+                                     MSG_TEL_HUMP_ST_BITS);
+        p_out->peak_mm      = get_u16(p_buf, MSG_TEL_PEAK_POS,
+                                      MSG_TEL_PEAK_BITS);
+        p_out->hump_count   = get_u8(p_buf, MSG_TEL_HUMP_CNT_POS,
+                                     MSG_TEL_HUMP_CNT_BITS);
         p_out->motion_class = get_u8(p_buf, MSG_TEL_MCLASS_POS,
                                      MSG_TEL_MCLASS_BITS);
-        p_out->turn_dps = get_s16(p_buf, MSG_TEL_TURN_POS,
-                                  MSG_TEL_TURN_BITS);
-        p_out->b_imu_ok = get_flag(p_buf, MSG_TEL_IMU_OK_POS);
-        p_out->b_cal_done = get_flag(p_buf, MSG_TEL_CAL_DONE_POS);
-        p_out->closest_mm = get_u16(p_buf, MSG_TEL_CLOSEST_POS,
-                                    MSG_TEL_CLOSEST_BITS);
-        p_out->angle_idx = get_u8(p_buf, MSG_TEL_ANGLE_POS,
-                                  MSG_TEL_ANGLE_BITS);
-        p_out->width_mm = get_u16(p_buf, MSG_TEL_WIDTH_POS,
-                                  MSG_TEL_WIDTH_BITS);
-        p_out->clear_l_mm = get_u16(p_buf, MSG_TEL_CLEAR_L_POS,
-                                    MSG_TEL_CLEAR_L_BITS);
-        p_out->clear_r_mm = get_u16(p_buf, MSG_TEL_CLEAR_R_POS,
-                                    MSG_TEL_CLEAR_R_BITS);
-        b_ok = true;
+        p_out->turn_dps     = get_s16(p_buf, MSG_TEL_TURN_POS,
+                                      MSG_TEL_TURN_BITS);
+        p_out->b_imu_ok     = get_flag(p_buf, MSG_TEL_IMU_OK_POS);
+        p_out->b_cal_done   = get_flag(p_buf, MSG_TEL_CAL_DONE_POS);
+        p_out->closest_mm   = get_u16(p_buf, MSG_TEL_CLOSEST_POS,
+                                      MSG_TEL_CLOSEST_BITS);
+        p_out->angle_idx    = get_u8(p_buf, MSG_TEL_ANGLE_POS,
+                                     MSG_TEL_ANGLE_BITS);
+        p_out->width_mm     = get_u16(p_buf, MSG_TEL_WIDTH_POS,
+                                      MSG_TEL_WIDTH_BITS);
+        p_out->clear_l_mm   = get_u16(p_buf, MSG_TEL_CLEAR_L_POS,
+                                      MSG_TEL_CLEAR_L_BITS);
+        p_out->clear_r_mm   = get_u16(p_buf, MSG_TEL_CLEAR_R_POS,
+                                      MSG_TEL_CLEAR_R_BITS);
+        b_ok                = true;
     }
 
     return (b_ok);
@@ -650,26 +652,26 @@ msg_codec_get_heartbeat (const uint8_t * p_buf, uint32_t len,
     uint32_t rssi_neg;
 
     if ((NULL != p_out)
-        && header_ok(p_buf, len, MSG_HB_BYTES, MSG_TYPE_HEARTBEAT))
+        && (header_ok(p_buf, len, MSG_HB_BYTES, MSG_TYPE_HEARTBEAT)))
     {
         rssi_neg = get_field(p_buf, MSG_HB_RSSI_POS, MSG_HB_RSSI_BITS);
 
-        p_out->seq = get_u8(p_buf, MSG_HB_SEQ_POS, MSG_HB_SEQ_BITS);
+        p_out->seq      = get_u8(p_buf, MSG_HB_SEQ_POS, MSG_HB_SEQ_BITS);
         p_out->uptime_s = get_field(p_buf, MSG_HB_UPTIME_POS,
                                     MSG_HB_UPTIME_BITS);
         /* rssi_neg is 0 to 127 (7-bit field); widening it to int32_t is
          * exact, and its negation, -127 to 0, fits int16_t.
          */
-        p_out->rssi_dbm = (int16_t)(-(int32_t)rssi_neg);
+        p_out->rssi_dbm      = (int16_t)(-(int32_t)rssi_neg);
         p_out->connect_count = get_field(p_buf, MSG_HB_CONNECT_POS,
                                          MSG_HB_CONNECT_BITS);
-        p_out->tel_drop = get_field(p_buf, MSG_HB_TEL_DROP_POS,
-                                    MSG_HB_TEL_DROP_BITS);
-        p_out->evt_drop = get_field(p_buf, MSG_HB_EVT_DROP_POS,
-                                    MSG_HB_EVT_DROP_BITS);
-        p_out->cmd_reject = get_field(p_buf, MSG_HB_CMD_REJ_POS,
-                                      MSG_HB_CMD_REJ_BITS);
-        b_ok = true;
+        p_out->tel_drop      = get_field(p_buf, MSG_HB_TEL_DROP_POS,
+                                         MSG_HB_TEL_DROP_BITS);
+        p_out->evt_drop      = get_field(p_buf, MSG_HB_EVT_DROP_POS,
+                                         MSG_HB_EVT_DROP_BITS);
+        p_out->cmd_reject    = get_field(p_buf, MSG_HB_CMD_REJ_POS,
+                                         MSG_HB_CMD_REJ_BITS);
+        b_ok                 = true;
     }
 
     return (b_ok);
@@ -731,7 +733,7 @@ msg_codec_get_command (const uint8_t * p_buf, uint32_t len,
             p_out->opcode = get_u8(p_buf, MSG_CMD_OPCODE_POS,
                                    MSG_CMD_OPCODE_BITS);
             p_out->cmd_id = get_u8(p_buf, MSG_CMD_ID_POS, MSG_CMD_ID_BITS);
-            b_ok = (MSG_OP_INVALID != p_out->opcode);
+            b_ok          = (MSG_OP_INVALID != p_out->opcode);
         }
     }
 
@@ -783,14 +785,14 @@ msg_codec_get_ack (const uint8_t * p_buf, uint32_t len,
     bool b_ok = false;
 
     if ((NULL != p_out)
-        && header_ok(p_buf, len, MSG_ACK_BYTES, MSG_TYPE_ACK))
+        && (header_ok(p_buf, len, MSG_ACK_BYTES, MSG_TYPE_ACK)))
     {
         p_out->opcode = get_u8(p_buf, MSG_ACK_OPCODE_POS,
                                MSG_ACK_OPCODE_BITS);
         p_out->cmd_id = get_u8(p_buf, MSG_ACK_ID_POS, MSG_ACK_ID_BITS);
         p_out->result = get_u8(p_buf, MSG_ACK_RESULT_POS,
                                MSG_ACK_RESULT_BITS);
-        b_ok = true;
+        b_ok          = true;
     }
 
     return (b_ok);
@@ -849,7 +851,7 @@ msg_codec_get_event (const uint8_t * p_buf, uint32_t len,
     uint32_t idx;
 
     if ((NULL != p_out)
-        && header_ok(p_buf, len, MSG_EVT_BYTES, MSG_TYPE_EVENT))
+        && (header_ok(p_buf, len, MSG_EVT_BYTES, MSG_TYPE_EVENT)))
     {
         p_out->event.code = get_u8(p_buf, MSG_EVT_CODE_POS,
                                    MSG_EVT_CODE_BITS);
@@ -862,7 +864,7 @@ msg_codec_get_event (const uint8_t * p_buf, uint32_t len,
         }
 
         p_out->t_ms = get_field(p_buf, MSG_EVT_TIME_POS, MSG_EVT_TIME_BITS);
-        b_ok = true;
+        b_ok        = true;
     }
 
     return (b_ok);
@@ -890,7 +892,7 @@ put_field (uint8_t * p_buf, uint32_t pos, uint32_t bits, uint32_t value)
     for (idx = 0U; idx < bits; idx++)
     {
         bit_pos = pos + idx;
-        mask = 0x80U >> (bit_pos % 8U);
+        mask    = 0x80U >> (bit_pos % 8U);
 
         if (0U != ((value >> (bits - 1U - idx)) & 1U))
         {
@@ -1174,3 +1176,4 @@ header_ok (const uint8_t * p_buf, uint32_t len, uint32_t expected_len,
 #endif /* TM_MQTT */
 
 /*** end of file ***/
+

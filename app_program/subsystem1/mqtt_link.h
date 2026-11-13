@@ -225,7 +225,7 @@ typedef struct
  */
 typedef struct
 {
-    mqtt_link_state_t   state;
+    mqtt_link_state_t       state;
     int32_t                 last_error;         /* Last error or status.    */
     uint32_t                connect_count;      /* Sessions established.    */
     uint32_t                disconnect_count;   /* Sessions lost or failed. */
@@ -280,7 +280,7 @@ int32_t mqtt_link_init(void);
  *
  * @param[in] p_netif The station netif.
  */
-void mqtt_link_poll(struct netif * p_netif);
+void mqtt_link_poll(const struct netif * p_netif);
 
 /**
  * @brief Copy the driver status.
@@ -382,3 +382,4 @@ int32_t mqtt_link_receive_command(mqtt_link_command_t * p_command,
 #endif /* MQTT_LINK_H */
 
 /*** end of file ***/
+

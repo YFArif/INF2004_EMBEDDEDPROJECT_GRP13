@@ -104,17 +104,17 @@ s1_telem_on_command (const mqtt_link_command_t * p_cmd,
                                                      1U);
         }
 
-        ack.opcode = cmd.opcode;
-        ack.cmd_id = cmd.cmd_id;
-        p_ack->topic = MQTT_LINK_TOPIC_ACK;
-        p_ack->qos = MQTT_LINK_QOS_1;
+        ack.opcode      = cmd.opcode;
+        ack.cmd_id      = cmd.cmd_id;
+        p_ack->topic    = MQTT_LINK_TOPIC_ACK;
+        p_ack->qos      = MQTT_LINK_QOS_1;
         p_ack->b_retain = false;
         /* The ack is MSG_ACK_BYTES long, which the compile-time check
          * above keeps within uint16_t.
          */
         p_ack->len = (uint16_t)msg_codec_put_ack(&ack, p_ack->payload,
                                                  sizeof(p_ack->payload));
-        b_ok = (MSG_ACK_BYTES == p_ack->len);
+        b_ok       = (MSG_ACK_BYTES == p_ack->len);
     }
 
     return (b_ok);
@@ -164,15 +164,15 @@ s1_telem_heartbeat (uint8_t seq, const s1_telem_hb_in_t * p_in,
             s1_telem_sat_add(p_stats->codec_reject, p_stats->post_failure),
             p_in->command_dropped);
 
-        p_hb->topic = MQTT_LINK_TOPIC_TELEMETRY;
-        p_hb->qos = MQTT_LINK_QOS_0;
+        p_hb->topic    = MQTT_LINK_TOPIC_TELEMETRY;
+        p_hb->qos      = MQTT_LINK_QOS_0;
         p_hb->b_retain = false;
         /* The heartbeat is MSG_HB_BYTES long, which the compile-time
          * check above keeps within uint16_t.
          */
         p_hb->len = (uint16_t)msg_codec_put_heartbeat(
             &hb_fields, p_hb->payload, sizeof(p_hb->payload));
-        b_ok = (MSG_HB_BYTES == p_hb->len);
+        b_ok      = (MSG_HB_BYTES == p_hb->len);
     }
 
     return (b_ok);
@@ -225,7 +225,7 @@ s1_telem_due (uint32_t now_msec, uint32_t period_msec,
 
         if (late_msec < HALF_RANGE_MSEC)
         {
-            b_due = true;
+            b_due        = true;
             *p_next_msec += ((late_msec / period_msec) + 1U) * period_msec;
         }
     }
@@ -459,3 +459,4 @@ s1_telem_fill_live (const s1_telem_src_t * p_src, uint8_t seq,
 #endif /* TM_MQTT */
 
 /*** end of file ***/
+

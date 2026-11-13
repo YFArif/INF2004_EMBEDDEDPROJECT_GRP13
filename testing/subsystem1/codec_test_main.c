@@ -267,9 +267,9 @@ static int64_t  tel_get(const msg_codec_telemetry_t * p_tel,
                         tel_field_t field);
 static void     tel_set(msg_codec_telemetry_t * p_tel, tel_field_t field,
                         int64_t value);
-static bool     put_matches(put_fn_t put, const void * p_in, uint32_t len,
+static bool     put_matches(put_fn_t p_put, const void * p_in, uint32_t len,
                             const uint8_t * p_expect);
-static bool     get_exact(get_fn_t get, const uint8_t * p_bytes,
+static bool     get_exact(get_fn_t p_get, const uint8_t * p_bytes,
                           uint32_t len, void * p_out);
 static bool     tel_same(const msg_codec_telemetry_t * p_a,
                          const msg_codec_telemetry_t * p_b,
@@ -1144,20 +1144,20 @@ unwrap16 (uint32_t prev_full, uint32_t low16)
 /*!
  * @brief Put into a buffer of exactly len bytes and compare the result.
  *
- * @param[in] put      The put adapter.
+ * @param[in] p_put    The put adapter.
  * @param[in] p_in     Fields to encode.
  * @param[in] len      Message length.
  * @param[in] p_expect Expected bytes.
  *
- * @return True if put returned len and wrote exactly p_expect.
+ * @return True if p_put returned len and wrote exactly p_expect.
  */
 static bool
-put_matches (put_fn_t put, const void * p_in, uint32_t len,
+put_matches (put_fn_t p_put, const void * p_in, uint32_t len,
              const uint8_t * p_expect)
 {
     uint8_t * p_buf = alloc_copy(NULL, len, 0U);
     bool      b_ok = (NULL != p_buf)
-                     && (len == put(p_in, p_buf, len))
+                     && (len == p_put(p_in, p_buf, len))
                      && (0 == memcmp(p_buf, p_expect, len));
 
     free(p_buf);
@@ -1168,19 +1168,19 @@ put_matches (put_fn_t put, const void * p_in, uint32_t len,
 /*!
  * @brief Get from a copy of the bytes in a buffer of exactly len bytes.
  *
- * @param[in]  get     The get adapter.
+ * @param[in]  p_get   The get adapter.
  * @param[in]  p_bytes Bytes to decode.
  * @param[in]  len     Message length.
  * @param[out] p_out   Receives the fields.
  *
- * @return What get returned (false if malloc failed).
+ * @return What p_get returned (false if malloc failed).
  */
 static bool
-get_exact (get_fn_t get, const uint8_t * p_bytes, uint32_t len,
+get_exact (get_fn_t p_get, const uint8_t * p_bytes, uint32_t len,
            void * p_out)
 {
     uint8_t * p_buf = alloc_copy(p_bytes, len, len);
-    bool      b_ok = (NULL != p_buf) && get(p_buf, len, p_out);
+    bool      b_ok = (NULL != p_buf) && p_get(p_buf, len, p_out);
 
     free(p_buf);
 
@@ -1305,7 +1305,7 @@ test_golden_tel (void)
 {
     uint32_t                    count = 0U;
     const codec_vectors_tel_t * p_vec = codec_vectors_tel(&count);
-    msg_codec_telemetry_t       in;
+    msg_codec_telemetry_t       tel_in;
     any_out_t                   out;
     uint32_t                    idx;
 
@@ -1313,8 +1313,8 @@ test_golden_tel (void)
 
     for (idx = 0U; idx < count; idx++)
     {
-        tel_input(&p_vec[idx], &in);
-        check(put_matches(put_tel, &in, MSG_TEL_BYTES, p_vec[idx].bytes),
+        tel_input(&p_vec[idx], &tel_in);
+        check(put_matches(put_tel, &tel_in, MSG_TEL_BYTES, p_vec[idx].bytes),
               "put gives the document's bytes", p_vec[idx].p_label);
         check(get_exact(get_tel, p_vec[idx].bytes, MSG_TEL_BYTES, &out)
               && tel_same(&out.tel, &p_vec[idx].out, TF_NONE),
@@ -1411,13 +1411,13 @@ test_fault_constants (void)
         MSG_FAULT_STALL, MSG_FAULT_ENCODER, MSG_FAULT_IMU,
         MSG_FAULT_NO_ECHO, MSG_FAULT_WIFI
     };
-    static const char * const labels[5] =
+    static const char * const p_labels[5] =
     {
         "TEL-F0", "TEL-F1", "TEL-F2", "TEL-F3", "TEL-F4"
     };
     const codec_vectors_tel_t * p_base = tel_find("TEL-2");
     const codec_vectors_tel_t * p_vec;
-    msg_codec_telemetry_t       in;
+    msg_codec_telemetry_t       tel_in;
     msg_codec_telemetry_t       out;
     uint8_t                     bytes[MSG_TEL_BYTES];
     uint32_t                    idx;
@@ -1426,13 +1426,13 @@ test_fault_constants (void)
 
     for (idx = 0U; (NULL != p_base) && (idx < 5U); idx++)
     {
-        p_vec = tel_find(labels[idx]);
-        tel_input(p_base, &in);
-        in.fault_mask = faults[idx];
-        check((NULL != p_vec) && tel_round_trip(&in, &out, bytes)
+        p_vec = tel_find(p_labels[idx]);
+        tel_input(p_base, &tel_in);
+        tel_in.fault_mask = faults[idx];
+        check((NULL != p_vec) && tel_round_trip(&tel_in, &out, bytes)
               && (0 == memcmp(bytes, p_vec->bytes, MSG_TEL_BYTES))
               && (out.fault_mask == (1U << idx)),
-              "MSG_FAULT constant gives the one-hot vector", labels[idx]);
+              "MSG_FAULT constant gives the one-hot vector", p_labels[idx]);
     }
 }
 
@@ -1443,7 +1443,7 @@ static void
 test_rounding (void)
 {
     const codec_vectors_tel_t * p_base = tel_find("TEL-2");
-    msg_codec_telemetry_t       in;
+    msg_codec_telemetry_t       tel_in;
     msg_codec_telemetry_t       out;
     uint8_t                     bytes[MSG_TEL_BYTES];
     const uint32_t              count =
@@ -1459,10 +1459,10 @@ test_rounding (void)
         check(hdeg == g_round_cases[idx].hdeg, "cdeg_to_hdeg result",
               "3.3 table row");
 
-        tel_input(p_base, &in);
-        in.pitch_hdeg = hdeg;
-        in.roll_hdeg = hdeg;
-        check(tel_round_trip(&in, &out, bytes)
+        tel_input(p_base, &tel_in);
+        tel_in.pitch_hdeg = hdeg;
+        tel_in.roll_hdeg = hdeg;
+        check(tel_round_trip(&tel_in, &out, bytes)
               && (g_round_cases[idx].stored
                   == read_bits(bytes, MSG_TEL_PITCH_POS, MSG_TEL_PITCH_BITS))
               && (g_round_cases[idx].stored
@@ -1480,7 +1480,7 @@ test_rounding (void)
 static void
 test_min_max (void)
 {
-    static const msg_codec_heartbeat_t hb[2] =
+    static const msg_codec_heartbeat_t hb_in[2] =
     {
         { 0U, 0U, 0, 0U, 0U, 0U, 0U },
         { 255U, 65535U, -127, 255U, 255U, 255U, 255U }
@@ -1497,7 +1497,8 @@ test_min_max (void)
 
     for (idx = 0U; idx < 2U; idx++)
     {
-        check(hb_round_trip(&hb[idx], &out.hb) && hb_same(&out.hb, &hb[idx]),
+        check(hb_round_trip(&hb_in[idx], &out.hb)
+              && hb_same(&out.hb, &hb_in[idx]),
               "heartbeat round trip", (0U == idx) ? "min" : "max");
         check(evt_round_trip(&evt[idx], &out.evt)
               && evt_same(&out.evt, &evt[idx]),
@@ -1541,7 +1542,7 @@ test_wrap (void)
     static const uint32_t       t_out[3] = { 16777215U, 0U, 0xABCDEFU };
     static const uint32_t       up_in[3] = { 65535U, 65536U, 70000U };
     msg_codec_telemetry_t       tel;
-    msg_codec_heartbeat_t       hb = { 255U, 0U, 0, 0U, 0U, 0U, 0U };
+    msg_codec_heartbeat_t       hb_in = { 255U, 0U, 0, 0U, 0U, 0U, 0U };
     msg_codec_event_t           evt = { { 1U, { 2U, 3U } }, 0U };
     msg_codec_command_t         cmd = { MSG_OP_STOP, 63U };
     msg_codec_ack_t             ack = { MSG_OP_STOP, 63U, MSG_ACK_ACCEPTED };
@@ -1563,11 +1564,11 @@ test_wrap (void)
               "telemetry seq after 255 is 0", "seq");
     }
 
-    check(hb_round_trip(&hb, &out.hb) && (255U == out.hb.seq),
+    check(hb_round_trip(&hb_in, &out.hb) && (255U == out.hb.seq),
           "heartbeat seq 255", "seq");
     /* Same wrap as the telemetry counter above: 255 + 1 narrows to 0. */
-    hb.seq = (uint8_t)(hb.seq + 1U);
-    check(hb_round_trip(&hb, &out.hb) && (0U == out.hb.seq),
+    hb_in.seq = (uint8_t)(hb_in.seq + 1U);
+    check(hb_round_trip(&hb_in, &out.hb) && (0U == out.hb.seq),
           "heartbeat seq after 255 is 0", "seq");
 
     for (idx = 0U; idx < 3U; idx++)
@@ -1575,8 +1576,8 @@ test_wrap (void)
         evt.t_ms = t_in[idx];
         check(evt_round_trip(&evt, &out.evt) && (t_out[idx] == out.evt.t_ms),
               "t_ms keeps its low 24 bits", "t_ms");
-        hb.uptime_s = up_in[idx];
-        check(hb_round_trip(&hb, &out.hb) && (65535U == out.hb.uptime_s),
+        hb_in.uptime_s = up_in[idx];
+        check(hb_round_trip(&hb_in, &out.hb) && (65535U == out.hb.uptime_s),
               "uptime_s saturates at 65535", "uptime_s");
     }
 
@@ -1636,15 +1637,15 @@ static void
 test_tel_cases (const tel_case_t * p_cases, uint32_t count)
 {
     const codec_vectors_tel_t * p_base = tel_find("TEL-1");
-    msg_codec_telemetry_t       in;
+    msg_codec_telemetry_t       tel_in;
     msg_codec_telemetry_t       out;
     uint32_t                    idx;
 
     for (idx = 0U; (NULL != p_base) && (idx < count); idx++)
     {
-        tel_input(p_base, &in);
-        tel_set(&in, p_cases[idx].field, p_cases[idx].value);
-        check(tel_round_trip(&in, &out, NULL)
+        tel_input(p_base, &tel_in);
+        tel_set(&tel_in, p_cases[idx].field, p_cases[idx].value);
+        check(tel_round_trip(&tel_in, &out, NULL)
               && (p_cases[idx].expect == tel_get(&out, p_cases[idx].field))
               && tel_same(&out, &p_base->out, p_cases[idx].field),
               "field decodes as expected, others unchanged",
@@ -1659,36 +1660,36 @@ static void
 test_clamps_other (void)
 {
     static const uint32_t counts[2] = { 256U, 0xFFFFFFFFU };
-    msg_codec_heartbeat_t hb = { 42U, 1234U, -67, 3U, 1U, 0U, 2U };
+    msg_codec_heartbeat_t hb_in = { 42U, 1234U, -67, 3U, 1U, 0U, 2U };
     msg_codec_heartbeat_t expect;
     msg_codec_command_t   cmd = { 4U, 5U };
     msg_codec_ack_t       ack = { 2U, 5U, 4U };
     any_out_t             out;
     uint32_t              idx;
 
-    expect = hb;
-    hb.rssi_dbm = 5;
+    expect = hb_in;
+    hb_in.rssi_dbm = 5;
     expect.rssi_dbm = 0;
-    check(hb_round_trip(&hb, &out.hb) && hb_same(&out.hb, &expect),
+    check(hb_round_trip(&hb_in, &out.hb) && hb_same(&out.hb, &expect),
           "rssi +5 dBm sends 0", "rssi");
-    hb.rssi_dbm = -128;
+    hb_in.rssi_dbm = -128;
     expect.rssi_dbm = -127;
-    check(hb_round_trip(&hb, &out.hb) && hb_same(&out.hb, &expect),
+    check(hb_round_trip(&hb_in, &out.hb) && hb_same(&out.hb, &expect),
           "rssi -128 dBm clamps to -127", "rssi");
-    hb.rssi_dbm = -67;
+    hb_in.rssi_dbm = -67;
     expect.rssi_dbm = -67;
 
     for (idx = 0U; idx < 2U; idx++)
     {
-        hb.connect_count = counts[idx];
-        hb.tel_drop = counts[idx];
-        hb.evt_drop = counts[idx];
-        hb.cmd_reject = counts[idx];
+        hb_in.connect_count = counts[idx];
+        hb_in.tel_drop = counts[idx];
+        hb_in.evt_drop = counts[idx];
+        hb_in.cmd_reject = counts[idx];
         expect.connect_count = 255U;
         expect.tel_drop = 255U;
         expect.evt_drop = 255U;
         expect.cmd_reject = 255U;
-        check(hb_round_trip(&hb, &out.hb) && hb_same(&out.hb, &expect),
+        check(hb_round_trip(&hb_in, &out.hb) && hb_same(&out.hb, &expect),
               "heartbeat counters saturate at 255", "counters");
     }
 
@@ -1826,14 +1827,14 @@ test_rejects_one (const msg_desc_t * p_msg)
 static void
 test_rejects (void)
 {
-    uint32_t                    n = 0U;
+    uint32_t                    count = 0U;
 
-    const codec_vectors_tel_t *       p_tel = codec_vectors_tel(&n);
-    const codec_vectors_liv_t * const p_liv = codec_vectors_liv(&n);
-    const codec_vectors_hb_t *        p_hb = codec_vectors_hb(&n);
-    const codec_vectors_evt_t *       p_evt = codec_vectors_evt(&n);
-    const codec_vectors_cmd_t *       p_cmd = codec_vectors_cmd(&n);
-    const codec_vectors_ack_t *       p_ack = codec_vectors_ack(&n);
+    const codec_vectors_tel_t *       p_tel = codec_vectors_tel(&count);
+    const codec_vectors_liv_t * const p_liv = codec_vectors_liv(&count);
+    const codec_vectors_hb_t *        p_hb = codec_vectors_hb(&count);
+    const codec_vectors_evt_t *       p_evt = codec_vectors_evt(&count);
+    const codec_vectors_cmd_t *       p_cmd = codec_vectors_cmd(&count);
+    const codec_vectors_ack_t *       p_ack = codec_vectors_ack(&count);
     const msg_desc_t                  msgs[MSG_DESC_COUNT] =
     {
         { "telemetry", MSG_TEL_BYTES, MSG_TYPE_TELEMETRY, get_tel, put_tel,
@@ -1864,3 +1865,4 @@ test_rejects (void)
 }
 
 /*** end of file ***/
+
