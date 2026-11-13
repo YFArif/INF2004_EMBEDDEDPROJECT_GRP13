@@ -206,7 +206,7 @@ mutate C6 compile msg_layout.h \
     's/\(MSG_LIV_BYTES  *\)14U/\115U/' \
     "MSG_LIV_BYTES 14 -> 15"
 mutate R1 run msg_codec.c \
-    's/mask = 0x80U >> (bit_pos % 8U);/mask = 0x01U << (bit_pos % 8U);/' \
+    's/\(mask  *= \)0x80U >> (bit_pos % 8U);/\10x01U << (bit_pos % 8U);/' \
     "bit order reversed in put_field"
 mutate R2 run msg_codec.c \
     '/^put_modulo (/,/^}/s/put_field(p_buf, pos, bits, value & field_max(bits));/put_unsigned(p_buf, pos, bits, value);/' \

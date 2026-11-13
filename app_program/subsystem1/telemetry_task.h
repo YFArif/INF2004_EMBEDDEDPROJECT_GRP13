@@ -47,3 +47,4 @@ uint32_t telemetry_task_stack_used(void);
 #endif /* TELEMETRY_TASK_H */
 
 /*** end of file ***/
+

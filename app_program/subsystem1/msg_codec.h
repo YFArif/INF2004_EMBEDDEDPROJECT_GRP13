@@ -216,3 +216,4 @@ bool     msg_codec_get_event(const uint8_t * p_buf, uint32_t len,
 #endif /* MSG_CODEC_H */
 
 /*** end of file ***/
+

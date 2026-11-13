@@ -286,3 +286,4 @@ typedef struct
 #endif /* MSG_LAYOUT_H */
 
 /*** end of file ***/
+

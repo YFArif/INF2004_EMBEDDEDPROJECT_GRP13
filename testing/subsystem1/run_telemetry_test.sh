@@ -183,13 +183,13 @@ mutate M4 run s1_telem.c \
     's/\*p_next_msec += ((late_msec \/ period_msec) + 1U) \* period_msec;/*p_next_msec = now_msec + period_msec;/' \
     "relative heartbeat deadline instead of absolute"
 mutate M5 run s1_telem.c \
-    's/p_ack->topic = MQTT_LINK_TOPIC_ACK;/p_ack->topic = MQTT_LINK_TOPIC_EVENT;/' \
+    's/\(p_ack->topic  *= \)MQTT_LINK_TOPIC_ACK;/\1MQTT_LINK_TOPIC_EVENT;/' \
     "ack published on the event topic"
 mutate M6 run s1_telem.c \
     's/return ((MQTT_LINK_STATE_CONNECTED == state) && (!b_stale));/return (MQTT_LINK_STATE_CONNECTED == state);/' \
     "heartbeat published while the snapshot is stale"
 mutate M7 run s1_telem.c \
-    's/p_hb->qos = MQTT_LINK_QOS_0;/p_hb->qos = MQTT_LINK_QOS_1;/' \
+    's/\(p_hb->qos  *= \)MQTT_LINK_QOS_0;/\1MQTT_LINK_QOS_1;/' \
     "heartbeat sent at QoS 1"
 
 mutate M8 run s1_telem.c \

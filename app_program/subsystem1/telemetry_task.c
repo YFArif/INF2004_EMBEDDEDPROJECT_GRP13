@@ -112,7 +112,7 @@ typedef uint8_t telemetry_task_check_map_t[((MSG_FAULT_STALL == S5_FAULT_STALL)
  * spare. The widest line, in characters:
  *   "S1: wifi fault " 15 + "clear" 5 + " link=" 6 + "-2147483648" 11
  *   + " mqtt=" 6 + state 1 (0 to 4) + " stale=" 7 + 1 (0 or 1)
- *   + " mask=0x" 8 + 2 (at most 1f) + "\n" 1 = 63,
+ *   + " mask=0x" 8 + 2 (at most 1f) + a newline 1 = 63,
  * plus the NUL tm_sprintf() writes = 64 bytes. 80 leaves 16 bytes spare.
  */
 #define WIFI_LINE_BYTES             80U
@@ -184,11 +184,11 @@ telemetry_task_start (void)
     /* NOTE: The casts are safe: telemetry_task has the kernel's task entry
      * signature, which FP stands for, and the stack is 2048 bytes.
      */
-    ctsk.tskatr = TA_HLNG | TA_RNG3 | TA_USERBUF;
-    ctsk.task = (FP)telemetry_task;
+    ctsk.tskatr  = TA_HLNG | TA_RNG3 | TA_USERBUF;
+    ctsk.task    = (FP)telemetry_task;
     ctsk.itskpri = TELEMETRY_TASK_PRI;
-    ctsk.stksz = (SZ)sizeof(g_stack);
-    ctsk.bufptr = g_stack;
+    ctsk.stksz   = (SZ)sizeof(g_stack);
+    ctsk.bufptr  = g_stack;
 #if TK_SUPPORT_SMP
     ctsk.tskatr |= TA_ASSPRC;
     ctsk.assprc = TP_PRC1;
@@ -290,7 +290,9 @@ telemetry_task (INT stacd, void * p_exinf)
         else
         {
             /* A kernel error: wait one pass rather than spin. The cast is
-             * safe: 50 ms fits the kernel's TMO.
+             * safe: 50 ms fits the kernel's TMO. The (void) drops
+             * tk_dly_tsk()'s result: a wait that ends early only brings
+             * the next pass forward.
              */
             g_stats.rx_error = s1_telem_sat_add(g_stats.rx_error, 1U);
             (void)tk_dly_tsk((TMO)TELEMETRY_TASK_RX_WAIT_MSEC);
@@ -616,7 +618,7 @@ send_periodic (bool b_tel_due, bool b_live_due)
     mqtt_link_status_t status;
     const bool         b_fresh = mqtt_link_get_status(&status);
 
-    if (b_fresh && s1_telem_hb_should_publish(status.state, status.b_stale))
+    if (b_fresh && (s1_telem_hb_should_publish(status.state, status.b_stale)))
     {
         collect_sources(&g_src);
 
@@ -721,6 +723,9 @@ now_msec (void)
 {
     SYSTIM otm;
 
+    /* The (void) drops tk_get_otm()'s result, which is always E_OK in this
+     * kernel (kernel/tkernel/time_calls.c).
+     */
     (void)tk_get_otm(&otm);
 
     /* otm.lo is the kernel's UW, an unsigned 32-bit integer on this port,
@@ -741,6 +746,9 @@ uptime_s (void)
     SYSTIM   otm;
     uint32_t seconds = UINT32_MAX;
 
+    /* The (void) drops tk_get_otm()'s result, which is always E_OK in this
+     * kernel (kernel/tkernel/time_calls.c).
+     */
     (void)tk_get_otm(&otm);
 
     if (0 == otm.hi)
@@ -776,3 +784,4 @@ report_stack (void)
 #endif /* TM_MQTT */
 
 /*** end of file ***/
+
