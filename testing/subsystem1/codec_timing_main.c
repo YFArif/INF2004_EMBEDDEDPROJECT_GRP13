@@ -94,7 +94,7 @@ typedef struct
     uint32_t    correct;        /* Timed calls that round-tripped.      */
 } op_stats_t;
 
-static const char * const g_op_name[OP_COUNT] =
+static const char * const gp_op_name[OP_COUNT] =
 {
     "put_telemetry", "get_telemetry", "put_command", "get_command"
 };
@@ -121,13 +121,13 @@ static void     time_put_cmd(op_stats_t * p_s);
 static void     time_get_cmd(op_stats_t * p_s);
 static void     time_overhead(op_stats_t * p_s);
 static void     measure_all(op_stats_t * p_stats);
-static void     print_op(uint32_t core, op_t op, const op_stats_t * p_s);
+static void     print_op(uint32_t core, op_t op_id, const op_stats_t * p_s);
 static void     print_core(uint32_t core, const op_stats_t * p_stats,
                            const op_stats_t * p_overhead);
 static void     gate_core1(const op_stats_t * p_stats);
 static bool     check_all_functions(void);
-static void     core1_task(INT stacd, void * exinf);
-static void     core0_task(INT stacd, void * exinf);
+static void     core1_task(INT stacd, void * p_exinf);
+static void     core0_task(INT stacd, void * p_exinf);
 
 /*!
  * @brief Entry point: wait for the USB console, check every codec
@@ -167,21 +167,21 @@ usermain (void)
  *        which this test app replaces; app.h declares it for every
  *        subsystem).
  *
- * @param[in] entry Task function.
- * @param[in] pri   Initial priority.
- * @param[in] prc   TP_PRC1 (core 0), TP_PRC2 (core 1), or 0 for any.
- * @param[in] name  Name printed if a kernel call fails.
+ * @param[in] p_entry Task function.
+ * @param[in] pri     Initial priority.
+ * @param[in] prc     TP_PRC1 (core 0), TP_PRC2 (core 1), or 0 for any.
+ * @param[in] p_name  Name printed if a kernel call fails.
  *
  * @return The task ID, or a negative error code.
  */
 EXPORT ID
-app_start_task (FP entry, PRI pri, UW prc, const char * name)
+app_start_task (FP p_entry, PRI pri, UW prc, const char * p_name)
 {
     T_CTSK ctsk = { 0 };
-    ID     tid;
-    ER     er;
+    ID     h_task;
+    ER     result;
 
-    ctsk.task = entry;
+    ctsk.task = p_entry;
     ctsk.itskpri = pri;
     ctsk.stksz = TASK_STACK_SIZE;
     ctsk.tskatr = TA_HLNG | TA_RNG3;
@@ -195,18 +195,18 @@ app_start_task (FP entry, PRI pri, UW prc, const char * name)
     (void)prc;
 #endif
 
-    tid = tk_cre_tsk(&ctsk);
-    if (tid >= E_OK)
+    h_task = tk_cre_tsk(&ctsk);
+    if (h_task >= E_OK)
     {
-        er = tk_sta_tsk(tid, 0);
-        CHECK(er, name);
+        result = tk_sta_tsk(h_task, 0);
+        CHECK(result, p_name);
     }
     else
     {
-        CHECK(tid, name);
+        CHECK(h_task, p_name);
     }
 
-    return (tid);
+    return (h_task);
 }
 
 /*!
@@ -375,42 +375,42 @@ cmd_fill (uint32_t idx, msg_codec_command_t * p_cmd)
 static void
 time_put_tel (op_stats_t * p_s)
 {
-    msg_codec_telemetry_t in;
+    msg_codec_telemetry_t tel_in;
     msg_codec_telemetry_t out;
     uint8_t               buf[MSG_TEL_BYTES];
     uint32_t              idx;
-    uint32_t              t0;
+    uint32_t              start_us;
     uint32_t              len;
 
     stats_reset(p_s);
-    tel_fill(0U, &in);
+    tel_fill(0U, &tel_in);
     xip_flush();
-    t0 = now_us();
-    (void)msg_codec_put_telemetry(&in, buf, MSG_TEL_BYTES);
-    p_s->first_us = now_us() - t0;
+    start_us = now_us();
+    (void)msg_codec_put_telemetry(&tel_in, buf, MSG_TEL_BYTES);
+    p_s->first_us = now_us() - start_us;
 
     for (idx = 0U; idx < ITERATIONS; idx++)
     {
-        tel_fill(idx, &in);
-        t0 = now_us();
-        len = msg_codec_put_telemetry(&in, buf, MSG_TEL_BYTES);
-        stats_add(p_s, now_us() - t0);
+        tel_fill(idx, &tel_in);
+        start_us = now_us();
+        len = msg_codec_put_telemetry(&tel_in, buf, MSG_TEL_BYTES);
+        stats_add(p_s, now_us() - start_us);
 
         if ((MSG_TEL_BYTES == len)
             && msg_codec_get_telemetry(buf, MSG_TEL_BYTES, &out)
-            && tel_same(&in, &out))
+            && tel_same(&tel_in, &out))
         {
             p_s->correct++;
         }
     }
 
-    tel_fill(1U, &in);
-    t0 = now_us();
+    tel_fill(1U, &tel_in);
+    start_us = now_us();
     for (idx = 0U; idx < ITERATIONS; idx++)
     {
-        (void)msg_codec_put_telemetry(&in, buf, MSG_TEL_BYTES);
+        (void)msg_codec_put_telemetry(&tel_in, buf, MSG_TEL_BYTES);
     }
-    p_s->batch_us = now_us() - t0;
+    p_s->batch_us = now_us() - start_us;
 }
 
 /*!
@@ -422,41 +422,41 @@ time_put_tel (op_stats_t * p_s)
 static void
 time_get_tel (op_stats_t * p_s)
 {
-    msg_codec_telemetry_t in;
+    msg_codec_telemetry_t tel_in;
     msg_codec_telemetry_t out;
     uint8_t               buf[MSG_TEL_BYTES];
     uint32_t              idx;
-    uint32_t              t0;
+    uint32_t              start_us;
     bool                  b_ok;
 
     stats_reset(p_s);
-    tel_fill(0U, &in);
-    (void)msg_codec_put_telemetry(&in, buf, MSG_TEL_BYTES);
+    tel_fill(0U, &tel_in);
+    (void)msg_codec_put_telemetry(&tel_in, buf, MSG_TEL_BYTES);
     xip_flush();
-    t0 = now_us();
+    start_us = now_us();
     (void)msg_codec_get_telemetry(buf, MSG_TEL_BYTES, &out);
-    p_s->first_us = now_us() - t0;
+    p_s->first_us = now_us() - start_us;
 
     for (idx = 0U; idx < ITERATIONS; idx++)
     {
-        tel_fill(idx, &in);
-        (void)msg_codec_put_telemetry(&in, buf, MSG_TEL_BYTES);
-        t0 = now_us();
+        tel_fill(idx, &tel_in);
+        (void)msg_codec_put_telemetry(&tel_in, buf, MSG_TEL_BYTES);
+        start_us = now_us();
         b_ok = msg_codec_get_telemetry(buf, MSG_TEL_BYTES, &out);
-        stats_add(p_s, now_us() - t0);
+        stats_add(p_s, now_us() - start_us);
 
-        if (b_ok && tel_same(&in, &out))
+        if (b_ok && tel_same(&tel_in, &out))
         {
             p_s->correct++;
         }
     }
 
-    t0 = now_us();
+    start_us = now_us();
     for (idx = 0U; idx < ITERATIONS; idx++)
     {
         (void)msg_codec_get_telemetry(buf, MSG_TEL_BYTES, &out);
     }
-    p_s->batch_us = now_us() - t0;
+    p_s->batch_us = now_us() - start_us;
 }
 
 /*!
@@ -467,42 +467,42 @@ time_get_tel (op_stats_t * p_s)
 static void
 time_put_cmd (op_stats_t * p_s)
 {
-    msg_codec_command_t in;
+    msg_codec_command_t cmd_in;
     msg_codec_command_t out;
     uint8_t             buf[MSG_CMD_BYTES];
     uint32_t            idx;
-    uint32_t            t0;
+    uint32_t            start_us;
     uint32_t            len;
 
     stats_reset(p_s);
-    cmd_fill(0U, &in);
+    cmd_fill(0U, &cmd_in);
     xip_flush();
-    t0 = now_us();
-    (void)msg_codec_put_command(&in, buf, MSG_CMD_BYTES);
-    p_s->first_us = now_us() - t0;
+    start_us = now_us();
+    (void)msg_codec_put_command(&cmd_in, buf, MSG_CMD_BYTES);
+    p_s->first_us = now_us() - start_us;
 
     for (idx = 0U; idx < ITERATIONS; idx++)
     {
-        cmd_fill(idx, &in);
-        t0 = now_us();
-        len = msg_codec_put_command(&in, buf, MSG_CMD_BYTES);
-        stats_add(p_s, now_us() - t0);
+        cmd_fill(idx, &cmd_in);
+        start_us = now_us();
+        len = msg_codec_put_command(&cmd_in, buf, MSG_CMD_BYTES);
+        stats_add(p_s, now_us() - start_us);
 
         if ((MSG_CMD_BYTES == len)
             && msg_codec_get_command(buf, MSG_CMD_BYTES, &out)
-            && (out.opcode == in.opcode) && (out.cmd_id == in.cmd_id))
+            && (out.opcode == cmd_in.opcode) && (out.cmd_id == cmd_in.cmd_id))
         {
             p_s->correct++;
         }
     }
 
-    cmd_fill(1U, &in);
-    t0 = now_us();
+    cmd_fill(1U, &cmd_in);
+    start_us = now_us();
     for (idx = 0U; idx < ITERATIONS; idx++)
     {
-        (void)msg_codec_put_command(&in, buf, MSG_CMD_BYTES);
+        (void)msg_codec_put_command(&cmd_in, buf, MSG_CMD_BYTES);
     }
-    p_s->batch_us = now_us() - t0;
+    p_s->batch_us = now_us() - start_us;
 }
 
 /*!
@@ -514,41 +514,42 @@ time_put_cmd (op_stats_t * p_s)
 static void
 time_get_cmd (op_stats_t * p_s)
 {
-    msg_codec_command_t in;
+    msg_codec_command_t cmd_in;
     msg_codec_command_t out;
     uint8_t             buf[MSG_CMD_BYTES];
     uint32_t            idx;
-    uint32_t            t0;
+    uint32_t            start_us;
     bool                b_ok;
 
     stats_reset(p_s);
-    cmd_fill(0U, &in);
-    (void)msg_codec_put_command(&in, buf, MSG_CMD_BYTES);
+    cmd_fill(0U, &cmd_in);
+    (void)msg_codec_put_command(&cmd_in, buf, MSG_CMD_BYTES);
     xip_flush();
-    t0 = now_us();
+    start_us = now_us();
     (void)msg_codec_get_command(buf, MSG_CMD_BYTES, &out);
-    p_s->first_us = now_us() - t0;
+    p_s->first_us = now_us() - start_us;
 
     for (idx = 0U; idx < ITERATIONS; idx++)
     {
-        cmd_fill(idx, &in);
-        (void)msg_codec_put_command(&in, buf, MSG_CMD_BYTES);
-        t0 = now_us();
+        cmd_fill(idx, &cmd_in);
+        (void)msg_codec_put_command(&cmd_in, buf, MSG_CMD_BYTES);
+        start_us = now_us();
         b_ok = msg_codec_get_command(buf, MSG_CMD_BYTES, &out);
-        stats_add(p_s, now_us() - t0);
+        stats_add(p_s, now_us() - start_us);
 
-        if (b_ok && (out.opcode == in.opcode) && (out.cmd_id == in.cmd_id))
+        if (b_ok && (out.opcode == cmd_in.opcode)
+            && (out.cmd_id == cmd_in.cmd_id))
         {
             p_s->correct++;
         }
     }
 
-    t0 = now_us();
+    start_us = now_us();
     for (idx = 0U; idx < ITERATIONS; idx++)
     {
         (void)msg_codec_get_command(buf, MSG_CMD_BYTES, &out);
     }
-    p_s->batch_us = now_us() - t0;
+    p_s->batch_us = now_us() - start_us;
 }
 
 /*!
@@ -560,14 +561,14 @@ static void
 time_overhead (op_stats_t * p_s)
 {
     uint32_t idx;
-    uint32_t t0;
+    uint32_t start_us;
 
     stats_reset(p_s);
 
     for (idx = 0U; idx < ITERATIONS; idx++)
     {
-        t0 = now_us();
-        stats_add(p_s, now_us() - t0);
+        start_us = now_us();
+        stats_add(p_s, now_us() - start_us);
     }
 }
 
@@ -594,19 +595,19 @@ measure_all (op_stats_t * p_stats)
  * i.e. t * 200 millionths of a percent per us; a command uses t / 300 ms
  * of the NFR15 budget, i.e. t * 1000 / 3 millionths of a percent per us.
  *
- * @param[in] core Core number, 0 or 1.
- * @param[in] op   The operation.
- * @param[in] p_s  Its results.
+ * @param[in] core  Core number, 0 or 1.
+ * @param[in] op_id The operation.
+ * @param[in] p_s   Its results.
  */
 static void
-print_op (uint32_t core, op_t op, const op_stats_t * p_s)
+print_op (uint32_t core, op_t op_id, const op_stats_t * p_s)
 {
     /* sum_us / ITERATIONS is the mean of 32-bit times, so the mean in
      * thousandths of a microsecond fits uint32_t for any mean below about
      * 4.29 s, far above anything measured here.
      */
     const uint32_t mean_milli = (uint32_t)((p_s->sum_us * 1000U) / ITERATIONS);
-    const bool     b_tel = (op <= OP_GET_TEL);
+    const bool     b_tel = (op_id <= OP_GET_TEL);
     uint32_t       cold_upct;
     uint32_t       warm_upct;
 
@@ -622,14 +623,14 @@ print_op (uint32_t core, op_t op, const op_stats_t * p_s)
     }
 
     tm_printf((UB *)"[S1-U08] core %u %s: first call (cold, deployed) %u us;"
-              " batch mean (warm) %u.%03u us\n", core, g_op_name[op],
+              " batch mean (warm) %u.%03u us\n", core, gp_op_name[op_id],
               p_s->first_us, p_s->batch_us / 1000U, p_s->batch_us % 1000U);
     tm_printf((UB *)"[S1-U08] core %u %s: n=%u min %u mean %u.%03u max %u us;"
-              " round trips %u/%u\n", core, g_op_name[op], ITERATIONS,
+              " round trips %u/%u\n", core, gp_op_name[op_id], ITERATIONS,
               p_s->min_us, mean_milli / 1000U, mean_milli % 1000U,
               p_s->max_us, p_s->correct, ITERATIONS);
     tm_printf((UB *)"[S1-U08] core %u %s: CPU share %s deployed %u.%06u,"
-              " warm %u.%06u percent\n", core, g_op_name[op],
+              " warm %u.%06u percent\n", core, gp_op_name[op_id],
               b_tel ? "at 2 Hz of one core:" : "of the 300 ms NFR15 budget:",
               cold_upct / 1000000U, cold_upct % 1000000U,
               warm_upct / 1000000U, warm_upct % 1000000U);
@@ -637,7 +638,7 @@ print_op (uint32_t core, op_t op, const op_stats_t * p_s)
     if (b_tel)
     {
         tm_printf((UB *)"[S1-U08] core %u %s: estimate %u to %u us"
-                  " (information, not a gate)\n", core, g_op_name[op],
+                  " (information, not a gate)\n", core, gp_op_name[op_id],
                   ESTIMATE_LOW_US, ESTIMATE_HIGH_US);
     }
 }
@@ -656,7 +657,7 @@ print_core (uint32_t core, const op_stats_t * p_stats,
     /* As in print_op(): a mean below about 4.29 s fits uint32_t. */
     const uint32_t mean_milli =
         (uint32_t)((p_overhead->sum_us * 1000U) / ITERATIONS);
-    uint32_t       op;
+    uint32_t       op_idx;
 
     tm_printf((UB *)"[S1-U08] round %u, core %u, priority %d%s\n", g_round,
               core, TIMING_PRI,
@@ -666,10 +667,10 @@ print_core (uint32_t core, const op_stats_t * p_stats,
               p_overhead->min_us, mean_milli / 1000U, mean_milli % 1000U,
               p_overhead->max_us);
 
-    for (op = 0U; op < (uint32_t)OP_COUNT; op++)
+    for (op_idx = 0U; op_idx < (uint32_t)OP_COUNT; op_idx++)
     {
         /* op is below OP_COUNT, so it names a valid operation. */
-        print_op(core, (op_t)op, &p_stats[op]);
+        print_op(core, (op_t)op_idx, &p_stats[op_idx]);
     }
 }
 
@@ -714,7 +715,7 @@ check_all_functions (void)
 {
     msg_codec_telemetry_t tel;
     msg_codec_telemetry_t tel_out;
-    msg_codec_heartbeat_t hb = { 42U, 1234U, -67, 3U, 1U, 0U, 2U };
+    msg_codec_heartbeat_t hb_in = { 42U, 1234U, -67, 3U, 1U, 0U, 2U };
     msg_codec_heartbeat_t hb_out;
     msg_codec_event_t     evt = { { 0x21U, { 0x25U, 0x30U } }, 123456U };
     msg_codec_event_t     evt_out;
@@ -731,9 +732,9 @@ check_all_functions (void)
             && msg_codec_get_telemetry(buf, MSG_TEL_BYTES, &tel_out)
             && tel_same(&tel, &tel_out)
             && (MSG_HB_BYTES
-                == msg_codec_put_heartbeat(&hb, buf, MSG_MAX_BYTES))
+                == msg_codec_put_heartbeat(&hb_in, buf, MSG_MAX_BYTES))
             && msg_codec_get_heartbeat(buf, MSG_HB_BYTES, &hb_out)
-            && (hb_out.rssi_dbm == hb.rssi_dbm)
+            && (hb_out.rssi_dbm == hb_in.rssi_dbm)
             && (MSG_EVT_BYTES == msg_codec_put_event(&evt, buf, MSG_MAX_BYTES))
             && msg_codec_get_event(buf, MSG_EVT_BYTES, &evt_out)
             && (evt_out.t_ms == evt.t_ms)
@@ -750,17 +751,17 @@ check_all_functions (void)
  * @brief Core 1 task: measure, print, gate, then hand over to core 0 and
  *        wait for the next round.
  *
- * @param[in] stacd Unused.
- * @param[in] exinf Unused.
+ * @param[in] stacd   Unused.
+ * @param[in] p_exinf Unused.
  */
 static void
-core1_task (INT stacd, void * exinf)
+core1_task (INT stacd, void * p_exinf)
 {
     static op_stats_t stats[OP_COUNT];
     static op_stats_t overhead;
 
     (void)stacd;
-    (void)exinf;
+    (void)p_exinf;
 
     for (;;)
     {
@@ -779,17 +780,17 @@ core1_task (INT stacd, void * exinf)
  * @brief Core 0 task: when woken, measure and print (report only), wait
  *        REPORT_PERIOD_MS, then start the next round on core 1.
  *
- * @param[in] stacd Unused.
- * @param[in] exinf Unused.
+ * @param[in] stacd   Unused.
+ * @param[in] p_exinf Unused.
  */
 static void
-core0_task (INT stacd, void * exinf)
+core0_task (INT stacd, void * p_exinf)
 {
     static op_stats_t stats[OP_COUNT];
     static op_stats_t overhead;
 
     (void)stacd;
-    (void)exinf;
+    (void)p_exinf;
 
     for (;;)
     {

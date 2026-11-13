@@ -334,11 +334,11 @@ sys_now (void)
 
 err_t
 dns_gethostbyname (const char * p_name, ip_addr_t * p_addr,
-                   dns_found_callback found, void * p_arg)
+                   dns_found_callback p_found, void * p_arg)
 {
     (void)p_name;
     (void)p_addr;
-    (void)found;
+    (void)p_found;
     (void)p_arg;
 
     return (ERR_VAL);
@@ -361,25 +361,25 @@ mqtt_client_new (void)
 
 void
 mqtt_set_inpub_callback (mqtt_client_t * p_client,
-                         mqtt_incoming_publish_cb_t publish_cb,
-                         mqtt_incoming_data_cb_t data_cb, void * p_arg)
+                         mqtt_incoming_publish_cb_t p_publish_cb,
+                         mqtt_incoming_data_cb_t p_data_cb, void * p_arg)
 {
     (void)p_client;
-    (void)publish_cb;
-    (void)data_cb;
+    (void)p_publish_cb;
+    (void)p_data_cb;
     (void)p_arg;
 }
 
 err_t
 mqtt_client_connect (mqtt_client_t * p_client, const ip_addr_t * p_addr,
-                     u16_t port, mqtt_connection_cb_t connection_cb,
+                     u16_t port, mqtt_connection_cb_t p_connection_cb,
                      void * p_arg,
                      const struct mqtt_connect_client_info_t * p_info)
 {
     (void)p_client;
     (void)p_addr;
     (void)port;
-    (void)connection_cb;
+    (void)p_connection_cb;
     (void)p_arg;
 
     /* Recorded for test_connect_info(); every other field is unused. */
@@ -397,14 +397,14 @@ mqtt_disconnect (mqtt_client_t * p_client)
 err_t
 mqtt_publish (mqtt_client_t * p_client, const char * p_topic,
               const void * p_payload, u16_t length, u8_t qos, u8_t retain,
-              mqtt_request_cb_t done_cb, void * p_arg)
+              mqtt_request_cb_t p_done_cb, void * p_arg)
 {
     (void)p_client;
     (void)p_payload;
     (void)length;
     (void)qos;
     (void)retain;
-    (void)done_cb;
+    (void)p_done_cb;
     (void)p_arg;
 
     /* Recorded for test_topic_mapping(). build_topic() wrote the topic into
@@ -417,12 +417,12 @@ mqtt_publish (mqtt_client_t * p_client, const char * p_topic,
 
 err_t
 mqtt_sub_unsub (mqtt_client_t * p_client, const char * p_topic, u8_t qos,
-                mqtt_request_cb_t done_cb, void * p_arg, u8_t sub)
+                mqtt_request_cb_t p_done_cb, void * p_arg, u8_t sub)
 {
     (void)p_client;
     (void)p_topic;
     (void)qos;
-    (void)done_cb;
+    (void)p_done_cb;
     (void)p_arg;
     (void)sub;
 
