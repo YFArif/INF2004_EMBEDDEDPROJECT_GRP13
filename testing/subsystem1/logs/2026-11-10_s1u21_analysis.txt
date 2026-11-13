@@ -1,0 +1,137 @@
+S1-U21 analysis: NFR15 diagnosis, stage B (radio power save off)
+Session 2026-11-10, rig run 2026-11-10_185118. Sources: the masked logs
+2026-11-10_s1u21_*.txt, the console's S5 command lines, and a packet
+capture of TCP port 1883 on the Mac's WiFi interface for the whole
+session (local only, never committed; read here for times, ports and
+counts). All times are the Mac clock: markers, console and recorder to
+the ms, broker log to the second.
+
+VERDICT: INCONCLUSIVE (pre-registered rule in the S1-U21 definition).
+Baseline runs 2 and 3 reached 95 percent under 300 ms, so this session
+cannot tell the two images apart. Stage B was not flashed or run. Commit
+0ad813a (the mqtt_utk.c change) is not merged; it stays on the local
+branch s1-pm-off.
+
+Image under test: the baseline only, make NET=lwip MQTT=1 at b2f6653,
+UF2 sha256 a6488a8379b80d9100374235c2efadb953e20c09b3370b655ef9b8ec4c182126
+(a clean build of main at d63276e gives the same file), flashed from a
+copy kept outside the repository. The console has no "S1: wifi pm off"
+line, which only the stage B image prints. The rig's run.env names the
+stage B UF2 because build_make held it when "rig new" ran; it is not the
+image that was flashed. Device: a bare Pico W over the phone hotspot,
+USB power only (tester's report).
+
+Runs (cmd_rtt.py --prefix robot --op stop --count 50; a missing ack is
+a miss)
+  run  sent acked missing dup  under 300 ms  min    median p95    max (ms)
+  1    50   42    8       0    42 (84.0 %)   50.6   70.2   165.9  238.7
+  2    50   50    0       0    50 (100.0 %)  38.4   65.5   126.2  180.9
+  3    50   50    0       0    50 (100.0 %)  43.7   69.4   135.1  298.8
+cmd_rtt.py printed FAIL, PASS and PASS. Broker log: run 1 STOPs from
+19:08:23 to 19:08:48, run 2 from 19:09:00 to 19:09:25, run 3 from
+19:10:06 to 19:10:32.
+
+Session timeline
+  18:51:24.657  marker broker-start (mosquitto 2.1.2 starting 18:51:24)
+  18:52:58.926  marker power-up (boot 1); banner 18:53:00.494;
+                joining 18:53:01.409; status 1 at 18:53:01.649
+  18:54:06.830  status -3 ("authentication rejected"), the first of 8:
+                18:54:06.830, 18:54:48.870, 18:55:30.949, 18:55:50.330,
+                18:56:43.710, 18:57:59.790, 18:59:49.949, 19:03:16.295.
+                Status 1 was held 65.2, 36.8, 36.8, 14.1, 48.1, 70.8,
+                104.9 and 201.1 s before each. Each -3 was followed by a
+                joining line 5.019 to 5.020 s later: the template's 5 s
+                retry, so the TIMER ran at the right rate on this cold
+                boot of the main image.
+                Tester's report: the join kept failing until the hotspot
+                was restarted and other devices were disconnected; the
+                restart time is not in the logs.
+  19:03:25.254  wifi: link up; broker: robot connected 19:03:25
+  19:03:40.715  last console line of boot 1; robot silent on the wire
+                from 19:03:41.997; broker "exceeded timeout" 19:03:49
+                (no power-cut marker)
+  19:05:20.681  marker power-up (boot 2); broker: robot connected
+                19:05:30
+  19:06:26      broker "exceeded timeout": robot silent on the wire from
+                19:06:19.025 to 19:06:26.323 (7.30 s); the robot
+                reconnected at 19:06:27
+  19:08:06.456  console: 47 lines arrive with one time stamp (boot 2's
+                banner and first lines, held in the console ring). No
+                console line between 19:03:40.715 and 19:08:06.456.
+                Boot 2's "no IP yet" and "link up" lines are missing:
+                dropped because the ring was full. Tester's report: the
+                console in window D was stopped and restarted just
+                before baseline run 1.
+  19:08:22      broker "connection closed by client": robot silent on the
+                wire from 19:08:17.177 to 19:08:22.346 (5.17 s), then 4
+                data segments at once (2 retransmitted), robot FIN at
+                19:08:22.397 and RST at 19:08:22.421; console
+                "S1: wifi fault set link=3 mqtt=4 stale=0 mask=0x14" at
+                19:08:22.454
+  19:08:23      run 1 starts (first STOP published)
+  19:08:26.992  robot SYN; broker "New client connected" 19:08:27;
+                console "S1: wifi fault clear link=3 mqtt=3 stale=0
+                mask=0x04" at 19:08:27.194
+  19:12:52.216  marker broker-stop; console "S1: wifi fault set ...
+                mqtt=4" at 19:12:52.254
+
+(a) Run 1 trials 0 to 7: lost, not processed late
+cmd_rtt.py published them from 19:08:23 to 19:08:27, while the robot had
+no MQTT session: it closed its connection at 19:08:22 and reconnected at
+19:08:27. The broker sent none of them to robocar-buddy1: its first
+"Sending PUBLISH to robocar-buddy1" on robot/cmd/dash is at 19:08:27,
+after the reconnect, and is trial 8. The capture has no robot connection
+between the RST at 19:08:22.421 and the SYN at 19:08:26.992. The console
+logged 42 S5 command lines in run 1, the first at 19:08:27.674 (runs 2
+and 3: 50 each). The 8 STOPs never reached the Pico; with no session
+for the robot and no broker persistence, they were not kept.
+
+(b) Retransmissions in the capture
+A data segment counts as retransmitted when it repeats sequence numbers
+already sent on the same TCP connection (connections split at each SYN).
+"up" is robot to Mac, "down" is Mac to robot.
+  run 1: up 0 of 284 data segments, down 0 of 91
+  run 2: up 0 of 331, down 0 of 106
+  run 3: up 1 of 331, down 2 of 107 (19:10:06.890 in both directions,
+         19:10:12.556 down). The 19:10:06.890 pair ends a 2.71 s robot
+         silence and falls on run 3's first STOP: trial 0, 185.6 ms,
+         under 300 ms.
+  whole session, 6 connections: up 50, down 2
+No acked trial reached 300 ms (maxima 238.7, 180.9 and 298.8 ms), so the
+per-trial direction split and the capture check for trials of 300 ms or
+more have nothing to classify in this session. Run 1's 8 misses are (a).
+
+(c) Can the console restart explain the 8 misses? No.
+Code: tm_usb_console_put() (lib/libtm/sysdepend/pico_rp2040/usb/
+usb_console.c lines 268 to 285) appends to a 4 KB ring and, when the ring
+is full, drops and counts the bytes; it never waits on the host. The USB
+service task (priority 3, core 0) runs every 10 ms and, when the host is
+not reading, stops writing without waiting (lines 175 to 202). An unread
+console therefore loses output (boot 2's missing lines) but cannot stall
+a task. Timing: the robot's silences on the wire are not tied to the
+console. They go on after the reader restarted, for example 19:12:24.357
+to 19:12:30.953 (6.60 s), while the console printed about 11 lines a
+second (also about 11 a second during 19:08:16 to 19:08:24).
+
+Observation, not a gate: robot uplink silences
+The capture has 31 robot silences of more than 2 s (2.0 to 7.3 s), before,
+between and inside the runs. In 26 of them the burst that ends the
+silence starts with a retransmission of a segment the Mac had already
+received and acknowledged at once, followed by new segments. This fits a
+TCP acknowledgement from the Mac that did not reach the robot in time,
+holding the robot's later segments (Nagle is on: neither lwIP's mqtt.c
+nor mqtt_link.c turns it off) until lwIP's retransmission timer fired
+(500 ms ticks, doubling). Both MQTT session losses in this session follow
+such a silence. The cause of the lost or late downlink acknowledgements
+is not established; the radio's power save, which stage B turns off, is
+one candidate.
+
+Comparison, the unlogged 8 Nov 2026 baseline (same image, same rig,
+rig run 2026-11-08_192943, files 2026-11-08_s1u21_unlogged_baseline_*):
+  run 1: 42 of 50 (84.0 %), min 42.9, median 82.3, p95 1399.3, max 1939.7
+  run 2: 31 of 50 (62.0 %), min 40.1, median 100.4, p95 1813.3, max 2345.4
+  run 3: 44 of 50 (88.0 %), min 42.8, median 69.8, p95 991.8, max 1556.9
+
+Not covered: stage B; NFR15 on the robot (S1-U06); the cause of the
+downlink acknowledgement losses; why the hotspot rejected the join until
+it was restarted.
