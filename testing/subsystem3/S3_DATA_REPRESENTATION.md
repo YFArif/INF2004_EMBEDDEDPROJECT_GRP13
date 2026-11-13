@@ -19,7 +19,23 @@ This covers firmware v14 (v14b after the review fixes). v16 renamed the types to
 | Analogue pass copy `g_win` (RUN) | 16,384 × 16-bit = 32 KB | 4,096 × 8-bit = 4 KB | −87.5 % |
 | Analogue extrema table | 640 B | 320 B | −50 % |
 
-Size checks in code: compile-time asserts in `s3_api.c` (NAV = 4 B, STATUS = 16 B, line ≤ 40 B), and host test S3-L26 (cal = 8 B, line ≤ 44 B; prints 36).
+Size checks in code: compile-time asserts in `s3_api.c` (NAV = 4 B, STATUS = 16 B, line ≤ 48 B), and host test S3-L26 (cal = 8 B, line ≤ 48 B; prints 36).
+
+### 1a. Current build (12 Nov 2026, commit `a4e3cbc`)
+
+The v14 column above is the state right after the change. Since then the analogue barcode ring was enlarged on purpose, so the S3 RAM total is now higher. Measured with `arm-none-eabi-size` on the integrated build (`make`, DRIVE=0); log `logs/2026-11-12_host_cr1.txt`.
+
+| Item | v13 (before) | v14 | Now | Why it changed |
+|---|---|---|---|---|
+| S3 static RAM (data + bss of S3 objects) | 67,790 B | 9,678 B | **34,983 B** (−48 % vs v13) | Analogue ring and pass copy grew from 2 s to 8.2 s (below) |
+| Analogue sample ring `g_ring` | 32 KB (16-bit, 8 s) | 4 KB (8-bit, 2 s) | **16 KB** (8-bit, 16,384 × 0.5 ms = 8.2 s) | Line following runs at 40–50 mm/s, so one barcode pass (about 130 mm plus margins) takes about 3 s. 2 s cut the start off passes (commits `22fda8a`, `fbc6eb6`: "4 s cut off the A run"). Samples stay 8-bit, so the CR1 saving per sample is kept; only the duration grew. |
+| Analogue pass copy `g_win` | 32 KB | 4 KB | **16 KB** | Must hold a whole ring window |
+| Digital gaps, task copy `g_dur` | — | 64 × 32-bit = 256 B | 256 B (unchanged) | Task-side working copy of the 16-bit `g_gap` ring, widened back to µs for the decoder. Not shared, so not packed. |
+| `s3_line_t` | 80 B | 36 B | 36 B | |
+| `s3_nav_msg_t` / `s3_line_status_t` / `s3_ir_cal_t` | 12 / 32 / 14 B | 4 / 16 / 8 B | 4 / 16 / 8 B | Unchanged, compile-time checked |
+| Whole-firmware bss | 92,260 B | 34,148 B | 62,404 B | Not comparable: includes all five subsystems' later work, not only S3 |
+
+Trade-off: 24 KB more RAM (35 KB of 264 KB in total) buys reliable reads of slow barcode passes. RAM is not the bottleneck; a missed barcode fails the mission. Every packing decision from CR1 (field widths, 8-bit samples, 16-bit gaps, one-word `steer_sp`) is still in place.
 
 ## 2. Field table
 
@@ -74,6 +90,7 @@ These are event-flag bitmasks. `flg_line` uses 3 bits (`LF_ENABLE`, `LF_SEARCH_L
 | Line sensor pair `g_line_lc` | outer bits 0–7, Centre bits 8–15, one 16-bit store | The ISR writes both with one store, so the task can never read a torn pair. |
 | Edge gaps `g_gap[64]` | 16-bit, 16 µs units, saturating | Holds up to 1.048 s. That is above the 300 ms end-of-pass quiet time (RUN). The narrowest bar at 0.3 m/s is about 3 ms, which is about 190 units, so resolution is 0.5 %. |
 | Edge ring indices | `g_gap_wr` (ISR only) and `g_gap_rd` (task only) in separate bytes | single-producer, single-consumer; no lock |
+| Gap working copy `g_dur[64]` | 32-bit µs, task only | Decoder input; private to the barcode task, so not packed (256 B) |
 | `s3_ir_cal_t` | white:12, black:12, valid:1, started:1, filt:12, win_lo:8, win_hi:8 | 12-bit ADC range |
 | `s3_line_t` | int16 gains/error, saturating uint16 µm distances (max 65 mm, longer than any rule threshold), state:3, mode:2, req_mode:2, 6 one-bit flags | |
 | Activity flags `g_act` | bit0 open, bit1 AOUT, bit2 DOUT | |
@@ -118,6 +135,10 @@ The 16 B MQTT figure is UNVERIFIED end to end. It depends on Buddy 1 publishing 
 
 All of this is host or compile evidence. **No hardware run of v14 yet**, so the on-robot behaviour is UNVERIFIED.
 
+Re-run on 12 Nov 2026 (commit `a4e3cbc`, log `logs/2026-11-12_host_cr1.txt`): all four host programs pass (`test_line`, `test_nav`, `test_analog`, `test_code39`, 0 failures); `s3_line_t` 36 B, `s3_ir_cal_t` 8 B; the ARM build compiles with the size asserts.
+
+Still to show on the car ("nothing broke or got slower"): S3-U07 (line step and sampler ISR time) and S3-U10 (barcodes read at mission speed). Line tracking itself was run on the car on 12 Nov (5 gain sets, `Projects/log/COM4_2026_11_12.17.*`).
+
 ## 6. Performance
 
 - **RAM:** measured; see section 1.
@@ -129,7 +150,7 @@ All of this is host or compile evidence. **No hardware run of v14 yet**, so the 
 1. `cmd` is 3 bits, not 2, because there are 5 values including NONE.
 2. IF-01 is a message buffer (`mbf_nav`), not a mailbox. It copies 4 bytes, so there is no buffer-lifetime rule.
 3. The edge buffer is 128 B (64 × 16-bit), which leaves room for 2 barcodes of 30 edges.
-4. The RUN analogue ring is 2 s. That covers a 141 mm barcode at ≥ 0.10 m/s plus margins. Slower passes are flagged `TOO SLOW, start lost`, and the digital path still decodes them.
+4. The RUN analogue ring was 2 s in v14 (a 141 mm barcode at ≥ 0.10 m/s plus margins). It is now 8.2 s (16 KB), because line following runs at 40–50 mm/s and 2 s cut the start off real passes; see section 1a. Slower passes are still flagged `TOO SLOW, start lost`, and the digital path still decodes them.
 
 ## 8. Review fixes in v14b
 

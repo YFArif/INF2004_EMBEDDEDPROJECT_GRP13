@@ -1,0 +1,107 @@
+# S3 host tests + Change Requirement 1 RAM, commit a4e3cbc, 2026-11-12
+# gcc: gcc.exe (tdm64-1) 10.3.0
+
+== line
+[TEST] S3-L01   PASS  uncalibrated -> steer 0
+[TEST] S3-L02   PASS  both grey (centred) -> steer ~0, FOLLOW
+[TEST] S3-L03   PASS  car drifted right (left darker, right lighter) -> steer LEFT, Kp x e
+[TEST] S3-L04   PASS  car drifted left (right darker) -> steer RIGHT, same size
+[TEST] S3-L05   PASS  mirror mount: left sensor lighter -> steer RIGHT
+  half drift -> steer -366, black/white -> steer -600 (Kp 60)
+[TEST] S3-L06   PASS  steer proportional to the difference; one sensor white -> flagged
+[TEST] S3-L07   PASS  both white: keep the last PD steer (LEFT) for the first 15 mm
+[TEST] S3-L07b  PASS  both white 18-24 mm -> soft LEFT, rising, not yet LOST
+[TEST] S3-L08   PASS  40 mm both white -> 1 LOST event, keeps LEFT; line back -> FOLLOW
+[TEST] S3-L08b  PASS  edge grey -> straight; edge fades to white -> firm RIGHT, no LOST
+[TEST] S3-L09   PASS  30 mm white gap -> not lost
+[TEST] S3-L10   PASS  stopped on white for 2 s -> no LOST
+[TEST] S3-L11   PASS  both black 100 mm -> 1 junction event, steer 0; 3 mm -> none; next one re-arms
+[TEST] S3-L11b  PASS  807 + 674 -> junction; turn 1000 + 250 -> no junction
+[TEST] S3-L12   PASS  calibration relax keeps >= 600 counts range
+[TEST] S3-L13   PASS  one-off extreme fades to real black in 30 s
+[TEST] S3-L14   PASS  2 min of white only -> black level unchanged
+[TEST] S3-L15   PASS  disabled: steer 0, no events
+[TEST] S3-L16   PASS  search from LEFT: steer 0, found -> FOLLOW (not restarted), off line -> RIGHT
+[TEST] S3-L17   PASS  search from RIGHT: found, off line -> LEFT
+[TEST] S3-L18   PASS  D adds on a sudden change; first step after LOST is P only
+[TEST] S3-L19   PASS  dt 1 us, Kd max: D clamped to its limit
+[TEST] S3-L20   PASS  black stuck at 3600 recovers within 60 s; real black reads black again
+[TEST] S3-L21   PASS  dv: follow 40, OFF LINE / LOST x 5/4 = 50, clamp 511
+[TEST] S3-L22   PASS  boost 300: none at |e| 500, -700 + 300 x -200 / 100 -> full lock
+[TEST] S3-L23   PASS  edge sensor white -> RIGHT (guard side), whatever the noise
+[TEST] S3-L42   PASS  edge sensor white -> guard side (RIGHT)
+[TEST] S3-L41   PASS  car lifted (4050) not learned: tape 2700 reads black
+  sizeof(s3_ir_cal_t)=8 (was 14)  sizeof(s3_line_t)=36 (was 80)
+[TEST] S3-L26   PASS  calibration 14 -> 8 B, line state 80 -> <= 48 B
+[TEST] S3-N01   PASS  A/B/C/D -> L/R/S/U, others NONE
+ALL PASSED: 0 failure(s)
+exit 0
+
+== nav
+[TEST] S3-C01   PASS  all 43 Code 39 characters decode forwards and backwards (ratio 3 and 2)
+[TEST] S3-C02   PASS  every character survives the 6-bit index round trip; unknown -> 63
+[TEST] S3-N01   PASS  default map ABCD
+[TEST] S3-N02   PASS  "DCBA" -> D=LEFT C=RIGHT B=STRAIGHT A=U-TURN
+[TEST] S3-N03   PASS  "zx1w" accepted (upper-cased); letters not in the map -> NONE
+[TEST] S3-N04   PASS  short/long/repeat/'*'/invalid/NULL rejected, old map kept
+ALL PASSED: 0 failure(s)
+exit 0
+
+== an
+[TEST] sharp *A* at 0.30 m/s              PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 27 ms)
+[TEST] blurred 1.5 mm *A* at 0.30 m/s     PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 12 ms)
+[TEST] blurred 1.8 mm *Z* at 0.15 m/s     PASS  (elements=29 extrema=31 res=0 ch=Z, trigger gap max 20 ms)
+[TEST] blurred 1.5 mm *A* reversed        PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 12 ms)
+[TEST] blurred 1.5 mm *A* at 0.40 m/s     PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 9 ms)
+[TEST] too blurred (3 mm) -> reject       PASS  (elements=13 extrema=15 res=1 ch=?, trigger gap max 18 ms)
+[TEST] hand 25 mm/s, swing 1500, blur 1.5 PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 176 ms)
+[TEST] hand 50 mm/s, swing 1500, blur 1.8 PASS  (elements=29 extrema=31 res=0 ch=Z, trigger gap max 92 ms)
+[TEST] car: blur 2.2 mm, noise, 50 mm/s   PASS  (elements=29 extrema=31 res=0 ch=A, trigger gap max 56 ms)
+[TEST] car: blur 2.4 mm -> reject, not wrong PASS  (elements=23 extrema=25 res=1 ch=?, trigger gap max 129 ms)
+[TEST] car: blur 2.6 mm -> reject, not wrong PASS  (elements=13 extrema=15 res=1 ch=?, trigger gap max 77 ms)
+[TEST] noise spikes inside stripes, 50 mm/s PASS  (elements=31 extrema=51 res=0 ch=A, trigger gap max 69 ms)
+[TEST] noise spikes, reversed *Z*, 40 mm/s PASS  (elements=31 extrema=55 res=0 ch=Z, trigger gap max 82 ms)
+[TEST] plain white -> no edges            PASS  (elements=0)
+[TEST] car: DOUT flicker inside a bar     PASS  (stripes 31 -> 29, ch=A)
+[TEST] car: 6 ms narrow bar kept          PASS  (stripes 29 -> 29, ch=A)
+[TEST] car: pass starts on black          PASS  (stripes 30 -> 30, ch=A)
+ALL PASSED: 0 failure(s)
+exit 0
+
+== c39
+[TEST] sample *A*                   PASS  (res=0 ch=A rev=0)
+[TEST] sample *Z*                   PASS  (res=0 ch=Z rev=0)
+[TEST] *A* read backwards           PASS  (res=0 ch=A rev=1)
+[TEST] *A* at quarter speed         PASS  (res=0 ch=A rev=0)
+[TEST] *A* gradual slow-down        PASS  (res=0 ch=A rev=0)
+[TEST] only 27 elements             PASS  (res=1 ch=? rev=9)
+[TEST] blurred bar -> reject        PASS  (res=2 ch=? rev=9)
+[TEST] all-equal noise -> reject    PASS  (res=2 ch=? rev=9)
+ALL PASSED: 0 failure(s)
+exit 0
+
+== ARM integrated build (make, DRIVE=0), arm-none-eabi-size of S3 objects
+   text	   data	    bss	    dec	    hex	filename
+    632	      0	     18	    650	    28a	../../../build_make/mtkernel_3/app_program/subsystem3/drv_adc.o
+   1148	      0	  33192	  34340	   8624	../../../build_make/mtkernel_3/app_program/subsystem3/drv_barcode.o
+   1316	      0	    640	   1956	    7a4	../../../build_make/mtkernel_3/app_program/subsystem3/s3_analog.o
+   1761	      4	     63	   1828	    724	../../../build_make/mtkernel_3/app_program/subsystem3/s3_api.o
+   1248	      4	      0	   1252	    4e4	../../../build_make/mtkernel_3/app_program/subsystem3/s3_code39.o
+   2568	      0	      0	   2568	    a08	../../../build_make/mtkernel_3/app_program/subsystem3/s3_line.o
+     62	      0	      0	     62	     3e	../../../build_make/mtkernel_3/app_program/subsystem3/subsystem3.o
+      0	      0	      0	      0	      0	../../../build_make/mtkernel_3/app_program/subsystem3/subsystem3_test.o
+   1523	      0	    969	   2492	    9bc	../../../build_make/mtkernel_3/app_program/subsystem3/task_barcode.o
+    398	      0	     24	    422	    1a6	../../../build_make/mtkernel_3/app_program/subsystem3/task_consumer.o
+      4	      0	      0	      4	      4	../../../build_make/mtkernel_3/app_program/subsystem3/task_drive_test.o
+   1850	      4	     65	   1919	    77f	../../../build_make/mtkernel_3/app_program/subsystem3/task_line.o
+  12510	     12	  34971	  47493	   b985	(TOTALS)
+
+== largest S3 buffers
+00000000 00000134 T drv_barcode_sample_isr
+00000000 00000198 T drv_barcode_take_pass
+00000000 00004000 b g_ring
+00000000 00004000 b g_win
+
+== whole firmware
+   text	   data	    bss	    dec	    hex	filename
+ 327848	    500	  62404	 390752	  5f660	../../../build_make/mtk3pico_smp1_usb_cdc_wifi.elf

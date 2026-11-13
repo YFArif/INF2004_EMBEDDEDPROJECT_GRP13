@@ -70,7 +70,7 @@ fixed.
 | GP19                   | _example:_ S1 | external LED (LED + 330 Ω to GND)                      |
 | GP20                   | S5            | Button 1: start/stop, held 2 s = reset (`vehicle_ctrl_task`, polled). `make TEST=1` images: read-only "next step" button for the S2 and S5 tests; the controller ignores it there |
 | GP21                   | S5            | Button 2: calibrate (`vehicle_ctrl_task`, polled)      |
-| GP22                   |               |                                                        |
+| GP22                   | S3            | Piezo buzzer, PWM slice 3A, 2.7 kHz: one beep per decoded barcode (`task_barcode`). S5's planned fault pattern must go through S3 or agree a share |
 | GP26                   | S3            | outer line IR AOUT, ADC0 (robot's right)               |
 | GP27                   | S3            | Centre line IR AOUT, ADC1                              |
 | GP28                   | S3            | barcode AOUT, ADC2 (rewired 28 Oct)                    |

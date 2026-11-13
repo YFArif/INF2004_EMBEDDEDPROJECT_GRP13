@@ -39,6 +39,13 @@
 #define ODOM_16_MASK    (0xFFFFu)
 
 /** Which path a result came from (s3_nav_msg_t.source). */
+/* Piezo buzzer on GP22 (PWM slice 3A; 3B is GP7, a plain GPIO input, so
+ * it is unaffected). 125 MHz / 46 296 = 2.7 kHz, 50 % duty.
+ * shortcut: relies on S2's motor init having taken PWM out of reset; if
+ * not, the beep is silent (never harmful). */
+#define BUZZER_PIN      (22u)
+#define BUZZER_TOP      (46296u)
+
 #define SRC_BOTH        (1u)
 #define SRC_ANALOG      (2u)
 #define SRC_DIGITAL     (3u)
@@ -53,6 +60,7 @@ static void         barcode_task(INT stacd, void * p_exinf);
 static void         hardware_start(void);
 static bool         pass_decode(char * p_ch, uint8_t * p_rev, uint8_t * p_src);
 static void         nav_publish(char ch, uint8_t rev, uint8_t src);
+static void         beep(void);
 #if (1 == S3_BC_VERBOSE)
 static void         result_print(s3_c39_result_t res, char ch);
 static void         stripes_print(char const * p_tag,
@@ -307,6 +315,7 @@ nav_publish (char ch, uint8_t rev, uint8_t src)
     {
         tm_printf((UB *) "S3 NAV '%c'%s not in today's map: ignored\n", ch,
                   (0u != rev) ? " (read backwards)" : "");
+        beep();                     /* Decoded, so beep even if unmapped. */
         return;
     }
     seq     = (seq + 1u) & NAV_SEQ_MASK;
@@ -320,6 +329,34 @@ nav_publish (char ch, uint8_t rev, uint8_t src)
               s3_nav_name((s3_nav_cmd_t) msg.cmd),
               (0u != rev) ? " (read backwards)" : "",
               (E_OK == er) ? "" : "  [mbf_nav full: nobody is reading it]");
+    beep();                         /* After the send: S5 is not delayed. */
+}
+
+/*!
+ * @brief One S3_BC_BEEP_MS beep on GP22 (0 = off). Blocks task_barcode for
+ *        that long only, which is fine: it is event-driven and the next
+ *        barcode cannot come within S3_BC_COOLDOWN_MS.
+ */
+static void
+beep (void)
+{
+    static bool b_ready;
+
+    if (0u == S3_BC_BEEP_MS)
+    {
+        return;
+    }
+    if (!b_ready)
+    {
+        (void) pwm_set_wrap(BUZZER_PIN, BUZZER_TOP);
+        (void) pwm_set_cc(BUZZER_PIN, 0u);      /* Silent until a beep. */
+        (void) pwm_set_pin(BUZZER_PIN);
+        (void) pwm_set_enabled(BUZZER_PIN, TRUE);
+        b_ready = true;
+    }
+    (void) pwm_set_cc(BUZZER_PIN, BUZZER_TOP / 2u);
+    tk_dly_tsk(S3_BC_BEEP_MS);
+    (void) pwm_set_cc(BUZZER_PIN, 0u);          /* Output held low.     */
 }
 
 #if (1 == S3_BC_VERBOSE)
