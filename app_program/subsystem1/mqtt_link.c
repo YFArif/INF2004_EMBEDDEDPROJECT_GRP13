@@ -256,7 +256,7 @@ static uint32_t                 g_session_start_msec = 0U;
 static uint32_t                 g_backoff_msec = 0U;
 
 /* Suffix of each topic ID, indexed by the ID. */
-static const char * const       g_topic_suffix[] =
+static const char * const       gp_topic_suffix[] =
 {
     [MQTT_LINK_TOPIC_TELEMETRY] = TOPIC_TELEMETRY,
     [MQTT_LINK_TOPIC_EVENT]     = TOPIC_EVENT,
@@ -266,8 +266,8 @@ static const char * const       g_topic_suffix[] =
 /* One suffix for each topic ID: an ID added without a suffix stops the
  * build here.
  */
-typedef uint8_t mqtt_link_check_table_t[((sizeof(g_topic_suffix) \
-    / sizeof(g_topic_suffix[0])) == MQTT_LINK_TOPIC_COUNT) ? 1 : -1];
+typedef uint8_t mqtt_link_check_table_t[((sizeof(gp_topic_suffix) \
+    / sizeof(gp_topic_suffix[0])) == MQTT_LINK_TOPIC_COUNT) ? 1 : -1];
 
 static void publish_status(void);
 static void build_topics(void);
@@ -965,9 +965,9 @@ submit_pending (uint32_t now_msec)
     err_t result = ERR_OK;
 
     /* take_pending() lets only a topic ID below MQTT_LINK_TOPIC_COUNT into
-     * g_pending, so the index is inside g_topic_suffix.
+     * g_pending, so the index is inside gp_topic_suffix.
      */
-    build_topic(topic, g_topic_suffix[g_pending.topic_id]);
+    build_topic(topic, gp_topic_suffix[g_pending.topic_id]);
 
     /* The retain flag is 0 or 1, so it fits lwIP's 8-bit argument. */
     result = mqtt_publish(gp_client, topic, g_pending.payload,

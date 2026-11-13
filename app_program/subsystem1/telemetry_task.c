@@ -172,7 +172,7 @@ int32_t
 telemetry_task_start (void)
 {
     T_CTSK   ctsk = {0};
-    ID       tid = 0;
+    ID       h_task = 0;
     ER       result = E_OK;
     uint32_t idx = 0U;
 
@@ -194,15 +194,15 @@ telemetry_task_start (void)
     ctsk.assprc = TP_PRC1;
 #endif
 
-    tid = tk_cre_tsk(&ctsk);
+    h_task = tk_cre_tsk(&ctsk);
 
-    if (tid < E_OK)
+    if (h_task < E_OK)
     {
-        result = tid;
+        result = h_task;
     }
     else
     {
-        result = tk_sta_tsk(tid, 0);
+        result = tk_sta_tsk(h_task, 0);
     }
 
     if (E_OK == result)

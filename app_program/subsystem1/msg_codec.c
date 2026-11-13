@@ -168,7 +168,7 @@ typedef uint8_t msg_codec_check_evt_t[((MSG_EVT_CODE_POS == 8U)
 /* 2. The event record has no padding, so its size is exactly the bytes
  *    the layout gives it.
  */
-typedef uint8_t msg_codec_check_rec_t[(sizeof(msg_event_t)
+typedef uint8_t msg_codec_check_rec_t[(sizeof(msg_layout_event_t)
     == MSG_EVENT_RECORD_BYTES) ? 1 : -1];
 
 /* 3. HDEG_MIN and HDEG_MAX are exactly the range of the 7-bit pitch and

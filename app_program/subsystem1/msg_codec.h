@@ -133,8 +133,8 @@ typedef struct
 /** Event as sent on the wire: the record plus a time stamp. */
 typedef struct
 {
-    msg_event_t event;
-    uint32_t    t_ms;           /* Uptime in ms, low 24 bits sent.      */
+    msg_layout_event_t  event;
+    uint32_t            t_ms;   /* Uptime in ms, low 24 bits sent.      */
 } msg_codec_event_t;
 
 /*
