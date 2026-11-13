@@ -127,7 +127,7 @@ typedef uint8_t telemetry_task_check_map_t[((MSG_FAULT_STALL == S5_FAULT_STALL)
 static uint64_t         g_stack[STACK_WORDS];
 
 /* Written by telemetry_task only. */
-static s1_telem_stats_t g_stats;
+static s1_telem_stats_t g_stats = {0U};
 static uint8_t          g_hb_seq = 0U;
 static uint8_t          g_tel_seq = 0U;
 static uint8_t          g_live_seq = 0U;
@@ -157,6 +157,7 @@ static void     publish_periodic(const uint8_t * p_buf, uint16_t len,
 static uint32_t now_msec(void);
 static uint32_t uptime_s(void);
 #if S1_TELEM_STACK_REPORT
+static uint32_t telemetry_task_stack_used(void);
 static void     report_stack(void);
 #endif
 
@@ -215,27 +216,6 @@ telemetry_task_start (void)
      * conversion keeps every value.
      */
     return ((int32_t)result);
-}
-
-/*!
- * @brief How much of telemetry_task's stack has been used so far.
- *
- * @return Bytes from the top of the stack to the deepest word written.
- */
-uint32_t
-telemetry_task_stack_used (void)
-{
-    uint32_t untouched = 0U;
-
-    /* The stack grows down: count the words at the bottom that still hold
-     * the fill pattern.
-     */
-    while ((untouched < STACK_WORDS) && (STACK_FILL == g_stack[untouched]))
-    {
-        untouched++;
-    }
-
-    return ((STACK_WORDS - untouched) * 8U);
 }
 
 /*!
@@ -763,6 +743,27 @@ uptime_s (void)
 }
 
 #if S1_TELEM_STACK_REPORT
+/*!
+ * @brief How much of telemetry_task's stack has been used so far.
+ *
+ * @return Bytes from the top of the stack to the deepest word written.
+ */
+static uint32_t
+telemetry_task_stack_used (void)
+{
+    uint32_t untouched = 0U;
+
+    /* The stack grows down: count the words at the bottom that still hold
+     * the fill pattern.
+     */
+    while ((untouched < STACK_WORDS) && (STACK_FILL == g_stack[untouched]))
+    {
+        untouched++;
+    }
+
+    return ((STACK_WORDS - untouched) * 8U);
+}
+
 /*!
  * @brief Print the stack high-water mark (S1_TELEM_STACK_REPORT builds).
  */

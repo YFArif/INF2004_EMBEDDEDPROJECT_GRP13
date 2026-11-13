@@ -280,7 +280,7 @@ int32_t mqtt_link_init(void);
  *
  * @param[in] p_netif The station netif.
  */
-void mqtt_link_poll(struct netif * p_netif);
+void mqtt_link_poll(const struct netif * p_netif);
 
 /**
  * @brief Copy the driver status.

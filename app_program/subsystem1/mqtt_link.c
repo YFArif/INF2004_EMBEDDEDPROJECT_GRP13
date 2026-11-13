@@ -273,11 +273,13 @@ static void publish_status(void);
 static void build_topics(void);
 static int32_t check_config(void);
 static int32_t start_link(void);
-static void run_state(struct netif * p_netif);
-static void step_idle(struct netif * p_netif, uint32_t now_msec);
+static void run_state(const struct netif * p_netif);
+static void step_idle(const struct netif * p_netif, uint32_t now_msec);
 static void step_resolving(uint32_t now_msec);
-static void step_connecting(struct netif * p_netif, uint32_t now_msec);
-static void step_connected(struct netif * p_netif, uint32_t now_msec);
+static void step_connecting(const struct netif * p_netif,
+                            uint32_t now_msec);
+static void step_connected(const struct netif * p_netif,
+                           uint32_t now_msec);
 static void step_backoff(uint32_t now_msec);
 static void step_subscribe(uint32_t now_msec);
 static void step_publish(uint32_t now_msec);
@@ -339,7 +341,7 @@ mqtt_link_init (void)
  * @param[in] p_netif The station netif.
  */
 void
-mqtt_link_poll (struct netif * p_netif)
+mqtt_link_poll (const struct netif * p_netif)
 {
     /* Stamped unconditionally, even before mqtt_link_init() has succeeded
      * or p_netif is usable, so mqtt_link_get_status()'s b_stale always
@@ -611,7 +613,7 @@ start_link (void)
  * @param[in] p_netif The station netif.
  */
 static void
-run_state (struct netif * p_netif)
+run_state (const struct netif * p_netif)
 {
     const uint32_t now_msec = sys_now();
 
@@ -648,7 +650,7 @@ run_state (struct netif * p_netif)
  * @brief IDLE: wait for the link and an address, then find the broker.
  */
 static void
-step_idle (struct netif * p_netif, uint32_t now_msec)
+step_idle (const struct netif * p_netif, uint32_t now_msec)
 {
     if (link_ready(p_netif))
     {
@@ -698,7 +700,7 @@ step_resolving (uint32_t now_msec)
  * @brief CONNECTING: wait for the broker, within a time limit.
  */
 static void
-step_connecting (struct netif * p_netif, uint32_t now_msec)
+step_connecting (const struct netif * p_netif, uint32_t now_msec)
 {
     if (!link_ready(p_netif))
     {
@@ -719,7 +721,7 @@ step_connecting (struct netif * p_netif, uint32_t now_msec)
  * @brief CONNECTED: subscribe, announce, then send queued messages.
  */
 static void
-step_connected (struct netif * p_netif, uint32_t now_msec)
+step_connected (const struct netif * p_netif, uint32_t now_msec)
 {
     g_status.connected_msec = now_msec - g_session_start_msec;
 
@@ -1090,8 +1092,11 @@ next_backoff (bool b_stable)
 static bool
 link_ready (const struct netif * p_netif)
 {
-    return ((0U != netif_is_up(p_netif))
-            && (0U != netif_is_link_up(p_netif))
+    /* lwIP's netif_is_up() and netif_is_link_up() yield an int (a ?: of
+     * two u8_t values), so they are compared with a signed 0.
+     */
+    return ((0 != netif_is_up(p_netif))
+            && (0 != netif_is_link_up(p_netif))
             && (!ip4_addr_isany_val(*netif_ip4_addr(p_netif))));
 }
 

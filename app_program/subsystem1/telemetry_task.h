@@ -40,7 +40,6 @@
 #define TELEMETRY_TASK_RX_WAIT_MSEC 50U     /* Longest wait per pass.    */
 
 int32_t  telemetry_task_start(void);
-uint32_t telemetry_task_stack_used(void);
 
 #endif /* TM_MQTT */
 
