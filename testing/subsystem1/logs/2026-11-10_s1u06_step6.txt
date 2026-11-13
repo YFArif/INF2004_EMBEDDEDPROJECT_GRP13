@@ -1,0 +1,5 @@
+raw 1409: ack opcode 0 (INVALID), id 9, rejected, after 75.7 ms
+raw 1585: ack opcode 0 (INVALID), id 0, rejected, after 53.3 ms
+raw 14: ack opcode 0 (INVALID), id 0, rejected, after 76.4 ms
+raw 148500: no ack within 2.0 s
+raw 148500: no ack within 2.0 s

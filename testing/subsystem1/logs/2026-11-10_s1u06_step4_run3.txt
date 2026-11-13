@@ -1,0 +1,53 @@
+trial  0 id  0 STOP:    62.7 ms, queued
+trial  1 id  1 STOP:    47.8 ms, queued
+trial  2 id  2 STOP:    47.4 ms, queued
+trial  3 id  3 STOP:    49.5 ms, queued
+trial  4 id  4 STOP:    53.1 ms, queued
+trial  5 id  5 STOP:    55.0 ms, queued
+trial  6 id  6 STOP:  2998.9 ms, queued
+trial  7 id  7 STOP:  2559.8 ms, queued
+trial  8 id  8 STOP:  2061.8 ms, queued
+trial  9 id  9 STOP:  1566.8 ms, queued
+trial 10 id 10 STOP:  1101.0 ms, queued
+trial 11 id 11 STOP:   593.8 ms, queued
+trial 12 id 12 STOP:   100.8 ms, queued
+trial 13 id 13 STOP:    83.0 ms, queued
+trial 14 id 14 STOP:    66.4 ms, queued
+trial 15 id 15 STOP:    63.6 ms, queued
+trial 16 id 16 STOP:   999.3 ms, queued
+trial 17 id 17 STOP:   521.3 ms, queued
+trial 18 id 18 STOP:    65.9 ms, queued
+trial 19 id 19 STOP:    66.6 ms, queued
+trial 20 id 20 STOP:    69.9 ms, queued
+trial 21 id 21 STOP:    71.1 ms, queued
+trial 22 id 22 STOP:    53.3 ms, queued
+trial 23 id 23 STOP:    54.3 ms, queued
+trial 24 id 24 STOP:    48.9 ms, queued
+trial 25 id 25 STOP:    46.9 ms, queued
+trial 26 id 26 STOP:    49.7 ms, queued
+trial 27 id 27 STOP:    58.5 ms, queued
+trial 28 id 28 STOP:    60.0 ms, queued
+trial 29 id 29 STOP:    73.9 ms, queued
+trial 30 id 30 STOP:    54.1 ms, queued
+trial 31 id 31 STOP:    75.0 ms, queued
+trial 32 id 32 STOP:    45.1 ms, queued
+trial 33 id 33 STOP:  4201.7 ms, queued
+trial 34 id 34 STOP:  3721.3 ms, queued
+trial 35 id 35 STOP:  3222.2 ms, queued
+trial 36 id 36 STOP:  2740.4 ms, queued
+trial 37 id 37 STOP:  2244.8 ms, queued
+trial 38 id 38 STOP: no ack
+trial 39 id 39 STOP: no ack
+trial 40 id 40 STOP: no ack
+trial 41 id 41 STOP:   189.6 ms, queued
+trial 42 id 42 STOP:  1094.4 ms, queued
+trial 43 id 43 STOP:   595.2 ms, queued
+trial 44 id 44 STOP:    98.2 ms, queued
+trial 45 id 45 STOP:    65.0 ms, queued
+trial 46 id 46 STOP:    47.2 ms, queued
+trial 47 id 47 STOP:    50.8 ms, queued
+trial 48 id 48 STOP:    47.9 ms, queued
+trial 49 id 49 STOP:    56.9 ms, queued
+sent 50, acked 47 (queued 47), missing 3, duplicate acks 0
+round trip ms: min 45.1, median 66.6, p95 3222.2, max 4201.7
+NFR15: 32 of 50 under 300 ms (64.0 %): FAIL
