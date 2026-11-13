@@ -94,7 +94,7 @@ endif
 # Isolated S3 drive test: only this task owns buttons and motion.
 # Separate profile tracking prevents stale images when changing speed.
 DRIVE ?= 0
-DRIVE_SPEED ?= 40
+DRIVE_SPEED ?= 50
 # STRAIGHT=1 (with DRIVE=1): barcode sensor test, straight MOVE, no line.
 STRAIGHT ?= 0
 ifneq ($(filter $(STRAIGHT),0 1),$(STRAIGHT))

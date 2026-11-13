@@ -100,7 +100,7 @@
 #endif                                  /* straight, no line following.   */
 #define S3_DRIVE_STRAIGHT_MM    (600)   /* Straight test distance.       */
 #ifndef S3_DRIVE_SPEED_MMS
-#define S3_DRIVE_SPEED_MMS      (40u)
+#define S3_DRIVE_SPEED_MMS      (50u)
 #endif
 #if ((S3_DRIVE_SPEED_MMS < 1) || (S3_DRIVE_SPEED_MMS > 300))
 #error "S3_DRIVE_SPEED_MMS must be 1..300 (including headroom for 1.5x boost)"

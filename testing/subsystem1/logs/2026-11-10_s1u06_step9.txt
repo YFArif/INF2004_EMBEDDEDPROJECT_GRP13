@@ -1,0 +1,3 @@
+trial  0 id  0 STOP: no ack
+sent 1, acked 0 (queued 0), missing 1, duplicate acks 0
+NFR15: 0 of 1 under 300 ms (0.0 %): FAIL
