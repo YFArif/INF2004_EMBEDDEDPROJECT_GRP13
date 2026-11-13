@@ -1,0 +1,28 @@
+S1-U16 part A run_dashboard_test.sh, 2026-11-13 22:59:26 +0800
+commit: 5152046 (clean tree)
+python: Python 3.13.7
+== stage 1: --check
+S1-U16 part A: s1_dashboard.py --check (simulate mode, no broker)
+A1  PASS: page 200 on 127.0.0.1; refused on 1 of 1 other IPv4 addresses; wrong Host 403; no token 403; wrong token 403; text/plain 415; op as a list 400, as a number 400; page headers CSP, nosniff and no-store: True; /api/sim in live mode 404
+A3  PASS: first event snapshot; status online (retained True): True; light green 0.000 s after the first heartbeat; rssi text 'not measured'
+A4  PASS: fake car READY: True; START 200, cmd_id 0; second START 409; START disabled then enabled: True; ack matched, queued, 86.3 ms
+A5  PASS: cmd_ids 1..63 then 0..6 as expected: True; acks matched to their own id: 70 of 70; unmatched 0; no ack 0; payload and cmd event agree with the reply's cmd_id: 70 of 70
+A6  PASS: START 200; ack matched, result 1, label rejected
+A7  PASS: dropped ack: no_ack after 2.15 s; delayed ack: no_ack, then late queued (late) 3022.9 ms; doubled ack: first matched, second duplicate
+A8  PASS: light red 3.192 s after the last heartbeat; START and RESET disabled, STOP enabled: True; STOP published while red: True; green after the resume: True
+A9  PASS: offline status and red light: True, logged: True; online and green again: True; connect_count 1 -> 2 logged: True
+A2  PASS: STOP tag without disabled: True; no script line disables it: True; stop true in all 9 controls events and the snapshot: True
+A13 PASS: cmd_rtt self-test: PASS; golden ACK 158500: STOP id 5 queued; 75 ack labels all queued, rejected or reserved: True; forbidden words in 151 cmd and ack events: none
+22:59:51.621  broker: connected
+A14 PASS: 4 telemetry and 11 live events in 2 s (about 4 and 10): True; state holds both with ages under 2 s: True; one S4 impact counted once (0 -> 1): True; S3 sim events give barcode, reject, junction and lost entries and a tally: True; page has the four panels: True; tel_drop 0 before the run, then 3 in a heartbeat, 3 in /api/state, 3 (text '3') in a new page's snapshot: True; in-process probe first ok, tally ok, kinds ok, texts ok, jump ok, rebase ok, restart ok, impact ok, lost ok, hb_restart ok, hb_gap ok, seq_gap ok, low_counter ok, tel_drop_clamp ok, snapshot_text ok
+A11 PASS: 76 publishes, 0 with a wrong argument (QoS 1, topic s1u16/cmd/dash, -s, no -r or --retain, login only through -o, host scrubbed); one options file, mode 600, holding the login: True; removed after exit: True
+A12 PASS: 0 hits of the host, user or password in the page, the stream, /api/state, the log, stdout, stderr and a request handler's error; error line masked: True; handler error one masked line, no traceback: True; port and prefix from the file: True; digit-only login: json ok, number ok, masked ok
+A10 PASS: banner raised: True; in a new connection's snapshot: True; cleared: True; with --banner-off: banner unavailable: True; no banner for a retained command: True
+steps run: A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14
+S1-U16 part A: PASS
+stage 1: ok
+== stage 2: probe mutations
+P1 heartbeat tel_drop ignored: caught by A14 and no other step
+P2 tel_drop_text returns the plain number: caught by A14 and no other step
+stage 2: 2/2 probe mutations caught
+S1-U16 part A: PASS (--check passed, 2/2 probe mutations caught)
