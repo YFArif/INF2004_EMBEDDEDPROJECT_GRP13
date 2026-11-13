@@ -30,6 +30,9 @@
  *   distance based on the width, which is a different dimension.
  * - HOLD: idle, servo ahead, no automatic stops. vehicle_ctrl_task must
  *   never be stopped by its own obstacle while it drives the bypass.
+ * - PINGING: servo ahead, pinging, the status published and nothing
+ *   else (OB_PING_AHEAD): s5_avoid.c checks the way out before driving
+ *   it. No automatic stops; OB_HOLD ends it.
  * - FAULT: the sensor failed. MF_ESTOP is set, because a robot that
  *   cannot see must not move. OB_HOLD or OB_RESUME leaves it; OB_RESUME
  *   also re-arms the sensor.
@@ -63,6 +66,19 @@
 #define SLOW_BELOW_MM       (350u + S5_SENSOR_SETBACK_MM)
 #define SLOW_EXIT_MM        (400u + S5_SENSOR_SETBACK_MM)
 #define STOP_BELOW_MM       (150u + S5_SENSOR_SETBACK_MM)
+/* Looking into bends while monitoring (Anna, 2026-11-12): on a curve
+ * the sensor, fixed straight ahead, points at the outside of the bend
+ * and met a box on the curve only 10 cm away (logs 2026-11-12_2213 and
+ * _2218). So before each forward ping the servo turns towards where the
+ * robot will be STOP_BELOW_MM along its current curve
+ * (s5_links_bend_deg(), from the wheel speeds), smoothed over pings by
+ * BEND_SMOOTH and limited to BEND_MAX_DEG. Moving the servo pauses the
+ * pinging while it settles (drv_servo.c), so it only moves once the aim
+ * has changed by BEND_STEP_DEG. On straights it stays straight ahead.
+ */
+#define BEND_MAX_DEG        (30)        /* Furthest it looks into a bend.*/
+#define BEND_STEP_DEG       (5)         /* Smaller change: no servo move.*/
+#define BEND_SMOOTH         (4)         /* 1/4 of the change per ping.   */
 #define NEAR_PINGS          (3u)
 #define CLEAR_PINGS         (3u)
 #define STOP_PINGS          (2u)
@@ -147,7 +163,7 @@ typedef struct
 } obst_flags_t;
 
 /* The state enum must fit its field; a misfit stops the build here. */
-typedef char obst_state_check[(S5_OBST_FAULT <= S5_OBST_STATE_MASK)
+typedef char obst_state_check[(S5_OBST_PINGING <= S5_OBST_STATE_MASK)
                               ? 1 : -1];
 
 static obst_flags_t             g_obst           = {S5_OBST_HOLD, false,
@@ -156,6 +172,8 @@ static subsystem5_obst_status_t g_status         = {0};
 static uint32_t                 g_near_run       = 0u;
 static uint32_t                 g_clear_run      = 0u;
 static uint32_t                 g_stop_run       = 0u;
+static int32_t                  g_bend_deg       = 0;   /* Smoothed aim  */
+                                                        /* off ahead.    */
 static int32_t                  g_track_mm       = 0;   /* Last near echo. */
 static int32_t                  g_track_odom_mm  = 0;   /* Odom at it.     */
 static s5_profile_t             g_profile        = {0};
@@ -174,6 +192,8 @@ static int32_t                  g_watch_ahead_mm = 0;   /* Last echo's   */
                                                         /* point, ahead. */
 static int32_t                  g_watch_last_mm  = 0;   /* Odometry when */
                                                         /* last seen.    */
+static volatile int32_t         g_scan_body_deg  = 0;   /* Body turned   */
+                                                        /* for the scan. */
 
 static void           handle_requests(uint32_t requests);
 static void           step_state(void);
@@ -195,6 +215,9 @@ static void           watch_again(int32_t ahead_mm);
 static void           run_cal_sweep(void);
 static void           enter_monitoring(void);
 static void           enter_hold(void);
+static void           start_pinging(void);
+static void           ping_step(void);
+static void           aim_into_bend(void);
 static void           enter_fault(void);
 static void           set_state(subsystem5_obst_state_t state);
 static void           take_reading(s5_ranger_reading_t * p_reading);
@@ -297,6 +320,10 @@ handle_requests (uint32_t requests)
     {
         start_watch(DRV_SERVO_RIGHT_LIMIT_DEG);
     }
+    else if (0u != (requests & OB_PING_AHEAD))
+    {
+        start_pinging();
+    }
     else if (0u != (requests & OB_CAL_SWEEP))
     {
         run_cal_sweep();
@@ -325,6 +352,10 @@ step_state (void)
             watch_step();
         break;
 
+        case S5_OBST_PINGING:
+            ping_step();
+        break;
+
         default:
             // HOLD and FAULT wait for a request; SCANNING has finished.
         break;
@@ -339,6 +370,7 @@ monitor_step (void)
 {
     s5_ranger_reading_t reading;
 
+    aim_into_bend();
     take_reading(&reading);
 
     if (S5_RANGER_FAULT == reading.status)
@@ -454,7 +486,7 @@ stop_robot (uint32_t dist_mm)
 {
     s5_links_motion_estop();
     subsystem5_mission_signal(EV_OBSTACLE);
-    s5_event_post(S5_EVENT_OBST_STOP, dist_mm, DRV_SERVO_AHEAD_DEG);
+    s5_event_post(S5_EVENT_OBST_STOP, dist_mm, drv_servo_angle());
     enter_hold();
 }
 
@@ -501,7 +533,7 @@ publish_scan_profile (void)
     uint32_t seq = s5_profile_next_seq(g_profile.seq);
 
     s5_profile_build(g_scan.points, g_scan.count, &g_scan.left,
-                     &g_scan.right, &g_profile);
+                     &g_scan.right, g_scan_body_deg, &g_profile);
     g_profile.seq = seq & S5_PROFILE_SEQ_MASK;
     subsystem5_profile_put(&g_profile);
 
@@ -801,11 +833,95 @@ static void
 enter_monitoring (void)
 {
     point_servo(DRV_SERVO_AHEAD_DEG);
+    g_bend_deg     = 0;
     g_near_run     = 0u;
     g_clear_run    = 0u;
     g_stop_run     = 0u;
     g_obst.b_track = false;
     set_state(S5_OBST_MONITORING);
+}
+
+/*!
+ * @brief MONITORING and SLOW: turn the servo towards where the robot is
+ *        going on a bend (see "Looking into bends" above).
+ */
+static void
+aim_into_bend (void)
+{
+    // NOTE: The cast is safe: STOP_BELOW_MM is a few hundred mm.
+    int32_t target = s5_links_bend_deg((int32_t) STOP_BELOW_MM);
+    int32_t change = 0;
+
+    if (target > BEND_MAX_DEG)
+    {
+        target = BEND_MAX_DEG;
+    }
+    else if (target < -BEND_MAX_DEG)
+    {
+        target = -BEND_MAX_DEG;
+    }
+    else
+    {
+        // Already inside the limits.
+    }
+
+    // Smooth out S3's steering wobble; small leftovers go straight to
+    // the target so the aim settles exactly.
+    change = target - g_bend_deg;
+
+    if (s5_math_abs(change) < BEND_SMOOTH)
+    {
+        g_bend_deg = target;
+    }
+    else
+    {
+        g_bend_deg += change / BEND_SMOOTH;
+    }
+
+    if (s5_math_abs((DRV_SERVO_AHEAD_DEG + g_bend_deg) - drv_servo_angle())
+        >= BEND_STEP_DEG)
+    {
+        point_servo(DRV_SERVO_AHEAD_DEG + g_bend_deg);
+    }
+}
+
+/*!
+ * @brief The next scans are made with the robot's body turned body_deg
+ *        from the heading their profile is wanted in (s5_avoid.c, "Seeing
+ *        past a corner"); 0 for a normal scan.
+ *
+ * @param[in] body_deg Degrees, + = turned left.
+ */
+void
+subsystem5_obst_scan_turned (int32_t body_deg)
+{
+    g_scan_body_deg = body_deg;
+}
+
+/*!
+ * @brief OB_PING_AHEAD: point ahead and ping, publishing each reading.
+ */
+static void
+start_pinging (void)
+{
+    point_servo(DRV_SERVO_AHEAD_DEG);
+    set_state(S5_OBST_PINGING);
+}
+
+/*!
+ * @brief One ping in PINGING: take_reading() publishes it; nothing else.
+ */
+static void
+ping_step (void)
+{
+    s5_ranger_reading_t reading;
+
+    take_reading(&reading);
+
+    if (S5_RANGER_FAULT == reading.status)
+    {
+        enter_fault();
+    }
 }
 
 /*!

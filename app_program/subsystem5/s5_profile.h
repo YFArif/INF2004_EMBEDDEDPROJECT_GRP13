@@ -48,12 +48,41 @@
                                         /* 2026-11-11_1744/1746); 60     */
                                         /* touched (log 1752).           */
 
+/* S3's sensors (Anna, 2026-11-13, measured from the front of the rear
+ * wheel; the wheel's radius is 33 mm, S2's 66.5 mm rolling diameter):
+ * - The barcode sensor sticks out 55 mm beyond the body on the robot's
+ *   left, low enough to hit a box, 40 mm ahead of the wheel's front.
+ * - The line sensors are about 100 mm ahead of the wheel's front.
+ */
+#define S5_SIDE_EXTRA_LEFT_MM   (55)    /* Beyond the body, left side.   */
+#define S5_SIDE_EXTRA_RIGHT_MM  (0)     /* Nothing sticks out, right.    */
+#define S5_SIDE_EXTRA_AHEAD_MM  (73)    /* Its tip ahead of the rear     */
+                                        /* axle: 33 + 40.                */
+#define S5_AXLE_TO_LINE_IR_MM   (133)   /* Line sensors ahead of the rear*/
+                                        /* axle: 33 + 100.               */
+
+/* The look while passing (s5_avoid.c, Anna 2026-11-13): a flat side
+ * slanting more than about 20 degrees from square sends no echo back, so
+ * the sensor at its 40 degree servo limit never hears a box's side from
+ * a parallel robot (logs 2026-11-12 and 2026-11-13_1417). The robot
+ * turns S5_LOOK_DEG towards the obstacle to look (beam 75 degrees off
+ * the track). It passes far enough out (s5_profile_pass_mm()) that the
+ * part swinging nearest to the obstacle in that turn still stays
+ * S5_LOOK_SPARE_MM from its side.
+ */
+#define S5_LOOK_DEG             (35)
+#define S5_LOOK_SPARE_MM        (15)
+
 /* Scan thresholds (Week 6 report 6.4, preliminary until S5-U04). */
 #define S5_HIT_RANGE_MM         (400)   /* Closer than this is a hit.    */
 #define S5_EDGE_JUMP_MM         (100)   /* Larger range step is an edge. */
 #define S5_EDGE_CORR_DEG        (6)     /* Edge correction, A16.         */
 #define S5_CLEAR_DEPTH_MM       (300)   /* Look this far past the edge.  */
 #define S5_CLEAR_OPEN_MM        (1000)  /* Clearance with nothing seen.  */
+#define S5_EDGE_UNSEEN_MM       (150)   /* Edge beyond the servo: assumed*/
+                                        /* this far past the last echo   */
+                                        /* (80 was 5 cm short, log       */
+                                        /* 2026-11-13_1549).             */
 
 /* Range value of a scan point at which nothing answered. */
 #define S5_PROFILE_NO_ECHO      (0xFFFFu)
@@ -115,7 +144,8 @@ typedef struct
     unsigned int b_on_path      : 1;    /* Something blocks the path.    */
     /* Word 2. */
     unsigned int clear_right_mm : 10;   /* Free gap beside right edge.   */
-    unsigned int shift_left_mm  : 10;   /* Sideways move to pass left.   */
+    unsigned int shift_left_mm  : 10;   /* Sideways move to pass left;   */
+                                        /* without the edge, assumed.    */
     unsigned int shift_right_mm : 10;   /* Sideways move to pass right.  */
     unsigned int b_left_edge    : 1;    /* Left edge inside servo range. */
     unsigned int b_right_edge   : 1;    /* Right edge inside servo range.*/
@@ -136,7 +166,7 @@ void s5_profile_to_xy(s5_profile_point_t const * p_point,
                       int32_t * p_x_mm, int32_t * p_y_mm);
 void s5_profile_build(s5_profile_point_t const * p_points, uint32_t count,
                       s5_profile_edge_t const * p_left,
-                      s5_profile_edge_t const * p_right,
+                      s5_profile_edge_t const * p_right, int32_t body_deg,
                       s5_profile_t * p_out);
 void s5_profile_set_clear(s5_profile_t * p_out);
 
@@ -144,6 +174,9 @@ uint32_t s5_profile_mm(int32_t value_mm);
 void     s5_profile_set_angle(s5_profile_t * p_profile, int32_t angle_deg);
 int32_t  s5_profile_angle(s5_profile_t const * p_profile);
 uint32_t s5_profile_next_seq(uint32_t seq);
+int32_t  s5_profile_pass_mm(bool b_box_left);
+int32_t  s5_profile_look_reach_mm(bool b_box_left);
+int32_t  s5_profile_half_mm(bool b_left);
 
 #endif /* S5_PROFILE_H */
 

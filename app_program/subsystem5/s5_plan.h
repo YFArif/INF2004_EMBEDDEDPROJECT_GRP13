@@ -10,15 +10,15 @@
  *   1. TURN +turn_deg (away from the obstacle; worked out from its width).
  *   2. MOVE out_mm: the whole robot is then S5_PATH_MARGIN_MM clear.
  *   3. TURN -turn_deg: parallel to the line again.
- *   4. MOVE alongside while obstacle_task watches the obstacle's side,
- *      until it has been passed.
- *   5. MOVE tail_mm: the obstacle is then behind the rear axle.
- *   6. TURN -in_deg (towards the line: the same angle as step 1).
- *   7. MOVE back_mm towards the line, S3 searching: the same distance
- *      as step 2, so on a straight track the robot ends on the line.
- *      As soon as S3 has the line (also during step 6), S3's line
- *      following takes over.
- *   8. Floor tests without S3 only: TURN +in_deg, along the line.
+ *   4. MOVE look_mm (the obstacle's face is then level with the sensor
+ *      when looking), then look: TURN S5_LOOK_DEG towards the obstacle,
+ *      ping its side with the servo at its limit, TURN back. While it
+ *      echoes, MOVE a step and look again (s5_avoid.c).
+ *   5. Two silent looks in a row: from the second, still turned
+ *      S5_LOOK_DEG towards the line, MOVE straight on to it, S3
+ *      searching; then onto the line and along it (s5_avoid.c).
+ * tail_mm, in_deg and back_mm are no longer driven (the tail and the
+ * mirrored turn in, until 2026-11-13); they stay in the PLAN log.
  * For the right side every angle has the opposite sign.
  *
  * @par
@@ -52,13 +52,20 @@ typedef struct
     int16_t             turn_deg;       /* Step 1; + = left, - = right.  */
     int16_t             in_deg;         /* Step 8; equals turn_deg.      */
     uint16_t            out_mm;         /* Step 2.                       */
+    uint16_t            look_mm;        /* Step 4, before the first look.*/
     uint16_t            tail_mm;        /* Step 5.                       */
     uint16_t            back_mm;        /* Step 7, before any search.    */
     uint16_t            clearance_mm;   /* Free gap on the chosen side.  */
     uint16_t            room_mm;        /* Step 0; 0 = no reverse.       */
 } s5_plan_t;
 
-void s5_plan_make(s5_profile_t const * p_profile, s5_plan_t * p_plan);
+/* Side to take if both may be used (s5_plan_make()). */
+#define S5_PLAN_PREFER_NONE     (0)
+#define S5_PLAN_PREFER_LEFT     (1)
+#define S5_PLAN_PREFER_RIGHT    (-1)
+
+void s5_plan_make(s5_profile_t const * p_profile, int32_t prefer,
+                  s5_plan_t * p_plan);
 
 #endif /* S5_PLAN_H */
 

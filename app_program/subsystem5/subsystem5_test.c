@@ -269,7 +269,7 @@ fixture_profile_is_right (void)
     // The outcome was checked in S5-U06b; the cast discards it here.
     (void) s5_scan_run(fixture_measure, &result);
     s5_profile_build(result.points, result.count, &result.left,
-                     &result.right, &profile);
+                     &result.right, 0, &profile);
 
     s5_event_trace("S5-U06 width_mm clear_left_mm", profile.width_mm,
                    profile.clear_left_mm);
@@ -289,58 +289,66 @@ static bool
 plan_is_right (void)
 {
     s5_profile_t profile = {0};
-    s5_plan_t    plan    = {S5_PLAN_CONTINUE, 0, 0, 0u, 0u, 0u, 0u, 0u};
+    s5_plan_t    plan    = {S5_PLAN_CONTINUE, 0, 0, 0u, 0u, 0u, 0u, 0u,
+                            0u};
     bool         b_ok    = true;
 
-    // Wall close on the left (150 < 190 mm needed): go right. The face is
-    // 150 mm from the front (225 mm from the sensor); with the rear wheels
-    // 160 mm behind the front, a 197 mm shift then needs a 35 degree turn
-    // out and a leg of about 343 mm, and the way back mirrors it.
+    // A box with its edges 57 mm either side of the centre line. Passing
+    // it leaves room for the look (s5_profile_pass_mm()): 164 mm on its
+    // left (shift 57 + 164), 195 mm on its right (57 + 195, S3's barcode
+    // sensor facing it). Wall close on the left (150 < 289 mm needed): go
+    // right. The face is 150 mm from the front (225 mm from the sensor);
+    // with the rear wheels 160 mm behind the front, that needs a 45 degree
+    // turn out and a leg of about 356 mm, and the way back mirrors it.
     profile.b_on_path      = true;
     profile.b_left_edge    = true;
     profile.b_right_edge   = true;
     profile.closest_mm     = 225u;
     profile.clear_left_mm  = 150u;
     profile.clear_right_mm = S5_CLEAR_OPEN_MM;
-    profile.shift_left_mm  = 197u;
-    profile.shift_right_mm = 197u;
-    s5_plan_make(&profile, &plan);
+    profile.shift_left_mm  = 221u;
+    profile.shift_right_mm = 252u;
+    s5_plan_make(&profile, S5_PLAN_PREFER_NONE, &plan);
     b_ok = b_ok && (S5_PLAN_RIGHT == plan.action)
-           && (is_between(plan.turn_deg, -37, -33))
-           && (is_between(plan.out_mm, 330, 355))
+           && (is_between(plan.turn_deg, -47, -43))
+           && (is_between(plan.out_mm, 345, 370))
            && (plan.in_deg == plan.turn_deg)
            && (plan.back_mm == plan.out_mm) && (0u == plan.room_mm);
 
-    // Both sides wide enough, same shift: the larger gap (left).
+    // Both sides wide enough: the larger gap (left).
     profile.clear_left_mm  = 600u;
     profile.clear_right_mm = 400u;
-    s5_plan_make(&profile, &plan);
+    s5_plan_make(&profile, S5_PLAN_PREFER_NONE, &plan);
     b_ok = b_ok && (S5_PLAN_LEFT == plan.action) && (plan.turn_deg > 0);
 
     // Both sides wide enough: the larger gap (left), even though the
     // right needs the smaller shift.
     profile.shift_left_mm  = 250u;
     profile.shift_right_mm = 150u;
-    s5_plan_make(&profile, &plan);
+    s5_plan_make(&profile, S5_PLAN_PREFER_NONE, &plan);
     b_ok = b_ok && (S5_PLAN_LEFT == plan.action);
 
     // Same gap on both sides: the smaller shift (right).
     profile.clear_right_mm = 600u;
-    s5_plan_make(&profile, &plan);
+    s5_plan_make(&profile, S5_PLAN_PREFER_NONE, &plan);
     b_ok = b_ok && (S5_PLAN_RIGHT == plan.action);
+
+    // Unless the left was looked at past the corner and found free.
+    s5_plan_make(&profile, S5_PLAN_PREFER_LEFT, &plan);
+    b_ok = b_ok && (S5_PLAN_LEFT == plan.action);
     profile.clear_right_mm = 400u;
-    profile.shift_left_mm  = 197u;
-    profile.shift_right_mm = 197u;
+    profile.shift_left_mm  = 221u;
+    profile.shift_right_mm = 252u;
 
     // Neither side wide enough: reverse and rescan.
     profile.clear_left_mm  = 120u;
     profile.clear_right_mm = 150u;
-    s5_plan_make(&profile, &plan);
+    s5_plan_make(&profile, S5_PLAN_PREFER_NONE, &plan);
     b_ok = b_ok && (S5_PLAN_REVERSE == plan.action);
 
     // Not in the robot's path: carry on.
     profile.b_on_path = false;
-    s5_plan_make(&profile, &plan);
+    s5_plan_make(&profile, S5_PLAN_PREFER_NONE, &plan);
     b_ok = b_ok && (S5_PLAN_CONTINUE == plan.action);
 
     return (b_ok);

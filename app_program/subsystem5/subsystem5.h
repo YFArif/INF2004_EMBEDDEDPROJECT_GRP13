@@ -118,7 +118,8 @@
 #define OB_WATCH_LEFT       (0x08u)     /* Watch the obstacle on the     */
 #define OB_WATCH_RIGHT      (0x10u)     /* left/right until passed.      */
 #define OB_CAL_SWEEP        (0x20u)     /* Slow servo sweep, S5-U03.     */
-#define OB_ALL_REQUESTS     (0x3Fu)
+#define OB_PING_AHEAD       (0x40u)     /* Ping ahead, status only.      */
+#define OB_ALL_REQUESTS     (0x7Fu)
 
 /** Controller states, numbered as S1's telemetry ctrl_state field. */
 typedef enum
@@ -196,7 +197,8 @@ typedef enum
     S5_OBST_SLOW,           /* Obstacle under 35 cm; still pinging.      */
     S5_OBST_SCANNING,       /* Coarse and fine scan in progress.         */
     S5_OBST_WATCH,          /* Watching the obstacle beside the robot.   */
-    S5_OBST_FAULT           /* Ultrasonic failed; waiting for OB_RESUME. */
+    S5_OBST_FAULT,          /* Ultrasonic failed; waiting for OB_RESUME. */
+    S5_OBST_PINGING         /* Pinging ahead; no stops (OB_PING_AHEAD).  */
 } subsystem5_obst_state_t;
 
 /* 6 states need 3 bits. */
@@ -248,6 +250,7 @@ uint32_t subsystem5_obst_take(bool b_wait);
 bool     subsystem5_obst_pending(uint32_t requests);
 void     subsystem5_profile_put(s5_profile_t const * p_profile);
 void     subsystem5_obst_status_put(subsystem5_obst_status_t const * p_status);
+void     subsystem5_obst_scan_turned(int32_t body_deg);  /* obstacle_task.c */
 void     subsystem5_delay_ms(uint32_t delay_ms);
 uint32_t subsystem5_now_ms(void);
 bool     subsystem5_command_take(uint8_t * p_opcode, uint8_t * p_cmd_id);

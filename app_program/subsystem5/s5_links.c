@@ -29,6 +29,9 @@
 #define MOVE_MAX_MM         (32000)     /* int16_t limit of S2's MOVE.   */
 #define TURN_MAX_DEG        (720)       /* S2 clips larger turns.        */
 #define STILL_POLL_MS       (20u)       /* motion_task's period.         */
+#define BEND_MIN_SUM_MMS    (20)        /* Wheel speeds added: under     */
+                                        /* 10 mm/s forward, no bend.     */
+#define DEG_PER_RAD_X10     (573)       /* 57.3 degrees per radian.      */
 
 /* Line following tuning: S3's drive-test default preset, the settings S3
  * proved on the car for the single-edge layout (task_drive_test.c
@@ -194,6 +197,61 @@ s5_links_odom_dist_mm (void)
     subsystem2_odom_get(&odom);
 
     return (odom.dist_mm);
+}
+
+/*!
+ * @brief Heading from the wheels since power-up (IF-06).
+ *
+ * @return 1/100 degree, + = left, -17999 ... 18000.
+ *
+ * NOTE: S2 works it out from the encoders, so a wheel that slips is not
+ * seen.
+ */
+int32_t
+s5_links_odom_heading_cdeg (void)
+{
+    subsystem2_odom_t odom = {0};
+
+    subsystem2_odom_get(&odom);
+
+    return (odom.heading_cdeg);
+}
+
+/*!
+ * @brief On a bend: how far to the side of straight ahead a point
+ *        ahead_mm along the robot's current curve lies, from S2's wheel
+ *        speeds (IF-06).
+ *
+ * @param[in] ahead_mm Distance along the curve.
+ *
+ * @return Degrees, + = left; 0 when (nearly) stopped, reversing or
+ *         turning on the spot.
+ *
+ * NOTE: On a circle of radius R the chord to a point s along it is
+ * s / (2 R) radians off the heading. R = v / omega, with v the mean and
+ * omega the difference of the wheel speeds over the track, so the angle
+ * is s x (right - left) / (track x (right + left)) radians.
+ */
+int32_t
+s5_links_bend_deg (int32_t ahead_mm)
+{
+    subsystem2_odom_t odom     = {0};
+    int32_t           bend_deg = 0;
+
+    subsystem2_odom_get(&odom);
+
+    int32_t sum_mms  = odom.speed_l_mms + odom.speed_r_mms;
+    int32_t diff_mms = odom.speed_r_mms - odom.speed_l_mms;
+
+    if (sum_mms >= BEND_MIN_SUM_MMS)
+    {
+        // NOTE: ahead_mm x diff_mms x 573 stays far below 2^31: both are
+        // a few hundred at most.
+        bend_deg = (ahead_mm * diff_mms * DEG_PER_RAD_X10)
+                   / (S2_TRACK_MM * sum_mms * 10);
+    }
+
+    return (bend_deg);
 }
 
 /*!
