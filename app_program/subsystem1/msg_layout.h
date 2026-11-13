@@ -5,7 +5,7 @@
 /** @file msg_layout.h
  *
  * @brief Shared layout of every packed message: telemetry, live,
- *        heartbeat, command, ack and event.
+ *        heartbeat, command, map, ack and event.
  *
  * @par Source of truth
  * docs/S1_binary_frame.md (draft 3). Every position and width below is a
@@ -37,7 +37,7 @@
 /* Widest field in any message. The codec's bit helpers rely on it. */
 #define MSG_FIELD_BITS_MAX          24U
 
-/* Message types, in the low 4 bits of every message. 0 and 7 to 15 are
+/* Message types, in the low 4 bits of every message. 0 and 8 to 15 are
  * reserved.
  */
 #define MSG_TYPE_TELEMETRY          1U
@@ -46,6 +46,7 @@
 #define MSG_TYPE_COMMAND            4U
 #define MSG_TYPE_ACK                5U
 #define MSG_TYPE_LIVE               6U
+#define MSG_TYPE_MAP                7U
 
 /* Header byte, common to every message. */
 #define MSG_HDR_VERSION_POS         0U
@@ -218,7 +219,14 @@
 #define MSG_CMD_DATA_BITS           16U
 #define MSG_CMD_BYTES               2U
 
-/* Opcodes. 0 is rejected, so an all-zero payload is never a command. */
+/* Opcodes. 0 is rejected, so an all-zero payload is never a command.
+ * NOTE: 0 has a second use, in acks only (MSG_ACK_OP_MAP): an ack with
+ * opcode 0 answers either a MAP (cmd_id is the MAP's, 1 to 63 from the
+ * dashboard) or a command the codec refused (cmd_id echoed when the
+ * header was readable, otherwise 0). The dashboard never sends opcode 0
+ * or a MAP with id 0, so it can tell the two apart; section 5.1 of the
+ * document.
+ */
 #define MSG_OP_INVALID              0U
 #define MSG_OP_START                1U
 #define MSG_OP_STOP                 2U
@@ -236,9 +244,41 @@
 #define MSG_ACK_DATA_BITS           18U
 #define MSG_ACK_BYTES               3U
 
-/* Ack results. 2 and 3 are reserved. */
+/* Ack results. 2 and 3 are reserved. For a COMMAND, accepted means queued
+ * for S5. For a MAP, accepted means S3 applied it; rejected means S3
+ * refused it or the MAP was malformed.
+ */
 #define MSG_ACK_ACCEPTED            0U
 #define MSG_ACK_REJECTED            1U
+
+/* Opcode of the ack that answers a MAP (see MSG_OP_INVALID). */
+#define MSG_ACK_OP_MAP              0U
+
+/* ---------------------------------------------------------------------
+ * MAP, dashboard to robot: the barcode letters for LEFT, RIGHT, STRAIGHT
+ * and U-TURN, in that order (S3's IF-S3f). Section 5 of the document.
+ * Each letter is S3's Code 39 index, 0 to 43 ('0' to '9' are 0 to 9, 'A'
+ * is 10), the numbering of the barcode letter fields above. The codec
+ * returns the raw 6-bit values and does not judge them: S3 does.
+ * ------------------------------------------------------------------- */
+#define MSG_MAP_ID_POS              8U      /* Echoed in the ack.       */
+#define MSG_MAP_ID_BITS             6U
+#define MSG_MAP_LEFT_POS            14U
+#define MSG_MAP_LEFT_BITS           6U
+#define MSG_MAP_RIGHT_POS           20U
+#define MSG_MAP_RIGHT_BITS          6U
+#define MSG_MAP_STRAIGHT_POS        26U
+#define MSG_MAP_STRAIGHT_BITS       6U
+#define MSG_MAP_UTURN_POS           32U
+#define MSG_MAP_UTURN_BITS          6U
+#define MSG_MAP_DATA_BITS           38U
+#define MSG_MAP_BYTES               5U
+
+/* Largest message the robot receives: the MAP (5 bytes) is longer than
+ * the COMMAND (2 bytes). MQTT_LINK_COMMAND_MAX, the driver's cap on an
+ * incoming payload, is this value.
+ */
+#define MSG_IN_MAX_BYTES            MSG_MAP_BYTES
 
 /* ---------------------------------------------------------------------
  * EVENT. Section 6. Inside the robot an event is an msg_layout_event_t record

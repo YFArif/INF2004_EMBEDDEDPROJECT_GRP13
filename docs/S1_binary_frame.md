@@ -16,6 +16,13 @@ Version history:
   existing vector is unchanged. Two meanings are clarified (section 3,
   rows 6 and 7): `bc_letter` is S3's Code 39 index with 63 for none, and
   `bc_cmd` is not filled (LIVE carries the barcode command).
+- Draft 3b, 14 Nov 2026: adds message type 7, MAP (section 5): the
+  barcode letters for LEFT, RIGHT, STRAIGHT and U-TURN, dashboard to
+  robot. No existing position or width changes, so the layout version
+  stays 1: a decoder that knows only types 1 to 6 rejects type 7 as an
+  unknown type, and every existing vector is unchanged. The driver's cap
+  on an incoming payload grows from 2 to 5 bytes (9.2), and ack opcode 0
+  gains a second meaning (5.1).
 
 This document answers the Tribunal 1 change requirement "Minimum-Bit
 Data Representation" for the MQTT messages S1 sends and receives. It is
@@ -74,7 +81,7 @@ Rulings applied (19 Oct 2026, after Tribunal 1):
 | Field | Range | Bits | Bit offset | Status | Notes |
 |---|---|---|---|---|---|
 | version | 0 to 15 | 4 | 0 | from Version B | Layout version. The first agreed layout is 1. 0 is never valid. |
-| msg_type | 0 to 15 | 4 | 4 | guess | 1 TELEMETRY, 2 HEARTBEAT, 3 EVENT, 4 COMMAND, 5 ACK, 6 LIVE. 0 and 7 to 15 reserved. |
+| msg_type | 0 to 15 | 4 | 4 | guess | 1 TELEMETRY, 2 HEARTBEAT, 3 EVENT, 4 COMMAND, 5 ACK, 6 LIVE, 7 MAP. 0 and 8 to 15 reserved. |
 
 Version B asked for "a version byte in each message". Sharing the byte
 with the type keeps the 2-byte command at 2 bytes.
@@ -362,11 +369,14 @@ can trigger; the 10-bit field would clamp at -512 and 511 anyway.
 
 **Total: 71 data bits + 1 padding bit = 72 bits = 9 bytes.**
 
-## 5. COMMAND (dashboard to robot) and ACK (robot to dashboard)
+## 5. COMMAND and MAP (dashboard to robot) and ACK (robot to dashboard)
 
 Commands are only START, STOP and RESET, so remote input can never steer
-the robot. They arrive on `<prefix>/cmd/...` (the driver subscribes to
-`<prefix>/cmd/#`).
+the robot. The only other message the robot takes is the MAP, which sets
+the barcode letters S3 reads as LEFT, RIGHT, STRAIGHT and U-TURN; it does
+not move the robot either. Both arrive on `<prefix>/cmd/...` (the driver
+subscribes to `<prefix>/cmd/#`), and `telemetry_task` tells them apart by
+the type field.
 
 COMMAND:
 
@@ -378,15 +388,39 @@ COMMAND:
 
 **Total: 16 bits = 2 bytes.**
 
+MAP, the barcode letter map (S3's IF-S3f, `s3_set_nav_map()`):
+
+| Field | Range | Bits | Bit offset | Status | Notes |
+|---|---|---|---|---|---|
+| version, msg_type | see 2.1 | 8 | 0 | see 2.1 | msg_type = 7 |
+| cmd_id | 1 to 63 from the dashboard; 0 to 63 decoded | 6 | 8 | decided by S1, 14 Nov 2026 | Echoed in the ack. The dashboard never uses 0 (5.1). |
+| letter_left | 0 to 43 valid; 0 to 63 decoded | 6 | 14 | decided by S1, 14 Nov 2026 | Letter for LEFT, as S3's Code 39 index: '0' to '9' are 0 to 9, 'A' to 'Z' are 10 to 35, then '-', '.', space, '*', '$', '/', '+', '%' are 36 to 43; the numbering of `bc_letter`. |
+| letter_right | as letter_left | 6 | 20 | decided by S1, 14 Nov 2026 | Letter for RIGHT. |
+| letter_straight | as letter_left | 6 | 26 | decided by S1, 14 Nov 2026 | Letter for STRAIGHT. |
+| letter_uturn | as letter_left | 6 | 32 | decided by S1, 14 Nov 2026 | Letter for U-TURN. |
+| padding | 0 | 2 | 38 | - | |
+
+**Total: 38 data bits + 2 padding bits = 40 bits = 5 bytes.**
+
+The codec returns the four indices as they arrived and does not judge
+them. S3 is the authority: `telemetry_task` turns each index into its
+character with `s3_code39_char()` (which gives `?` above 43) and passes
+the four characters to `s3_set_nav_map()`, which refuses a wrong
+length, a repeated letter, `*`, and anything that is not a Code 39
+character, and then keeps the old map. The robot takes a MAP in any
+state; S5 is not asked. The map is not saved and S3 goes back to ABCD at
+every reset, so the dashboard sends it again after a restart
+(docs/S1_dashboard.md).
+
 ACK, published on `<prefix>/ack` (not under `cmd/`, which the driver
 reserves for incoming commands):
 
 | Field | Range | Bits | Bit offset | Status | Notes |
 |---|---|---|---|---|---|
 | version, msg_type | see 2.1 | 8 | 0 | see 2.1 | msg_type = 5 |
-| opcode | 0 to 3, echoed | 2 | 8 | guess | 0 when the command could not be parsed. |
-| cmd_id | 0 to 63, echoed | 6 | 10 | guess | 0 when the command could not be parsed. |
-| result | 0 accepted, 1 rejected (bad length, version or opcode, or a post failure), 2 and 3 reserved | 2 | 16 | guess | Stage 4a: 0 means queued for S5 (`subsystem5_command_post()` returned `E_OK`), not carried out; the dashboard labels it "queued". |
+| opcode | 0 to 3, echoed | 2 | 8 | guess | 0 when the command could not be parsed, and for every MAP (`MSG_ACK_OP_MAP`; 5.1). |
+| cmd_id | 0 to 63, echoed | 6 | 10 | guess | 0 when the command or MAP could not be parsed. |
+| result | 0 accepted, 1 rejected (bad length, version or opcode, or a post failure), 2 and 3 reserved | 2 | 16 | guess | Stage 4a: for a COMMAND, 0 means queued for S5 (`subsystem5_command_post()` returned `E_OK`), not carried out; the dashboard labels it "queued". For a MAP, 0 means applied (`s3_set_nav_map()` returned `E_OK`) and 1 that S3 refused it (`E_PAR` or a mutex error) or that it was malformed; the dashboard labels them "applied" and "refused". |
 | padding | 0 | 6 | 18 | - | |
 
 **Total: 18 data bits + 6 padding bits = 24 bits = 3 bytes.**
@@ -398,12 +432,23 @@ can be acked:
 
 | Case | Where it stops | Acked? | Counted in |
 |---|---|---|---|
-| Payload longer than `MQTT_LINK_COMMAND_MAX` (2 B once the cap comes from the layout header, 9.2) | The driver, before the codec: `incoming_publish_cb` accepts a message only if `total_len <= MQTT_LINK_COMMAND_MAX` (`mqtt_link.c:1363`); otherwise the payload is never copied | **No.** The cmd_id is never read, so there is nothing to echo. The dashboard sees a timeout. | `command_dropped` in the driver status (`mqtt_link.c:1220`) |
+| Payload longer than `MQTT_LINK_COMMAND_MAX` (5 B, the MAP, since 14 Nov 2026; 2 B before; 9.2) | The driver, before the codec: `incoming_publish_cb` accepts a message only if `total_len <= MQTT_LINK_COMMAND_MAX` (`mqtt_link.c:1363`); otherwise the payload is never copied | **No.** The cmd_id is never read, so there is nothing to echo. The dashboard sees a timeout. | `command_dropped` in the driver status (`mqtt_link.c:1220`) |
 | Topic suffix longer than `MQTT_LINK_TOPIC_MAX`, or the command queue full | The driver, same path | No | `command_dropped` (`mqtt_link.c:1220` and `1228`) |
-| Shorter than 2 B, wrong version or type, or opcode 0 | The codec, in `telemetry_task` | Yes, result 1. opcode and cmd_id are echoed when the length, version and type are right; otherwise both are 0. | `cmd_reject` (kept by `telemetry_task`) |
+| Shorter than 2 B, wrong version or type, or opcode 0 (any type field but 7) | The codec, in `telemetry_task` | Yes, result 1. opcode and cmd_id are echoed when the length, version and type are right; otherwise both are 0. | `cmd_reject` (kept by `telemetry_task`) |
+| Type field 7 (MAP), but the wrong length or version | The codec, in `telemetry_task` | Yes, result 1, opcode 0 and cmd_id 0. | `cmd_reject` (`telemetry_task`'s `map_reject`) |
+| A well-formed MAP that S3 refuses (`s3_set_nav_map()` returns `E_PAR` or a mutex error) | `telemetry_task` | Yes, result 1, opcode 0 and the MAP's cmd_id. | `cmd_reject` (`telemetry_task`'s `map_reject`) |
 | Valid, but `subsystem5_command_post()` fails (S5's command queue full or missing): a post failure | `telemetry_task` (Stage 4a) | Yes, result 1, opcode and cmd_id echoed. | `cmd_reject` (kept by `telemetry_task`) |
 
 Line numbers in this table are as of `df58a14`.
+
+Ack opcode 0 has two uses. It answers a COMMAND the codec refused
+(cmd_id echoed when the header was readable, otherwise 0, so an
+unreadable command gives `15 00 40`), and it answers every MAP
+(`MSG_ACK_OP_MAP`, cmd_id the MAP's). The dashboard never sends a
+COMMAND with opcode 0 and never gives a MAP id 0, so for the dashboard an
+ack with opcode 0 and the id of the MAP it sent is that MAP's answer. A
+client that sends opcode-0 commands, or MAPs with id 0, has to tell the
+two apart itself. The same note is on `MSG_OP_INVALID` in `msg_layout.h`.
 
 The driver does count the oversize case, but in its own
 `command_dropped`, which also counts over-long topics and a full queue.
@@ -828,7 +873,7 @@ Wrap (modulo) fields:
 | count_l, count_r reconstruction | previous full count 65535, received low bits 0 | full count 65536 (difference taken modulo 65536) |
 | count_l, count_r reconstruction | previous 0x0001FFF0, received 0x0010 | 0x00020010 |
 | t_ms (event) | 16 777 215; 16 777 216; 0x01ABCDEF | 16 777 215; 0; 0xABCDEF |
-| cmd_id (command, ack) | 63; 64 | 63; 0 |
+| cmd_id (command, ack, map) | 63; 64 | 63; 0 |
 | fault_mask | 0xE5 (bits above the 5 defined) | 0x05 (stall + IMU): unknown bits dropped, not clamped to all-faults |
 | uptime_s (heartbeat) | 65535; 65536; 70000 | 65535; 65535; 65535 (saturates, as section 4 defines it) |
 
@@ -854,6 +899,7 @@ Clamp fields (one value beyond each end that can be exceeded):
 | rssi (heartbeat) | +5 dBm; -128 dBm | 0; -127 |
 | connect_count, tel_drop, evt_drop, cmd_reject | 256; 0xFFFFFFFF | 255 |
 | opcode (command put), result (ack) | 4 | 3 |
+| letter_left, letter_right, letter_straight, letter_uturn (map put) | 64; 255 | 63 |
 
 Reject cases: each message one byte short and one byte long; version 0
 and version 2; a wrong type in the low nibble; a command with opcode 0
@@ -912,6 +958,10 @@ before the modulo, pitch and roll as both cdeg (input) and hdeg (sent).
 | ACK-1 | accepted, answers CMD-1 (STOP id 5) | `15 85 00` |
 | ACK-2 | rejected, answers CMD-4 (opcode 0, id 5 echoed) | `15 05 40` |
 | ACK-3 | rejected, command unreadable (wrong length, version or type) | `15 00 40` |
+| MAP-1 | "DCBA", id 9: letters D 13, C 12, B 11, A 10 | `17 24 D3 0B 28` |
+| MAP-2 | all minimum: id 0, every letter 0 ('0') | `17 00 00 00 00` |
+| MAP-3 | all maximum: id 63, every letter 63 (not a Code 39 index; decoded, then refused by S3) | `17 FF FF FF FC` |
+| MAP-4 | "09-Z", id 33: letters 0, 9, 36 ('-'), 35 ('Z') | `17 84 02 64 8C` |
 
 TEL-2 is all zeros after the header because every unsigned field is 0
 and every signed field at its minimum is stored as 0 (offset binary).
@@ -932,6 +982,9 @@ Check by hand, CMD-1: header `0001 0100` = `14` (version 1, type 4);
 then opcode STOP `10` and cmd_id 5 `000101` = `1000 0101` = `85`.
 ACK-1: header `15`, the same `85`, then result `00` and six padding
 zeros = `00`.
+MAP-1: header `0001 0111` = `17` (version 1, type 7); then cmd_id 9
+`001001`, D `001101`, C `001100`, B `001011`, A `001010` and two padding
+zeros: `00100100 11010011 00001011 00101000` = `24 D3 0B 28`.
 
 ## 11. Other open points found while writing this
 

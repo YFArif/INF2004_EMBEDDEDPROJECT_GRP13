@@ -122,6 +122,18 @@ typedef struct
     uint8_t     cmd_id;         /* 0-63, set by the dashboard.          */
 } msg_codec_command_t;
 
+/** Map fields: S3's Code 39 index of each letter, as received. The codec
+ *  does not judge the letters; S3 refuses an index above 43.
+ */
+typedef struct
+{
+    uint8_t     cmd_id;         /* 0-63; the dashboard uses 1-63.       */
+    uint8_t     letter_left;    /* Letter for LEFT, 0-63.               */
+    uint8_t     letter_right;   /* Letter for RIGHT, 0-63.              */
+    uint8_t     letter_straight; /* Letter for STRAIGHT, 0-63.          */
+    uint8_t     letter_uturn;   /* Letter for U-TURN, 0-63.             */
+} msg_codec_map_t;
+
 /** Ack fields. */
 typedef struct
 {
@@ -194,6 +206,23 @@ uint32_t msg_codec_put_command(const msg_codec_command_t * p_in,
  */
 bool     msg_codec_get_command(const uint8_t * p_buf, uint32_t len,
                                msg_codec_command_t * p_out);
+
+/** @brief Read the type field of a received message, so the caller can
+ *         pick the get function; nothing else is checked. 0 (never a
+ *         valid type) for a NULL buffer or a length of 0.
+ */
+uint32_t msg_codec_get_type(const uint8_t * p_buf, uint32_t len);
+
+/** @brief Pack a map (MSG_MAP_BYTES); for tests and tools. */
+uint32_t msg_codec_put_map(const msg_codec_map_t * p_in,
+                           uint8_t * p_buf, uint32_t buf_len);
+
+/** @brief Unpack a received map. True when the length is exact and the
+ *         version and type match; the letters are not judged. Otherwise
+ *         every field of p_out is 0, so the ack echoes cmd_id 0.
+ */
+bool     msg_codec_get_map(const uint8_t * p_buf, uint32_t len,
+                           msg_codec_map_t * p_out);
 
 /** @brief Pack an ack (MSG_ACK_BYTES). */
 uint32_t msg_codec_put_ack(const msg_codec_ack_t * p_in,

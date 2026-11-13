@@ -19,13 +19,16 @@
 #      warnings as errors, UBSan and ASan.
 #   2  Run the test; it must end with "RESULT: all passed".
 #   3  golden.py --check: golden.py's own packing, the document's 10.2
-#      table and codec_vectors.c agree on all 21 vectors.
-#   4  Thirteen mutations, each on a copy of the codec in a temporary
-#      folder; every one must be caught. Six must stop the build at a
-#      compile-time check; seven must build and make the test fail. Each
-#      mutation matches on text, not line numbers, and the mutated copy is
-#      compared with the original: "mutation did not apply" if nothing
-#      changed, and exactly one changed line is required.
+#      table and codec_vectors.c agree on all 25 vectors (21, plus the
+#      4 MAP vectors of S1-U24).
+#   4  Eighteen mutations, each on a copy of the codec in a temporary
+#      folder; every one must be caught. Eight must stop the build at a
+#      compile-time check; ten must build and make the test fail. C1 to
+#      C6 and R1 to R7 are S1-U05's; N1 to N5 are S1-U24 part A's (the
+#      MAP message). Each mutation matches on text, not line numbers, and
+#      the mutated copy is compared with the original: "mutation did not
+#      apply" if nothing changed, and exactly one changed line is
+#      required, except N1, which swaps two lines.
 #   5  If arm-none-eabi-gcc is on the PATH, compile msg_codec.c for the
 #      target with the profile's code-generation flags; any warning fails.
 #      Otherwise the stage is skipped.
@@ -116,9 +119,10 @@ echo "== stage 4: mutations"
 CAUGHT=0
 MISSED=0
 
-# mutate ID KIND FILE SED_SCRIPT DESCRIPTION
+# mutate ID KIND FILE SED_SCRIPT DESCRIPTION [LINES]
 #   KIND is "compile" (the build must stop at a compile-time check) or
-#   "run" (the mutant must build and the test must fail).
+#   "run" (the mutant must build and the test must fail). LINES is how
+#   many lines the mutation must change; the default is 1.
 mutate ()
 {
     dir="$WORK/$1"
@@ -135,9 +139,9 @@ mutate ()
     fi
 
     changed=$(diff "$CODEC_DIR/$3" "$dir/$3" | grep -c '^>')
-    if [ "$changed" -ne 1 ]
+    if [ "$changed" -ne "${6:-1}" ]
     then
-        echo "$1 $5: changed $changed lines, expected 1"
+        echo "$1 $5: changed $changed lines, expected ${6:-1}"
         MISSED=$((MISSED + 1))
         return
     fi
@@ -227,8 +231,29 @@ mutate R7 run msg_codec.c \
     's/\(HEADING_CDEG_LIMIT  *\)18000$/\117000/' \
     "heading limit 18000 -> 17000"
 
-echo "stage 4: $CAUGHT/13 mutations caught"
-if [ "$CAUGHT" -ne 13 ] || [ "$MISSED" -ne 0 ]
+# S1-U24 part A: the MAP message.
+mutate N1 run msg_codec.c \
+    '/^msg_codec_put_map (/,/^}/{
+s/p_in->letter_left);/p_in->SWAPPED);/
+s/p_in->letter_right);/p_in->letter_left);/
+s/p_in->SWAPPED);/p_in->letter_right);/
+}' \
+    "MAP put swaps LEFT and RIGHT" 2
+mutate N2 compile msg_layout.h \
+    's/\(MSG_MAP_BYTES  *\)5U/\16U/' \
+    "MSG_MAP_BYTES 5 -> 6 (10 padding bits)"
+mutate N3 run msg_layout.h \
+    's/\(MSG_TYPE_MAP  *\)7U/\18U/' \
+    "MSG_TYPE_MAP 7 -> 8"
+mutate N4 compile msg_layout.h \
+    's/\(MSG_MAP_LEFT_POS  *\)14U/\115U/' \
+    "MSG_MAP_LEFT_POS 14 -> 15 (a letter off by one bit)"
+mutate N5 run msg_codec.c \
+    '/^msg_codec_get_map (/,/^}/s/len, MSG_MAP_BYTES,/len, MSG_CMD_BYTES,/' \
+    "MAP get checks the COMMAND length"
+
+echo "stage 4: $CAUGHT/18 mutations caught (C1 to C6, R1 to R7, N1 to N5)"
+if [ "$CAUGHT" -ne 18 ] || [ "$MISSED" -ne 0 ]
 then
     fail "4: mutations"
 fi
@@ -260,6 +285,6 @@ else
     echo "stage 5 skipped (arm-none-eabi-gcc is not on the PATH)"
 fi
 
-echo "S1-U05: PASS ($CHECKS checks, 21/21 vectors agree," \
-     "$CAUGHT/13 mutations caught, target compile $STAGE5)"
+echo "S1-U05: PASS ($CHECKS checks, 25/25 vectors agree," \
+     "$CAUGHT/18 mutations caught, target compile $STAGE5)"
 exit 0

@@ -14,7 +14,8 @@ Usage, from the repository root:
         testing/subsystem1/codec_vectors.c
         Compare three copies of each vector: this script's own packing, the
         hex in the document's 10.2 table and the bytes in codec_vectors.c.
-        Exit 0 only if all three agree for all 21 vectors.
+        Exit 0 only if all three agree for all 25 vectors (21, plus the
+        4 MAP vectors of S1-U24).
 
 TEL-INDEP is a second independent calculation from the section 3 table;
 its bytes in the document were not produced by this script, which only
@@ -33,7 +34,7 @@ if not (CHECK or (len(ARGS) == 1 and not ARGS[0].startswith("-"))):
     sys.exit(2)
 DOC = ARGS[1] if CHECK else ARGS[0]
 VERSION = 1
-GOLDEN_COUNT = 21
+GOLDEN_COUNT = 25
 
 
 def table(section_start, section_end, name_col, bits_col, off_col):
@@ -89,7 +90,8 @@ def hdeg(cdeg):
 tel = table("## 3. TELEMETRY", "### 3.1", 1, 4, 5)
 live = table("## 3A. LIVE", "### 3A.1", 0, 2, 3)
 hb = table("## 4. HEARTBEAT", "## 5. COMMAND", 0, 2, 3)
-cmd = table("COMMAND:", "ACK, published", 0, 2, 3)
+cmd = table("COMMAND:", "MAP, the barcode letter map", 0, 2, 3)
+mp = table("MAP, the barcode letter map", "ACK, published", 0, 2, 3)
 ack = table("ACK, published", "### 5.1", 0, 2, 3)
 evt = table("EVENT message on the wire:", "## 7.", 0, 2, 3)
 
@@ -224,6 +226,21 @@ for label, desc, opc, cid, res in (
          "type)", 0, 0, 1)):
     out.append((label, desc, pack(ack, {"opcode": opc, "cmd_id": cid,
                                         "result": res}, 5, 3)))
+
+# MAP letters are S3's Code 39 indices (s3_code39.c), written out here by
+# hand rather than looked up, so this stays independent of the decoder.
+for label, desc, cid, letters in (
+        ("MAP-1", '"DCBA", id 9: letters D 13, C 12, B 11, A 10', 9,
+         (13, 12, 11, 10)),
+        ("MAP-2", "all minimum: id 0, every letter 0 ('0')", 0, (0, 0, 0, 0)),
+        ("MAP-3", "all maximum: id 63, every letter 63 (not a Code 39 "
+         "index; decoded, then refused by S3)", 63, (63, 63, 63, 63)),
+        ("MAP-4", "\"09-Z\", id 33: letters 0, 9, 36 ('-'), 35 ('Z')", 33,
+         (0, 9, 36, 35))):
+    out.append((label, desc, pack(mp, {
+        "cmd_id": cid, "letter_left": letters[0],
+        "letter_right": letters[1], "letter_straight": letters[2],
+        "letter_uturn": letters[3]}, 7, 5)))
 
 
 def short_id(label):
