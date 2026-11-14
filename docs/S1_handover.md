@@ -116,6 +116,13 @@ To catch the boot lines, keep this order: start the console command
 first, then plug in USB, then switch the battery on. Then wait for the
 green robot light.
 
+**Demo day: the barcode letter map.** Type the day's letters in the
+dashboard's map boxes (LEFT, RIGHT, STRAIGHT, U-TURN) and press Set map.
+Set it after every power cycle of the car and wait for "Applied on the
+robot: ..." before START. The dashboard sends it again by itself when the
+car comes back, but check that it says Applied. Details:
+`docs/S1_dashboard.md` section 8.2.
+
 ## 4. Calibrate before START
 
 START is refused until the line sensors are calibrated. Put the car on

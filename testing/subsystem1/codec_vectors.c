@@ -564,6 +564,55 @@ static const codec_vectors_ack_t g_ack[] =
     },
 };
 
+/* Map (S1-U24): MAP-1 to MAP-4. Letters are S3's Code 39 indices. */
+static const codec_vectors_map_t g_map[] =
+{
+    {
+        .p_label = "MAP-1",
+        .in = { .cmd_id = 9U, .letter_left = 13U, .letter_right = 12U,
+                .letter_straight = 11U, .letter_uturn = 10U },
+        .out = { .cmd_id = 9U, .letter_left = 13U, .letter_right = 12U,
+                 .letter_straight = 11U, .letter_uturn = 10U },
+        .bytes =
+        {
+            0x17U, 0x24U, 0xD3U, 0x0BU, 0x28U,
+        },
+    },
+    {
+        .p_label = "MAP-2",
+        .in = { .cmd_id = 0U, .letter_left = 0U, .letter_right = 0U,
+                .letter_straight = 0U, .letter_uturn = 0U },
+        .out = { .cmd_id = 0U, .letter_left = 0U, .letter_right = 0U,
+                 .letter_straight = 0U, .letter_uturn = 0U },
+        .bytes =
+        {
+            0x17U, 0x00U, 0x00U, 0x00U, 0x00U,
+        },
+    },
+    {
+        .p_label = "MAP-3",
+        .in = { .cmd_id = 63U, .letter_left = 63U, .letter_right = 63U,
+                .letter_straight = 63U, .letter_uturn = 63U },
+        .out = { .cmd_id = 63U, .letter_left = 63U, .letter_right = 63U,
+                 .letter_straight = 63U, .letter_uturn = 63U },
+        .bytes =
+        {
+            0x17U, 0xFFU, 0xFFU, 0xFFU, 0xFCU,
+        },
+    },
+    {
+        .p_label = "MAP-4",
+        .in = { .cmd_id = 33U, .letter_left = 0U, .letter_right = 9U,
+                .letter_straight = 36U, .letter_uturn = 35U },
+        .out = { .cmd_id = 33U, .letter_left = 0U, .letter_right = 9U,
+                 .letter_straight = 36U, .letter_uturn = 35U },
+        .bytes =
+        {
+            0x17U, 0x84U, 0x02U, 0x64U, 0x8CU,
+        },
+    },
+};
+
 /*!
  * @brief Return the telemetry vectors.
  *
@@ -688,6 +737,27 @@ codec_vectors_ack (uint32_t * p_count)
     }
 
     return (g_ack);
+}
+
+/*!
+ * @brief Return the map vectors (S1-U24).
+ *
+ * @param[out] p_count Receives the number of vectors (ignored if NULL).
+ *
+ * @return The first vector.
+ */
+const codec_vectors_map_t *
+codec_vectors_map (uint32_t * p_count)
+{
+    if (NULL != p_count)
+    {
+        /* The table holds a handful of entries, so its count fits
+         * uint32_t.
+         */
+        *p_count = (uint32_t)(sizeof(g_map) / sizeof(g_map[0]));
+    }
+
+    return (g_map);
 }
 
 /*** end of file ***/

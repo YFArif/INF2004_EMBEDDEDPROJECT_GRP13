@@ -14,7 +14,9 @@ standard library only. Test: S1-U16 in `testing/subsystem1/TEST_LOG.md`.
 ## 1. What it does, and what it does not
 
 - Mission commands only: START, STOP and RESET. No steering, no speed:
-  the robot drives itself.
+  the robot drives itself. The one other thing it sends is the barcode
+  letter map (section 8.2), which only tells S3 which letter means which
+  turn.
 - Commands are never published retained (section 11).
 - An ack with result 0 is labelled **queued**: S1 handed the command to
   S5, which decides on its own. S5's verdict is on the robot's USB
@@ -247,7 +249,7 @@ green light.
 | Heartbeat age | Seconds since the last heartbeat; red above 3 s |
 | Uptime | The robot's time since power-up, h:mm:ss (16 bits: wraps after 18.2 h) |
 | connect_count | Broker sessions since power-up; it rises by 1 at each reconnect |
-| cmd_reject | Commands S1 refused: codec rejections, post failures (S5's queue full) and commands the driver dropped |
+| cmd_reject | Commands S1 refused: codec rejections, post failures (S5's queue full), maps S3 refused or that were malformed, and commands the driver dropped |
 | rssi | "not measured": always 0 for now, because the robot cannot read the signal strength yet |
 | tel_drop / evt_drop | tel_drop: telemetry, live and heartbeat messages the robot did not send since power-up, because its publish queue was too full (it keeps room for acks) or the driver refused them. It should stay 0; if it climbs, the link is too slow for 8 messages a second. It stops at 255, shown as "255 or more": from there the page cannot show new drops until the robot restarts. evt_drop: always 0 for now, no events yet |
 | Heartbeats lost | Gaps in the heartbeat sequence since the dashboard started (heartbeats use QoS 0, so a few can go missing). A robot restart does not count |
@@ -330,6 +332,69 @@ wheel encoders, so it drifts and starts from 0 at power-up.
 The `--log` file records every telemetry and live message as it arrives,
 so it grows by roughly 20 MB an hour while the robot runs.
 
+### 8.2 The barcode letter map
+
+The demo day gives the letter for each turn, and the code may not be
+recompiled, so the robot takes the letters over MQTT: a 5-byte MAP
+message (`docs/S1_binary_frame.md` section 5). Type one letter in each
+box, LEFT, RIGHT, STRAIGHT and U-TURN, and press **Set map**; lower case
+becomes upper case. The page checks S3's rules, and the server checks
+them again: four different Code 39 characters (`0` to `9`, `A` to `Z`,
+`-`, `.`, space, `$`, `/`, `+`, `%`; not `*`). The robot hands the
+letters to S3 (`s3_set_nav_map()`), and the ack says what S3 did. A map is
+taken in any state, running or not.
+
+| Status line | Meaning |
+|---|---|
+| No map set (robot uses its default) | Nothing set since the dashboard started. S3 uses ABCD after every reset |
+| Sending DCBA (try n of 3) | Published; waiting for the ack |
+| Applied on the robot: LEFT=D RIGHT=C STRAIGHT=B U-TURN=A (acked hh:mm:ss) | Ack result 0: S3 took the map. The console prints `S3 NAV MAP set: LEFT=D RIGHT=C STRAIGHT=B U-TURN=A` |
+| NOT CONFIRMED: ... | No ack after 3 sends, 2 s apart. The map may or may not be on the robot; it is sent again when the robot's status next turns online |
+| REFUSED: ... | Ack result 1: S3 refused the map and kept the one it had (console `S3 NAV MAP REJECTED (kept)`). The line still shows the last map applied. Not retried |
+| Robot offline: DCBA is kept and sent when it comes online | Set while the robot's status was not online; nothing is published until it is |
+
+**Sending it again.** S3 does not save the map: every reset of the car
+brings back ABCD. The dashboard keeps the last map you set in memory
+only, never on disk (if the dashboard restarts, set the map again), and
+sends it again by itself whenever the robot's status turns online (every
+reconnect and every boot) and whenever the heartbeat's uptime goes down
+(a restart). A map already acked since that restart is not sent twice.
+Each round has one id, 1 to 63 (0 is never used, so a MAP's ack cannot
+be mistaken for the ack of an unreadable command), and is sent up to 3
+times, 2 s apart, until it is acked. A repeat does no harm: setting the
+same map twice changes nothing. After a refusal the last applied map is
+the one sent again. With `--log`, map events are written to the log
+file like every other event.
+
+**Without the page.** If the dashboard cannot be used, publish the 5
+bytes yourself, at QoS 1 and never retained. Print them for your letters
+and an id from 1 to 63:
+
+```bash
+python3 -I -B testing/subsystem1/cmd_rtt.py --map DCBA --id 9
+```
+
+This prints `1724d30b28`. In a second window, start listening for the
+ack first:
+
+```bash
+mosquitto_sub -h <broker> -p 1883 -t '<prefix>/ack' -F '%x'
+```
+
+Then publish the bytes on the dashboard's command topic:
+
+```bash
+echo 1724d30b28 | xxd -r -p | mosquitto_pub -h <broker> -p 1883 -q 1 -t '<prefix>/cmd/dash' -s
+```
+
+Replace `<broker>` and `<prefix>` with your own, and never add `-r`.
+`150900` on the ack topic means applied (opcode 0, id 9, result 0) and
+`150940` refused. On Windows there is no `xxd`: write the bytes with
+PowerShell, `[IO.File]::WriteAllBytes("$PWD\map.bin",
+[byte[]](0x17,0x24,0xD3,0x0B,0x28))`, then publish with `-f map.bin`
+in place of `-s`. A map sent this way is not sent again by the dashboard
+after a restart.
+
 ## 9. Operator rules
 
 These are S5's rules (`s5_mission_command()` in
@@ -367,11 +432,13 @@ These are S5's rules (`s5_mission_command()` in
 2. Hotspot, broker and dashboard as in sections 3, 6 and 7.
 3. Power the robot. Wait for the green light and a heartbeat age under
    1.5 s.
-4. Calibrate the line sensors (section 9). This needs the robot on the
+4. Set the barcode letter map (section 8.2) and wait for "Applied on the
+   robot". After every power cycle of the car, wait for it again.
+5. Calibrate the line sensors (section 9). This needs the robot on the
    line: on the stand every START is refused (`b=0`).
-5. START: "queued", and the wheels turn (the console shows `b=1`).
-6. STOP: "queued", and the wheels stop (FINISHED).
-7. START once more: "queued", but the wheels stay still (back to READY).
+6. START: "queued", and the wheels turn (the console shows `b=1`).
+7. STOP: "queued", and the wheels stop (FINISHED).
+8. START once more: "queued", but the wheels stay still (back to READY).
    START again to run.
 
 ## 11. Clearing a retained command
@@ -426,6 +493,13 @@ values are made up; only the formats and rates are real.
 | S4 impact | A 1 s IMPACT flag (motion class 6) in the telemetry |
 | S4 hump | A 3 s hump: climbing, then descending |
 | S3 barcode, S3 barcode rejected, S3 junction, S3 line lost | One S3 event now, even when the car is not running |
+| Reboot (map back to ABCD) | A power cycle: status offline, S3's map back to ABCD, online again 2 s later with the uptime from 0, so the dashboard sends the map again |
+| Restart, no status | A restart that only the heartbeat's uptime shows; the dashboard sends the map again |
+| Drop MAP acks, Keep MAP acks | Every MAP is applied but its ack is lost, until Keep: shows the 3 sends and NOT CONFIRMED |
+
+The fake car applies a map with S3's rules (four Code 39 letters, not
+`*`, none twice) and prints S3's console line in the event log; Reject
+next makes it refuse the next map.
 
 ## 13. Troubleshooting
 
@@ -455,6 +529,9 @@ values are made up; only the formats and rates are real.
   `app_program/subsystem1/dashboard/s1_decode.py` must follow.
 - A repeated command with the same cmd_id is not filtered on the robot
   yet (Stage 4b).
+- The barcode letter map lives in the dashboard's memory only: after a
+  dashboard restart, set it again. A map sent without the page (section
+  8.2) is not sent again after a restart of the car.
 - One dashboard per robot. A second client's commands are logged as
   "command from another client", but its acks can confuse the matching.
 - Tested on macOS with mosquitto 2.1.2 and Python 3.13.

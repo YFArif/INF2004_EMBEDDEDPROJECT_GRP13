@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # run_telemetry_test.sh -- S1-U14: host test of telemetry_task's logic
-# (app_program/subsystem1/s1_telem.h, s1_telem.c) with a stub in place of
-# subsystem5_command_post().
+# (app_program/subsystem1/s1_telem.h, s1_telem.c) with stubs in place of
+# subsystem5_command_post() and of the function that calls
+# s3_set_nav_map(). S1-U24 part C (the MAP path) is the "map" group of the
+# same test and mutations N1 to N4.
 #
 # Run from the repository root:
 #
@@ -15,14 +17,17 @@
 #         | tee testing/subsystem1/logs/YYYY-MM-DD_host_test_telemetry.txt
 #
 # Stages; the run stops at the first stage that fails:
-#   1  Build s1_telem_test.c, s1_telem.c and msg_codec.c with strict
-#      warnings as errors, UBSan and ASan.
+#   1  Build s1_telem_test.c, s1_telem.c and msg_codec.c, and S3's
+#      s3_code39.c (s1_telem.c calls s3_code39_char(); the map stub calls
+#      s3_nav_set_map()), with strict warnings as errors, UBSan and ASan.
 #   2  Run the test; it must end with "RESULT: all passed".
-#   3  Twenty-five mutations, each on a copy of s1_telem in a temporary folder;
-#      every one must be caught. One must stop the build at a compile-time
-#      check; twenty-four must build and make the test fail. Each mutation
-#      matches on text, and exactly one line must change, except M17, which
-#      sets both schedule offsets and so changes two.
+#   3  Twenty-nine mutations, each on a copy of s1_telem in a temporary
+#      folder; every one must be caught. One must stop the build at a
+#      compile-time check; twenty-eight must build and make the test fail.
+#      C1 and M1 to M24 are S1-U14's; N1 to N4 are S1-U24 part C's. Each
+#      mutation matches on text, and exactly one line must change, except
+#      M17, which sets both schedule offsets, and N1, which swaps two
+#      letters, and so change two.
 #   4  If arm-none-eabi-gcc is on the PATH, compile s1_telem.c for the
 #      target with the profile's code-generation flags; any warning fails.
 #      Otherwise the stage is skipped.
@@ -38,6 +43,7 @@ set -u
 
 TEST_DIR=testing/subsystem1
 SRC_DIR=app_program/subsystem1
+S3_SRC=app_program/subsystem3/s3_code39.c
 
 if [ ! -f "$SRC_DIR/s1_telem.c" ] || [ ! -f "$TEST_DIR/s1_telem_test.c" ]
 then
@@ -76,7 +82,8 @@ echo "cc: $($CC --version 2>&1 | head -n 1)"
 echo "== stage 1: build (strict warnings as errors, UBSan/ASan)"
 if ! $CC $WARN -Werror -O1 -g $SAN -DTM_MQTT=1 -I"$SRC_DIR" \
         "$TEST_DIR/s1_telem_test.c" "$SRC_DIR/s1_telem.c" \
-        "$SRC_DIR/msg_codec.c" -o "$WORK/s1u14" 2>"$WORK/build.err"
+        "$SRC_DIR/msg_codec.c" "$S3_SRC" -o "$WORK/s1u14" \
+        2>"$WORK/build.err"
 then
     cat "$WORK/build.err"
     fail "1: build"
@@ -144,7 +151,7 @@ mutate ()
     fi
     if ! $CC $WARN -O1 -g $SAN -DTM_MQTT=1 -I"$dir" -I"$SRC_DIR" \
             "$TEST_DIR/s1_telem_test.c" "$dir/s1_telem.c" \
-            "$SRC_DIR/msg_codec.c" -o "$dir/test" 2>"$dir/err"
+            "$SRC_DIR/msg_codec.c" "$S3_SRC" -o "$dir/test" 2>"$dir/err"
     then
         echo "$1 $5: mutant did not build"
         cat "$dir/err"
@@ -245,8 +252,26 @@ mutate M24 run s1_telem.c \
     's/p_change(MSG_FAULT_WIFI);/p_change(MSG_FAULT_IMU);/' \
     "WiFi fault changes the IMU bit"
 
-echo "stage 3: $CAUGHT/25 mutations caught"
-if [ "$CAUGHT" -ne 25 ] || [ "$MISSED" -ne 0 ]
+# S1-U24 part C: the MAP path.
+mutate N1 run s1_telem.c \
+    '/^on_map (/,/^}/{
+s/(map.letter_left);/(map.SWAPPED);/
+s/(map.letter_right);/(map.letter_left);/
+s/(map.SWAPPED);/(map.letter_right);/
+}' \
+    "LEFT and RIGHT swapped before S3 gets them" 2
+mutate N2 run s1_telem.c \
+    's/^                p_stats->map_reject),/                0U),/' \
+    "map_reject left out of cmd_reject"
+mutate N3 run s1_telem.c \
+    's/answer.result = MSG_ACK_ACCEPTED;/answer.result = MSG_ACK_REJECTED;/' \
+    "an applied MAP acked as refused"
+mutate N4 run s1_telem.c \
+    's/if (MSG_TYPE_MAP == msg_codec_get_type(/if (MSG_TYPE_ACK == msg_codec_get_type(/' \
+    "the MAP path never taken"
+
+echo "stage 3: $CAUGHT/29 mutations caught (C1, M1 to M24, N1 to N4)"
+if [ "$CAUGHT" -ne 29 ] || [ "$MISSED" -ne 0 ]
 then
     fail "3: mutations"
 fi
@@ -254,8 +279,9 @@ fi
 # ---------------------------------------------------------------- stage 4
 # The profile's code-generation flags, from build_make/pico_rp2040.mk (the
 # base CFLAGS, -DNDEBUG -ffunction-sections -fdata-sections, and
-# -DTM_MQTT=1 for MQTT=1). s1_telem.c includes only standard headers and
-# S1's own, so no board flags are needed.
+# -DTM_MQTT=1 for MQTT=1). s1_telem.c includes only standard headers, S1's
+# own and S3's s3_code39.h (standard headers only), so no board flags are
+# needed.
 echo "== stage 4: target compile"
 STAGE4=skipped
 if command -v arm-none-eabi-gcc >/dev/null 2>&1
@@ -278,6 +304,6 @@ else
     echo "stage 4 skipped (arm-none-eabi-gcc is not on the PATH)"
 fi
 
-echo "S1-U14: PASS ($CHECKS checks, $CAUGHT/25 mutations caught," \
+echo "S1-U14: PASS ($CHECKS checks, $CAUGHT/29 mutations caught," \
      "target compile $STAGE4)"
 exit 0

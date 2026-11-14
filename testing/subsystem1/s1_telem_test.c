@@ -34,7 +34,11 @@
  *   messages due in the same millisecond;
  * - the WiFi fault rule, with stubs in place of subsystem5_fault_set() and
  *   subsystem5_fault_clear(): armed by the first connection, set by a radio
- *   or session loss, cleared only when both are good, one call per change.
+ *   or session loss, cleared only when both are good, one call per change;
+ * - S1-U24 part C, in a group of its own ("map"): the MAP path, with a
+ *   stub in place of the function that calls s3_set_nav_map(). The stub
+ *   applies S3's own rules with s3_nav_set_map() from s3_code39.c, which
+ *   the runner links in.
  *
  * @par How
  * Expected bytes are written out by hand from the document's tables,
@@ -61,18 +65,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../subsystem3/s3_code39.h"
 #include "msg_layout.h"
 #include "mqtt_link.h"
 #include "s1_telem.h"
 
 /* Kernel error codes the stub returns (include/tk/errno.h). */
 #define E_OK_VALUE              0
+#define E_PAR_VALUE             (-17)
 #define E_ID_VALUE              (-18)
 #define E_NOEXS_VALUE           (-42)
 #define E_TMOUT_VALUE           (-50)
 
 /* Header bytes: version 1 in the high nibble, the type in the low one. */
 #define HDR_COMMAND             0x14U
+#define HDR_MAP                 0x17U
 #define HDR_ACK                 0x15U
 #define HDR_HEARTBEAT           0x12U
 
@@ -147,6 +154,13 @@ static uint8_t  g_post_opcode;
 static uint8_t  g_post_cmd_id;
 static int32_t  g_post_return;
 
+/* The map stub's call log, the letters it was given, and a forced
+ * return value (0: apply S3's rules).
+ */
+static uint32_t g_map_calls;
+static char     g_map_text[8];
+static int32_t  g_map_force;
+
 /* The fault stubs' call log. */
 static uint32_t g_set_calls;
 static uint32_t g_clear_calls;
@@ -199,6 +213,18 @@ static void group_begin(const char * p_name);
 static void group_end(void);
 static int32_t stub_post(uint8_t opcode, uint8_t cmd_id);
 static void stub_reset(int32_t ret);
+static int32_t stub_map(const char * p_letters);
+static void map_reset(int32_t force);
+static mqtt_link_command_t make_map(const uint8_t * p_bytes, uint16_t len);
+static bool map_ack_is(const mqtt_link_command_t * p_cmd,
+                       s1_telem_stats_t * p_stats, const uint8_t * p_want);
+static void test_map_type4_unchanged(void);
+static void test_map_applied(void);
+static void test_map_refused(void);
+static void test_map_malformed(void);
+static void test_map_duplicate(void);
+static void test_map_letters(void);
+static void test_map_null_and_sum(void);
 static mqtt_link_command_t make_cmd(uint8_t byte0, uint8_t byte1,
                                     uint16_t len);
 static bool bytes_equal(const uint8_t * p_a, const uint8_t * p_b,
@@ -339,7 +365,7 @@ test_valid_commands (void)
             (void)memset(&stats, 0, sizeof(stats));
             (void)memset(&ack, 0xA5, sizeof(ack));
             stub_reset(E_OK_VALUE);
-            b_ok = s1_telem_on_command(&cmd, stub_post, &stats, &ack);
+            b_ok = s1_telem_on_command(&cmd, stub_post, stub_map, &stats, &ack);
 
             check(b_ok, "valid: returns true", cmd_byte1);
             check(1U == g_post_calls, "valid: posted once", cmd_byte1);
@@ -380,7 +406,7 @@ test_post_failures (void)
         const uint8_t       want[3] = {HDR_ACK, 0x85U, ACK_BYTE2_REJECTED};
 
         stub_reset(errors[err_idx]);
-        check(s1_telem_on_command(&cmd, stub_post, &stats, &ack),
+        check(s1_telem_on_command(&cmd, stub_post, stub_map, &stats, &ack),
               "post failure: returns true", err_idx);
         check(1U == g_post_calls, "post failure: posted once", err_idx);
         check(bytes_equal(ack.payload, want, 3U),
@@ -422,7 +448,7 @@ test_codec_rejects (void)
                                        ACK_BYTE2_REJECTED};
 
         stub_reset(E_OK_VALUE);
-        check(s1_telem_on_command(&cmd, stub_post, &stats, &ack),
+        check(s1_telem_on_command(&cmd, stub_post, stub_map, &stats, &ack),
               "codec reject: returns true", case_idx);
         check(0U == g_post_calls, "codec reject: not posted", case_idx);
         check(bytes_equal(ack.payload, want, 3U),
@@ -440,7 +466,7 @@ test_codec_rejects (void)
         const uint8_t       want[3] = {HDR_ACK, 0x00U, ACK_BYTE2_REJECTED};
 
         stub_reset(E_OK_VALUE);
-        check(s1_telem_on_command(&cmd, stub_post, &stats, &ack)
+        check(s1_telem_on_command(&cmd, stub_post, stub_map, &stats, &ack)
               && (0U == g_post_calls)
               && bytes_equal(ack.payload, want, 3U),
               "codec reject: over-long length refused, not posted", 3U);
@@ -460,11 +486,14 @@ test_null_arguments (void)
 
     (void)memset(&stats, 0, sizeof(stats));
     stub_reset(E_OK_VALUE);
-    check(!s1_telem_on_command(NULL, stub_post, &stats, &pub), "null cmd", 0U);
-    check(!s1_telem_on_command(&cmd, NULL, &stats, &pub), "null post", 0U);
-    check(!s1_telem_on_command(&cmd, stub_post, NULL, &pub), "null stats",
-          0U);
-    check(!s1_telem_on_command(&cmd, stub_post, &stats, NULL), "null ack", 0U);
+    check(!s1_telem_on_command(NULL, stub_post, stub_map, &stats, &pub),
+          "null cmd", 0U);
+    check(!s1_telem_on_command(&cmd, NULL, stub_map, &stats, &pub),
+          "null post", 0U);
+    check(!s1_telem_on_command(&cmd, stub_post, stub_map, NULL, &pub),
+          "null stats", 0U);
+    check(!s1_telem_on_command(&cmd, stub_post, stub_map, &stats, NULL),
+          "null ack", 0U);
     check(0U == g_post_calls, "null: never posted", g_post_calls);
     check(!s1_telem_heartbeat(0U, NULL, &stats, &pub), "null hb in", 0U);
     check(!s1_telem_heartbeat(0U, &hb_in, NULL, &pub), "null hb stats", 0U);
@@ -652,7 +681,8 @@ test_should_publish (void)
 int
 main (void)
 {
-    int result = EXIT_FAILURE;
+    int      result = EXIT_FAILURE;
+    uint32_t map_checks = 0U;
 
     (void)printf("S1-U14 s1_telem host test (layout version %u)\n",
                  MSG_LAYOUT_VERSION);
@@ -693,6 +723,21 @@ main (void)
     test_wifi_drop_replay();
     test_wifi_null_arguments();
     group_end();
+
+    /* S1-U24 part C; its own count is printed so the totals of the groups
+     * above stay readable.
+     */
+    map_checks = g_checks;
+    group_begin("map");
+    test_map_type4_unchanged();
+    test_map_applied();
+    test_map_refused();
+    test_map_malformed();
+    test_map_duplicate();
+    test_map_letters();
+    test_map_null_and_sum();
+    group_end();
+    (void)printf("  map group: %" PRIu32 " checks\n", g_checks - map_checks);
 
     if (0U == g_failures)
     {
@@ -1365,6 +1410,320 @@ test_wifi_null_arguments (void)
           "wifi: null level", 0U);
     check((0U == g_set_calls) && (0U == g_clear_calls) && (!b_fault_set),
           "wifi: null arguments, no calls", g_set_calls + g_clear_calls);
+}
+
+/* S1-U24 part C: the MAP path. ---------------------------------------- */
+
+/* Golden vectors MAP-1 ("DCBA", id 9), MAP-3 (all 63, id 63) and MAP-4
+ * ("09-Z", id 33), docs/S1_binary_frame.md 10.2.
+ */
+static const uint8_t g_map1[MSG_MAP_BYTES] = {0x17U, 0x24U, 0xD3U, 0x0BU,
+                                              0x28U};
+static const uint8_t g_map3[MSG_MAP_BYTES] = {0x17U, 0xFFU, 0xFFU, 0xFFU,
+                                              0xFCU};
+static const uint8_t g_map4[MSG_MAP_BYTES] = {0x17U, 0x84U, 0x02U, 0x64U,
+                                              0x8CU};
+
+/* "DDBA", id 9: MAP-1 with RIGHT changed from C (12) to D (13). */
+static const uint8_t g_map_ddba[MSG_MAP_BYTES] = {0x17U, 0x24U, 0xD3U,
+                                                  0x4BU, 0x28U};
+
+/* Acks written out by hand: opcode 0, then the id, then the result. */
+static const uint8_t g_ack_map1_ok[MSG_ACK_BYTES] = {HDR_ACK, 0x09U,
+                                                     ACK_BYTE2_QUEUED};
+static const uint8_t g_ack_map1_no[MSG_ACK_BYTES] = {HDR_ACK, 0x09U,
+                                                     ACK_BYTE2_REJECTED};
+static const uint8_t g_ack_unread[MSG_ACK_BYTES] = {HDR_ACK, 0x00U,
+                                                    ACK_BYTE2_REJECTED};
+
+/*!
+ * @brief Stand-in for the function telemetry_task passes, which calls
+ *        s3_set_nav_map(): records the letters and applies S3's own rules
+ *        with s3_nav_set_map(), or returns the forced value.
+ *
+ * @param[in] p_letters The letters for LEFT, RIGHT, STRAIGHT and U-TURN.
+ *
+ * @return E_OK_VALUE if S3's rules accept the map, otherwise E_PAR_VALUE;
+ *         g_map_force instead when it is not 0.
+ */
+static int32_t
+stub_map (const char * p_letters)
+{
+    int32_t ret = E_PAR_VALUE;
+
+    g_map_calls++;
+    (void)memset(g_map_text, 0, sizeof(g_map_text));
+    (void)strncpy(g_map_text, p_letters, sizeof(g_map_text) - 1U);
+
+    if (0 != g_map_force)
+    {
+        ret = g_map_force;
+    }
+    else if (0 == s3_nav_set_map(p_letters))
+    {
+        ret = E_OK_VALUE;
+    }
+    else
+    {
+        /* S3 refused it and kept the old map. */
+    }
+
+    return (ret);
+}
+
+/*!
+ * @brief Clear the map stub's log, set its forced return value, and put
+ *        S3's map back to ABCD.
+ */
+static void
+map_reset (int32_t force)
+{
+    g_map_calls = 0U;
+    (void)memset(g_map_text, 0, sizeof(g_map_text));
+    g_map_force = force;
+    s3_nav_reset();
+}
+
+/*!
+ * @brief A received message of up to MSG_MAP_BYTES bytes; len may claim
+ *        more, as a corrupt record would.
+ */
+static mqtt_link_command_t
+make_map (const uint8_t * p_bytes, uint16_t len)
+{
+    mqtt_link_command_t cmd;
+
+    (void)memset(&cmd, 0, sizeof(cmd));
+    (void)memcpy(cmd.payload, p_bytes, MSG_MAP_BYTES);
+    cmd.payload_len = len;
+
+    return (cmd);
+}
+
+/*!
+ * @brief Run one message through s1_telem_on_command() and compare its ack
+ *        with the bytes expected; the ack must go out like any other.
+ */
+static bool
+map_ack_is (const mqtt_link_command_t * p_cmd, s1_telem_stats_t * p_stats,
+            const uint8_t * p_want)
+{
+    s1_telem_pub_t ack;
+
+    (void)memset(&ack, 0xA5, sizeof(ack));
+
+    return (s1_telem_on_command(p_cmd, stub_post, stub_map, p_stats, &ack)
+            && (MSG_ACK_BYTES == ack.len)
+            && bytes_equal(ack.payload, p_want, MSG_ACK_BYTES)
+            && (MQTT_LINK_TOPIC_ACK == ack.topic)
+            && (MQTT_LINK_QOS_1 == ack.qos) && (!ack.b_retain));
+}
+
+/*!
+ * @brief The command path is unchanged by the map path: START, STOP and
+ *        RESET still posted and acked "queued", and the map stub is never
+ *        called; a type 5 message is still a codec reject.
+ */
+static void
+test_map_type4_unchanged (void)
+{
+    static const uint8_t want_stop[MSG_ACK_BYTES] = {HDR_ACK, 0x85U,
+                                                     ACK_BYTE2_QUEUED};
+    static const uint8_t want_start[MSG_ACK_BYTES] = {HDR_ACK, 0x40U,
+                                                      ACK_BYTE2_QUEUED};
+    static const uint8_t want_reset[MSG_ACK_BYTES] = {HDR_ACK, 0xFFU,
+                                                      ACK_BYTE2_QUEUED};
+    mqtt_link_command_t  stop = make_cmd(HDR_COMMAND, 0x85U, 2U);
+    mqtt_link_command_t  start = make_cmd(HDR_COMMAND, 0x40U, 2U);
+    mqtt_link_command_t  reset = make_cmd(HDR_COMMAND, 0xFFU, 2U);
+    mqtt_link_command_t  type5 = make_cmd(HDR_ACK, 0x85U, 2U);
+    s1_telem_stats_t     stats;
+
+    (void)memset(&stats, 0, sizeof(stats));
+    stub_reset(E_OK_VALUE);
+    map_reset(0);
+    check(map_ack_is(&stop, &stats, want_stop) && (1U == g_post_calls)
+          && (MSG_OP_STOP == g_post_opcode) && (5U == g_post_cmd_id),
+          "map: STOP still posted and acked queued", 0U);
+    check(map_ack_is(&start, &stats, want_start),
+          "map: START id 0 still acked 15 40 00", 0U);
+    check(map_ack_is(&reset, &stats, want_reset),
+          "map: RESET id 63 still acked 15 FF 00", 0U);
+    check(3U == g_post_calls, "map: START, STOP, RESET posted",
+          g_post_calls);
+    check(map_ack_is(&type5, &stats, g_ack_unread) && (3U == g_post_calls),
+          "map: type 5 still a codec reject", 0U);
+    check((0U == g_map_calls) && (1U == stats.codec_reject)
+          && (0U == stats.map_reject),
+          "map: the map stub never called on the command path",
+          g_map_calls);
+}
+
+/*!
+ * @brief MAP-1 ("DCBA", id 9) applied: ack 15 09 00, the stub called once
+ *        with "DCBA", nothing posted, no counter changed.
+ */
+static void
+test_map_applied (void)
+{
+    mqtt_link_command_t cmd = make_map(g_map1, MSG_MAP_BYTES);
+    s1_telem_stats_t    stats;
+    char                now[S3_NAV_MAP_LEN + 1U];
+
+    (void)memset(&stats, 0, sizeof(stats));
+    stub_reset(E_OK_VALUE);
+    map_reset(0);
+    check(map_ack_is(&cmd, &stats, g_ack_map1_ok),
+          "map: DCBA applied, ack 15 09 00", 0U);
+    check((1U == g_map_calls) && (0 == strcmp(g_map_text, "DCBA")),
+          "map: the stub given DCBA once", g_map_calls);
+    s3_nav_get_map(now);
+    check(0 == strcmp(now, "DCBA"), "map: S3's map is DCBA", 0U);
+    check(0U == g_post_calls, "map: nothing posted to S5", g_post_calls);
+    check((0U == stats.codec_reject) && (0U == stats.post_failure)
+          && (0U == stats.map_reject), "map: no counter changed", 0U);
+}
+
+/*!
+ * @brief Refused maps: by the forced stub, and by S3's rules ("DDBA"):
+ *        ack 15 09 40, map_reject +1 each, S3's map kept.
+ */
+static void
+test_map_refused (void)
+{
+    mqtt_link_command_t cmd = make_map(g_map1, MSG_MAP_BYTES);
+    mqtt_link_command_t ddba = make_map(g_map_ddba, MSG_MAP_BYTES);
+    s1_telem_stats_t    stats;
+    char                now[S3_NAV_MAP_LEN + 1U];
+
+    (void)memset(&stats, 0, sizeof(stats));
+    stub_reset(E_OK_VALUE);
+    map_reset(E_PAR_VALUE);
+    check(map_ack_is(&cmd, &stats, g_ack_map1_no)
+          && (1U == stats.map_reject),
+          "map: stub refuses, ack 15 09 40, map_reject 1", stats.map_reject);
+    map_reset(0);
+    check(map_ack_is(&ddba, &stats, g_ack_map1_no)
+          && (2U == stats.map_reject)
+          && (0 == strcmp(g_map_text, "DDBA")),
+          "map: DDBA refused by S3's rules, map_reject 2", stats.map_reject);
+    s3_nav_get_map(now);
+    check(0 == strcmp(now, "ABCD"), "map: S3 kept its map", 0U);
+    check((0U == stats.codec_reject) && (0U == stats.post_failure)
+          && (0U == g_post_calls), "map: refusals counted only once", 0U);
+}
+
+/*!
+ * @brief Malformed MAPs: length 4, length 6 (more than the record holds)
+ *        and type 7 with version 2; none applied, map_reject +1 each,
+ *        ack 15 00 40.
+ */
+static void
+test_map_malformed (void)
+{
+    uint8_t             version2_bytes[MSG_MAP_BYTES];
+    mqtt_link_command_t len4 = make_map(g_map1, MSG_MAP_BYTES - 1U);
+    mqtt_link_command_t len6 = make_map(g_map1, MSG_MAP_BYTES + 1U);
+    mqtt_link_command_t version2;
+    s1_telem_stats_t    stats;
+
+    (void)memcpy(version2_bytes, g_map1, MSG_MAP_BYTES);
+    version2_bytes[0] = 0x27U;
+    version2 = make_map(version2_bytes, MSG_MAP_BYTES);
+    (void)memset(&stats, 0, sizeof(stats));
+    stub_reset(E_OK_VALUE);
+    map_reset(0);
+    check(map_ack_is(&len4, &stats, g_ack_unread)
+          && (1U == stats.map_reject), "map: length 4 refused", 4U);
+    check(map_ack_is(&len6, &stats, g_ack_unread)
+          && (2U == stats.map_reject), "map: length 6 refused", 6U);
+    check(map_ack_is(&version2, &stats, g_ack_unread)
+          && (3U == stats.map_reject), "map: version 2 refused", 2U);
+    check((0U == g_map_calls) && (0U == g_post_calls)
+          && (0U == stats.codec_reject),
+          "map: malformed ones never reach S3 or S5", g_map_calls);
+}
+
+/*!
+ * @brief The same MAP delivered twice (a QoS 1 duplicate): two acks with
+ *        the same result, two calls; applied or refused alike.
+ */
+static void
+test_map_duplicate (void)
+{
+    mqtt_link_command_t cmd = make_map(g_map1, MSG_MAP_BYTES);
+    s1_telem_stats_t    stats;
+
+    (void)memset(&stats, 0, sizeof(stats));
+    stub_reset(E_OK_VALUE);
+    map_reset(0);
+    check(map_ack_is(&cmd, &stats, g_ack_map1_ok)
+          && map_ack_is(&cmd, &stats, g_ack_map1_ok)
+          && (2U == g_map_calls) && (0U == stats.map_reject),
+          "map: applied twice, two equal acks", g_map_calls);
+    map_reset(E_PAR_VALUE);
+    check(map_ack_is(&cmd, &stats, g_ack_map1_no)
+          && map_ack_is(&cmd, &stats, g_ack_map1_no)
+          && (2U == g_map_calls) && (2U == stats.map_reject),
+          "map: refused twice, two equal acks", g_map_calls);
+}
+
+/*!
+ * @brief The letters reach S3 in the right order: MAP-4 ("09-Z", id 33)
+ *        as "09-Z", and MAP-3 (every index 63) as "????", which S3
+ *        refuses.
+ */
+static void
+test_map_letters (void)
+{
+    static const uint8_t want4[MSG_ACK_BYTES] = {HDR_ACK, 0x21U,
+                                                 ACK_BYTE2_QUEUED};
+    static const uint8_t want3[MSG_ACK_BYTES] = {HDR_ACK, 0x3FU,
+                                                 ACK_BYTE2_REJECTED};
+    mqtt_link_command_t  map4 = make_map(g_map4, MSG_MAP_BYTES);
+    mqtt_link_command_t  map3 = make_map(g_map3, MSG_MAP_BYTES);
+    s1_telem_stats_t     stats;
+
+    (void)memset(&stats, 0, sizeof(stats));
+    stub_reset(E_OK_VALUE);
+    map_reset(0);
+    check(map_ack_is(&map4, &stats, want4)
+          && (0 == strcmp(g_map_text, "09-Z")),
+          "map: 09-Z reaches S3 as 09-Z, applied", 0U);
+    check(map_ack_is(&map3, &stats, want3)
+          && (0 == strcmp(g_map_text, "????"))
+          && (1U == stats.map_reject),
+          "map: index 63 reaches S3 as ?, refused", 0U);
+}
+
+/*!
+ * @brief A NULL map function gives no ack; the heartbeat's cmd_reject
+ *        adds map_reject to the other three counts.
+ */
+static void
+test_map_null_and_sum (void)
+{
+    mqtt_link_command_t cmd = make_map(g_map1, MSG_MAP_BYTES);
+    s1_telem_hb_in_t    hb_in = {2U, 3U, 4U};
+    s1_telem_stats_t    stats;
+    s1_telem_pub_t      pub;
+
+    (void)memset(&stats, 0, sizeof(stats));
+    stub_reset(E_OK_VALUE);
+    map_reset(0);
+    check(!s1_telem_on_command(&cmd, stub_post, NULL, &stats, &pub)
+          && (0U == g_map_calls), "map: null map function", 0U);
+
+    /* cmd_reject = 1 + 2 + 3 + 4 = 10 = 0000 1010, at bits 63 to 70:
+     * bit 63 (the 0 at the top) ends byte 7, and byte 8 is the other
+     * seven bits and a padding 0, 0001 0100.
+     */
+    stats.codec_reject = 1U;
+    stats.post_failure = 2U;
+    stats.map_reject = 3U;
+    check(s1_telem_heartbeat(1U, &hb_in, &stats, &pub)
+          && (0x14U == pub.payload[8]),
+          "map: cmd_reject = codec + post + map + dropped", pub.payload[8]);
 }
 
 /*** end of file ***/

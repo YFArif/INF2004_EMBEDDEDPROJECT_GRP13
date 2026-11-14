@@ -48,10 +48,23 @@ succeeded. Each pass it waits up to 50 ms in
 `mqtt_link_receive_command()`; a command wakes it at once, so the wait
 adds nothing to a STOP's round trip (NFR15).
 
-- **Command to S5.** The codec checks the 2-byte command. A valid START,
-  STOP or RESET goes to `subsystem5_command_post(opcode, cmd_id)`, which
-  queues it for `vehicle_ctrl_task` without blocking and raises
-  `EV_COMMAND`.
+- **Command to S5.** The type field picks the path: type 7 is a MAP
+  (next point); any other type goes to the codec, which checks the 2-byte
+  command. A valid START, STOP or RESET goes to
+  `subsystem5_command_post(opcode, cmd_id)`, which queues it for
+  `vehicle_ctrl_task` without blocking and raises `EV_COMMAND`.
+- **MAP to S3.** A 5-byte MAP (S1_binary_frame.md section 5) carries the
+  barcode letters for LEFT, RIGHT, STRAIGHT and U-TURN. `telemetry_task`
+  turns each 6-bit index into its character with S3's `s3_code39_char()`
+  and calls `s3_set_nav_map()` (IF-S3f). S3 judges the map: a repeated
+  letter, `*`, or an index above 43 (`?`) is refused and S3 keeps its old
+  map. `s3_set_nav_map()` takes `mtx_s3` with `TMO_FEVR`, so the task can
+  wait while S3's line or barcode task holds it, and it prints
+  `S3 NAV MAP set: LEFT=D RIGHT=C STRAIGHT=B U-TURN=A` (or `REJECTED
+  (kept)`) with `tm_printf` on `telemetry_task`'s own stack (S1-U25
+  measures it). A MAP is taken in any state; S5 is not asked. S3 does
+  not save the map and goes back to ABCD at every reset, so the dashboard
+  sends it again after a restart (S1_dashboard.md).
 - **Ack.** One 3-byte ack per command the driver delivers, on
   `<prefix>/ack` at QoS 1, not retained. Result 0 means **queued for S5**:
   the post returned `E_OK`. `vehicle_ctrl_task` decides later, on
@@ -62,6 +75,11 @@ adds nothing to a STOP's round trip (NFR15).
   (`[S5] EVT 0x65 a=<opcode> b=<1 or 0>`). Result 1 means the codec
   refused the command (echo rules in S1_binary_frame.md section 5.1) or
   the post failed (S5's queue full or missing): a **post failure**.
+  A MAP's ack has opcode 0 and the MAP's cmd_id; result 0 means
+  **applied** (`s3_set_nav_map()` returned `E_OK`), not queued, and
+  result 1 that S3 refused it or that it was malformed (opcode 0 and
+  cmd_id 0 then). Ack opcode 0 also answers a refused command; section
+  5.1 of S1_binary_frame.md says how the two are told apart.
 - **Heartbeat.** 9 bytes on the telemetry topic at QoS 0, once a second
   on absolute deadlines, and only while the session is up and the driver
   snapshot is fresh, so an outage does not fill the publish queue that
@@ -69,7 +87,8 @@ adds nothing to a STOP's round trip (NFR15).
   RSSI can be read outside the radio service task yet ("not measured"),
   evt_drop because there is no `mbf_event` yet. tel_drop is the periodic
   messages skipped or refused (next point), and cmd_reject is the codec
-  rejections plus the post failures plus the driver's `command_dropped`.
+  rejections plus the post failures plus the refused or malformed MAPs
+  (`map_reject`) plus the driver's `command_dropped`.
 - **Keeping room for the acks.** The publish queue is first in, first out
   and the driver sends one message at a time, so a periodic message delays
   any ack queued behind it. Before each periodic message `telemetry_task`
@@ -151,7 +170,7 @@ will topic as `<prefix>/status` (`build_topics()`,
 | `<prefix>/telemetry` | 0 | robot to dashboard | TELEMETRY, LIVE and HEARTBEAT frames; the type nibble of the header byte tells them apart | `MQTT_LINK_TOPIC_TELEMETRY`, `TOPIC_TELEMETRY`; S1_binary_frame.md section 11 |
 | `<prefix>/event` | 1 | robot to dashboard | EVENT frames | `MQTT_LINK_TOPIC_EVENT`, `TOPIC_EVENT` |
 | `<prefix>/ack` | 2 | robot to dashboard | ACK frames | `MQTT_LINK_TOPIC_ACK`, `TOPIC_ACK` |
-| `<prefix>/cmd/#` | - | dashboard to robot | COMMAND frames. Only the payload reaches the robot's code, not the topic | `build_topics()`, `incoming_publish_cb()` |
+| `<prefix>/cmd/#` | - | dashboard to robot | COMMAND and MAP frames; the type nibble tells them apart. Only the payload reaches the robot's code, not the topic | `build_topics()`, `incoming_publish_cb()` |
 | `<prefix>/status` | - | robot to everyone | The text `online` or `offline` (section 6) | `MQTT_LINK_TOPIC_STATUS`, `send_birth()` |
 
 - The IDs are the values of `mqtt_link_topic_t`; tasks publish by ID and
@@ -214,12 +233,15 @@ version is 1 (`MSG_LAYOUT_VERSION`); a receiver rejects any other.
 | HEARTBEAT | `telemetry` | 9 B | `MSG_HB_BYTES` |
 | EVENT | `event` | 7 B | `MSG_EVT_BYTES` |
 | COMMAND | `cmd/...` | 2 B | `MSG_CMD_BYTES` |
+| MAP | `cmd/...` | 5 B | `MSG_MAP_BYTES` |
 | ACK | `ack` | 3 B | `MSG_ACK_BYTES` |
 
-The driver drops a command longer than 2 bytes
-(`MQTT_LINK_COMMAND_MAX`, counted in `command_dropped`); a shorter one
-reaches the command handler, whose decoder rejects it. The driver also
-refuses to publish a payload over 25 bytes (`MQTT_LINK_PAYLOAD_MAX`).
+The driver drops an incoming payload longer than 5 bytes, the MAP
+(`MQTT_LINK_COMMAND_MAX` = `MSG_IN_MAX_BYTES`, counted in
+`command_dropped`; 2 bytes until the MAP existed); a shorter one reaches
+the command handler, whose decoder rejects anything that is not exactly
+a COMMAND or a MAP. The driver also refuses to publish a payload over 25
+bytes (`MQTT_LINK_PAYLOAD_MAX`).
 
 ## 8. Message rates
 
@@ -340,7 +362,7 @@ outage the robot sends the oldest first.
 |---|---|---|
 | `publish_queue_full` | Publishes refused because the publish queue was full | `mqtt_queue_put_publish()`, `count_full()` |
 | `publish_failed` | Publishes given up after 3 tries, refused by lwIP for good, or with a topic ID out of range | `finish_message()`, `submit_pending()`, `take_pending()` |
-| `command_dropped` | Commands over 2 bytes, command topics over 48 characters, or a full command queue | `incoming_publish_cb()`, `finish_command()` |
+| `command_dropped` | Commands over 5 bytes (the MAP; 2 bytes before it), command topics over 48 characters, or a full command queue | `incoming_publish_cb()`, `finish_command()` |
 | `command_received` | Commands handed to the robot's code | `finish_command()` |
 | `connect_count`, `disconnect_count`, `backoff_msec` | Sessions made and lost, and the current retry delay | `connection_cb()`, `enter_backoff()` |
 | `b_stale` | The driver has not run for 1000 ms or more | `MQTT_LINK_STALE_MSEC` |
@@ -390,11 +412,14 @@ python3 app_program/subsystem1/dashboard/s1_decode.py [--describe] [--session]
 - Exit status: 0 if every line decoded, 1 if any line was rejected, 2 for
   a bad option (`main()`; S1-U11 `CommandLine` tests).
 - `--describe` adds display fields (pitch and roll in degrees, mean speed,
-  fault names, opcode and result names) (`describe()`).
+  fault names, opcode and result names) (`describe()`). A MAP shows its
+  letters (`?` above index 43, as S3 reads it); an ack with opcode 0 and
+  an id above 0 is named MAP, with result 0 "applied" and 1 "refused",
+  and one with id 0 INVALID (S1_binary_frame.md section 5.1).
 - `--session` keeps state across lines: lost frames from `seq`, and full
   encoder counts rebuilt from the 16 bits sent (`Session`, `unwrap16()`).
 
-Offline check with the 21 golden vectors:
+Offline check with the 25 golden vectors:
 
 ```
 python3 testing/subsystem1/golden.py docs/S1_binary_frame.md \
@@ -481,7 +506,7 @@ STOP round trip under 300 ms) and of the NFR14 test.
 | Clean session: a command sent while the robot is offline is lost | lwIP `mqtt_client_connect()`; "Command delivery" note in `mqtt_link.h` |
 | QoS 1 commands can arrive twice | `COMMAND_QOS`; "Command delivery" note |
 | A retained command whose topic is longer than lwIP's 128-byte header buffer makes the robot reconnect over and over until the retained message is cleared; only trusted clients should publish under `<prefix>/cmd/` | lwIP `MQTT_VAR_HEADER_BUFFER_LEN`; "Command topic length" note in `mqtt_link.h` |
-| Prefix 32 characters, command topic suffix 48, command 2 bytes, payload 25 bytes | `PREFIX_MAX_LEN`, `MQTT_LINK_TOPIC_MAX`, `MQTT_LINK_COMMAND_MAX`, `MQTT_LINK_PAYLOAD_MAX` |
+| Prefix 32 characters, command topic suffix 48, incoming payload 5 bytes (the MAP), payload 25 bytes | `PREFIX_MAX_LEN`, `MQTT_LINK_TOPIC_MAX`, `MQTT_LINK_COMMAND_MAX`, `MQTT_LINK_PAYLOAD_MAX` |
 | 8 messages per queue; when full, the new message is refused | `MQTT_LINK_QUEUE_DEPTH` |
 | With the queue rule, an ack can still wait behind the message being sent plus 2 queued ones, or more if heartbeats were queued while the link was slow. The driver waits for each message's TCP ACK before the next, so this delay is not known until measured on the car | section 1.1; `step_publish()`; S1-U06 |
 | `telemetry_task` preempted by the WiFi task while it holds an owner's mutex delays a core-1 task; rare, known, not worked around, not measured | S1_binary_frame.md section 3.4 |

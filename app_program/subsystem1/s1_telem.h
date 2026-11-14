@@ -5,7 +5,8 @@
 /** @file s1_telem.h
  *
  * @brief The part of telemetry_task that needs no kernel: a received
- *        command turned into its ack, the heartbeat packed, the schedules,
+ *        command or map turned into its ack, the heartbeat packed, the
+ *        schedules,
  *        the rules for keeping room in the publish queue, the telemetry and
  *        live messages filled in, and the WiFi fault rule.
  *
@@ -13,7 +14,8 @@
  * telemetry_task.c makes every kernel and driver call. This module only
  * works on the values it is given, so the host test S1-U14 can build and
  * run it with stubs in place of subsystem5_command_post(),
- * subsystem5_fault_set() and subsystem5_fault_clear().
+ * s3_set_nav_map(), subsystem5_fault_set() and subsystem5_fault_clear().
+ * It also calls S3's s3_code39_char(), which needs no kernel either.
  *
  * @par What an ack means (Stage 4a)
  * Result MSG_ACK_ACCEPTED means the command was queued for S5
@@ -22,6 +24,12 @@
  * verdict. The dashboard labels this ack "queued", not "started".
  * Result MSG_ACK_REJECTED means the codec refused the command, or the
  * post failed (S5's command queue was full or missing).
+ *
+ * @par What an ack means for a MAP
+ * The ack's opcode is MSG_ACK_OP_MAP (0) and its cmd_id the MAP's.
+ * MSG_ACK_ACCEPTED means S3 applied the map (s3_set_nav_map() returned
+ * E_OK); MSG_ACK_REJECTED means S3 refused it or the MAP was malformed.
+ * A MAP is taken in any state; S5 is not asked.
  *
  * @par Thread safety
  * Every function works only on the structs it is given. The counters in
@@ -96,6 +104,13 @@
  */
 typedef int32_t (* s1_telem_post_fn_t)(uint8_t opcode, uint8_t cmd_id);
 
+/** Gives a received map to S3: telemetry_task passes a function that
+ *  calls s3_set_nav_map(). p_letters holds the letters for LEFT, RIGHT,
+ *  STRAIGHT and U-TURN, then a NUL. Returns 0 when S3 applied the map, or
+ *  a negative kernel error code when it did not.
+ */
+typedef int32_t (* s1_telem_map_fn_t)(const char * p_letters);
+
 /** Sets or clears fault bits in S5's flg_fault: subsystem5_fault_set() or
  *  subsystem5_fault_clear(), passed in so that s1_telem.c builds on the host.
  */
@@ -106,6 +121,7 @@ typedef struct
 {
     uint32_t    codec_reject;       /* Commands the codec refused.        */
     uint32_t    post_failure;       /* Posts S5's command queue refused.  */
+    uint32_t    map_reject;         /* MAPs S3 refused, or malformed.     */
     uint32_t    ack_publish_failed; /* Acks mqtt_link_publish() refused.  */
     uint32_t    hb_published;       /* Heartbeats queued for publishing.  */
     uint32_t    hb_publish_failed;  /* Heartbeats mqtt_link_publish()     */
@@ -211,6 +227,7 @@ typedef struct
 uint32_t s1_telem_sat_add(uint32_t total, uint32_t amount);
 bool     s1_telem_on_command(const mqtt_link_command_t * p_cmd,
                              s1_telem_post_fn_t p_post,
+                             s1_telem_map_fn_t p_map,
                              s1_telem_stats_t * p_stats,
                              s1_telem_pub_t * p_ack);
 bool     s1_telem_heartbeat(uint8_t seq, const s1_telem_hb_in_t * p_in,

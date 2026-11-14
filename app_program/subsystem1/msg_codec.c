@@ -161,6 +161,27 @@ typedef uint8_t msg_codec_check_cmd_t[((MSG_CMD_OPCODE_POS == 8U)
     && (MSG_ACK_OPCODE_BITS == MSG_CMD_OPCODE_BITS)
     && (MSG_ACK_ID_BITS == MSG_CMD_ID_BITS)) ? 1 : -1];
 
+typedef uint8_t msg_codec_check_map_t[((MSG_MAP_ID_POS == 8U)
+    && (MSG_MAP_LEFT_POS == (MSG_MAP_ID_POS + MSG_MAP_ID_BITS))
+    && (MSG_MAP_RIGHT_POS == (MSG_MAP_LEFT_POS + MSG_MAP_LEFT_BITS))
+    && (MSG_MAP_STRAIGHT_POS == (MSG_MAP_RIGHT_POS + MSG_MAP_RIGHT_BITS))
+    && (MSG_MAP_UTURN_POS
+        == (MSG_MAP_STRAIGHT_POS + MSG_MAP_STRAIGHT_BITS))
+    && (MSG_MAP_DATA_BITS == (MSG_MAP_UTURN_POS + MSG_MAP_UTURN_BITS))
+    && (MSG_MAP_BYTES == ((MSG_MAP_DATA_BITS + 7U) / 8U))
+    && (MSG_MAP_ID_BITS == MSG_ACK_ID_BITS)
+    && (MSG_MAP_LEFT_BITS == MSG_TEL_BC_LETTER_BITS)
+    && (MSG_MAP_RIGHT_BITS == MSG_TEL_BC_LETTER_BITS)
+    && (MSG_MAP_STRAIGHT_BITS == MSG_TEL_BC_LETTER_BITS)
+    && (MSG_MAP_UTURN_BITS == MSG_TEL_BC_LETTER_BITS)
+    && (MSG_ACK_OP_MAP < (1U << MSG_ACK_OPCODE_BITS))) ? 1 : -1];
+
+/* The largest received message is the longer of COMMAND and MAP. */
+typedef uint8_t msg_codec_check_in_t[((MSG_IN_MAX_BYTES >= MSG_CMD_BYTES)
+    && (MSG_IN_MAX_BYTES >= MSG_MAP_BYTES)
+    && ((MSG_IN_MAX_BYTES == MSG_CMD_BYTES)
+        || (MSG_IN_MAX_BYTES == MSG_MAP_BYTES))) ? 1 : -1];
+
 typedef uint8_t msg_codec_check_evt_t[((MSG_EVT_CODE_POS == 8U)
     && (MSG_EVT_ARGS_POS == (MSG_EVT_CODE_POS + MSG_EVT_CODE_BITS))
     && (MSG_EVT_TIME_POS == (MSG_EVT_ARGS_POS + MSG_EVT_ARGS_BITS))
@@ -200,7 +221,8 @@ typedef uint8_t msg_codec_check_max_t[((MSG_FIELD_BITS_MAX < 32U)
     && (MSG_HB_BYTES <= MSG_MAX_BYTES)
     && (MSG_EVT_BYTES <= MSG_MAX_BYTES)
     && (MSG_ACK_BYTES <= MSG_MAX_BYTES)
-    && (MSG_CMD_BYTES <= MSG_MAX_BYTES)) ? 1 : -1];
+    && (MSG_CMD_BYTES <= MSG_MAX_BYTES)
+    && (MSG_MAP_BYTES <= MSG_MAX_BYTES)) ? 1 : -1];
 
 static void     put_field(uint8_t * p_buf, uint32_t pos, uint32_t bits,
                           uint32_t value);
@@ -734,6 +756,113 @@ msg_codec_get_command (const uint8_t * p_buf, uint32_t len,
                                    MSG_CMD_OPCODE_BITS);
             p_out->cmd_id = get_u8(p_buf, MSG_CMD_ID_POS, MSG_CMD_ID_BITS);
             b_ok          = (MSG_OP_INVALID != p_out->opcode);
+        }
+    }
+
+    return (b_ok);
+}
+
+/*!
+ * @brief Read the type field of a received message (the low 4 bits of
+ *        its first byte), so the caller can choose the get function.
+ *
+ * Nothing else is checked here: the get function for that type checks
+ * the length and the version.
+ *
+ * @param[in] p_buf The received bytes (may be NULL).
+ * @param[in] len   Number of received bytes.
+ *
+ * @return The type field, 0 to 15; 0, which is never a valid type, when
+ *         p_buf is NULL or len is 0.
+ */
+uint32_t
+msg_codec_get_type (const uint8_t * p_buf, uint32_t len)
+{
+    uint32_t type = 0U;
+
+    if ((NULL != p_buf) && (len > 0U))
+    {
+        type = get_field(p_buf, MSG_HDR_TYPE_POS, MSG_HDR_TYPE_BITS);
+    }
+
+    return (type);
+}
+
+/*!
+ * @brief Pack a map (used by tests and tools; the robot only reads maps).
+ *
+ * @param[in]  p_in    The id (sent modulo 64) and the four letters (each
+ *                     clamped to 63).
+ * @param[out] p_buf   Receives MSG_MAP_BYTES bytes.
+ * @param[in]  buf_len Size of p_buf.
+ *
+ * @return MSG_MAP_BYTES, or 0 if a pointer is NULL or p_buf is too small.
+ */
+uint32_t
+msg_codec_put_map (const msg_codec_map_t * p_in, uint8_t * p_buf,
+                   uint32_t buf_len)
+{
+    uint32_t written = 0U;
+
+    if ((NULL != p_in) && (NULL != p_buf) && (buf_len >= MSG_MAP_BYTES))
+    {
+        start_message(p_buf, MSG_MAP_BYTES, MSG_TYPE_MAP);
+        put_modulo(p_buf, MSG_MAP_ID_POS, MSG_MAP_ID_BITS, p_in->cmd_id);
+        put_unsigned(p_buf, MSG_MAP_LEFT_POS, MSG_MAP_LEFT_BITS,
+                     p_in->letter_left);
+        put_unsigned(p_buf, MSG_MAP_RIGHT_POS, MSG_MAP_RIGHT_BITS,
+                     p_in->letter_right);
+        put_unsigned(p_buf, MSG_MAP_STRAIGHT_POS, MSG_MAP_STRAIGHT_BITS,
+                     p_in->letter_straight);
+        put_unsigned(p_buf, MSG_MAP_UTURN_POS, MSG_MAP_UTURN_BITS,
+                     p_in->letter_uturn);
+        written = MSG_MAP_BYTES;
+    }
+
+    return (written);
+}
+
+/*!
+ * @brief Unpack a received map.
+ *
+ * The four letters are returned as they arrived, 0 to 63, and are not
+ * judged: S3 decides whether a map is valid.
+ *
+ * @param[in]  p_buf The received payload.
+ * @param[in]  len   Payload length.
+ * @param[out] p_out Receives the id and the letters when the length,
+ *                   version and type are right; otherwise every field is
+ *                   set to 0, so the ack echoes cmd_id 0.
+ *
+ * @return True if the length is exact and the version and type match.
+ */
+bool
+msg_codec_get_map (const uint8_t * p_buf, uint32_t len,
+                   msg_codec_map_t * p_out)
+{
+    bool b_ok = false;
+
+    if (NULL != p_out)
+    {
+        p_out->cmd_id          = 0U;
+        p_out->letter_left     = 0U;
+        p_out->letter_right    = 0U;
+        p_out->letter_straight = 0U;
+        p_out->letter_uturn    = 0U;
+
+        if (header_ok(p_buf, len, MSG_MAP_BYTES, MSG_TYPE_MAP))
+        {
+            p_out->cmd_id          = get_u8(p_buf, MSG_MAP_ID_POS,
+                                            MSG_MAP_ID_BITS);
+            p_out->letter_left     = get_u8(p_buf, MSG_MAP_LEFT_POS,
+                                            MSG_MAP_LEFT_BITS);
+            p_out->letter_right    = get_u8(p_buf, MSG_MAP_RIGHT_POS,
+                                            MSG_MAP_RIGHT_BITS);
+            p_out->letter_straight = get_u8(p_buf, MSG_MAP_STRAIGHT_POS,
+                                            MSG_MAP_STRAIGHT_BITS);
+            p_out->letter_uturn    = get_u8(p_buf, MSG_MAP_UTURN_POS,
+                                            MSG_MAP_UTURN_BITS);
+            b_ok                   = true;
         }
     }
 

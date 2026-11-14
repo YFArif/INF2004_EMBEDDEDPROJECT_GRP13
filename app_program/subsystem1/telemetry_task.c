@@ -6,7 +6,8 @@
  *
  * @brief S1's telemetry_task (see telemetry_task.h): takes each dashboard
  *        command from the MQTT driver, posts it to S5 with
- *        subsystem5_command_post(), publishes its ack on <prefix>/ack, and,
+ *        subsystem5_command_post() (or, for a MAP, gives its letters to S3
+ *        with s3_set_nav_map()), publishes its ack on <prefix>/ack, and,
  *        while the session is up, publishes the heartbeat once a second,
  *        the telemetry frame at 2 Hz and the live message at 5 Hz.
  *
@@ -34,7 +35,7 @@
  * @par Kernel and driver calls
  * This file makes them all; the logic that needs none is in s1_telem.c,
  * which the host test S1-U14 runs with stubs in place of
- * subsystem5_command_post(), subsystem5_fault_set() and
+ * subsystem5_command_post(), s3_set_nav_map(), subsystem5_fault_set() and
  * subsystem5_fault_clear().
  */
 
@@ -142,6 +143,7 @@ static msg_codec_live_t      g_live;
 
 static void     telemetry_task(INT stacd, void * p_exinf);
 static int32_t  post_to_s5(uint8_t opcode, uint8_t cmd_id);
+static int32_t  apply_map(const char * p_letters);
 static void     handle_command(const mqtt_link_command_t * p_cmd);
 static void     update_wifi_fault(void);
 static void     print_wifi_change(int32_t link_status,
@@ -328,7 +330,29 @@ post_to_s5 (uint8_t opcode, uint8_t cmd_id)
 }
 
 /*!
- * @brief Post one received command and publish its ack.
+ * @brief Give one received map to S3: the map function given to s1_telem.c.
+ *
+ * s3_set_nav_map() takes mtx_s3 with TMO_FEVR, so it may wait while S3's
+ * line or barcode task holds that mutex, and it prints one console line
+ * with tm_printf() on this task's stack (S1-U25 measures the stack).
+ *
+ * @param[in] p_letters The letters for LEFT, RIGHT, STRAIGHT and U-TURN,
+ *                      then a NUL.
+ *
+ * @return 0 (E_OK) when S3 applied the map; E_PAR when it refused it (the
+ *         old map is kept); another negative kernel error from the mutex.
+ */
+static int32_t
+apply_map (const char * p_letters)
+{
+    /* ER is the kernel's W, a signed 32-bit integer on this port, so the
+     * conversion keeps every value.
+     */
+    return ((int32_t)s3_set_nav_map(p_letters));
+}
+
+/*!
+ * @brief Act on one received command or map and publish its ack.
  *
  * The ack goes out at QoS 1 whether or not the session is up; if the
  * publish queue is full it is dropped and counted.
@@ -341,7 +365,7 @@ handle_command (const mqtt_link_command_t * p_cmd)
     s1_telem_pub_t ack = {MQTT_LINK_TOPIC_ACK, MQTT_LINK_QOS_1, false, 0U,
                           {0U}};
 
-    if (s1_telem_on_command(p_cmd, post_to_s5, &g_stats, &ack))
+    if (s1_telem_on_command(p_cmd, post_to_s5, apply_map, &g_stats, &ack))
     {
         if (MQTT_LINK_OK != mqtt_link_publish(ack.topic, ack.payload,
                                               ack.len, ack.qos,

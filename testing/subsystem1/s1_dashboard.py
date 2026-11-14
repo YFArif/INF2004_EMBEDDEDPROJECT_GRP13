@@ -1,5 +1,6 @@
 """S1 laptop dashboard: START, STOP and RESET, their acks, the heartbeat
-and the robot's telemetry (S2 motion, S3 line, S4 IMU, S5 state).
+and the robot's telemetry (S2 motion, S3 line, S4 IMU, S5 state), and the
+barcode letter map (MAP) for S3.
 
 Serves one page on http://127.0.0.1:8765/ (this machine only) and pushes
 live updates to it with server-sent events. It reaches the broker through
@@ -14,6 +15,15 @@ retain flag, so the robot would run a retained command again after every
 reconnect (docs/MQTT.md section 1.1). An ack with result 0 means "queued
 for S5", not carried out: S5's verdict is on the robot's console only
 until the event channel is built (the S5 panel shows the state change).
+
+The barcode letter map (S1-U24): four letters for LEFT, RIGHT, STRAIGHT and
+U-TURN, packed by cmd_rtt.map_bytes() and sent like a command, never
+retained. The robot applies it with S3's s3_set_nav_map() and acks result 0
+("applied") or 1 ("refused"). S3 forgets the map at every reset, so the
+server keeps the last map in memory (never on disk) and sends it again
+whenever the robot's status turns "online" and whenever the heartbeat's
+uptime goes down; each round is sent at most MAP_TRIES times, MAP_RETRY_S
+apart, until it is acked.
 
 The telemetry panels read two messages on <prefix>/telemetry: the 2 Hz
 telemetry frame (type 1) and the 5 Hz live message (type 6), both defined
@@ -33,8 +43,9 @@ Run from the repository root (docs/S1_dashboard.md is the full guide):
 
 --simulate needs no broker: a fake car answers with S5's command rules
 and telemetry_task's acks, heartbeat, telemetry and live message.
---check is test S1-U16 part A;
-it exits 0 PASS, 1 FAIL, 2 INCOMPLETE (steps not built yet).
+--check is tests S1-U16 part A (steps A1 to A14) and S1-U24 part D (the
+map, steps D1 to D7); it exits 0 PASS, 1 FAIL, 2 INCOMPLETE (steps not
+built yet).
 """
 
 import argparse
@@ -103,6 +114,11 @@ COUNTER_JUMP_MAX = {"barcodes": 4, "junctions": 4, "losts": 4, "rejects": 3}
 SEQ_GAP_MAX = 25                # About 5 s of live messages.
 TEL_DROP_MAX = 255              # tel_drop is 8 bits and clamps here.
 RETAINED_TEST_SUFFIX = "cmd/test"
+MAP_TRIES = 3                   # Sends of one map before NOT CONFIRMED.
+MAP_RETRY_S = 2.0               # Between two sends of one map.
+MAP_ID_MAX = 63                 # MAP ids run 1 to 63; 0 is never sent.
+MAP_WHY = {"set": "set on this page", "online": "the robot came online",
+           "restart": "the robot restarted (its uptime went down)"}
 SUB_FORMAT = "@Y-@m-@dT@H:@M:@S.@N %r %t %x"
 LABELS = {0: "queued", 1: "rejected"}
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
@@ -122,6 +138,20 @@ CONFIG_PATTERNS = {
 def now_text():
     """This machine's local time, ISO, to the millisecond."""
     return datetime.datetime.now().isoformat(timespec="milliseconds")
+
+
+def map_check(letters):
+    """S3's rules for a map (s3_nav_set_map()), on upper-case letters: None
+    if S3 would take it, else why not. The page checks the same, but the
+    server does not trust the page."""
+    if len(letters) != cmd_rtt.MAP_LETTERS:
+        return "a map is exactly 4 letters"
+    for letter in letters:
+        if (letter not in s1_decode.CODE39) or (letter == "*"):
+            return "%r is not a Code 39 letter S3 takes" % letter
+    if len(set(letters)) != cmd_rtt.MAP_LETTERS:
+        return "each letter may be used once"
+    return None
 
 
 def age_ms(now, then):
@@ -448,6 +478,13 @@ class FakeCar:
     reports 3 more skipped messages in tel_drop, which clamps at 255 as the
     robot's does. The fake car's own state is also in the
     simulator panel; a real car's state is in the S5 panel.
+
+    A MAP is applied with S3's rules (s3_nav_set_map(): 4 letters, Code 39
+    but not '*', no letter twice, upper or lower case) and acked "applied"
+    or "refused"; a refused map leaves the old one. "reboot" restarts the
+    car: the broker sees it go, its map is ABCD again (S3's default), and
+    it comes back online 2 s later with its uptime from 0. "reboot_quiet"
+    restarts it with no status message, so only the uptime shows it.
     """
 
     CAL_S = 3.0
@@ -513,6 +550,8 @@ class FakeCar:
         self._bc = {"letter": s1_decode.LETTER_NONE, "cmd": 0,
                     "b_rev": False, "turn": 0}
         self._view = {}
+        self._map = "ABCD"          # S3's default until a MAP is applied.
+        self._b_drop_map_acks = False
 
     def start(self):
         self._t0 = time.monotonic()
@@ -786,14 +825,18 @@ class FakeCar:
         """telemetry_task and S5 handling one command from the broker."""
         if not self._b_connected:
             return
-        if len(payload) > 2:
-            # The driver drops it before the codec: no ack, counted.
+        if len(payload) > s1_decode.LENGTHS[s1_decode.MAP]:
+            # Over the driver's cap, MQTT_LINK_COMMAND_MAX (5 B, the MAP):
+            # dropped before the codec, no ack, counted.
             self._cmd_reject += 1
             return
         try:
             msg = s1_decode.decode(payload)
         except s1_decode.DecodeError:
             msg = None
+        if (msg is not None) and (msg["msg_type"] == s1_decode.MAP):
+            self._take_map(msg)
+            return
         if (msg is None) or (msg["msg_type"] != s1_decode.COMMAND):
             opcode, cmd_id, b_valid = 0, 0, False
         else:
@@ -822,6 +865,63 @@ class FakeCar:
         self._after(delay, self._deliver, self._topic["ack"], ack)
         if mode == "dup":
             self._after(delay + 0.05, self._deliver, self._topic["ack"], ack)
+
+    def _take_map(self, msg):
+        """telemetry_task and S3 handling one MAP: s3_set_nav_map()."""
+        letters = s1_decode.map_letters(msg)
+        mode, self._next_mode = self._next_mode, None
+        b_ok = (mode != "reject") and (self._s3_rules(letters))
+        if b_ok:
+            self._map = letters.upper()
+        else:
+            self._cmd_reject += 1
+        self.on_sim(self._state, "fake car console: S3 NAV MAP %s: %s"
+                    % ("set" if b_ok else "REJECTED (kept)",
+                       s1_decode.map_text(self._map)))
+        ack = pack(s1_decode.ACK, {"opcode": s1_decode.ACK_OP_MAP,
+                                   "cmd_id": msg["cmd_id"],
+                                   "result": 0 if b_ok else 1})
+        if self._b_drop_map_acks or (mode == "drop"):
+            self.on_sim(self._state, "simulator: this MAP ack is dropped")
+            return
+        self._after(self._rng.uniform(0.03, 0.12), self._deliver,
+                    self._topic["ack"], ack)
+
+    @staticmethod
+    def _s3_rules(letters):
+        """s3_nav_set_map(): 4 Code 39 letters, not '*', none twice."""
+        upper = letters.upper()
+        return ((len(upper) == 4) and (len(set(upper)) == 4)
+                and all((c in s1_decode.CODE39) and (c != "*")
+                        for c in upper))
+
+    def _reboot(self, b_quiet):
+        """Power-cycle the car: S3's map back to ABCD, uptime from 0."""
+        self._t0 = time.monotonic()
+        self._uptime0 = 0
+        self._state = "CALIBRATING"
+        self._map = "ABCD"
+        self._cmd_reject = 0
+        self._tel_drop = 0
+        self._connect_count = 1
+        self._hb_seq = 0
+        self.on_sim(self._state, "fake car console: power-up, CALIBRATING; "
+                    "S3 NAV MAP %s (default)" % s1_decode.map_text(self._map))
+        if b_quiet:
+            # The session survives in this make-believe case: no status
+            # message, only the heartbeat's uptime shows the restart.
+            self._next_hb = time.monotonic() + 0.5
+            return
+        self._b_connected = False
+        self._after(0.5, self._deliver_live_retained, self._topic["status"],
+                    b"offline")
+        self._after(2.0, self._boot_online)
+
+    def _boot_online(self):
+        """The rebooted car joins the WiFi and connects again."""
+        self._b_connected = True
+        self._deliver_live_retained(self._topic["status"], b"online")
+        self._next_hb = time.monotonic() + 0.5
 
     def _mission(self, opcode):
         """The rules of s5_mission_command(): True if S5 would accept."""
@@ -856,6 +956,10 @@ class FakeCar:
             self._next_mode = action[:-len("_next")]
         elif action in ("offline", "online"):
             self._set_connected(action == "online")
+        elif action in ("reboot", "reboot_quiet"):
+            self._reboot(action == "reboot_quiet")
+        elif action in ("map_ack_drop", "map_ack_keep"):
+            self._b_drop_map_acks = (action == "map_ack_drop")
         elif action in ("fault", "gp20"):
             self._car_action(action)
         elif action in ("s3_barcode", "s3_reject", "s3_junction", "s3_lost",
@@ -976,6 +1080,13 @@ class Dashboard:
         self.impact_at = None
         self.b_impact_prev = False
         self.car_state = None
+        # The map is kept in memory only, never written to disk.
+        self.map = {"state": "none", "letters": None, "confirmed": None,
+                    "acked_at": None, "refused": None, "cmd_id": None,
+                    "tries": 0, "why": None}
+        self.map_next_id = 1
+        self.map_next_send = None
+        self.map_acked_mono = None
         self.log_file = None
         if log_path:
             self.log_file = open(log_path, "a", encoding="utf-8")
@@ -1048,6 +1159,7 @@ class Dashboard:
                 "car_state": self.car_state, "banner": self.banner,
                 "banner_why": self.banner_why,
                 "retained_cmd": [dict(e) for e in self.retained.values()],
+                "map": self.map_view(),
                 "t": now_text()}
         return self.scrub.obj(snap)
 
@@ -1124,6 +1236,8 @@ class Dashboard:
         self.emit("status", {"value": value, "retained": b_retained,
                              "log": "robot status: %s%s" % (
                                  value, " (retained)" if b_retained else "")})
+        if value == "online":
+            self.map_trigger("online")
 
     def on_telemetry(self, suffix, data):
         try:
@@ -1249,6 +1363,7 @@ class Dashboard:
             if msg["uptime_s"] < old["uptime_s"]:
                 notes.append("uptime went back: the robot restarted")
                 self.session.rebase_robot()
+                self.map_trigger("restart", time.monotonic() - msg["uptime_s"])
                 # feed() compared this seq with the previous run's.
                 msg["lost_before"] = 0
                 self.emit("s3_events", {
@@ -1285,6 +1400,9 @@ class Dashboard:
         if msg["msg_type"] != s1_decode.ACK:
             self.emit("note", {"log": "%s message on ack ignored"
                                       % msg["type"]})
+            return
+        if s1_decode.ack_is_map(msg):
+            self.on_map_ack(msg)
             return
         cmd_id, opcode, result = msg["cmd_id"], msg["opcode"], msg["result"]
         name = s1_decode.OPCODE_NAMES[opcode]
@@ -1427,6 +1545,165 @@ class Dashboard:
             return 502, {"error": "not published: %s" % err}
         return 200, {"cmd_id": cmd_id, "n": rec["n"]}
 
+    # -- the barcode letter map -------------------------------------------
+
+    def map_status(self):
+        """The one status line of the map control."""
+        m = self.map
+        applied = None
+        if m["confirmed"] is not None:
+            applied = "Applied on the robot: %s (acked %s)" % (
+                s1_decode.map_text(m["confirmed"]), m["acked_at"])
+        state = m["state"]
+        if state == "sending":
+            text = "Sending %s" % m["letters"]
+            if m["tries"] > 0:
+                text += " (try %d of %d)" % (m["tries"], MAP_TRIES)
+        elif state == "applied":
+            text = applied
+        elif state == "offline":
+            text = ("Robot offline: %s is kept and sent when it comes "
+                    "online" % m["letters"])
+        elif state == "not_confirmed":
+            text = ("NOT CONFIRMED: no ack for %s after %d sends; it is sent "
+                    "again when the robot comes online"
+                    % (m["letters"], MAP_TRIES))
+        elif state == "refused":
+            text = "REFUSED: the robot refused %s and kept its map" % (
+                m["refused"])
+            if applied is not None:
+                text += ". " + applied
+        else:
+            text = "No map set (robot uses its default)"
+        return text
+
+    def map_view(self):
+        view = dict(self.map)
+        view["status"] = self.map_status()
+        return view
+
+    def emit_map(self, text, payload_hex=None):
+        """One "map" event with the whole state (lock held)."""
+        data = self.map_view()
+        data["log"] = text
+        if payload_hex is not None:
+            data["hex"] = payload_hex
+        self.emit("map", data)
+
+    def set_map(self, letters):
+        """POST /api/map. Returns (HTTP status, reply)."""
+        if not isinstance(letters, str):
+            return 400, {"error": "letters must be a string of 4 Code 39 "
+                                  "characters"}
+        letters = letters.upper()
+        why = map_check(letters)
+        with self.lock:
+            if why is not None:
+                self.emit("note", {"log": "map not sent: %s" % why})
+                return 400, {"error": "map not sent: %s" % why}
+            self.map["letters"] = letters
+            self.map["refused"] = None
+            if self.status["value"] != "online":
+                self.map.update(state="offline", cmd_id=None, tries=0,
+                                why=None)
+                self.map_next_send = None
+                self.emit_map("map %s kept: the robot is offline" % letters)
+                return 200, {"offline": True, "status": self.map_status()}
+            self.map_start("set")
+        self.map_pump()
+        with self.lock:
+            return 200, {"offline": False, "cmd_id": self.map["cmd_id"],
+                         "status": self.map_status()}
+
+    def map_start(self, why):
+        """Begin a round of sends with a new id, 1 to 63 (lock held)."""
+        cmd_id = self.map_next_id
+        self.map_next_id = (cmd_id % MAP_ID_MAX) + 1
+        self.map.update(state="sending", cmd_id=cmd_id, tries=0, why=why)
+        self.map_next_send = time.monotonic()
+
+    def map_trigger(self, why, boot_mono=None):
+        """Send the kept map again: S3 forgets it at every reset (lock
+        held). boot_mono, for a restart, is the latest the robot can have
+        booted; a map acked since then is not sent again."""
+        if self.map["letters"] is None:
+            return
+        if self.map["state"] == "sending":
+            return
+        if ((boot_mono is not None) and (self.map_acked_mono is not None)
+                and (self.map_acked_mono >= boot_mono)):
+            return
+        self.map_start(why)
+        self.emit_map("map %s to be sent again: %s"
+                      % (self.map["letters"], MAP_WHY[why]))
+
+    def map_take_due(self):
+        """The payload of a try that is due, or None (lock held)."""
+        now = time.monotonic()
+        m = self.map
+        if ((m["state"] != "sending") or (self.map_next_send is None)
+                or (now < self.map_next_send)):
+            return None
+        if m["tries"] >= MAP_TRIES:
+            m["state"] = "not_confirmed"
+            self.map_next_send = None
+            self.emit_map("map %s: no ack after %d sends"
+                          % (m["letters"], MAP_TRIES))
+            return None
+        m["tries"] += 1
+        self.map_next_send = now + MAP_RETRY_S
+        payload = cmd_rtt.map_bytes(m["letters"], m["cmd_id"])
+        self.emit_map("sent MAP %s id %d, try %d of %d (%s)"
+                      % (m["letters"], m["cmd_id"], m["tries"], MAP_TRIES,
+                         MAP_WHY[m["why"]]), payload.hex())
+        return payload
+
+    def map_pump(self):
+        """Publish the map if a try is due (call without the lock)."""
+        with self.lock:
+            payload = self.map_take_due()
+        if payload is None:
+            return
+        try:
+            self.link.publish(payload)
+        except LinkError as err:
+            with self.lock:
+                self.emit("note", {"log": "map not published: %s" % err})
+
+    def on_map_ack(self, msg):
+        """An ack with opcode 0 and an id above 0: a MAP's (lock held)."""
+        m = self.map
+        cmd_id, result = msg["cmd_id"], msg["result"]
+        label = s1_decode.MAP_RESULT_NAMES.get(result, "reserved %d" % result)
+        if cmd_id != m["cmd_id"]:
+            self.emit("map_ack", {"cmd_id": cmd_id, "result": result,
+                                  "label": label, "match": "unmatched",
+                                  "log": "ack MAP id %d: %s, not a map this "
+                                         "dashboard sent" % (cmd_id, label)})
+            return
+        if m["state"] not in ("sending", "not_confirmed"):
+            self.emit("map_ack", {"cmd_id": cmd_id, "result": result,
+                                  "label": label, "match": "duplicate",
+                                  "log": "duplicate ack MAP id %d: %s"
+                                         % (cmd_id, label)})
+            return
+        self.map_next_send = None
+        if result == 0:
+            m.update(state="applied", confirmed=m["letters"],
+                     acked_at=time.strftime("%H:%M:%S"))
+            self.map_acked_mono = time.monotonic()
+            text = "ack MAP id %d: applied, %s" % (
+                cmd_id, s1_decode.map_text(m["letters"]))
+        elif result == 1:
+            m.update(state="refused", refused=m["letters"],
+                     letters=m["confirmed"])
+            text = "ack MAP id %d: REFUSED %s, not retried" % (
+                cmd_id, m["refused"])
+        else:
+            m["state"] = "not_confirmed"
+            text = "ack MAP id %d: %s" % (cmd_id, label)
+        self.emit_map(text)
+
     def sim(self, action):
         if self.mode != "simulate":
             return 404, {"error": "not in simulate mode"}
@@ -1457,6 +1734,7 @@ class Dashboard:
                 if now - rec["resolved_mono"] > RECENT_KEEP_S:
                     del self.recent[cmd_id]
             self.update_derived()
+        self.map_pump()
 
     def robot_light(self, now):
         value = self.status["value"]
@@ -1553,7 +1831,7 @@ class Server(http.server.ThreadingHTTPServer):
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    """The page, the event stream and the two POST endpoints."""
+    """The page, the event stream and the three POST endpoints."""
 
     server_version = "s1_dashboard"
     sys_version = ""
@@ -1586,6 +1864,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(403, {"error": "wrong Host header"})
         elif path == "/":
             page = PAGE.replace("__TOKEN__", json.dumps(self.server.token))
+            page = page.replace("__CODE39__", json.dumps(s1_decode.CODE39))
             self._reply(200, page, "text/html; charset=utf-8", PAGE_CSP)
         elif path == "/events":
             self._events(dash)
@@ -1645,6 +1924,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                               "reset"})
                 else:
                     self._json(*dash.send(op))
+            elif path == "/api/map":
+                self._json(*dash.set_map(body.get("letters")))
             elif path == "/api/sim":
                 self._json(*dash.sim(body.get("action")))
             else:
@@ -1750,6 +2031,28 @@ li { margin-bottom: 4px; }
 .log-telemetry { color: var(--red); font-weight: 700; }
 .log-retained_cmd { color: var(--red); font-weight: 700; }
 .sim-buttons button { margin: 4px 6px 0 0; }
+.map-row {
+  display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end;
+}
+.map-row label {
+  display: flex; flex-direction: column; font-size: 12px;
+  color: var(--muted);
+}
+.map-row input {
+  width: 2.2em; height: 1.8em; margin-top: 2px; text-align: center;
+  font-size: 22px; font-weight: 700; text-transform: uppercase;
+  border: 2px solid var(--line); border-radius: 8px;
+  background: var(--panel); color: var(--text);
+}
+.map-row button {
+  height: 44px; padding: 0 16px; font-size: 16px; font-weight: 700;
+  border-radius: 10px; border: 2px solid var(--btn-edge);
+  background: var(--btn); color: #fff; cursor: pointer;
+}
+#map-status { margin-top: 10px; font-weight: 600; }
+#map-status.st-applied { color: var(--green); }
+#map-status.st-sending, #map-status.st-offline { color: var(--queued); }
+#map-status.st-refused, #map-status.st-not_confirmed { color: var(--red); }
 .tgrid {
   display: grid; gap: 16px; grid-column: 1 / -1;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -1846,6 +2149,25 @@ li { margin-bottom: 4px; }
       <tbody id="cmds"></tbody>
     </table>
   </div>
+  <div class="panel" id="map-panel">
+    <h2>Barcode letter map</h2>
+    <p class="note muted">The letter S3 reads for each turn. Set it after
+      every power cycle of the car and wait for "Applied"; the dashboard
+      also sends it again when the robot comes back.</p>
+    <div class="map-row">
+      <label>LEFT <input id="map-left" maxlength="1" autocomplete="off"
+        aria-label="letter for LEFT"></label>
+      <label>RIGHT <input id="map-right" maxlength="1" autocomplete="off"
+        aria-label="letter for RIGHT"></label>
+      <label>STRAIGHT <input id="map-straight" maxlength="1"
+        autocomplete="off" aria-label="letter for STRAIGHT"></label>
+      <label>U-TURN <input id="map-uturn" maxlength="1" autocomplete="off"
+        aria-label="letter for U-TURN"></label>
+      <button id="map-set" type="button">Set map</button>
+    </div>
+    <div id="map-status">No map set (robot uses its default)</div>
+    <div id="map-why" class="reason"></div>
+  </div>
 </section>
 <section>
   <div class="panel">
@@ -1918,6 +2240,12 @@ li { margin-bottom: 4px; }
         </button>
       <button type="button" data-sim="s3_junction">S3 junction</button>
       <button type="button" data-sim="s3_lost">S3 line lost</button>
+      <button type="button" data-sim="reboot">Reboot (map back to ABCD)
+        </button>
+      <button type="button" data-sim="reboot_quiet">Restart, no status
+        </button>
+      <button type="button" data-sim="map_ack_drop">Drop MAP acks</button>
+      <button type="button" data-sim="map_ack_keep">Keep MAP acks</button>
     </div>
   </div>
 </section>
@@ -2007,6 +2335,8 @@ li { margin-bottom: 4px; }
 <script>
 "use strict";
 const TOKEN = __TOKEN__;
+const CODE39 = __CODE39__;
+const MAP_IDS = ["map-left", "map-right", "map-straight", "map-uturn"];
 const el = (id) => document.getElementById(id);
 const rows = new Map();
 let hbBase = null;
@@ -2056,6 +2386,43 @@ document.addEventListener("keydown", (e) => {
     send("stop");
   }
 });
+function mapCheck(letters) {
+  if (letters.length !== 4) { return "Fill in all four boxes."; }
+  for (const ch of letters) {
+    if ((CODE39.indexOf(ch) < 0) || (ch === "*")) {
+      return "\"" + ch + "\" is not a Code 39 letter S3 takes.";
+    }
+  }
+  if (new Set(letters).size !== 4) { return "Each letter may be used once."; }
+  return "";
+}
+
+function setMap(m) {
+  el("map-status").textContent = m.status;
+  el("map-status").className = "st-" + m.state;
+}
+
+MAP_IDS.forEach((id) => {
+  el(id).addEventListener("input", (e) => {
+    e.target.value = e.target.value.toUpperCase();
+  });
+});
+el("map-set").addEventListener("click", () => {
+  const letters = MAP_IDS.map((id) => el(id).value).join("");
+  const why = mapCheck(letters);
+  el("map-why").textContent = why;
+  if (why) { return; }
+  post("/api/map", {letters: letters}).then((r) => {
+    if (r.status !== 200) {
+      el("map-why").textContent = (r.body && r.body.error) ? r.body.error
+        : "not sent (HTTP " + r.status + ")";
+    } else if (r.body.offline) {
+      el("map-why").textContent = "The robot is offline: the map is kept "
+        + "and sent when it comes online.";
+    }
+  });
+});
+
 document.querySelectorAll("[data-sim]").forEach((b) => {
   b.addEventListener("click", () => post("/api/sim",
                                          {action: b.dataset.sim}));
@@ -2357,6 +2724,7 @@ function applySnapshot(s) {
   banner.why = s.banner_why || "";
   banner.entries = new Map(s.retained_cmd.map((e) => [e.topic_suffix, e]));
   renderBanner();
+  setMap(s.map);
 }
 
 const es = new EventSource("/events");
@@ -2413,6 +2781,8 @@ on("sim", (d) => {
   el("car-state").textContent = d.car_state || "-";
   addLog("sim", d);
 });
+on("map", (d) => { setMap(d); addLog("map", d); });
+on("map_ack", (d) => addLog("map_ack", d));
 </script>
 </body>
 </html>
@@ -2515,7 +2885,14 @@ FAKE_PASSWORD = "p-s1u16-secret"
 FAKE_DIGITS = "1234"            # A login of digits only (A12).
 FAKE_PORT = 1884
 FAKE_PREFIX = "s1u16"
-ALL_STEPS = ["A%d" % number for number in range(1, 15)]
+A_STEPS = ["A%d" % number for number in range(1, 15)]
+# S1-U24 part D: the barcode letter map, in the same run after A14.
+D_STEPS = ["D%d" % number for number in range(1, 8)]
+ALL_STEPS = A_STEPS + D_STEPS
+MAP_APPLIED_RE = re.compile(r"Applied on the robot: LEFT=(.) RIGHT=(.) "
+                            r"STRAIGHT=(.) U-TURN=(.) "
+                            r"\(acked \d\d:\d\d:\d\d\)")
+DCBA_LINE = "S3 NAV MAP set: LEFT=D RIGHT=C STRAIGHT=B U-TURN=A"
 # Measured between client receipts: allow 0.1 s of jitter below the 3 s limit.
 A8_RED_MIN_S = 2.9
 A8_RED_MAX_S = 3.5
@@ -3411,6 +3788,213 @@ def check_a12(ctx, state_text):
                     for name, good in ctx.digits.items())))
 
 
+# -- S1-U24 part D: the barcode letter map --------------------------------
+
+def map_sends(ctx, since):
+    """(time, data) of every map send (a "map" event with the payload)."""
+    with ctx.stream.cond:
+        return [(when, data) for when, name, data in ctx.stream.events[since:]
+                if (name == "map") and data.get("hex")]
+
+
+def wait_map(ctx, pred, timeout, since):
+    return ctx.stream.wait_for("map", pred, timeout, since)
+
+
+def console_line(ctx, text, timeout, since):
+    """The fake car's console line holding text, as a "sim" event."""
+    return ctx.stream.wait_for("sim", lambda d: text in d.get("log", ""),
+                               timeout, since)
+
+
+def check_d1(ctx):
+    since = ctx.stream.mark()
+    status, reply = post_json(ctx, "/api/map", {"letters": "dcba"})
+    sent = wait_map(ctx, lambda d: bool(d.get("hex")), 2.0, since)
+    applied = wait_map(ctx, lambda d: d["state"] == "applied", 3.0, since)
+    console = console_line(ctx, DCBA_LINE, 3.0, since)
+    b_payload, first = False, ""
+    if sent is not None:
+        first = sent[2]["status"]
+        msg = s1_decode.decode(bytes.fromhex(sent[2]["hex"]))
+        b_payload = ((msg["msg_type"] == s1_decode.MAP)
+                     and (1 <= msg["cmd_id"] <= 63)
+                     and (msg["cmd_id"] == reply.get("cmd_id"))
+                     and (s1_decode.map_letters(msg) == "DCBA"))
+    text = applied[2]["status"] if applied else ""
+    match = MAP_APPLIED_RE.fullmatch(text)
+    b_text = (match is not None) and (match.groups() == ("D", "C", "B", "A"))
+    ok = ((status == 200) and first.startswith("Sending") and b_payload
+          and b_text and (console is not None))
+    return ok, ("Set map dcba: %d; first status %r; payload a MAP with the "
+                "reply's id %s and DCBA: %s; then %r; fake car console line: "
+                "%s" % (status, first, reply.get("cmd_id"), b_payload, text,
+                        console is not None))
+
+
+def check_d2(ctx):
+    since = ctx.stream.mark()
+    codes = [post_json(ctx, "/api/map", {"letters": bad})[0]
+             for bad in ("DDBA", "D*BA", "DCB", "DCB?")]
+    # Let any map that went out anyway reach the car and be answered
+    # before the car is told to refuse the next one.
+    time.sleep(1.0)
+    b_none = not map_sends(ctx, since)
+    post_json(ctx, "/api/sim", {"action": "reject_next"})
+    since = ctx.stream.mark()
+    status, _ = post_json(ctx, "/api/map", {"letters": "BADC"})
+    refused = wait_map(ctx, lambda d: d["state"] == "refused", 3.0, since)
+    time.sleep(3.0)
+    sends = map_sends(ctx, since)
+    text = refused[2]["status"] if refused else ""
+    b_text = (text.startswith("REFUSED") and ("BADC" in text)
+              and (MAP_APPLIED_RE.search(text) is not None)
+              and ("LEFT=D RIGHT=C STRAIGHT=B U-TURN=A" in text))
+    _, state_text = http_call(ctx.port, "GET", "/api/state")
+    kept = json.loads(state_text)["map"]["letters"]
+    ok = ((codes == [400, 400, 400, 400]) and b_none and (status == 200)
+          and b_text and (len(sends) == 1) and (kept == "DCBA"))
+    return ok, ("DDBA, D*BA, DCB, DCB?: %s, nothing published: %s; BADC "
+                "with the car told to refuse: %d, %r; sends %d (no retry); "
+                "map kept for the next re-send: %s"
+                % (codes, b_none, status, text, len(sends), kept))
+
+
+def check_d3(ctx):
+    since = ctx.stream.mark()
+    post_json(ctx, "/api/sim", {"action": "reboot"})
+    off = ctx.stream.wait_for("status", lambda d: d["value"] == "offline",
+                              3.0, since)
+    online = ctx.stream.wait_for("status", lambda d: d["value"] == "online",
+                                 5.0, since)
+    at = online[0] if online else since
+    resend = wait_map(ctx, lambda d: bool(d.get("hex"))
+                      and (d.get("why") == "online"), 3.0, at)
+    applied = wait_map(ctx, lambda d: d["state"] == "applied", 3.0,
+                       resend[0] if resend else at)
+    console = console_line(ctx, DCBA_LINE, 3.0, at)
+    restart = ctx.stream.wait_for("heartbeat", lambda d: "uptime went back"
+                                  in d.get("log", ""), 4.0, at)
+    time.sleep(2.0)
+    sends = map_sends(ctx, at)
+    ok = ((off is not None) and (online is not None) and (resend is not None)
+          and (applied is not None) and (console is not None)
+          and (restart is not None) and (len(sends) == 1))
+    return ok, ("offline then online: %s; sent again because of online: %s; "
+                "applied: %s; console DCBA again: %s; restart seen in the "
+                "heartbeat: %s; sends after online: %d (expected 1)"
+                % ((off is not None) and (online is not None),
+                   resend is not None, applied is not None,
+                   console is not None, restart is not None, len(sends)))
+
+
+def check_d4(ctx):
+    since = ctx.stream.mark()
+    post_json(ctx, "/api/sim", {"action": "reboot_quiet"})
+    restart = ctx.stream.wait_for("heartbeat", lambda d: "uptime went back"
+                                  in d.get("log", ""), 4.0, since)
+    resend = wait_map(ctx, lambda d: bool(d.get("hex"))
+                      and (d.get("why") == "restart"), 3.0, since)
+    applied = wait_map(ctx, lambda d: d["state"] == "applied", 3.0,
+                       resend[0] if resend else since)
+    console = console_line(ctx, DCBA_LINE, 3.0, since)
+    statuses = ctx.stream.all_of("status", since)
+    ok = ((restart is not None) and (resend is not None)
+          and (applied is not None) and (console is not None)
+          and (not statuses))
+    return ok, ("no status message: %s; uptime went down: %s; sent again "
+                "because of the restart: %s; applied: %s; console DCBA "
+                "again: %s" % (not statuses, restart is not None,
+                               resend is not None, applied is not None,
+                               console is not None))
+
+
+def check_d5(ctx):
+    post_json(ctx, "/api/sim", {"action": "map_ack_drop"})
+    since = ctx.stream.mark()
+    status, _ = post_json(ctx, "/api/map", {"letters": "WXYZ"})
+    gave_up = wait_map(ctx, lambda d: d["state"] == "not_confirmed", 9.0,
+                       since)
+    sends = map_sends(ctx, since)
+    if sends:
+        time.sleep(max(0.0, sends[-1][0] + 4.0 - time.monotonic()))
+    later = map_sends(ctx, since)
+    post_json(ctx, "/api/sim", {"action": "map_ack_keep"})
+    gaps = [b[0] - a[0] for a, b in zip(sends, sends[1:])]
+    b_gaps = (len(gaps) == 2) and all(1.7 <= gap <= 2.5 for gap in gaps)
+    text = gave_up[2]["status"] if gave_up else ""
+    ok = ((status == 200) and text.startswith("NOT CONFIRMED")
+          and (len(sends) == 3) and (len(later) == 3) and b_gaps)
+    return ok, ("WXYZ with every MAP ack dropped: %d; sends %d, gaps %s s; "
+                "%r; sends 4 s after the third: %d"
+                % (status, len(sends),
+                   ", ".join("%.2f" % gap for gap in gaps) or "none", text,
+                   len(later)))
+
+
+def check_d6(ctx):
+    since = ctx.stream.mark()
+    post_json(ctx, "/api/sim", {"action": "offline"})
+    off = ctx.stream.wait_for("status", lambda d: d["value"] == "offline",
+                              3.0, since)
+    since = ctx.stream.mark()
+    status, reply = post_json(ctx, "/api/map", {"letters": "LRSU"})
+    kept = wait_map(ctx, lambda d: d["state"] == "offline", 1.0, since)
+    time.sleep(0.5)
+    b_none = not map_sends(ctx, since)
+    since = ctx.stream.mark()
+    post_json(ctx, "/api/sim", {"action": "online"})
+    online = ctx.stream.wait_for("status", lambda d: d["value"] == "online",
+                                 3.0, since)
+    resend = wait_map(ctx, lambda d: bool(d.get("hex"))
+                      and (d.get("why") == "online")
+                      and (d.get("letters") == "LRSU"), 3.0, since)
+    applied = wait_map(ctx, lambda d: (d["state"] == "applied")
+                       and (d.get("confirmed") == "LRSU"), 3.0, since)
+    text = kept[2]["status"] if kept else ""
+    ok = ((off is not None) and (status == 200)
+          and (reply.get("offline") is True) and text.startswith(
+              "Robot offline") and b_none and (online is not None)
+          and (resend is not None) and (applied is not None))
+    return ok, ("offline: %s; Set map LRSU: %d, offline %s, %r, nothing "
+                "published: %s; online: sent %s, applied %s"
+                % (off is not None, status, reply.get("offline"), text,
+                   b_none, resend is not None, applied is not None))
+
+
+def check_d7(ctx):
+    settings = Settings(FAKE_HOST, FAKE_PORT, FAKE_PREFIX, FAKE_USER,
+                        FAKE_PASSWORD, "check")
+    argv = pub_args(settings, None)
+    refused = 0
+    for extra in (["-r"], ["--retain"]):
+        try:
+            check_no_retain(argv + extra)
+        except RuntimeError:
+            refused += 1
+    _, text = http_call(ctx.port, "GET", "/api/state")
+    args_list = json.loads(text).get("publish_args", [])
+    n_map = len(map_sends(ctx, 0))
+    topic = FAKE_PREFIX + "/" + CMD_SUFFIX
+    b_args = (len(args_list) >= n_map) and all(
+        ("-q" in a) and (a[a.index("-q") + 1] == "1") and ("-t" in a)
+        and (a[a.index("-t") + 1] == topic) and ("-s" in a)
+        and ("-r" not in a) and ("--retain" not in a) for a in args_list)
+    st_none, _ = http_call(ctx.port, "POST", "/api/map", {"letters": "DCBA"})
+    st_bad, _ = http_call(ctx.port, "POST", "/api/map", {"letters": "DCBA"},
+                          {"X-S1-Token": "0" * 32})
+    st_num, _ = post_json(ctx, "/api/map", {"letters": 5})
+    st_list, _ = post_json(ctx, "/api/map", {"letters": ["D", "C", "B", "A"]})
+    ok = ((refused == 2) and (n_map > 0) and b_args and (st_none == 403)
+          and (st_bad == 403) and (st_num == 400) and (st_list == 400))
+    return ok, ("check_no_retain refuses -r and --retain: %d of 2; %d "
+                "publishes (%d MAP sends) all -q 1, -t %s, -s, no retain: "
+                "%s; /api/map with no token %d, wrong token %d, letters as a "
+                "number %d, as a list %d"
+                % (refused, len(args_list), n_map, topic, b_args, st_none,
+                   st_bad, st_num, st_list))
+
+
 class CheckContext:
     def __init__(self, run):
         self.run = run
@@ -3422,8 +4006,8 @@ class CheckContext:
 
 
 def run_check(args):
-    print("S1-U16 part A: s1_dashboard.py --check (simulate mode, no "
-          "broker)", flush=True)
+    print("S1-U16 part A and S1-U24 part D: s1_dashboard.py --check "
+          "(simulate mode, no broker)", flush=True)
     results = {}
 
     def record(step, outcome):
@@ -3458,6 +4042,13 @@ def run_check(args):
         record("A2", check_a2(ctx))
         record("A13", check_a13(ctx))
         record("A14", check_a14(ctx))
+        record("D1", check_d1(ctx))
+        record("D2", check_d2(ctx))
+        record("D3", check_d3(ctx))
+        record("D4", check_d4(ctx))
+        record("D5", check_d5(ctx))
+        record("D6", check_d6(ctx))
+        record("D7", check_d7(ctx))
         run.stop()
         record("A11", check_a11(ctx, args_list, options_live))
         record("A12", check_a12(ctx, state_text))
@@ -3473,21 +4064,32 @@ def run_check(args):
     return summarise(results)
 
 
+def verdict_of(results, steps):
+    """PASS, FAIL or INCOMPLETE for one test's steps."""
+    ran = [step for step in steps if step in results]
+    if not all(results[step][0] for step in ran):
+        return "FAIL"
+    if len(ran) < len(steps):
+        return "INCOMPLETE"
+    return "PASS"
+
+
 def summarise(results):
     ran = [step for step in ALL_STEPS if step in results]
     missing = [step for step in ALL_STEPS if step not in results]
-    passed = all(results[step][0] for step in ran)
     print("steps run: %s" % (" ".join(ran) or "none"))
     if missing:
         print("not run (not built yet, or the check stopped): %s"
               % " ".join(missing))
-    if not passed:
-        verdict, code = "FAIL", 1
-    elif missing:
-        verdict, code = "INCOMPLETE", 2
+    verdicts = [verdict_of(results, A_STEPS), verdict_of(results, D_STEPS)]
+    if "FAIL" in verdicts:
+        code = 1
+    elif "INCOMPLETE" in verdicts:
+        code = 2
     else:
-        verdict, code = "PASS", 0
-    print("S1-U16 part A: %s" % verdict, flush=True)
+        code = 0
+    print("S1-U16 part A: %s" % verdicts[0])
+    print("S1-U24 part D: %s" % verdicts[1], flush=True)
     return code
 
 
@@ -3509,7 +4111,7 @@ def main():
     parser.add_argument("--banner-off", action="store_true",
                         help="run without the retained-command banner")
     parser.add_argument("--check", action="store_true",
-                        help="run test S1-U16 part A")
+                        help="run tests S1-U16 part A and S1-U24 part D")
     parser.add_argument("--opts-dir", help=argparse.SUPPRESS)
     args = parser.parse_args()
     try:

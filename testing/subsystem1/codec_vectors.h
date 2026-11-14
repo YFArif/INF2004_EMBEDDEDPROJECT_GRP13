@@ -84,6 +84,15 @@ typedef struct
     uint8_t                 bytes[MSG_ACK_BYTES];
 } codec_vectors_ack_t;
 
+/** One map vector (S1-U24). */
+typedef struct
+{
+    const char *            p_label;
+    msg_codec_map_t         in;
+    msg_codec_map_t         out;
+    uint8_t                 bytes[MSG_MAP_BYTES];
+} codec_vectors_map_t;
+
 /** @brief Telemetry vectors; *p_count receives how many. */
 const codec_vectors_tel_t * codec_vectors_tel(uint32_t * p_count);
 
@@ -101,6 +110,9 @@ const codec_vectors_cmd_t * codec_vectors_cmd(uint32_t * p_count);
 
 /** @brief Ack vectors; *p_count receives how many. */
 const codec_vectors_ack_t * codec_vectors_ack(uint32_t * p_count);
+
+/** @brief Map vectors (S1-U24); *p_count receives how many. */
+const codec_vectors_map_t * codec_vectors_map(uint32_t * p_count);
 
 #endif /* CODEC_VECTORS_H */
 
