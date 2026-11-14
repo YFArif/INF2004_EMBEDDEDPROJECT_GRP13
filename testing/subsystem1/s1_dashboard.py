@@ -2072,6 +2072,186 @@ def run_server(args, settings, scrub):
     return 0
 
 
+# -- The design-token audit (--token-audit; S1-U26 part A will call it) ---
+
+TOKEN_FILE = "tokens.css"
+TOKEN_FREE_FILES = ("app.css", "app.js", "index.html")
+AUDIT_CONTEXTS = (("light", False), ("dark", False), ("light", True),
+                  ("dark", True))
+PAIR_RE = re.compile(r"@pair\s+fg=(--[\w-]+)\s+bg=(--[\w-]+)"
+                     r"(?:\s+over=(--[\w-]+))?\s+min=([0-9.]+)")
+DECL_RE = re.compile(r"(--[\w-]+)\s*:\s*([^;{}]+);")
+COLOUR_LITERAL_RE = re.compile(
+    r"(?<![&\w])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b"
+    r"|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(")
+COLOUR_NAME_RE = re.compile(
+    r":\s*(?:white|black|red|green|blue|gray|grey|silver|orange|yellow)\b")
+COLOUR_PROP_RE = re.compile(r"(?<![\w-])color\s*:\s*([^;}]+)")
+COLOUR_PLAIN = ("inherit", "currentColor", "currentcolor")
+
+
+def css_block(text, start):
+    """The text between the first "{" at or after start and its "}"."""
+    opened = text.index("{", start)
+    return text[opened + 1:text.index("}", opened)]
+
+
+def token_tables(css):
+    """({token: value} of the base :root block, the same for the
+    prefers-contrast: more block). Comments are removed first."""
+    plain = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    base = dict(DECL_RE.findall(css_block(plain, plain.index(":root {"))))
+    media = plain.index("@media (prefers-contrast: more)")
+    more = dict(DECL_RE.findall(css_block(plain,
+                                          plain.index(":root {", media))))
+    return base, more
+
+
+def split_args(text):
+    """Split a function's arguments at the commas outside brackets."""
+    parts, depth, last = [], 0, 0
+    for index, char in enumerate(text):
+        depth += (char == "(") - (char == ")")
+        if (char == ",") and (depth == 0):
+            parts.append(text[last:index].strip())
+            last = index + 1
+    parts.append(text[last:].strip())
+    return parts
+
+
+def colour_of(value, table, scheme, depth=0):
+    """(r, g, b, alpha) of a token value in one colour scheme. Raises
+    ValueError for anything that is not a colour."""
+    value = " ".join(value.split())
+    if depth > 8:
+        raise ValueError("tokens refer to each other in a circle")
+    if value.startswith("var(") and value.endswith(")"):
+        name = value[4:-1].strip()
+        if name not in table:
+            raise ValueError("unknown token %s" % name)
+        return colour_of(table[name], table, scheme, depth + 1)
+    if value.startswith("light-dark(") and value.endswith(")"):
+        parts = split_args(value[11:-1])
+        if len(parts) != 2:
+            raise ValueError("light-dark() needs two values: %s" % value)
+        return colour_of(parts[0 if scheme == "light" else 1], table,
+                         scheme, depth + 1)
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+        return tuple(int(value[i:i + 2], 16) for i in (1, 3, 5)) + (1.0,)
+    match = re.fullmatch(r"rgba?\(([^()]*)\)", value)
+    if match is not None:
+        numbers = [float(part) for part in split_args(match.group(1))]
+        if len(numbers) in (3, 4):
+            return tuple(numbers[:3]) + (numbers[3] if len(numbers) == 4
+                                         else 1.0,)
+    raise ValueError("not a colour: %s" % value)
+
+
+def colour_over(top, under):
+    """Lay a colour with alpha over an opaque one."""
+    alpha = top[3]
+    return tuple(top[i] * alpha + under[i] * (1.0 - alpha)
+                 for i in range(3)) + (1.0,)
+
+
+def luminance(colour):
+    """WCAG 2 relative luminance of an opaque sRGB colour."""
+    def linear(channel):
+        channel /= 255.0
+        if channel <= 0.04045:
+            return channel / 12.92
+        return ((channel + 0.055) / 1.055) ** 2.4
+    return (0.2126 * linear(colour[0]) + 0.7152 * linear(colour[1])
+            + 0.0722 * linear(colour[2]))
+
+
+def contrast(first, second):
+    """WCAG 2 contrast ratio of two opaque colours."""
+    high, low = sorted((luminance(first), luminance(second)), reverse=True)
+    return (high + 0.05) / (low + 0.05)
+
+
+def pair_ratio(pair, table, scheme):
+    """The contrast ratio of one @pair in one context."""
+    fg_name, bg_name, over_name, _ = pair
+    back = colour_of("var(%s)" % bg_name, table, scheme)
+    if back[3] < 1.0:
+        if not over_name:
+            raise ValueError("%s is translucent: the pair needs over="
+                             % bg_name)
+        under = colour_of("var(%s)" % over_name, table, scheme)
+        if under[3] < 1.0:
+            raise ValueError("%s must be opaque" % over_name)
+        back = colour_over(back, under)
+    fore = colour_over(colour_of("var(%s)" % fg_name, table, scheme), back)
+    return contrast(fore, back)
+
+
+def token_audit(ui_dir=None):
+    """Check the design tokens. Returns (ok, lines to print).
+
+    1. Every "@pair" of tokens.css reaches its minimum WCAG contrast ratio
+       in the four contexts (light, dark, each with prefers-contrast:
+       more).
+    2. No other page file holds a colour literal.
+    3. Every "color:" in app.css is a token that is the text side of a
+       pair, so no text colour escapes check 1.
+    """
+    ui_dir = UI_DIR if ui_dir is None else ui_dir
+    css = (ui_dir / TOKEN_FILE).read_text(encoding="utf-8")
+    base, more = token_tables(css)
+    pairs = PAIR_RE.findall(css)
+    lines, failures = [], 0
+    for pair in pairs:
+        ratios = []
+        for scheme, b_more in AUDIT_CONTEXTS:
+            table = dict(base, **more) if b_more else base
+            try:
+                ratios.append(pair_ratio(pair, table, scheme))
+            except ValueError as err:
+                ratios.append(0.0)
+                lines.append("  error: %s" % err)
+        b_good = min(ratios) >= float(pair[3])
+        failures += 0 if b_good else 1
+        lines.append("  %s %s on %s%s: %s (min %s)"
+                     % ("ok  " if b_good else "FAIL", pair[0], pair[1],
+                        (" over " + pair[2]) if pair[2] else "",
+                        " ".join("%.2f" % ratio for ratio in ratios),
+                        pair[3]))
+    literals = 0
+    for name in TOKEN_FREE_FILES:
+        text = (ui_dir / name).read_text(encoding="utf-8")
+        found = COLOUR_LITERAL_RE.findall(text)
+        if name.endswith(".css"):
+            found += COLOUR_NAME_RE.findall(text)
+        literals += len(found)
+        if found:
+            lines.append("  FAIL %s holds %d colour literals, first %r"
+                         % (name, len(found), found[0]))
+    text_tokens = {pair[0] for pair in pairs}
+    loose = []
+    app_css = re.sub(r"/\*.*?\*/", "",
+                     (ui_dir / "app.css").read_text(encoding="utf-8"),
+                     flags=re.S)
+    for value in COLOUR_PROP_RE.findall(app_css):
+        value = value.strip()
+        match = re.fullmatch(r"var\((--[\w-]+)\)", value)
+        if value in COLOUR_PLAIN:
+            pass
+        elif (match is None) or (match.group(1) not in text_tokens):
+            loose.append(value)
+    if loose:
+        lines.append("  FAIL app.css text colours outside the pairs: %s"
+                     % ", ".join(sorted(set(loose))))
+    ok = bool(pairs) and (failures == 0) and (literals == 0) and (not loose)
+    lines.append("token audit: %d pairs in 4 contexts (light, dark, light "
+                 "more, dark more), %d below their minimum; %d colour "
+                 "literals outside %s; %d text colours outside the pairs: %s"
+                 % (len(pairs), failures, literals, TOKEN_FILE,
+                    len(set(loose)), "PASS" if ok else "FAIL"))
+    return ok, lines
+
+
 # -- S1-U16 part A: --check ---------------------------------------------
 
 FAKE_HOST = "203.0.113.77"      # TEST-NET-3: a documentation address.
@@ -3319,9 +3499,15 @@ def main():
                         help="run without the retained-command banner")
     parser.add_argument("--check", action="store_true",
                         help="run tests S1-U16 part A and S1-U24 part D")
+    parser.add_argument("--token-audit", action="store_true",
+                        help="check the contrast of dashboard_ui/tokens.css")
     parser.add_argument("--opts-dir", help=argparse.SUPPRESS)
     args = parser.parse_args()
     try:
+        if args.token_audit:
+            ok, lines = token_audit()
+            print("\n".join(lines), flush=True)
+            return 0 if ok else 1
         if args.check:
             return run_check(args)
         return serve(args)

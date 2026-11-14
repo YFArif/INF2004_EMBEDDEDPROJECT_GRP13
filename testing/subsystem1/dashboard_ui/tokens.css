@@ -1,0 +1,209 @@
+/* S1 dashboard design tokens. The only file that may hold a colour.
+ *
+ * Source: Apple Human Interface Guidelines, pages Color (change log:
+ * 9 June 2025 values, updated 16 December 2025), Dark Mode, Materials and
+ * Typography, retrieved 2026-11-14, and the UIKit "UI element colors"
+ * documentation for the neutral structure. docs/ui/S1_design_tokens.md
+ * lists every token, its Apple name and each deviation.
+ *
+ * How the four contexts are written:
+ *   light-dark(A, B)                 A in the light theme, B in the dark
+ *   @media (prefers-contrast: more)  the increased-contrast values
+ * The theme follows the system (color-scheme: light dark) unless the page
+ * sets data-theme="light" or "dark" on <html>.
+ *
+ * "@pair" comments declare which text token sits on which background.
+ * s1_dashboard.py --token-audit computes the WCAG contrast ratio of every
+ * pair in all four contexts and fails below "min". "over" is the surface
+ * under a translucent background.
+ */
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-latin-opsz-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+
+  /* -- Apple system colours: light, dark, light IC, dark IC ------------ */
+  --sys-blue-l: #0088FF;   --sys-blue-d: #0091FF;
+  --sys-blue-lc: #1E6EF4;  --sys-blue-dc: #5CB8FF;
+  --sys-red-l: #FF383C;    --sys-red-d: #FF4245;
+  --sys-red-lc: #E9152D;   --sys-red-dc: #FF6165;
+  --sys-green-l: #34C759;  --sys-green-d: #30D158;
+  --sys-green-lc: #008932; --sys-green-dc: #4AD968;
+  --sys-orange-l: #FF8D28; --sys-orange-d: #FF9230;
+  --sys-orange-lc: #C55300; --sys-orange-dc: #FFA056;
+  --sys-yellow-l: #FFCC00; --sys-yellow-d: #FFD600;
+  --sys-yellow-lc: #A16A00; --sys-yellow-dc: #FEDF43;
+  --sys-gray-l: #8E8E93;   --sys-gray-d: #8E8E93;
+  --sys-gray-lc: #6C6C70;  --sys-gray-dc: #AEAEB2;
+  --sys-gray2-l: #AEAEB2;  --sys-gray2-d: #636366;
+  --sys-gray3-l: #C7C7CC;  --sys-gray3-d: #48484A;
+  --sys-gray4-l: #D1D1D6;  --sys-gray4-d: #3A3A3C;
+  --sys-gray5-l: #E5E5EA;  --sys-gray5-d: #2C2C2E;
+  --sys-gray6-l: #F2F2F7;  --sys-gray6-d: #1C1C1E;
+
+  /* -- Surfaces: the grouped background set ---------------------------- */
+  --bg-page: light-dark(#F2F2F7, #000000);    /* systemGroupedBackground */
+  --bg-card: light-dark(#FFFFFF, #1C1C1E);    /* secondary grouped       */
+  --bg-inset: light-dark(#F2F2F7, #2C2C2E);   /* tertiary grouped        */
+
+  /* -- Labels. Secondary and tertiary are darker than Apple's (.6, .3)
+   *    so that they reach 4.5:1 and 3:1 (deviation 3). ----------------- */
+  --label: light-dark(#000000, #FFFFFF);
+  --label-2: light-dark(rgba(60, 60, 67, 0.76), rgba(235, 235, 245, 0.6));
+  --label-3: light-dark(rgba(60, 60, 67, 0.58), rgba(235, 235, 245, 0.4));
+  --label-4: light-dark(rgba(60, 60, 67, 0.18), rgba(235, 235, 245, 0.16));
+
+  /* -- Separators and fills -------------------------------------------- */
+  --separator: light-dark(rgba(60, 60, 67, 0.29), rgba(84, 84, 88, 0.6));
+  --separator-opaque: light-dark(#C6C6C8, #38383A);
+  --fill-1: light-dark(rgba(120, 120, 128, 0.2), rgba(120, 120, 128, 0.36));
+  --fill-2: light-dark(rgba(120, 120, 128, 0.16), rgba(120, 120, 128, 0.32));
+  --fill-3: light-dark(rgba(120, 120, 128, 0.12), rgba(120, 120, 128, 0.24));
+  --fill-4: light-dark(rgba(120, 120, 128, 0.08), rgba(120, 120, 128, 0.18));
+
+  /* -- Colour roles as text and glyphs. The light theme uses the
+   *    increased-contrast values: the default light values are 2.2:1 to
+   *    3.6:1 on white. --------------------------------------------------- */
+  --accent-text: light-dark(var(--sys-blue-lc), var(--sys-blue-d));
+  --red-text: light-dark(var(--sys-red-lc), var(--sys-red-d));
+  --green-text: light-dark(var(--sys-green-lc), var(--sys-green-d));
+  --orange-text: light-dark(var(--sys-orange-lc), var(--sys-orange-d));
+  --yellow-text: light-dark(var(--sys-yellow-lc), var(--sys-yellow-d));
+
+  /* -- Colour roles as decoration (dots, bars, plot lines): never text. */
+  --accent-deco: light-dark(var(--sys-blue-l), var(--sys-blue-d));
+  --red-deco: light-dark(var(--sys-red-l), var(--sys-red-d));
+  --green-deco: light-dark(var(--sys-green-l), var(--sys-green-d));
+  --orange-deco: light-dark(var(--sys-orange-l), var(--sys-orange-d));
+  --gray-deco: light-dark(var(--sys-gray-l), var(--sys-gray-d));
+
+  /* -- Filled controls. The accent fill carries white text in the light
+   *    theme and black in the dark one (white on #0091FF is 3.2:1). ----- */
+  --accent-fill: light-dark(var(--sys-blue-lc), var(--sys-blue-d));
+  --on-accent: light-dark(#FFFFFF, #000000);
+  --stop-fill: #E9152D;                 /* one red in both themes */
+  --on-stop: #FFFFFF;
+  --stop-shadow: rgba(233, 21, 45, 0.28);
+  --focus-ring: light-dark(var(--sys-blue-lc), var(--sys-blue-d));
+
+  /* -- Liquid Glass approximation: floating controls only -------------- */
+  --glass-fill: light-dark(rgba(255, 255, 255, 0.6), rgba(44, 44, 46, 0.55));
+  --glass-solid: light-dark(#FFFFFF, #2C2C2E);
+  --glass-border: light-dark(rgba(60, 60, 67, 0.18), rgba(235, 235, 245, 0.16));
+  --glass-highlight: light-dark(rgba(255, 255, 255, 0.9),
+                                rgba(255, 255, 255, 0.14));
+  --glass-shadow: light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.5));
+  --card-shadow: light-dark(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0));
+  --scrim: light-dark(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.5));
+
+  /* -- Type: iOS text styles at the default Large size, in px ---------- */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Inter", system-ui,
+             sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-display: 48px;     --lh-display: 52px;
+  --fs-large-title: 34px; --lh-large-title: 41px;
+  --fs-title1: 28px;      --lh-title1: 34px;
+  --fs-title2: 22px;      --lh-title2: 28px;
+  --fs-title3: 20px;      --lh-title3: 25px;
+  --fs-headline: 17px;    --lh-headline: 22px;
+  --fs-body: 17px;        --lh-body: 22px;
+  --fs-callout: 16px;     --lh-callout: 21px;
+  --fs-subhead: 15px;     --lh-subhead: 20px;
+  --fs-footnote: 13px;    --lh-footnote: 18px;
+  --fs-caption1: 12px;    --lh-caption1: 16px;
+  /* Tracking: SF adjusts its own on Apple platforms, so these stay
+   * "normal" there. html.font-inter (set by app.js) fills them in. */
+  --tr-display: normal;   --tr-large-title: normal; --tr-title1: normal;
+  --tr-title2: normal;    --tr-title3: normal;      --tr-headline: normal;
+  --tr-callout: normal;   --tr-subhead: normal;     --tr-footnote: normal;
+  --tr-caption1: normal;
+
+  /* -- Shape, spacing and motion --------------------------------------- */
+  --space-1: 8px; --space-2: 16px; --space-3: 24px;
+  --radius-card: 24px;
+  --radius-small: 12px;
+  --radius-capsule: 999px;
+  --target: 44px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur: 300ms;
+}
+
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+/* Apple's SF Pro tracking table (HIG Typography), in em, for the sizes
+ * above. Applied only when Inter is the font in use. */
+:root.font-inter {
+  --tr-display: 0.008em;  --tr-large-title: 0.012em; --tr-title1: 0.014em;
+  --tr-title2: -0.012em;  --tr-title3: -0.023em;     --tr-headline: -0.026em;
+  --tr-callout: -0.02em;  --tr-subhead: -0.016em;    --tr-footnote: -0.006em;
+  --tr-caption1: 0em;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --label-2: light-dark(rgba(60, 60, 67, 0.9), rgba(235, 235, 245, 0.78));
+    --label-3: light-dark(rgba(60, 60, 67, 0.76), rgba(235, 235, 245, 0.6));
+    --separator: light-dark(rgba(60, 60, 67, 0.6), rgba(235, 235, 245, 0.5));
+    --separator-opaque: light-dark(#8E8E93, #7C7C80);
+    --accent-text: light-dark(var(--sys-blue-lc), var(--sys-blue-dc));
+    --red-text: light-dark(var(--sys-red-lc), var(--sys-red-dc));
+    --green-text: light-dark(var(--sys-green-lc), var(--sys-green-dc));
+    --orange-text: light-dark(var(--sys-orange-lc), var(--sys-orange-dc));
+    --yellow-text: light-dark(var(--sys-yellow-lc), var(--sys-yellow-dc));
+    --accent-deco: light-dark(var(--sys-blue-lc), var(--sys-blue-dc));
+    --red-deco: light-dark(var(--sys-red-lc), var(--sys-red-dc));
+    --green-deco: light-dark(var(--sys-green-lc), var(--sys-green-dc));
+    --orange-deco: light-dark(var(--sys-orange-lc), var(--sys-orange-dc));
+    --gray-deco: light-dark(var(--sys-gray-lc), var(--sys-gray-dc));
+    --accent-fill: light-dark(var(--sys-blue-lc), var(--sys-blue-dc));
+    --focus-ring: light-dark(var(--sys-blue-lc), var(--sys-blue-dc));
+    --glass-fill: light-dark(#FFFFFF, #2C2C2E);
+    --glass-border: light-dark(rgba(60, 60, 67, 0.6),
+                               rgba(235, 235, 245, 0.5));
+  }
+}
+
+/* -- Contrast pairs (read by --token-audit) -----------------------------
+ * Text on the three surfaces.
+ * @pair fg=--label bg=--bg-page min=4.5
+ * @pair fg=--label bg=--bg-card min=4.5
+ * @pair fg=--label bg=--bg-inset min=4.5
+ * @pair fg=--label-2 bg=--bg-page min=4.5
+ * @pair fg=--label-2 bg=--bg-card min=4.5
+ * @pair fg=--label-2 bg=--bg-inset min=4.5
+ * Tertiary text carries only information nobody needs: 3:1.
+ * @pair fg=--label-3 bg=--bg-page min=3
+ * @pair fg=--label-3 bg=--bg-card min=3
+ * @pair fg=--label-3 bg=--bg-inset min=3
+ * Coloured text and glyphs: on cards only (app.css keeps them there).
+ * @pair fg=--accent-text bg=--bg-card min=4.5
+ * @pair fg=--red-text bg=--bg-card min=4.5
+ * @pair fg=--green-text bg=--bg-card min=4.5
+ * @pair fg=--orange-text bg=--bg-card min=4.5
+ * @pair fg=--yellow-text bg=--bg-card min=4.5
+ * Filled controls.
+ * @pair fg=--on-accent bg=--accent-fill min=4.5
+ * @pair fg=--on-stop bg=--stop-fill min=4.5
+ * Text on glass, against each surface the glass can float over.
+ * @pair fg=--label bg=--glass-fill over=--bg-page min=4.5
+ * @pair fg=--label bg=--glass-fill over=--bg-card min=4.5
+ * @pair fg=--label bg=--glass-fill over=--bg-inset min=4.5
+ * @pair fg=--label-2 bg=--glass-fill over=--bg-page min=4.5
+ * @pair fg=--label-2 bg=--glass-fill over=--bg-card min=4.5
+ * @pair fg=--label-2 bg=--glass-fill over=--bg-inset min=4.5
+ * @pair fg=--label bg=--glass-solid min=4.5
+ * @pair fg=--label-2 bg=--glass-solid min=4.5
+ * Text on a neutral fill laid on a card (segmented controls, chips).
+ * @pair fg=--label bg=--fill-3 over=--bg-card min=4.5
+ * @pair fg=--label-2 bg=--fill-3 over=--bg-card min=4.5
+ * @pair fg=--label bg=--fill-3 over=--bg-page min=4.5
+ * @pair fg=--label-2 bg=--fill-3 over=--bg-page min=4.5
+ */
