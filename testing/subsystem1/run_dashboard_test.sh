@@ -12,8 +12,8 @@
 #
 # Stages; the run stops at the first stage that fails:
 #   1  python3 s1_dashboard.py --check on the real files: exit status 0.
-#   2  Six mutations, each on a copy of the dashboard, its helper and its
-#      decoder in a temporary tree. Each matches on text, and exactly one
+#   2  Six mutations, each on a copy of the dashboard, its page files
+#      (dashboard_ui/), its helper and its decoder in a temporary tree. Each matches on text, and exactly one
 #      line must change. Each copy's --check must exit 1, with exactly the
 #      steps named failing and no other. P1 and P2 are S1-U16's; N1 to N4
 #      are S1-U24 part D's.
@@ -36,7 +36,8 @@ set -u
 TEST_DIR=testing/subsystem1
 DECODER=app_program/subsystem1/dashboard/s1_decode.py
 
-if [ ! -f "$TEST_DIR/s1_dashboard.py" ] || [ ! -f "$DECODER" ]
+if [ ! -f "$TEST_DIR/s1_dashboard.py" ] || [ ! -f "$DECODER" ] \
+   || [ ! -f "$TEST_DIR/dashboard_ui/index.html" ]
 then
     echo "run_dashboard_test.sh: run this from the repository root" >&2
     exit 2
@@ -74,6 +75,7 @@ mutate ()
     copy="$WORK/$1"
     mkdir -p "$copy/$TEST_DIR" "$copy/$(dirname "$DECODER")"
     cp "$TEST_DIR/cmd_rtt.py" "$copy/$TEST_DIR/"
+    cp -R "$TEST_DIR/dashboard_ui" "$copy/$TEST_DIR/"
     cp "$DECODER" "$copy/$DECODER"
     sed "$2" "$TEST_DIR/s1_dashboard.py" >"$copy/$TEST_DIR/s1_dashboard.py"
     if cmp -s "$TEST_DIR/s1_dashboard.py" "$copy/$TEST_DIR/s1_dashboard.py"

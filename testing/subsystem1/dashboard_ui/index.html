@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S1 dashboard</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header>
+  <strong>S1 dashboard</strong>
+  <span id="mode" class="badge">...</span>
+  <span>prefix <code id="prefix"></code></span>
+  <span>port <code id="port"></code></span>
+  <span class="muted">broker from <span id="source"></span></span>
+  <span><span id="broker-light" class="light"></span>
+    broker <span id="broker-text">waiting</span></span>
+  <span id="banner-off" class="muted"></span>
+  <span id="stream" class="bad"></span>
+</header>
+<div id="banner"></div>
+<main>
+<section>
+  <button id="stop" type="button" title="The Escape key also sends STOP"
+    >STOP</button>
+  <div class="pair">
+    <div>
+      <button id="start" type="button" disabled>START</button>
+      <div id="start-why" class="reason"></div>
+    </div>
+    <div>
+      <button id="reset" type="button" disabled>RESET</button>
+      <div id="reset-why" class="reason"></div>
+    </div>
+  </div>
+  <p id="why" class="muted"></p>
+  <div class="panel">
+    <h2>Last commands</h2>
+    <p class="note muted">queued = sent to the robot's controller, not
+      confirmed</p>
+    <table>
+      <thead><tr><th>id</th><th>command</th><th>sent</th><th>result</th>
+        <th>round trip</th></tr></thead>
+      <tbody id="cmds"></tbody>
+    </table>
+  </div>
+  <div class="panel" id="map-panel">
+    <h2>Barcode letter map</h2>
+    <p class="note muted">The letter S3 reads for each turn. Set it after
+      every power cycle of the car and wait for "Applied"; the dashboard
+      also sends it again when the robot comes back.</p>
+    <div class="map-row">
+      <label>LEFT <input id="map-left" maxlength="1" autocomplete="off"
+        aria-label="letter for LEFT"></label>
+      <label>RIGHT <input id="map-right" maxlength="1" autocomplete="off"
+        aria-label="letter for RIGHT"></label>
+      <label>STRAIGHT <input id="map-straight" maxlength="1"
+        autocomplete="off" aria-label="letter for STRAIGHT"></label>
+      <label>U-TURN <input id="map-uturn" maxlength="1" autocomplete="off"
+        aria-label="letter for U-TURN"></label>
+      <button id="map-set" type="button">Set map</button>
+    </div>
+    <div id="map-status">No map set (robot uses its default)</div>
+    <div id="map-why" class="reason"></div>
+  </div>
+</section>
+<section>
+  <div class="panel">
+    <h2>Robot link</h2>
+    <div class="bigline"><span id="robot-light" class="light big"></span>
+      <span id="robot-text">no status from the robot</span></div>
+    <table class="kv">
+      <tr><td>heartbeat age</td><td id="age">none yet</td></tr>
+      <tr><td>uptime</td><td id="uptime">-</td></tr>
+      <tr><td>connect_count</td><td id="connect">-</td></tr>
+      <tr><td>cmd_reject</td><td id="reject">-</td></tr>
+      <tr><td>rssi</td><td id="rssi">-</td></tr>
+      <tr><td>tel_drop / evt_drop</td><td id="drops">-</td></tr>
+      <tr><td>heartbeats lost</td><td id="lost">-</td></tr>
+      <tr><td>telemetry / live lost</td><td id="msg-lost">-</td></tr>
+    </table>
+  </div>
+  <div class="panel">
+    <h2>Operator rules</h2>
+    <ul>
+      <li>First test with the wheels off the ground.</li>
+      <li>START runs the robot only from READY. In FINISHED, START only
+        returns to READY; the next START runs.</li>
+      <li>START is refused while running, while calibrating (up to 3 s
+        after power-up, or after Button 2) and in FAULT (send RESET
+        first).</li>
+      <li>STOP is always accepted: it ends a run in FINISHED, and does
+        nothing when the robot is not running. This button, the Escape
+        key and the GP20 button all stop the robot.</li>
+      <li>RESET works only from FAULT or FINISHED, back to READY with the
+        motors braked.</li>
+      <li>After a GP20 start the robot is running, so a dashboard START
+        is refused; STOP still works. GP20 held for 2 s is RESET.</li>
+      <li>TEST=1 images ignore START, STOP and RESET until an S5 test
+        step arms the controller.</li>
+      <li>"queued" means S5 received the command, not that it acted.
+        S5's verdict is on the robot's console only (EVT 0x65 a=opcode
+        b=1 or 0) until the event channel is built; the S5 panel shows
+        the state change. "rejected" means S1 refused the command or
+        could not hand it to S5.</li>
+      <li>A command sent while the robot is offline is lost: no ack.</li>
+    </ul>
+  </div>
+  <div class="panel" id="sim-panel" hidden>
+    <h2>Simulator</h2>
+    <div>fake car state: <b id="car-state">-</b>
+      <span class="muted">(a real car's state is in the S5 panel)</span>
+    </div>
+    <div class="sim-buttons">
+      <button type="button" data-sim="hb_pause">Pause heartbeat</button>
+      <button type="button" data-sim="hb_resume">Resume heartbeat</button>
+      <button type="button" data-sim="offline">Go offline</button>
+      <button type="button" data-sim="online">Come back online</button>
+      <button type="button" data-sim="fault">Stall fault</button>
+      <button type="button" data-sim="gp20">GP20 press</button>
+      <button type="button" data-sim="reject_next">Reject next</button>
+      <button type="button" data-sim="drop_next">Drop next ack</button>
+      <button type="button" data-sim="delay_next">Delay next ack 3 s
+        </button>
+      <button type="button" data-sim="dup_next">Send next ack twice
+        </button>
+      <button type="button" data-sim="retained_cmd">Retained command
+        </button>
+      <button type="button" data-sim="retained_clear">Clear retained
+        </button>
+      <button type="button" data-sim="s4_impact">S4 lifted/overturned</button>
+      <button type="button" data-sim="s4_hump">S4 hump</button>
+      <button type="button" data-sim="s3_barcode">S3 barcode</button>
+      <button type="button" data-sim="s3_reject">S3 barcode rejected
+        </button>
+      <button type="button" data-sim="s3_junction">S3 junction</button>
+      <button type="button" data-sim="s3_lost">S3 line lost</button>
+      <button type="button" data-sim="reboot">Reboot (map back to ABCD)
+        </button>
+      <button type="button" data-sim="reboot_quiet">Restart, no status
+        </button>
+      <button type="button" data-sim="map_ack_drop">Drop MAP acks</button>
+      <button type="button" data-sim="map_ack_keep">Keep MAP acks</button>
+    </div>
+  </div>
+</section>
+<section class="tgrid">
+  <div class="panel" id="p-s2">
+    <h2>S2 motion <span class="age" id="age-s2"></span></h2>
+    <div class="vals">
+      <div class="bigline"><span id="s2-state">-</span>
+        <span id="s2-estop" class="flag" hidden>E-STOP</span>
+        <span id="s2-stall" class="flag" hidden>STALL</span></div>
+      <table class="kv">
+        <tr><td>commanded speed</td><td id="s2-cmd">-</td></tr>
+        <tr><td>measured speed</td><td id="s2-speed">-</td></tr>
+        <tr><td>left / right wheel</td><td id="s2-wheels">-</td></tr>
+        <tr><td>distance</td><td id="s2-dist">-</td></tr>
+        <tr><td>heading (wheel odometry)</td><td id="s2-head">-</td></tr>
+        <tr><td>fault bits</td><td id="s2-faults">-</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="panel" id="p-s3">
+    <h2>S3 line and barcodes <span class="age" id="age-s3"></span></h2>
+    <div class="vals">
+      <div class="bigline"><span id="s3-state">-</span>
+        <span id="s3-letter" class="letter">-</span></div>
+      <table class="kv">
+        <tr><td>outer sensors</td><td><span id="s3-outer">-</span>
+          <div class="bar"><i id="s3-outer-bar"></i></div></td></tr>
+        <tr><td>centre sensors</td><td><span id="s3-centre">-</span>
+          <div class="bar"><i id="s3-centre-bar"></i></div></td></tr>
+        <tr><td>steering</td><td id="s3-steer">-</td></tr>
+        <tr><td>OUTER rule</td><td id="s3-over">-</td></tr>
+        <tr><td>last barcode</td><td id="s3-bc">none yet</td></tr>
+        <tr><td>last junction</td><td id="s3-junc">none yet</td></tr>
+        <tr><td>robot counts</td><td id="s3-counts">-</td></tr>
+      </table>
+      <h2>Barcodes accepted, by letter</h2>
+      <div class="tally" id="s3-tally">none yet</div>
+      <div class="muted">rejected: <b id="s3-rejected">0</b> (S3 sends a
+        count, not the letter)</div>
+      <h2>Timeline</h2>
+      <div id="timeline"></div>
+    </div>
+  </div>
+  <div class="panel" id="p-s4">
+    <h2>S4 motion sensor <span class="age" id="age-s4"></span></h2>
+    <div class="vals">
+      <div class="impact" id="s4-impact">OK</div>
+      <div class="muted" id="s4-impacts">lift/overturn stops: 0</div>
+      <table class="kv">
+        <tr><td>pitch / roll</td><td id="s4-angles">-</td></tr>
+        <tr><td>turn rate</td><td id="s4-turn">-</td></tr>
+        <tr><td>motion class</td><td id="s4-class">-</td></tr>
+        <tr><td>hump</td><td id="s4-hump">-</td></tr>
+        <tr><td>humps / peak height</td><td id="s4-humps">-</td></tr>
+        <tr><td>IMU</td><td id="s4-imu">-</td></tr>
+      </table>
+      <svg id="imu" viewBox="0 0 240 90" preserveAspectRatio="none"
+        role="img" aria-label="pitch and roll, last 60 seconds">
+        <line x1="0" y1="45" x2="240" y2="45"></line>
+        <polyline id="g-pitch" points=""></polyline>
+        <polyline id="g-roll" points=""></polyline>
+      </svg>
+      <div class="note muted">pitch (solid) and roll (dashed), last 60 s,
+        scale +/-32 degrees</div>
+    </div>
+  </div>
+  <div class="panel" id="p-s5">
+    <h2>S5 controller <span class="age" id="age-s5"></span></h2>
+    <div class="vals">
+      <div class="bigline" id="s5-state">-</div>
+      <table class="kv">
+        <tr><td>calibration</td><td id="s5-cal">-</td></tr>
+        <tr><td>fault bits</td><td id="s5-faults">-</td></tr>
+        <tr><td>closest obstacle</td><td id="s5-closest">-</td></tr>
+        <tr><td>gap width</td><td id="s5-width">-</td></tr>
+        <tr><td>clear left / right</td><td id="s5-clear">-</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+<section class="panel full">
+  <h2>Event log</h2>
+  <div id="log"></div>
+</section>
+</main>
+<script type="application/json" id="s1-data">__S1_DATA__</script>
+<script src="/app.js"></script>
+</body>
+</html>

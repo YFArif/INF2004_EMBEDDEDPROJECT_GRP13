@@ -3,7 +3,10 @@ and the robot's telemetry (S2 motion, S3 line, S4 IMU, S5 state), and the
 barcode letter map (MAP) for S3.
 
 Serves one page on http://127.0.0.1:8765/ (this machine only) and pushes
-live updates to it with server-sent events. It reaches the broker through
+live updates to it with server-sent events. The page is three files in
+dashboard_ui/ next to this file (index.html, app.css, app.js), served from
+a fixed list (STATIC_FILES); nothing else on disk can be requested. It
+reaches the broker through
 mosquitto_sub (one for the whole run) and mosquitto_pub (one per command),
 and reuses the message code that is already tested: cmd_rtt.command_bytes()
 packs the commands (S1-U06 helper) and s1_decode decodes everything the
@@ -59,6 +62,7 @@ import io
 import json
 import math
 import os
+import pathlib
 import queue
 import random
 import re
@@ -122,9 +126,24 @@ MAP_WHY = {"set": "set on this page", "online": "the robot came online",
 SUB_FORMAT = "@Y-@m-@dT@H:@M:@S.@N %r %t %x"
 LABELS = {0: "queued", 1: "rejected"}
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
-PAGE_CSP = ("default-src 'none'; script-src 'unsafe-inline'; "
-            "style-src 'unsafe-inline'; connect-src 'self'; img-src 'self'; "
+PAGE_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; "
+            "font-src 'self'; connect-src 'self'; img-src 'self'; "
             "frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+# The page's files. pathlib resolves the folder from this file, so it does
+# not depend on the working directory or on the path separator (Windows).
+UI_DIR = pathlib.Path(__file__).resolve().parent / "dashboard_ui"
+INDEX_FILE = "index.html"
+INDEX_TYPE = "text/html; charset=utf-8"
+DATA_MARK = "__S1_DATA__"       # In index.html: replaced by page_data().
+DATA_RE = re.compile(r'<script type="application/json" id="s1-data">'
+                     r'(.*?)</script>', re.S)
+# Every other file the server can send: URL path -> (file name in UI_DIR,
+# Content-Type). A request is looked up here by its exact path and never
+# joined to a folder, so no path can reach a file that is not listed.
+STATIC_FILES = {
+    "/app.css": ("app.css", "text/css; charset=utf-8"),
+    "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+}
 
 CONFIG_PATTERNS = {
     "host": r'MQTT_LINK_CFG_BROKER_HOST\s+"([^"]*)"',
@@ -1831,7 +1850,8 @@ class Server(http.server.ThreadingHTTPServer):
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    """The page, the event stream and the three POST endpoints."""
+    """The page and its files, the event stream and the three POST
+    endpoints."""
 
     server_version = "s1_dashboard"
     sys_version = ""
@@ -1843,7 +1863,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return self.headers.get("Host", "") in self.server.allowed_hosts
 
     def _reply(self, status, body, content_type, csp=None):
-        data = body.encode("utf-8")
+        data = body if isinstance(body, bytes) else body.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
@@ -1863,9 +1883,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not self._host_ok():
             self._json(403, {"error": "wrong Host header"})
         elif path == "/":
-            page = PAGE.replace("__TOKEN__", json.dumps(self.server.token))
-            page = page.replace("__CODE39__", json.dumps(s1_decode.CODE39))
-            self._reply(200, page, "text/html; charset=utf-8", PAGE_CSP)
+            page = self.server.index.replace(DATA_MARK,
+                                             page_data(self.server.token))
+            self._reply(200, page, INDEX_TYPE, PAGE_CSP)
+        elif path in self.server.static:
+            data, content_type = self.server.static[path]
+            self._reply(200, data, content_type, PAGE_CSP)
         elif path == "/events":
             self._events(dash)
         elif path == "/api/state":
@@ -1932,866 +1955,33 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json(404, {"error": "not found"})
 
 
-PAGE = r"""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>S1 dashboard</title>
-<style>
-:root {
-  --bg: #f4f5f7; --panel: #ffffff; --text: #1c2230; --muted: #5d6677;
-  --line: #d8dce4; --green: #1e9e57; --red: #d23f3f; --grey: #9aa2b1;
-  --amber: #d79a00; --stop: #c62828; --queued: #3a6ea5;
-  --btn: #2c3e57; --btn-edge: #0f1b2b;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #13161b; --panel: #1c2027; --text: #e5e8ee; --muted: #9aa2b1;
-    --line: #2d333d; --queued: #7fa6d6; --btn: #3b5373;
-    --btn-edge: #a9bbd1;
-  }
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0; background: var(--bg); color: var(--text);
-  font: 15px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-}
-header {
-  display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
-  padding: 10px 16px; background: var(--panel);
-  border-bottom: 1px solid var(--line);
-}
-header strong { font-size: 17px; }
-code { font-size: 14px; }
-.muted { color: var(--muted); }
-.badge { padding: 2px 8px; border-radius: 6px; font-weight: 700; }
-.badge.sim { background: var(--amber); color: #000; }
-.badge.live { background: var(--green); color: #fff; }
-main {
-  display: grid; grid-template-columns: minmax(280px, 1fr)
-  minmax(320px, 1.15fr); gap: 16px; padding: 16px;
-}
-.full { grid-column: 1 / -1; }
-@media (max-width: 820px) { main { grid-template-columns: 1fr; } }
-.panel {
-  background: var(--panel); border: 1px solid var(--line);
-  border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;
-}
-h2 { font-size: 15px; margin: 0 0 8px; }
-#stop {
-  width: 100%; height: 40vh; min-height: 220px; border: 0;
-  border-radius: 14px; background: var(--stop); color: #fff;
-  font-size: 60px; font-weight: 800; letter-spacing: 6px; cursor: pointer;
-}
-#stop:active { filter: brightness(0.85); }
-.pair {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-  margin-top: 12px;
-}
-.pair button {
-  width: 100%; height: 64px; font-size: 21px; font-weight: 700;
-  border-radius: 10px; border: 2px solid var(--btn-edge);
-  background: var(--btn); color: #fff; cursor: pointer;
-}
-.pair button:disabled { opacity: 0.4; cursor: not-allowed; }
-.reason {
-  min-height: 2.6em; margin-top: 4px; font-size: 13px;
-  color: var(--muted);
-}
-.note { margin: -4px 0 8px; font-size: 13px; }
-#why { min-height: 1.4em; margin: 8px 2px 14px; }
-.light {
-  display: inline-block; width: 14px; height: 14px; border-radius: 50%;
-  background: var(--grey); vertical-align: -2px;
-}
-.light.big { width: 30px; height: 30px; vertical-align: middle; }
-.light.green { background: var(--green); }
-.light.red { background: var(--red); }
-.bigline { font-size: 19px; font-weight: 600; margin-bottom: 10px; }
-table { width: 100%; border-collapse: collapse; }
-td, th {
-  text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line);
-  font-variant-numeric: tabular-nums;
-}
-.kv td:first-child { color: var(--muted); width: 45%; }
-.bad { color: var(--red); font-weight: 700; }
-.st-queued, .log-ack_queued { color: var(--queued); }
-.log-ack_other { color: var(--red); }
-.st-rejected, .st-no-ack, .st-publish-failed { color: var(--red); }
-ul { margin: 0; padding-left: 20px; }
-li { margin-bottom: 4px; }
-#log {
-  max-height: 38vh; overflow: auto; font-size: 13px;
-  font-family: ui-monospace, Menlo, monospace;
-}
-#log div { padding: 1px 0; border-bottom: 1px dotted var(--line); }
-.log-no_ack, .log-cmd_failed, .log-decode_error { color: var(--red); }
-.log-sim, .log-cmd_seen { color: var(--muted); }
-.log-telemetry { color: var(--red); font-weight: 700; }
-.log-retained_cmd { color: var(--red); font-weight: 700; }
-.sim-buttons button { margin: 4px 6px 0 0; }
-.map-row {
-  display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end;
-}
-.map-row label {
-  display: flex; flex-direction: column; font-size: 12px;
-  color: var(--muted);
-}
-.map-row input {
-  width: 2.2em; height: 1.8em; margin-top: 2px; text-align: center;
-  font-size: 22px; font-weight: 700; text-transform: uppercase;
-  border: 2px solid var(--line); border-radius: 8px;
-  background: var(--panel); color: var(--text);
-}
-.map-row button {
-  height: 44px; padding: 0 16px; font-size: 16px; font-weight: 700;
-  border-radius: 10px; border: 2px solid var(--btn-edge);
-  background: var(--btn); color: #fff; cursor: pointer;
-}
-#map-status { margin-top: 10px; font-weight: 600; }
-#map-status.st-applied { color: var(--green); }
-#map-status.st-sending, #map-status.st-offline { color: var(--queued); }
-#map-status.st-refused, #map-status.st-not_confirmed { color: var(--red); }
-.tgrid {
-  display: grid; gap: 16px; grid-column: 1 / -1;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-}
-.tgrid .panel { margin-bottom: 0; }
-.age { font-size: 12px; font-weight: 400; color: var(--muted); }
-.panel.stale .vals { opacity: 0.4; }
-.panel.stale .age { color: var(--red); font-weight: 700; }
-.flag {
-  display: inline-block; padding: 1px 8px; border-radius: 6px;
-  font-size: 14px; font-weight: 700; background: var(--red); color: #fff;
-  vertical-align: 2px;
-}
-.flag[hidden] { display: none; }
-.impact {
-  margin: 2px 0 6px; padding: 12px 8px; text-align: center;
-  border: 2px solid var(--line); border-radius: 10px; font-size: 34px;
-  font-weight: 800; letter-spacing: 4px; color: var(--muted);
-}
-.impact.hot { background: var(--red); border-color: var(--red); color: #fff; }
-.letter {
-  display: inline-block; min-width: 1.4em; margin-left: 10px;
-  padding: 0 6px; text-align: center; border: 2px solid var(--line);
-  border-radius: 8px; font-size: 26px; font-weight: 800;
-}
-.bar {
-  height: 10px; margin-top: 2px; border: 1px solid var(--line);
-  border-radius: 5px; overflow: hidden;
-}
-.bar i { display: block; width: 0; height: 100%; background: var(--queued); }
-.tally { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
-.tally span {
-  padding: 1px 8px; border: 1px solid var(--line); border-radius: 6px;
-  font-variant-numeric: tabular-nums;
-}
-#timeline {
-  max-height: 180px; overflow: auto; font-size: 13px;
-  font-family: ui-monospace, Menlo, monospace;
-}
-#timeline div { padding: 1px 0; border-bottom: 1px dotted var(--line); }
-.tl-reject, .tl-lost { color: var(--red); }
-.tl-junction { color: var(--queued); }
-.tl-note { color: var(--muted); }
-#imu {
-  width: 100%; height: 90px; margin-top: 8px; border: 1px solid var(--line);
-  border-radius: 6px;
-}
-#imu line { stroke: var(--line); stroke-width: 1; }
-#imu polyline {
-  fill: none; stroke-width: 1.6; vector-effect: non-scaling-stroke;
-}
-#g-pitch { stroke: var(--queued); }
-#g-roll { stroke: var(--amber); stroke-dasharray: 5 3; }
-#banner { display: none; padding: 10px 16px; font-weight: 600; }
-#banner.warn { display: block; background: var(--red); color: #fff; }
-#banner.done { display: block; background: var(--amber); color: #000; }
-</style>
-</head>
-<body>
-<header>
-  <strong>S1 dashboard</strong>
-  <span id="mode" class="badge">...</span>
-  <span>prefix <code id="prefix"></code></span>
-  <span>port <code id="port"></code></span>
-  <span class="muted">broker from <span id="source"></span></span>
-  <span><span id="broker-light" class="light"></span>
-    broker <span id="broker-text">waiting</span></span>
-  <span id="banner-off" class="muted"></span>
-  <span id="stream" class="bad"></span>
-</header>
-<div id="banner"></div>
-<main>
-<section>
-  <button id="stop" type="button" title="The Escape key also sends STOP"
-    >STOP</button>
-  <div class="pair">
-    <div>
-      <button id="start" type="button" disabled>START</button>
-      <div id="start-why" class="reason"></div>
-    </div>
-    <div>
-      <button id="reset" type="button" disabled>RESET</button>
-      <div id="reset-why" class="reason"></div>
-    </div>
-  </div>
-  <p id="why" class="muted"></p>
-  <div class="panel">
-    <h2>Last commands</h2>
-    <p class="note muted">queued = sent to the robot's controller, not
-      confirmed</p>
-    <table>
-      <thead><tr><th>id</th><th>command</th><th>sent</th><th>result</th>
-        <th>round trip</th></tr></thead>
-      <tbody id="cmds"></tbody>
-    </table>
-  </div>
-  <div class="panel" id="map-panel">
-    <h2>Barcode letter map</h2>
-    <p class="note muted">The letter S3 reads for each turn. Set it after
-      every power cycle of the car and wait for "Applied"; the dashboard
-      also sends it again when the robot comes back.</p>
-    <div class="map-row">
-      <label>LEFT <input id="map-left" maxlength="1" autocomplete="off"
-        aria-label="letter for LEFT"></label>
-      <label>RIGHT <input id="map-right" maxlength="1" autocomplete="off"
-        aria-label="letter for RIGHT"></label>
-      <label>STRAIGHT <input id="map-straight" maxlength="1"
-        autocomplete="off" aria-label="letter for STRAIGHT"></label>
-      <label>U-TURN <input id="map-uturn" maxlength="1" autocomplete="off"
-        aria-label="letter for U-TURN"></label>
-      <button id="map-set" type="button">Set map</button>
-    </div>
-    <div id="map-status">No map set (robot uses its default)</div>
-    <div id="map-why" class="reason"></div>
-  </div>
-</section>
-<section>
-  <div class="panel">
-    <h2>Robot link</h2>
-    <div class="bigline"><span id="robot-light" class="light big"></span>
-      <span id="robot-text">no status from the robot</span></div>
-    <table class="kv">
-      <tr><td>heartbeat age</td><td id="age">none yet</td></tr>
-      <tr><td>uptime</td><td id="uptime">-</td></tr>
-      <tr><td>connect_count</td><td id="connect">-</td></tr>
-      <tr><td>cmd_reject</td><td id="reject">-</td></tr>
-      <tr><td>rssi</td><td id="rssi">-</td></tr>
-      <tr><td>tel_drop / evt_drop</td><td id="drops">-</td></tr>
-      <tr><td>heartbeats lost</td><td id="lost">-</td></tr>
-      <tr><td>telemetry / live lost</td><td id="msg-lost">-</td></tr>
-    </table>
-  </div>
-  <div class="panel">
-    <h2>Operator rules</h2>
-    <ul>
-      <li>First test with the wheels off the ground.</li>
-      <li>START runs the robot only from READY. In FINISHED, START only
-        returns to READY; the next START runs.</li>
-      <li>START is refused while running, while calibrating (up to 3 s
-        after power-up, or after Button 2) and in FAULT (send RESET
-        first).</li>
-      <li>STOP is always accepted: it ends a run in FINISHED, and does
-        nothing when the robot is not running. This button, the Escape
-        key and the GP20 button all stop the robot.</li>
-      <li>RESET works only from FAULT or FINISHED, back to READY with the
-        motors braked.</li>
-      <li>After a GP20 start the robot is running, so a dashboard START
-        is refused; STOP still works. GP20 held for 2 s is RESET.</li>
-      <li>TEST=1 images ignore START, STOP and RESET until an S5 test
-        step arms the controller.</li>
-      <li>"queued" means S5 received the command, not that it acted.
-        S5's verdict is on the robot's console only (EVT 0x65 a=opcode
-        b=1 or 0) until the event channel is built; the S5 panel shows
-        the state change. "rejected" means S1 refused the command or
-        could not hand it to S5.</li>
-      <li>A command sent while the robot is offline is lost: no ack.</li>
-    </ul>
-  </div>
-  <div class="panel" id="sim-panel" hidden>
-    <h2>Simulator</h2>
-    <div>fake car state: <b id="car-state">-</b>
-      <span class="muted">(a real car's state is in the S5 panel)</span>
-    </div>
-    <div class="sim-buttons">
-      <button type="button" data-sim="hb_pause">Pause heartbeat</button>
-      <button type="button" data-sim="hb_resume">Resume heartbeat</button>
-      <button type="button" data-sim="offline">Go offline</button>
-      <button type="button" data-sim="online">Come back online</button>
-      <button type="button" data-sim="fault">Stall fault</button>
-      <button type="button" data-sim="gp20">GP20 press</button>
-      <button type="button" data-sim="reject_next">Reject next</button>
-      <button type="button" data-sim="drop_next">Drop next ack</button>
-      <button type="button" data-sim="delay_next">Delay next ack 3 s
-        </button>
-      <button type="button" data-sim="dup_next">Send next ack twice
-        </button>
-      <button type="button" data-sim="retained_cmd">Retained command
-        </button>
-      <button type="button" data-sim="retained_clear">Clear retained
-        </button>
-      <button type="button" data-sim="s4_impact">S4 lifted/overturned</button>
-      <button type="button" data-sim="s4_hump">S4 hump</button>
-      <button type="button" data-sim="s3_barcode">S3 barcode</button>
-      <button type="button" data-sim="s3_reject">S3 barcode rejected
-        </button>
-      <button type="button" data-sim="s3_junction">S3 junction</button>
-      <button type="button" data-sim="s3_lost">S3 line lost</button>
-      <button type="button" data-sim="reboot">Reboot (map back to ABCD)
-        </button>
-      <button type="button" data-sim="reboot_quiet">Restart, no status
-        </button>
-      <button type="button" data-sim="map_ack_drop">Drop MAP acks</button>
-      <button type="button" data-sim="map_ack_keep">Keep MAP acks</button>
-    </div>
-  </div>
-</section>
-<section class="tgrid">
-  <div class="panel" id="p-s2">
-    <h2>S2 motion <span class="age" id="age-s2"></span></h2>
-    <div class="vals">
-      <div class="bigline"><span id="s2-state">-</span>
-        <span id="s2-estop" class="flag" hidden>E-STOP</span>
-        <span id="s2-stall" class="flag" hidden>STALL</span></div>
-      <table class="kv">
-        <tr><td>commanded speed</td><td id="s2-cmd">-</td></tr>
-        <tr><td>measured speed</td><td id="s2-speed">-</td></tr>
-        <tr><td>left / right wheel</td><td id="s2-wheels">-</td></tr>
-        <tr><td>distance</td><td id="s2-dist">-</td></tr>
-        <tr><td>heading (wheel odometry)</td><td id="s2-head">-</td></tr>
-        <tr><td>fault bits</td><td id="s2-faults">-</td></tr>
-      </table>
-    </div>
-  </div>
-  <div class="panel" id="p-s3">
-    <h2>S3 line and barcodes <span class="age" id="age-s3"></span></h2>
-    <div class="vals">
-      <div class="bigline"><span id="s3-state">-</span>
-        <span id="s3-letter" class="letter">-</span></div>
-      <table class="kv">
-        <tr><td>outer sensors</td><td><span id="s3-outer">-</span>
-          <div class="bar"><i id="s3-outer-bar"></i></div></td></tr>
-        <tr><td>centre sensors</td><td><span id="s3-centre">-</span>
-          <div class="bar"><i id="s3-centre-bar"></i></div></td></tr>
-        <tr><td>steering</td><td id="s3-steer">-</td></tr>
-        <tr><td>OUTER rule</td><td id="s3-over">-</td></tr>
-        <tr><td>last barcode</td><td id="s3-bc">none yet</td></tr>
-        <tr><td>last junction</td><td id="s3-junc">none yet</td></tr>
-        <tr><td>robot counts</td><td id="s3-counts">-</td></tr>
-      </table>
-      <h2>Barcodes accepted, by letter</h2>
-      <div class="tally" id="s3-tally">none yet</div>
-      <div class="muted">rejected: <b id="s3-rejected">0</b> (S3 sends a
-        count, not the letter)</div>
-      <h2>Timeline</h2>
-      <div id="timeline"></div>
-    </div>
-  </div>
-  <div class="panel" id="p-s4">
-    <h2>S4 motion sensor <span class="age" id="age-s4"></span></h2>
-    <div class="vals">
-      <div class="impact" id="s4-impact">OK</div>
-      <div class="muted" id="s4-impacts">lift/overturn stops: 0</div>
-      <table class="kv">
-        <tr><td>pitch / roll</td><td id="s4-angles">-</td></tr>
-        <tr><td>turn rate</td><td id="s4-turn">-</td></tr>
-        <tr><td>motion class</td><td id="s4-class">-</td></tr>
-        <tr><td>hump</td><td id="s4-hump">-</td></tr>
-        <tr><td>humps / peak height</td><td id="s4-humps">-</td></tr>
-        <tr><td>IMU</td><td id="s4-imu">-</td></tr>
-      </table>
-      <svg id="imu" viewBox="0 0 240 90" preserveAspectRatio="none"
-        role="img" aria-label="pitch and roll, last 60 seconds">
-        <line x1="0" y1="45" x2="240" y2="45"></line>
-        <polyline id="g-pitch" points=""></polyline>
-        <polyline id="g-roll" points=""></polyline>
-      </svg>
-      <div class="note muted">pitch (solid) and roll (dashed), last 60 s,
-        scale +/-32 degrees</div>
-    </div>
-  </div>
-  <div class="panel" id="p-s5">
-    <h2>S5 controller <span class="age" id="age-s5"></span></h2>
-    <div class="vals">
-      <div class="bigline" id="s5-state">-</div>
-      <table class="kv">
-        <tr><td>calibration</td><td id="s5-cal">-</td></tr>
-        <tr><td>fault bits</td><td id="s5-faults">-</td></tr>
-        <tr><td>closest obstacle</td><td id="s5-closest">-</td></tr>
-        <tr><td>gap width</td><td id="s5-width">-</td></tr>
-        <tr><td>clear left / right</td><td id="s5-clear">-</td></tr>
-      </table>
-    </div>
-  </div>
-</section>
-<section class="panel full">
-  <h2>Event log</h2>
-  <div id="log"></div>
-</section>
-</main>
-<script>
-"use strict";
-const TOKEN = __TOKEN__;
-const CODE39 = __CODE39__;
-const MAP_IDS = ["map-left", "map-right", "map-straight", "map-uturn"];
-const el = (id) => document.getElementById(id);
-const rows = new Map();
-let hbBase = null;
-let lastControls = {start: false, reset: false, start_why: "",
-                    reset_why: ""};
+def page_data(token):
+    """The JSON that replaces DATA_MARK in index.html: the page token and
+    the Code 39 table. "<" is escaped so that no value can close the
+    element that holds it."""
+    data = {"token": token, "code39": s1_decode.CODE39}
+    return json.dumps(data).replace("<", "\\u003c")
 
-function post(path, body) {
-  return fetch(path, {
-    method: "POST",
-    headers: {"Content-Type": "application/json", "X-S1-Token": TOKEN},
-    body: JSON.stringify(body)
-  }).then((r) => r.json().then((j) => ({status: r.status, body: j})))
-    .catch((e) => ({status: 0, body: {error: String(e)}}));
-}
 
-function setControls(c) {
-  lastControls = c;
-  el("start").disabled = !c.start;
-  el("reset").disabled = !c.reset;
-  el("start-why").textContent = c.start ? "" : (c.start_why || "");
-  el("reset-why").textContent = c.reset ? "" : (c.reset_why || "");
-}
-
-function send(op) {
-  post("/api/cmd", {op: op}).then((r) => {
-    el("why").textContent = "";
-    if (r.status !== 200) {
-      setControls(lastControls);
-      el("why").textContent = (r.body && r.body.error) ? r.body.error
-        : "not sent (HTTP " + r.status + ")";
-    }
-  });
-}
-
-el("stop").addEventListener("click", () => send("stop"));
-el("start").addEventListener("click", () => {
-  el("start").disabled = true;
-  send("start");
-});
-el("reset").addEventListener("click", () => {
-  el("reset").disabled = true;
-  send("reset");
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    e.preventDefault();
-    send("stop");
-  }
-});
-function mapCheck(letters) {
-  if (letters.length !== 4) { return "Fill in all four boxes."; }
-  for (const ch of letters) {
-    if ((CODE39.indexOf(ch) < 0) || (ch === "*")) {
-      return "\"" + ch + "\" is not a Code 39 letter S3 takes.";
-    }
-  }
-  if (new Set(letters).size !== 4) { return "Each letter may be used once."; }
-  return "";
-}
-
-function setMap(m) {
-  el("map-status").textContent = m.status;
-  el("map-status").className = "st-" + m.state;
-}
-
-MAP_IDS.forEach((id) => {
-  el(id).addEventListener("input", (e) => {
-    e.target.value = e.target.value.toUpperCase();
-  });
-});
-el("map-set").addEventListener("click", () => {
-  const letters = MAP_IDS.map((id) => el(id).value).join("");
-  const why = mapCheck(letters);
-  el("map-why").textContent = why;
-  if (why) { return; }
-  post("/api/map", {letters: letters}).then((r) => {
-    if (r.status !== 200) {
-      el("map-why").textContent = (r.body && r.body.error) ? r.body.error
-        : "not sent (HTTP " + r.status + ")";
-    } else if (r.body.offline) {
-      el("map-why").textContent = "The robot is offline: the map is kept "
-        + "and sent when it comes online.";
-    }
-  });
-});
-
-document.querySelectorAll("[data-sim]").forEach((b) => {
-  b.addEventListener("click", () => post("/api/sim",
-                                         {action: b.dataset.sim}));
-});
-
-function setLight(id, color, big) {
-  el(id).className = "light" + (big ? " big " : " ") + color;
-}
-
-function setBroker(b) {
-  const up = b && b.state === "up";
-  setLight("broker-light", up ? "green" : "red", false);
-  el("broker-text").textContent = up ? "connected" : "not connected";
-}
-
-function setLink(l) {
-  setLight("robot-light", l.light, true);
-  el("robot-text").textContent = l.reason;
-}
-
-function uptime(s) {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor(s / 60) % 60;
-  const x = s % 60;
-  return h + ":" + String(m).padStart(2, "0") + ":"
-    + String(x).padStart(2, "0");
-}
-
-function setHeartbeat(h, ageMs) {
-  if (!h) {
-    hbBase = null;
-    return;
-  }
-  hbBase = performance.now() - ageMs;
-  el("uptime").textContent = uptime(h.uptime_s);
-  el("connect").textContent = h.connect_count;
-  el("reject").textContent = h.cmd_reject;
-  el("rssi").textContent = h.rssi_text;
-  el("drops").textContent = h.tel_drop_text + " / " + h.evt_drop;
-  el("lost").textContent = h.lost_total;
-}
-
-setInterval(() => {
-  if (hbBase === null) {
-    el("age").textContent = "none yet";
-    el("age").className = "";
-    return;
-  }
-  const age = (performance.now() - hbBase) / 1000;
-  el("age").textContent = age.toFixed(1) + " s";
-  el("age").className = age > 3 ? "bad" : "";
-}, 200);
-
-function upsertRow(c) {
-  let tr = rows.get(c.n);
-  if (!tr) {
-    tr = document.createElement("tr");
-    for (let i = 0; i < 5; i++) {
-      tr.appendChild(document.createElement("td"));
-    }
-    el("cmds").prepend(tr);
-    rows.set(c.n, tr);
-    while (el("cmds").children.length > 20) {
-      const last = el("cmds").lastElementChild;
-      rows.forEach((v, k) => { if (v === last) { rows.delete(k); } });
-      last.remove();
-    }
-  }
-  const td = tr.children;
-  if (c.cmd_id !== undefined) { td[0].textContent = c.cmd_id; }
-  if (c.op) { td[1].textContent = c.op; }
-  if (c.sent_at) { td[2].textContent = c.sent_at.slice(11); }
-  if (c.state) {
-    const key = c.state.startsWith("queued") ? "queued"
-      : c.state.startsWith("rejected") ? "rejected"
-      : c.state.replace(/\s+/g, "-");
-    td[3].textContent = c.state;
-    td[3].className = "st-" + key;
-  }
-  if (typeof c.rtt_ms === "number") {
-    td[4].textContent = c.rtt_ms.toFixed(1) + " ms";
-  }
-}
-
-function addLog(kind, d) {
-  if (!d || !d.log) { return; }
-  const div = document.createElement("div");
-  div.className = "log-" + kind;
-  div.textContent = (d.t || "").slice(11) + "  " + d.log;
-  el("log").prepend(div);
-  while (el("log").children.length > 300) {
-    el("log").lastElementChild.remove();
-  }
-}
-
-const STALE_S = 2;
-const IMPACT_HOLD_S = 3;
-const IMU_KEEP = 120;
-const feedAt = {live: null, tel: null};
-const PANELS = [["p-s2", ["live", "tel"], "age-s2"],
-                ["p-s3", ["live"], "age-s3"],
-                ["p-s4", ["tel"], "age-s4"],
-                ["p-s5", ["tel"], "age-s5"]];
-let impactAt = null;
-let imu = [];
-let liveSeen = false;
-const msgLost = {tel: 0, live: 0};
-
-function markFeed(feed, ageMs) {
-  feedAt[feed] = (ageMs === null || ageMs === undefined) ? null
-    : performance.now() - ageMs;
-}
-
-function text(id, value) { el(id).textContent = value; }
-
-function num(v, unit, digits) {
-  return (typeof v === "number") ? v.toFixed(digits || 0) + (unit ? " " + unit : "")
-    : "-";
-}
-
-function list(names) { return names.length ? names.join(", ") : "none"; }
-
-function paintAges() {
-  const now = performance.now();
-  PANELS.forEach(([panel, feeds, ageId]) => {
-    const marks = feeds.map((f) => feedAt[f]);
-    let stale = true;
-    let label = "no data yet";
-    if (marks.every((m) => m !== null)) {
-      const age = (now - Math.min(...marks)) / 1000;
-      stale = age > STALE_S;
-      label = stale ? "no data for " + age.toFixed(1) + " s"
-        : "updated " + age.toFixed(1) + " s ago";
-    }
-    el(panel).classList.toggle("stale", stale);
-    text(ageId, label);
-  });
-  const hot = impactAt !== null && (now - impactAt) / 1000 < IMPACT_HOLD_S;
-  el("s4-impact").className = hot ? "impact hot" : "impact";
-  text("s4-impact", hot ? "LIFTED / OVERTURNED" : "OK");
-}
-setInterval(paintAges, 200);
-
-function drawImu() {
-  const x = (i) => 240 - (imu.length - 1 - i) * 2;
-  const y = (v) => 45 - Math.max(-32, Math.min(32, v)) * 45 / 32;
-  [["g-pitch", 0], ["g-roll", 1]].forEach(([id, k]) => {
-    el(id).setAttribute("points", imu.map((p, i) =>
-      x(i).toFixed(1) + "," + y(p[k]).toFixed(1)).join(" "));
-  });
-}
-
-function setMsgLost() {
-  text("msg-lost", msgLost.tel + " / " + msgLost.live);
-}
-
-function setTelemetry(t, ageMs) {
-  if (!t) { return; }
-  markFeed("tel", ageMs);
-  msgLost.tel = t.lost_total;
-  setMsgLost();
-  if (!liveSeen) { text("s2-state", t.motion_name); }
-  text("s2-speed", num(t.speed_mms, "mm/s"));
-  text("s2-wheels", num(t.speed_l_mms) + " / " + num(t.speed_r_mms)
-       + " mm/s");
-  text("s2-dist", num(t.dist_mm, "mm") + " (" + num(t.dist_mm / 1000, "m", 2)
-       + ")");
-  text("s2-faults", list(t.faults));
-  el("s2-faults").className = t.faults.length ? "bad" : "";
-  el("s2-stall").hidden = !t.faults.includes("stall");
-  el("s4-impacts").textContent = "lift/overturn stops: " + t.impact_count
-    + (t.impact_at ? " (last at " + t.impact_at.slice(11, 19) + ")" : "");
-  if (t.b_impact) { impactAt = performance.now() - (ageMs || 0); }
-  text("s4-angles", num(t.pitch_deg, "°", 1) + " / "
-       + num(t.roll_deg, "°", 1));
-  text("s4-turn", num(t.turn_dps, "deg/s"));
-  text("s4-class", t.class_name);
-  text("s4-hump", t.hump_name);
-  text("s4-humps", t.hump_count + " / " + num(t.peak_mm, "mm"));
-  text("s4-imu", t.b_imu_ok ? "ok" : "NOT OK");
-  el("s4-imu").className = t.b_imu_ok ? "" : "bad";
-  text("s5-state", t.ctrl_name);
-  text("s5-cal", t.b_cal_done ? "done" : "not done");
-  text("s5-faults", list(t.faults));
-  el("s5-faults").className = t.faults.length ? "bad" : "";
-  text("s5-closest", t.closest_mm ? num(t.closest_mm, "mm") + " at "
-       + num(t.angle_idx * 7.5, "\u00b0", 1) + " (servo)" : "none");
-  text("s5-width", t.width_mm ? num(t.width_mm, "mm") : "-");
-  text("s5-clear", (t.width_mm || t.clear_l_mm || t.clear_r_mm)
-       ? num(t.clear_l_mm) + " / " + num(t.clear_r_mm) + " mm" : "-");
-}
-
-function setLive(l, ageMs) {
-  if (!l) { return; }
-  markFeed("live", ageMs);
-  msgLost.live = l.lost_total;
-  setMsgLost();
-  liveSeen = true;
-  text("s2-state", l.motion_name);
-  el("s2-estop").hidden = !l.b_estop;
-  text("s2-cmd", num(l.cmd_speed_mms, "mm/s"));
-  text("s2-head", num(l.heading_deg, "°", 1));
-  text("s3-state", l.line_name);
-  el("s3-state").className = (l.line_name === "LOST") ? "bad" : "";
-  text("s3-letter", l.bc_char || "-");
-  text("s3-outer", num(l.outer_ir) + " of 255");
-  el("s3-outer-bar").style.width = (l.outer_ir * 100 / 255) + "%";
-  text("s3-centre", num(l.centre_ir) + " of 255");
-  el("s3-centre-bar").style.width = (l.centre_ir * 100 / 255) + "%";
-  text("s3-steer", num(l.steer_dv_mms, "mm/s"));
-  text("s3-over", l.b_overshoot ? "on" : "off");
-  text("s3-bc", l.bc_char ? l.bc_char + ": " + l.bc_cmd_name + ", read "
-       + (l.b_bc_rev ? "backwards" : "forwards") : "none yet");
-  text("s3-junc", l.junctions ? "turn " + l.junc_name : "none yet");
-  text("s3-counts", "barcodes " + l.barcodes + ", rejected " + l.rejects
-       + " (wraps at 16), junctions " + l.junctions + ", lost " + l.losts);
-}
-
-function addTimeline(entry) {
-  const div = document.createElement("div");
-  div.className = "tl-" + entry.kind;
-  div.textContent = entry.t.slice(11, 21) + "  " + entry.text;
-  el("timeline").prepend(div);
-  while (el("timeline").children.length > 100) {
-    el("timeline").lastElementChild.remove();
-  }
-}
-
-function setTally(tally, rejected) {
-  const box = el("s3-tally");
-  box.textContent = "";
-  const symbols = Object.keys(tally).sort();
-  if (symbols.length === 0) { box.textContent = "none yet"; }
-  symbols.forEach((k) => {
-    const chip = document.createElement("span");
-    chip.textContent = k + " × " + tally[k];
-    box.appendChild(chip);
-  });
-  text("s3-rejected", rejected);
-}
-
-const banner = {state: "ok", why: "", entries: new Map()};
-
-function renderBanner() {
-  const box = el("banner");
-  const all = Array.from(banner.entries.values());
-  const open = all.filter((e) => !e.cleared);
-  el("banner-off").textContent = banner.state === "ok" ? ""
-    : "retained-command banner unavailable: " + banner.why;
-  if ((banner.state !== "ok") || (all.length === 0)) {
-    box.className = "";
-    box.textContent = "";
-  } else if (open.length > 0) {
-    box.className = "warn";
-    box.textContent = "WARNING: a retained command is stored on "
-      + open.map((e) => el("prefix").textContent + "/" + e.topic_suffix
-                 + " (" + e.hex + ", since " + e.at.slice(11) + ")")
-        .join(", ")
-      + ". The robot would run it again after every reconnect. Clear it:"
-      + " docs/S1_dashboard.md, \"Clearing a retained command\".";
-  } else {
-    box.className = "done";
-    box.textContent = "Retained command cleared: "
-      + all.map((e) => e.topic_suffix + " at " + e.cleared_at.slice(11))
-        .join(", ") + ".";
-  }
-}
-
-function applySnapshot(s) {
-  const sim = s.mode === "simulate";
-  el("mode").textContent = sim ? "SIMULATED (no robot)" : "LIVE";
-  el("mode").className = "badge " + (sim ? "sim" : "live");
-  el("prefix").textContent = s.prefix;
-  el("port").textContent = s.port;
-  el("source").textContent = s.config_source;
-  setBroker(s.broker);
-  setLink(s.link);
-  setControls(s.controls);
-  setHeartbeat(s.heartbeat, s.hb_age_ms || 0);
-  el("cmds").textContent = "";
-  rows.clear();
-  s.commands.forEach(upsertRow);
-  el("log").textContent = "";
-  s.log.forEach((e) => addLog(e.kind, {t: e.t, log: e.text}));
-  el("sim-panel").hidden = !sim;
-  el("car-state").textContent = s.car_state || "-";
-  liveSeen = false;
-  imu = s.imu_history.slice();
-  drawImu();
-  setTelemetry(s.telemetry, s.tel_age_ms);
-  setLive(s.live, s.live_age_ms);
-  if (!s.telemetry) { markFeed("tel", null); }
-  if (!s.live) { markFeed("live", null); }
-  el("timeline").textContent = "";
-  s.s3_timeline.forEach(addTimeline);
-  setTally(s.s3_tally, s.s3_rejected);
-  paintAges();
-  banner.state = s.banner;
-  banner.why = s.banner_why || "";
-  banner.entries = new Map(s.retained_cmd.map((e) => [e.topic_suffix, e]));
-  renderBanner();
-  setMap(s.map);
-}
-
-const es = new EventSource("/events");
-es.onopen = () => { el("stream").textContent = ""; };
-es.onerror = () => {
-  el("stream").textContent = "dashboard server not reachable: retrying";
-};
-function on(name, fn) {
-  es.addEventListener(name, (ev) => fn(JSON.parse(ev.data)));
-}
-on("snapshot", applySnapshot);
-on("broker", (d) => { setBroker(d); addLog("broker", d); });
-on("status", (d) => addLog("status", d));
-on("link", (d) => { setLink(d); addLog("link", d); });
-on("heartbeat", (d) => { setHeartbeat(d, 0); addLog("heartbeat", d); });
-on("controls", setControls);
-on("cmd", (d) => { upsertRow(d); addLog("cmd", d); });
-on("ack", (d) => {
-  if (d.n !== undefined) { upsertRow(d); }
-  addLog(d.result === 0 ? "ack_queued" : "ack_other", d);
-});
-on("no_ack", (d) => { upsertRow(d); addLog("no_ack", d); });
-on("cmd_failed", (d) => { upsertRow(d); addLog("cmd_failed", d); });
-on("cmd_seen", (d) => addLog("cmd_seen", d));
-on("decode_error", (d) => addLog("decode_error", d));
-on("telemetry", (d) => {
-  setTelemetry(d, 0);
-  addLog("telemetry", d);
-  imu.push([d.pitch_deg, d.roll_deg]);
-  if (imu.length > IMU_KEEP) { imu.shift(); }
-  drawImu();
-  paintAges();
-});
-on("live", (d) => { setLive(d, 0); paintAges(); });
-on("s3_events", (d) => {
-  d.entries.forEach(addTimeline);
-  setTally(d.tally, d.rejected);
-});
-on("event", (d) => addLog("event", d));
-on("note", (d) => addLog("note", d));
-on("retained_cmd", (d) => {
-  banner.entries.set(d.topic_suffix, d);
-  renderBanner();
-  addLog("retained_cmd", d);
-});
-on("banner", (d) => {
-  banner.state = d.banner;
-  banner.why = d.why;
-  banner.entries.clear();
-  renderBanner();
-  addLog("banner", d);
-});
-on("sim", (d) => {
-  el("car-state").textContent = d.car_state || "-";
-  addLog("sim", d);
-});
-on("map", (d) => { setMap(d); addLog("map", d); });
-on("map_ack", (d) => addLog("map_ack", d));
-</script>
-</body>
-</html>
-"""
+def load_static():
+    """Read the page's files once: (index.html as text, {URL path:
+    (bytes, Content-Type)}). A missing file stops the start-up."""
+    index = (UI_DIR / INDEX_FILE).read_text(encoding="utf-8")
+    if index.count(DATA_MARK) != 1:
+        raise RuntimeError("%s must hold %s exactly once"
+                           % (INDEX_FILE, DATA_MARK))
+    static = {url: ((UI_DIR / name).read_bytes(), content_type)
+              for url, (name, content_type) in STATIC_FILES.items()}
+    return index, static
 
 
 def make_server(dash, http_port):
-    """The HTTP server on 127.0.0.1, with a fresh page token."""
+    """The HTTP server on 127.0.0.1, with a fresh page token and the
+    page's files read from dashboard_ui/."""
+    index, static = load_static()
     server = Server((BIND_ADDRESS, http_port), Handler)
+    server.index = index
+    server.static = static
     port = server.server_address[1]
     server.dash = dash
     server.token = secrets.token_hex(16)
@@ -3999,9 +3189,21 @@ class CheckContext:
     def __init__(self, run):
         self.run = run
         self.port = run.port
-        _, self.page = http_call(run.port, "GET", "/")
-        match = re.search(r'const TOKEN = "([0-9a-f]+)";', self.page)
-        self.token = match.group(1) if match else ""
+        _, index = http_call(run.port, "GET", "/")
+        match = DATA_RE.search(index)
+        try:
+            self.token = json.loads(match.group(1))["token"]
+        except (AttributeError, ValueError, KeyError, TypeError):
+            self.token = ""
+        # "The page" in A2, A12 and A14 is everything the server can send
+        # for it: index.html as served, then every file of STATIC_FILES.
+        parts = [index]
+        for url in sorted(STATIC_FILES):
+            status, text = http_call(run.port, "GET", url)
+            if status != 200:
+                raise RuntimeError("GET %s gave %d" % (url, status))
+            parts.append(text)
+        self.page = "\n".join(parts)
         self.stream = Stream(run.port)
 
 

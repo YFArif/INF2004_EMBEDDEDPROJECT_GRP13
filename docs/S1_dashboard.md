@@ -1,7 +1,7 @@
 # S1 laptop dashboard
 
-`testing/subsystem1/s1_dashboard.py` is a one-file dashboard for the
-robot: START, STOP and RESET, the ack for each command, an online light,
+`testing/subsystem1/s1_dashboard.py` is the dashboard for the robot
+(one Python file, with its page in `testing/subsystem1/dashboard_ui/`): START, STOP and RESET, the ack for each command, an online light,
 the 1 Hz heartbeat and four telemetry panels (S2 motion, S3 line and
 barcodes, S4 motion sensor, S5 controller). It runs on the laptop that runs the broker,
 serves one page on `http://127.0.0.1:8765/` (that laptop only), and talks
