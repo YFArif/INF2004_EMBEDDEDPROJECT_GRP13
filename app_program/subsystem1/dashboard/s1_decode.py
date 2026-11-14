@@ -5,8 +5,10 @@ one MQTT payload into a dict whose field names and values are exactly
 what msg_codec_get_*() in app_program/subsystem1/msg_codec.c returns, so
 the robot, the C test and the dashboard use one name per field. It
 accepts and rejects the same payloads as the C decoder: the length must
-be exact for the type, the version must be 1 and the type 1 to 6.
-Padding bits are ignored (rule 5 of section 2).
+be exact for the type, the version must be 1 and the type 1 to 7.
+Padding bits are ignored (rule 5 of section 2). A MAP (type 7) decodes to
+its four raw letter indices, 0 to 63, which are not judged: S3 is the
+authority on which maps are valid.
 
 Use from Python:
 
@@ -37,6 +39,7 @@ EVENT = 3
 COMMAND = 4
 ACK = 5
 LIVE = 6
+MAP = 7
 
 TYPE_NAMES = {
     TELEMETRY: "TELEMETRY",
@@ -45,11 +48,12 @@ TYPE_NAMES = {
     COMMAND: "COMMAND",
     ACK: "ACK",
     LIVE: "LIVE",
+    MAP: "MAP",
 }
 
 # Exact payload length of each message type, in bytes.
 LENGTHS = {TELEMETRY: 25, HEARTBEAT: 9, EVENT: 7, COMMAND: 2, ACK: 3,
-           LIVE: 14}
+           LIVE: 14, MAP: 5}
 
 # How a stored field becomes a value.
 UNSIGNED = "unsigned"      # as stored
@@ -134,12 +138,29 @@ FIELDS = {
         ("cmd_id", 10, 6, UNSIGNED),
         ("result", 16, 2, UNSIGNED),
     ),
+    MAP: (
+        ("cmd_id", 8, 6, UNSIGNED),
+        ("letter_left", 14, 6, UNSIGNED),
+        ("letter_right", 20, 6, UNSIGNED),
+        ("letter_straight", 26, 6, UNSIGNED),
+        ("letter_uturn", 32, 6, UNSIGNED),
+    ),
 }
 
 OP_INVALID = 0
 OPCODE_NAMES = {0: "INVALID", 1: "START", 2: "STOP", 3: "RESET"}
 # Result 0 means the command was queued for S5, not that S5 carried it out.
 RESULT_NAMES = {0: "queued", 1: "rejected"}
+# An ack's opcode 0 has two uses (section 5.1): it answers a MAP, whose id
+# the dashboard keeps from 1 to 63, or a command the codec refused, whose
+# id is echoed or, when it could not be read, 0. So an ack with opcode 0
+# and an id above 0 is named MAP, and one with id 0 INVALID. For a MAP,
+# result 0 means S3 applied the map.
+ACK_OP_MAP = 0
+MAP_RESULT_NAMES = {0: "applied", 1: "refused"}
+# The four letters of a MAP, in wire order, and the command each one is.
+MAP_SLOTS = (("letter_left", "LEFT"), ("letter_right", "RIGHT"),
+             ("letter_straight", "STRAIGHT"), ("letter_uturn", "U-TURN"))
 
 # Section 3.1: bit n of fault_mask is fault n, as S5 numbers them
 # (S5_FAULT_xxx in subsystem5.h).
@@ -216,7 +237,7 @@ def decode(data):
             version, LAYOUT_VERSION,
             " (0 is never valid)" if version == 0 else ""))
     if msg_type not in LENGTHS:
-        raise DecodeError("type", "type %d is not 1 to 6" % msg_type)
+        raise DecodeError("type", "type %d is not 1 to 7" % msg_type)
     if len(data) != LENGTHS[msg_type]:
         raise DecodeError("length", "%d bytes; %s needs exactly %d" % (
             len(data), TYPE_NAMES[msg_type], LENGTHS[msg_type]))
@@ -250,6 +271,31 @@ def letter_of(index):
     return ""
 
 
+def code39_char(index):
+    """S3's s3_code39_char(): the symbol for an index, '?' above 43."""
+    if 0 <= index < len(CODE39):
+        return CODE39[index]
+    return "?"
+
+
+def map_letters(msg):
+    """The four letters of a decoded MAP as S3 will read them, e.g.
+    "DCBA"; '?' for an index above 43."""
+    return "".join(code39_char(msg[name]) for name, _ in MAP_SLOTS)
+
+
+def map_text(letters):
+    """'LEFT=D RIGHT=C STRAIGHT=B U-TURN=A' for the letters "DCBA", the
+    order of S3's own console line."""
+    return " ".join("%s=%s" % (slot, letter)
+                    for (_, slot), letter in zip(MAP_SLOTS, letters))
+
+
+def ack_is_map(msg):
+    """True for an ack that answers a MAP: opcode 0 and an id above 0."""
+    return (msg["opcode"] == ACK_OP_MAP) and (msg["cmd_id"] != 0)
+
+
 def describe(msg):
     """Return a copy of a decoded message with display-only fields added.
 
@@ -278,11 +324,20 @@ def describe(msg):
         shown["bc_char"] = letter_of(msg["bc_letter"])
         shown["bc_cmd_name"] = name_of(BC_CMD_NAMES, msg["bc_cmd"])
         shown["junc_name"] = name_of(JUNC_NAMES, msg["junc_turn"])
+    elif (msg["msg_type"] == ACK) and ack_is_map(msg):
+        shown["opcode_name"] = "MAP"
+        shown["result_name"] = MAP_RESULT_NAMES.get(
+            msg["result"], "reserved %d" % msg["result"])
     elif msg["msg_type"] in (COMMAND, ACK):
         shown["opcode_name"] = OPCODE_NAMES[msg["opcode"]]
         if msg["msg_type"] == ACK:
             shown["result_name"] = RESULT_NAMES.get(
                 msg["result"], "reserved %d" % msg["result"])
+    elif msg["msg_type"] == MAP:
+        shown["letters"] = map_letters(msg)
+        shown["map_text"] = map_text(shown["letters"])
+    else:
+        pass
     return shown
 
 

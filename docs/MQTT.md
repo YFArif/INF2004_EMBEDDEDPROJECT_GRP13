@@ -412,11 +412,14 @@ python3 app_program/subsystem1/dashboard/s1_decode.py [--describe] [--session]
 - Exit status: 0 if every line decoded, 1 if any line was rejected, 2 for
   a bad option (`main()`; S1-U11 `CommandLine` tests).
 - `--describe` adds display fields (pitch and roll in degrees, mean speed,
-  fault names, opcode and result names) (`describe()`).
+  fault names, opcode and result names) (`describe()`). A MAP shows its
+  letters (`?` above index 43, as S3 reads it); an ack with opcode 0 and
+  an id above 0 is named MAP, with result 0 "applied" and 1 "refused",
+  and one with id 0 INVALID (S1_binary_frame.md section 5.1).
 - `--session` keeps state across lines: lost frames from `seq`, and full
   encoder counts rebuilt from the 16 bits sent (`Session`, `unwrap16()`).
 
-Offline check with the 21 golden vectors:
+Offline check with the 25 golden vectors:
 
 ```
 python3 testing/subsystem1/golden.py docs/S1_binary_frame.md \
