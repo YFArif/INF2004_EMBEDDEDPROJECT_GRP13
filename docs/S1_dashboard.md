@@ -256,15 +256,15 @@ green light.
 | Telemetry / live lost | Gaps in each message's sequence since the dashboard started: messages the robot handed to the driver that never arrived. A gap of more than 25 is read as a restart and not counted |
 | Red banner | A retained command is stored on `<prefix>/cmd/...` (section 11) |
 | Amber banner | That retained command was cleared |
-| "banner unavailable" (top bar) | The banner is off: `--banner-off`, an old `mosquitto_sub`, or a broker without MQTT v5 |
+| "banner unavailable" (under the header) | The banner is off: `--banner-off`, an old `mosquitto_sub`, or a broker without MQTT v5 |
 
 **Buttons.** STOP is always enabled; the Escape key also sends STOP.
 START and RESET are enabled only while the robot light is green, and
 START (or RESET) stays disabled until the ack of the previous one
 arrives, so a double click cannot run the robot from FINISHED. An
-enabled START or RESET is lit (white text, visible border); a disabled
-one is dimmed and shows the reason underneath, for example "online,
-waiting for a heartbeat". The buttons are decided by the robot light only, not by the S5
+enabled START or RESET has full-strength text; a disabled one is dimmed
+and shows the reason underneath, for example "online, waiting for a
+heartbeat". The buttons are decided by the robot light only, not by the S5
 panel: a START sent while the robot calibrates is acked "queued" and
 refused by S5 (section 9).
 
@@ -394,6 +394,66 @@ PowerShell, `[IO.File]::WriteAllBytes("$PWD\map.bin",
 [byte[]](0x17,0x24,0xD3,0x0B,0x28))`, then publish with `-f map.bin`
 in place of `-s`. A map sent this way is not sent again by the dashboard
 after a restart.
+
+### 8.3 Layout, appearance and the derived words
+
+The page is `index.html`, `tokens.css`, `app.css` and `app.js` in
+`testing/subsystem1/dashboard_ui/`, with the Inter font and its licence
+in `fonts/`. The server sends only the files in its fixed list
+(`STATIC_FILES` in `s1_dashboard.py`). The look follows Apple's Human
+Interface Guidelines; `docs/ui/S1_design_tokens.md` lists every colour
+and size and where it comes from.
+
+**Layout.** Header: the group, the SIMULATED or LIVE badge, and the link
+status (robot light and text, broker light, messages per second over the
+last 5 s, age of the last frame). Left column: Control (STOP, START,
+RESET), Last commands, Barcode letter map. Centre: Live view and Latest
+events (the three newest lines of the event log). Right column: Motion,
+Attitude, Line and barcode, Obstacle sensor. The Live view holds a
+placeholder until the 3D view is built.
+
+- At 1700 px wide and 900 px high or more (a 1080p browser window)
+  everything fits and the page does not scroll.
+- From 1280 px: three columns; the page may scroll. From 760 px: two
+  columns, the number cards below. Narrower: one column, STOP first.
+- STOP is the first stop of the Tab key. The Developer button and the
+  appearance switch come last.
+
+**Appearance.** Auto (the default) follows the system's light or dark
+setting. Light and Dark override it and are remembered in the browser's
+`localStorage`; the page works the same if that is not available. The
+page also follows the system settings for increased contrast, reduced
+transparency and reduced motion.
+
+**Developer drawer.** The Developer button opens a panel on the right.
+It is closed when the page loads. It holds the Simulator (`--simulate`
+only), the Robot link figures of section 8, the four detailed panels of
+section 8.1, the Operator rules and the full Event log. The Escape key
+stays STOP, so the drawer has its own Close button. On a narrow screen
+the drawer covers the page and shows its own STOP button.
+
+**Derived words.** Some cards show a word worked out from the decoded
+fields. The raw values are in the word's tooltip and in the detailed
+panels. The thresholds are constants at the top of the cards' code in
+`app.js`.
+
+| Word | Where | Rule |
+|---|---|---|
+| Starting up, Calibrating, Ready, Following line, Approaching junction, Turning at junction, Finding the line again, Recovering the line, Avoiding obstacle, Fault, Finished | Live view, first chip | `ctrl_state` 0 to 10 (telemetry), one word each. "Following line" is `ctrl_state` 3, LINE_FOLLOWING |
+| Stopped, Cruising, Turning, E-stop | Live view, second chip | `motion_state` (live): 0 IDLE is Stopped; 1 FOLLOWING and 2 MOVING are Cruising; 3 TURNING; 4 ESTOP |
+| Obstacle ahead, N mm | Live view, orange chip | `closest_mm` above 0 and at most 350 (telemetry). 350 mm is S5's own "near" limit (`EV_OBSTACLE_NEAR`: under 35 cm). 0 means no echo, so no chip |
+| E-stop latched | Live view, red chip | the E-stop flag of the live message |
+| Fault: names | Live view, red chip | any bit of `fault_mask` (telemetry) |
+| Lifted or overturned | Live view, red banner | `motion_class` 6, held for 3 s as in the S4 panel |
+| Centred, Correcting | Line | `line_state` 0 FOLLOW (live). Centred: `steer_dv` within 10 mm/s of zero, so the line controller asks for no correction. Otherwise Correcting |
+| At junction, Lost, Off, Searching, Not ready | Line | `line_state` 1 JUNCTION, 2 LOST, 3 DISABLED, 4 SEARCH, 5 UNCAL |
+| Straight, Slight left or right, Hard left or right | Steering | `steer_dv` (live, positive is a turn right): at most 10 mm/s in size is Straight; at most 100 is Slight; above is Hard. S3's full lock is 200 mm/s (`S3_STEER_MAX_MMS`), so the limits are 5 % and 50 % of it |
+| None, Climbing, Descending | Hump | `hump_state` 0, 1, 2 (telemetry) |
+| Calibrated, Not calibrated, Fault | IMU | Fault: `imu_ok` 0. Otherwise by `cal_done` |
+| None, None yet, No echo | Last barcode, Junction turn, Closest | `bc_letter` 63; `junctions` 0; `closest_mm` 0 |
+
+The 10 and 100 mm/s steering limits are our own choice, not S3's. They
+were not checked against the car on the track.
 
 ## 9. Operator rules
 

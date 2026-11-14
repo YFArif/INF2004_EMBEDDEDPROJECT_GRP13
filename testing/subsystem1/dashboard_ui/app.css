@@ -100,7 +100,8 @@ h1 {
   border-radius: var(--radius-capsule);
 }
 .seg button {
-  min-height: 38px; min-width: var(--target); padding: 0 14px; border: 0;
+  min-height: var(--target); min-width: var(--target); padding: 0 14px;
+  border: 0;
   border-radius: var(--radius-capsule); background: transparent;
   color: var(--label-2); font-weight: 600;
   transition: background var(--dur) var(--ease);
@@ -226,7 +227,10 @@ th {
   font-weight: 600; color: var(--label-2); border-top: 0;
 }
 .cmds td:nth-child(2) { font-weight: 600; }
-.st-queued, .st-applied { color: var(--green-text); font-weight: 600; }
+/* "queued" is blue, not green: it reached the controller, which has not
+ * confirmed that it acted. Green is kept for a confirmed map. */
+.st-queued { color: var(--accent-text); font-weight: 600; }
+.st-applied { color: var(--green-text); font-weight: 600; }
 .st-sending, .st-offline { color: var(--label-2); font-weight: 600; }
 .st-rejected, .st-no-ack, .st-publish-failed, .st-refused,
 .st-not_confirmed { color: var(--red-text); font-weight: 600; }
@@ -378,7 +382,7 @@ li { margin-bottom: 4px; }
 #log div, #timeline div {
   padding: 2px 0; border-bottom: 1px solid var(--separator);
 }
-.log-ack_queued { color: var(--green-text); }
+.log-ack_queued { color: var(--accent-text); }
 .log-ack_other, .log-no_ack, .log-cmd_failed, .log-decode_error,
 .tl-reject, .tl-lost { color: var(--red-text); }
 .log-telemetry, .log-retained_cmd {
