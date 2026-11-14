@@ -756,6 +756,7 @@ ID, `df58a14`), and so is the codec's flash (S1-U08 build, `3814f93`);
 | Heartbeat payload | not defined | 9 B | - |
 | Live payload (5 Hz) | not defined | 14 B | - |
 | Ack payload | not defined | 3 B | - |
+| Map payload (dashboard to robot) | not defined | 5 B | - |
 
 Example on the wire, topic `robot/telemetry` (15 characters; the suffix
 is fixed by the topic ID, the prefix `robot` is a guess),
@@ -769,21 +770,25 @@ QoS 0: before 1 + 2 + 2 + 15 + 138 = 158 B, after 1 + 1 + 2 + 15 + 25 =
 
 ```
 #define MQTT_LINK_PAYLOAD_MAX   MSG_MAX_BYTES   /* largest message */
-#define MQTT_LINK_COMMAND_MAX   MSG_CMD_BYTES
+#define MQTT_LINK_COMMAND_MAX   MSG_IN_MAX_BYTES /* largest received */
 ```
+
+(`MSG_CMD_BYTES` until the MAP; `MSG_IN_MAX_BYTES` is `MSG_MAP_BYTES`.)
 
 and `mqtt_link_check_caps_t` in `mqtt_link.c` (a negative-size array
 typedef, the pattern the driver already uses) stops the build unless:
 
 - every message length (`MSG_TEL_BYTES`, `MSG_HB_BYTES`, `MSG_EVT_BYTES`,
   `MSG_ACK_BYTES`) is at most `MQTT_LINK_PAYLOAD_MAX`;
-- `MQTT_LINK_COMMAND_MAX` equals `MSG_CMD_BYTES`;
+- `MQTT_LINK_COMMAND_MAX` equals the larger of `MSG_CMD_BYTES` and
+  `MSG_MAP_BYTES` (it equalled `MSG_CMD_BYTES` until the MAP);
 - `PUBLISH_WIRE_MAX` is still below lwIP's output ring (the existing
   check, unchanged).
 
 So dropping or widening a field changes the buffers automatically, and a
 cap that no longer fits a message cannot build. With today's layout the
-header gives 25 and 2 (depth 8). Since `df58a14` the publish record
+header gives 25 and 5 (depth 8; 25 and 2 until the MAP). Since `df58a14`
+the publish record
 carries a one-byte topic ID instead of a topic string, and the command
 record carries no topic (see the end of this section). If turn_rate is
 dropped (section 7), `MSG_MAX_BYTES` becomes 24: the publish record
@@ -801,6 +806,19 @@ so the totals below do not change.
 | `mbf_event` (30 events) | 2048 B | 240 B | 240 B | 30 x (4 + 4), record 3 B rounded to 4 | computed (to be created by `telemetry_task`, planned, Stage 4) |
 | `telemetry_task` stack | 2048 B (Week 6 design) | - | 2048 B at `cb204b3` | `g_stack`, `TELEMETRY_TASK_STACK_BYTES`. Built; high-water mark not yet measured with the telemetry and live code in. The static estimate for the deepest path is 688 B (`telemetry_task` -> `mqtt_link_publish()` -> `tk_snd_mbf()` and the kernel below it; `-fstack-usage` and `-fcallgraph-info=su`; leaves out indirect calls, interrupt frames and library leaves) | measured size; not in the row below |
 | **S1 static RAM, object level** | **5430 B**, with the computed `mbf_event` | **about 1858 B**, with the computed `mbf_event` | **941 B** at `cb204b3`, without the stack and `mbf_event` (the two rows above) | `mqtt_link.o` 1 data + 354 bss and `mqtt_queue.o` 365 bss (as at `df58a14`), `telemetry_task.o` 212 bss without its stack (`g_src` 92, `g_tel` 52, `g_stats` 36, `g_live` 28, four 1-byte variables), `subsystem1.o` 9 bss (the template LED task's 8 B and `gb_mqtt_ok`); `msg_codec.o`, `s1_telem.o` and `s1_radio.o` 0 | measured (`arm-none-eabi-size` and `nm`, `NET=lwip MQTT=1` objects). Not linked-image figures; see 8.3 for those |
+
+**MAP (14 Nov 2026).** The command cap grows from 2 to 5 B, so the
+command record grows from 4 B (2 len + 2 payload) to 8 B (2 len + 5
+payload + 1 pad, for the length's alignment) and `mbf_cmd` from 64 B to
+96 B (8 x (4 + 8)); the driver's `g_command` grows from 4 to 8 B and
+`telemetry_task`'s `g_stats` from 36 to 40 B (`map_reject`). Measured
+with `arm-none-eabi-nm` in the linked `NET=lwip MQTT=1` image:
+`g_command_buf` 0x40 -> 0x60 B, `g_command` 4 -> 8 B. The whole image
+(`arm-none-eabi-size`), before (`c0bcce6`) and after the MAP code:
+`SMP=1` text 395608 -> 396376 (+768), data 504 -> 504, bss 122992 ->
+123032 (+40); `SMP=0` text 387992 -> 388760 (+768), data 488 -> 488,
+bss 118888 -> 118928 (+40). The table above keeps its `df58a14`
+figures.
 
 **Measured saving: 2664 B** of static RAM in the linked image for the
 driver objects and the two buffers (3392 -> 1628 -> 728 B, 8.3): 1764 B

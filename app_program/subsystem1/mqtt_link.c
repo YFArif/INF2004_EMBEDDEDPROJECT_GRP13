@@ -190,14 +190,18 @@ typedef uint8_t mqtt_link_check_suffix_t[ \
      && ((sizeof(TOPIC_EVENT) - 1U) <= MQTT_LINK_TOPIC_MAX) \
      && ((sizeof(TOPIC_ACK) - 1U) <= MQTT_LINK_TOPIC_MAX)) ? 1 : -1];
 /* The caps come from msg_layout.h: every message the robot publishes must
- * fit the publish cap, and the command cap must be exactly one COMMAND
- * message (docs/S1_binary_frame.md, section 9.2).
+ * fit the publish cap, and the command cap must equal the largest message
+ * the robot receives, the longer of COMMAND and MAP
+ * (docs/S1_binary_frame.md, section 9.2).
  */
 typedef uint8_t mqtt_link_check_caps_t[((MSG_TEL_BYTES \
     <= MQTT_LINK_PAYLOAD_MAX) && (MSG_HB_BYTES <= MQTT_LINK_PAYLOAD_MAX) \
     && (MSG_EVT_BYTES <= MQTT_LINK_PAYLOAD_MAX) \
     && (MSG_ACK_BYTES <= MQTT_LINK_PAYLOAD_MAX) \
-    && (MQTT_LINK_COMMAND_MAX == MSG_CMD_BYTES)) ? 1 : -1];
+    && (MQTT_LINK_COMMAND_MAX >= MSG_CMD_BYTES) \
+    && (MQTT_LINK_COMMAND_MAX >= MSG_MAP_BYTES) \
+    && ((MQTT_LINK_COMMAND_MAX == MSG_CMD_BYTES) \
+        || (MQTT_LINK_COMMAND_MAX == MSG_MAP_BYTES))) ? 1 : -1];
 
 /** What the one publish that lwIP may hold at a time is. */
 typedef enum

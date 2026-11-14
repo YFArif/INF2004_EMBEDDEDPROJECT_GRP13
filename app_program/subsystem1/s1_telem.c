@@ -4,9 +4,9 @@
 
 /** @file s1_telem.c
  *
- * @brief Command to ack, heartbeat packing, schedules, the queue room rule,
- *        the WiFi fault rule and message filling for telemetry_task (see
- *        s1_telem.h). No kernel or driver calls.
+ * @brief Command and map to ack, heartbeat packing, schedules, the queue
+ *        room rule, the WiFi fault rule and message filling for
+ *        telemetry_task (see s1_telem.h). No kernel or driver calls.
  */
 
 #include "s1_telem.h"
@@ -15,7 +15,18 @@
 
 #include <stddef.h>
 
+#include "../subsystem3/s3_code39.h"
 #include "msg_codec.h"
+
+/* A MAP's letters, in the order s3_set_nav_map() takes them, and the text
+ * passed to it: the four letters and a NUL.
+ */
+#define MAP_SLOT_LEFT               0U
+#define MAP_SLOT_RIGHT              1U
+#define MAP_SLOT_STRAIGHT           2U
+#define MAP_SLOT_UTURN              3U
+#define MAP_LETTERS                 4U
+#define MAP_TEXT_BYTES              (MAP_LETTERS + 1U)
 
 /* Both messages this module builds must fit one s1_telem_pub_t, and a
  * length must fit its uint16_t.
@@ -23,6 +34,17 @@
 typedef uint8_t s1_telem_check_pub_t[((MSG_ACK_BYTES <= S1_TELEM_PUB_MAX)
     && (MSG_HB_BYTES <= S1_TELEM_PUB_MAX)
     && (S1_TELEM_PUB_MAX <= UINT16_MAX)) ? 1 : -1];
+
+/* S3 takes exactly MAP_LETTERS letters (S3_NAV_MAP_LEN). */
+typedef uint8_t s1_telem_check_map_t[(MAP_LETTERS == S3_NAV_MAP_LEN)
+                                     ? 1 : -1];
+
+static msg_codec_ack_t on_opcode(const mqtt_link_command_t * p_cmd,
+                                 s1_telem_post_fn_t p_post,
+                                 s1_telem_stats_t * p_stats);
+static msg_codec_ack_t on_map(const mqtt_link_command_t * p_cmd,
+                              s1_telem_map_fn_t p_map,
+                              s1_telem_stats_t * p_stats);
 
 /* Half the range of a 32-bit millisecond clock: a deadline less than this
  * far behind "now" has passed; one further away is still ahead.
@@ -51,18 +73,16 @@ s1_telem_sat_add (uint32_t total, uint32_t amount)
 }
 
 /*!
- * @brief Decode one received command, post it to S5 if it is valid, and
- *        build its ack.
+ * @brief Decode one received message, act on it, and build its ack.
  *
- * A command the codec refuses (wrong length, version or type, or opcode
- * 0) is not posted; its ack is MSG_ACK_REJECTED and codec_reject goes up.
- * A valid command is posted once; the ack is MSG_ACK_ACCEPTED ("queued")
- * if the post returned 0, otherwise MSG_ACK_REJECTED and post_failure
- * goes up. The ack echoes the opcode and id whenever the codec could read
- * them (msg_codec_get_command()), otherwise both are 0.
+ * The type field alone picks the path (msg_codec_get_type()): type 7 is
+ * a MAP (on_map()); any other type takes the command path (on_opcode()),
+ * whose codec refuses everything but a well-formed COMMAND, as before the
+ * MAP existed.
  *
- * @param[in]     p_cmd   The command from mqtt_link_receive_command().
+ * @param[in]     p_cmd   The message from mqtt_link_receive_command().
  * @param[in]     p_post  Posts a command to S5 (see s1_telem_post_fn_t).
+ * @param[in]     p_map   Gives a map to S3 (see s1_telem_map_fn_t).
  * @param[in,out] p_stats Counters to update.
  * @param[out]    p_ack   Receives the ack and how to publish it: topic
  *                        MQTT_LINK_TOPIC_ACK, QoS 1, not retained.
@@ -72,40 +92,26 @@ s1_telem_sat_add (uint32_t total, uint32_t amount)
  */
 bool
 s1_telem_on_command (const mqtt_link_command_t * p_cmd,
-                     s1_telem_post_fn_t p_post, s1_telem_stats_t * p_stats,
-                     s1_telem_pub_t * p_ack)
+                     s1_telem_post_fn_t p_post, s1_telem_map_fn_t p_map,
+                     s1_telem_stats_t * p_stats, s1_telem_pub_t * p_ack)
 {
-    msg_codec_command_t cmd = {MSG_OP_INVALID, 0U};
-    msg_codec_ack_t     ack = {MSG_OP_INVALID, 0U, MSG_ACK_REJECTED};
-    bool                b_valid = false;
-    bool                b_ok = false;
+    msg_codec_ack_t ack = {MSG_OP_INVALID, 0U, MSG_ACK_REJECTED};
+    bool            b_ok = false;
 
-    if ((NULL != p_cmd) && (NULL != p_post) && (NULL != p_stats)
-        && (NULL != p_ack))
+    if ((NULL != p_cmd) && (NULL != p_post) && (NULL != p_map)
+        && (NULL != p_stats) && (NULL != p_ack))
     {
-        if (p_cmd->payload_len <= sizeof(p_cmd->payload))
+        /* get_type() reads byte 0 only, which the payload always has. */
+        if (MSG_TYPE_MAP == msg_codec_get_type(p_cmd->payload,
+                                               p_cmd->payload_len))
         {
-            b_valid = msg_codec_get_command(p_cmd->payload,
-                                            p_cmd->payload_len, &cmd);
-        }
-
-        if (!b_valid)
-        {
-            p_stats->codec_reject = s1_telem_sat_add(p_stats->codec_reject,
-                                                     1U);
-        }
-        else if (0 == p_post(cmd.opcode, cmd.cmd_id))
-        {
-            ack.result = MSG_ACK_ACCEPTED;
+            ack = on_map(p_cmd, p_map, p_stats);
         }
         else
         {
-            p_stats->post_failure = s1_telem_sat_add(p_stats->post_failure,
-                                                     1U);
+            ack = on_opcode(p_cmd, p_post, p_stats);
         }
 
-        ack.opcode      = cmd.opcode;
-        ack.cmd_id      = cmd.cmd_id;
         p_ack->topic    = MQTT_LINK_TOPIC_ACK;
         p_ack->qos      = MQTT_LINK_QOS_1;
         p_ack->b_retain = false;
@@ -128,8 +134,8 @@ s1_telem_on_command (const mqtt_link_command_t * p_cmd,
  * reads as "not measured". tel_drop is the sum of the periodic messages
  * the queue rule skipped and the ones the driver refused (telemetry, live
  * and heartbeats). cmd_reject is the sum of the codec rejections, the post
- * failures and the driver's command_dropped. The codec saturates every count
- * at its field's largest value.
+ * failures, the refused or malformed MAPs and the driver's command_dropped.
+ * The codec saturates every count at its field's largest value.
  *
  * TODO: evt_drop is 0: there is no mbf_event yet. Count its drops when
  * Stage 4b adds it.
@@ -161,7 +167,10 @@ s1_telem_heartbeat (uint8_t seq, const s1_telem_hb_in_t * p_in,
             p_stats->hb_publish_failed);
         hb_fields.evt_drop      = 0U;
         hb_fields.cmd_reject    = s1_telem_sat_add(
-            s1_telem_sat_add(p_stats->codec_reject, p_stats->post_failure),
+            s1_telem_sat_add(
+                s1_telem_sat_add(p_stats->codec_reject,
+                                 p_stats->post_failure),
+                p_stats->map_reject),
             p_in->command_dropped);
 
         p_hb->topic    = MQTT_LINK_TOPIC_TELEMETRY;
@@ -454,6 +463,115 @@ s1_telem_fill_live (const s1_telem_src_t * p_src, uint8_t seq,
             p_live->barcodes     = p_src->barcodes;
         }
     }
+}
+
+/*!
+ * @brief The command path: decode a COMMAND, post it to S5 if it is valid,
+ *        and say what its ack is. Unchanged from before the MAP existed.
+ *
+ * A command the codec refuses (wrong length, version or type, or opcode
+ * 0) is not posted; its ack is MSG_ACK_REJECTED and codec_reject goes up.
+ * A valid command is posted once; the ack is MSG_ACK_ACCEPTED ("queued")
+ * if the post returned 0, otherwise MSG_ACK_REJECTED and post_failure
+ * goes up. The ack echoes the opcode and id whenever the codec could read
+ * them (msg_codec_get_command()), otherwise both are 0.
+ *
+ * @param[in]     p_cmd   The message (not NULL).
+ * @param[in]     p_post  Posts a command to S5 (not NULL).
+ * @param[in,out] p_stats Counters to update (not NULL).
+ *
+ * @return The ack's opcode, id and result.
+ */
+static msg_codec_ack_t
+on_opcode (const mqtt_link_command_t * p_cmd, s1_telem_post_fn_t p_post,
+           s1_telem_stats_t * p_stats)
+{
+    msg_codec_command_t cmd = {MSG_OP_INVALID, 0U};
+    msg_codec_ack_t     ack = {MSG_OP_INVALID, 0U, MSG_ACK_REJECTED};
+    bool                b_valid = false;
+
+    if (p_cmd->payload_len <= sizeof(p_cmd->payload))
+    {
+        b_valid = msg_codec_get_command(p_cmd->payload,
+                                        p_cmd->payload_len, &cmd);
+    }
+
+    if (!b_valid)
+    {
+        p_stats->codec_reject = s1_telem_sat_add(p_stats->codec_reject,
+                                                 1U);
+    }
+    else if (0 == p_post(cmd.opcode, cmd.cmd_id))
+    {
+        ack.result = MSG_ACK_ACCEPTED;
+    }
+    else
+    {
+        p_stats->post_failure = s1_telem_sat_add(p_stats->post_failure,
+                                                 1U);
+    }
+
+    ack.opcode = cmd.opcode;
+    ack.cmd_id = cmd.cmd_id;
+
+    return (ack);
+}
+
+/*!
+ * @brief The map path: decode a MAP, give its letters to S3, and say what
+ *        its ack is.
+ *
+ * Each 6-bit index becomes its character with S3's own s3_code39_char(),
+ * which gives '?' above 43, so S3 alone judges the map. A MAP the codec
+ * refuses is not passed on. The ack's opcode is MSG_ACK_OP_MAP and its id
+ * the MAP's (0 when the codec refused it); its result is
+ * MSG_ACK_ACCEPTED only when the map function returned 0. Otherwise
+ * map_reject goes up.
+ *
+ * @param[in]     p_cmd   The message (not NULL), type field 7.
+ * @param[in]     p_map   Gives the map to S3 (not NULL).
+ * @param[in,out] p_stats Counters to update (not NULL).
+ *
+ * @return The ack's opcode, id and result.
+ */
+static msg_codec_ack_t
+on_map (const mqtt_link_command_t * p_cmd, s1_telem_map_fn_t p_map,
+        s1_telem_stats_t * p_stats)
+{
+    msg_codec_map_t map = {0U, 0U, 0U, 0U, 0U};
+    msg_codec_ack_t answer = {MSG_ACK_OP_MAP, 0U, MSG_ACK_REJECTED};
+    char            letters[MAP_TEXT_BYTES];
+    bool            b_valid = false;
+    bool            b_applied = false;
+
+    if (p_cmd->payload_len <= sizeof(p_cmd->payload))
+    {
+        b_valid = msg_codec_get_map(p_cmd->payload, p_cmd->payload_len,
+                                    &map);
+    }
+
+    if (b_valid)
+    {
+        letters[MAP_SLOT_LEFT]     = s3_code39_char(map.letter_left);
+        letters[MAP_SLOT_RIGHT]    = s3_code39_char(map.letter_right);
+        letters[MAP_SLOT_STRAIGHT] = s3_code39_char(map.letter_straight);
+        letters[MAP_SLOT_UTURN]    = s3_code39_char(map.letter_uturn);
+        letters[MAP_LETTERS]       = '\0';
+        b_applied = (0 == p_map(letters));
+    }
+
+    if (b_applied)
+    {
+        answer.result = MSG_ACK_ACCEPTED;
+    }
+    else
+    {
+        p_stats->map_reject = s1_telem_sat_add(p_stats->map_reject, 1U);
+    }
+
+    answer.cmd_id = map.cmd_id;
+
+    return (answer);
 }
 
 #endif /* TM_MQTT */

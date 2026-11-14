@@ -60,12 +60,17 @@
  * it is MQTT_LINK_QUEUE_DEPTH times the cost of one:
  *
  *   publish:  32-byte record ->  32 + 4 =   36 bytes;  8 x  36 =  288 bytes
- *   command:   4-byte record ->   4 + 4 =    8 bytes;  8 x   8 =   64 bytes
- *   total static RAM for the two buffers                          352 bytes
+ *   command:   8-byte record ->   8 + 4 =   12 bytes;  8 x  12 =   96 bytes
+ *   total static RAM for the two buffers                          384 bytes
+ *
+ * The command record is a 2-byte length and 5 payload bytes, padded to 8
+ * for the length's alignment.
  *
  * NOTE: The figures above are for a depth of 8, a one-byte topic ID,
- * MQTT_LINK_PAYLOAD_MAX 25 and MQTT_LINK_COMMAND_MAX 2 (both from
- * msg_layout.h). The macros recompute them if those constants change.
+ * MQTT_LINK_PAYLOAD_MAX 25 and MQTT_LINK_COMMAND_MAX 5 (both from
+ * msg_layout.h; the command cap was 2, and the command buffer 64 bytes,
+ * until the MAP message). The macros recompute them if those constants
+ * change.
  */
 #define PUBLISH_BUF_BYTES       (MQTT_LINK_QUEUE_DEPTH * PUBLISH_COST_BYTES)
 #define COMMAND_BUF_BYTES       (MQTT_LINK_QUEUE_DEPTH * COMMAND_COST_BYTES)

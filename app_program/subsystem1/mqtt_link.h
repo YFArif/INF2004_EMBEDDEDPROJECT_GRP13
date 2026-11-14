@@ -119,12 +119,13 @@
  */
 #define MQTT_LINK_PAYLOAD_MAX       MSG_MAX_BYTES
 
-/* Largest command payload delivered to an application, in bytes: one
- * packed COMMAND message (msg_layout.h). A longer incoming command is
- * dropped and counted in command_dropped; mqtt_link.c checks this value
- * against MSG_CMD_BYTES at compile time.
+/* Largest command payload delivered to an application, in bytes: the
+ * largest message the robot receives, MSG_IN_MAX_BYTES (msg_layout.h): a
+ * MAP is 5 bytes, a COMMAND 2. A longer incoming payload is dropped and
+ * counted in command_dropped; mqtt_link.c checks at compile time that this
+ * value is the larger of MSG_CMD_BYTES and MSG_MAP_BYTES.
  */
-#define MQTT_LINK_COMMAND_MAX       MSG_CMD_BYTES
+#define MQTT_LINK_COMMAND_MAX       MSG_IN_MAX_BYTES
 
 /* Number of messages the publish queue holds. When the queue is full a new
  * message is not queued: mqtt_link_publish() returns

@@ -28,8 +28,9 @@
  * the reconnect delay sequence and its cap) and start_connect()
  * (test_connect_info(), the keep-alive placed in the CONNECT info). The
  * incoming-message callbacks incoming_publish_cb() and incoming_data_cb()
- * are also called directly (test_incoming_commands(), the 2-byte command
- * limit, whole and in fragments, and the topic length limit), and so are
+ * are also called directly (test_incoming_commands(), the 5-byte limit on
+ * a received message, whole and in fragments, and the topic length
+ * limit), and so are
  * take_pending() and submit_pending() (test_topic_mapping(), the full
  * topic of each ID and a queued record with an ID out of range). The rest
  * of the state machine is not
@@ -124,11 +125,12 @@ typedef uint8_t host_test_check_connect_timeout_t[
     (CONNECT_TIMEOUT_MSEC == 5000U) ? 1 : -1];
 
 /* Pins the caps that now come from msg_layout.h: the largest message is the
- * 25-byte telemetry frame, and a command is 2 bytes. A layout change that
+ * 25-byte telemetry frame, and the largest received message is the 5-byte
+ * MAP (2 bytes, one COMMAND, before the MAP existed). A layout change that
  * moves either cap stops the build here until these tests are updated.
  */
 typedef uint8_t host_test_check_caps_t[((MQTT_LINK_PAYLOAD_MAX == 25U)
-    && (MQTT_LINK_COMMAND_MAX == 2U)) ? 1 : -1];
+    && (MQTT_LINK_COMMAND_MAX == 5U)) ? 1 : -1];
 
 /* Stub state. The tests set the results and read what the stubs recorded. */
 static bool                 gb_stub_ready = false;
@@ -628,56 +630,62 @@ test_receive_command (void)
     check(MQTT_LINK_WAIT_FOREVER == g_stub_command_timeout, __LINE__);
 }
 
-/* Incoming commands against the 2-byte limit (MQTT_LINK_COMMAND_MAX),
- * whole and in fragments, and against the topic length limit
- * (MQTT_LINK_TOPIC_MAX), through the callbacks lwIP would call.
+/* Incoming messages against the 5-byte limit (MQTT_LINK_COMMAND_MAX, the
+ * MAP; 2 bytes before the MAP existed), whole and in fragments, and
+ * against the topic length limit (MQTT_LINK_TOPIC_MAX), through the
+ * callbacks lwIP would call.
  */
 static void
 test_incoming_commands (void)
 {
     static const u8_t  cmd2[2] = { 0x14U, 0x85U };
-    static const u8_t  cmd3[3] = { 0x14U, 0x85U, 0x00U };
+    static const u8_t  map5[5] = { 0x17U, 0x24U, 0xD3U, 0x0BU, 0x28U };
+    static const u8_t  map6[6] = { 0x17U, 0x24U, 0xD3U, 0x0BU, 0x28U,
+                                   0x00U };
     const char * const p_topic = MQTT_LINK_CFG_TOPIC_PREFIX "/cmd/stop";
     uint32_t           dropped;
     int32_t            calls;
+    uint32_t           idx;
 
-    say("-- incoming commands: 2-byte limit, whole and in fragments,"
+    say("-- incoming commands: 5-byte limit, whole and in fragments,"
         " topic length\n");
 
-    /* 2 bytes in one piece: queued intact, nothing dropped. */
+    /* 5 bytes in one piece: queued intact, nothing dropped. */
     calls = g_stub_cmd_calls;
     dropped = g_status.command_dropped;
-    incoming_publish_cb(NULL, p_topic, 2U);
-    incoming_data_cb(NULL, cmd2, 2U, MQTT_DATA_FLAG_LAST);
+    incoming_publish_cb(NULL, p_topic, 5U);
+    incoming_data_cb(NULL, map5, 5U, MQTT_DATA_FLAG_LAST);
     check((calls + 1) == g_stub_cmd_calls, __LINE__);
-    check((2U == g_stub_cmd_last.payload_len)
-          && (0 == memcmp(g_stub_cmd_last.payload, cmd2, 2U)), __LINE__);
+    check((5U == g_stub_cmd_last.payload_len)
+          && (0 == memcmp(g_stub_cmd_last.payload, map5, 5U)), __LINE__);
     check(dropped == g_status.command_dropped, __LINE__);
 
-    /* The same 2 bytes as two 1-byte fragments: queued intact. */
+    /* The same 5 bytes as fragments of 2 and 3 bytes: queued intact. */
     calls = g_stub_cmd_calls;
     (void)memset(&g_stub_cmd_last, 0, sizeof(g_stub_cmd_last));
-    incoming_publish_cb(NULL, p_topic, 2U);
-    incoming_data_cb(NULL, &cmd2[0], 1U, 0U);
-    incoming_data_cb(NULL, &cmd2[1], 1U, MQTT_DATA_FLAG_LAST);
+    incoming_publish_cb(NULL, p_topic, 5U);
+    incoming_data_cb(NULL, &map5[0], 2U, 0U);
+    incoming_data_cb(NULL, &map5[2], 3U, MQTT_DATA_FLAG_LAST);
     check((calls + 1) == g_stub_cmd_calls, __LINE__);
-    check((2U == g_stub_cmd_last.payload_len)
-          && (0 == memcmp(g_stub_cmd_last.payload, cmd2, 2U)), __LINE__);
+    check((5U == g_stub_cmd_last.payload_len)
+          && (0 == memcmp(g_stub_cmd_last.payload, map5, 5U)), __LINE__);
     check(dropped == g_status.command_dropped, __LINE__);
 
-    /* 3 bytes in one piece: dropped before the queue, counted once. */
+    /* 6 bytes in one piece: dropped before the queue, counted once. */
     calls = g_stub_cmd_calls;
-    incoming_publish_cb(NULL, p_topic, 3U);
-    incoming_data_cb(NULL, cmd3, 3U, MQTT_DATA_FLAG_LAST);
+    incoming_publish_cb(NULL, p_topic, 6U);
+    incoming_data_cb(NULL, map6, 6U, MQTT_DATA_FLAG_LAST);
     check(calls == g_stub_cmd_calls, __LINE__);
     check((dropped + 1U) == g_status.command_dropped, __LINE__);
 
-    /* The same 3 bytes as three 1-byte fragments: counted exactly once. */
+    /* The same 6 bytes as six 1-byte fragments: counted exactly once. */
     dropped = g_status.command_dropped;
-    incoming_publish_cb(NULL, p_topic, 3U);
-    incoming_data_cb(NULL, &cmd3[0], 1U, 0U);
-    incoming_data_cb(NULL, &cmd3[1], 1U, 0U);
-    incoming_data_cb(NULL, &cmd3[2], 1U, MQTT_DATA_FLAG_LAST);
+    incoming_publish_cb(NULL, p_topic, 6U);
+    for (idx = 0U; idx < 5U; idx++)
+    {
+        incoming_data_cb(NULL, &map6[idx], 1U, 0U);
+    }
+    incoming_data_cb(NULL, &map6[5], 1U, MQTT_DATA_FLAG_LAST);
     check(calls == g_stub_cmd_calls, __LINE__);
     check((dropped + 1U) == g_status.command_dropped, __LINE__);
 
