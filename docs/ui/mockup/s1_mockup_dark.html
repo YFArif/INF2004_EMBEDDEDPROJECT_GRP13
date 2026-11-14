@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>S1 dashboard, dark</title>
+
+</head>
+<body>
+<div>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+body{margin:0}
+.dash{font-family:Inter,-apple-system,"SF Pro Text","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.dash *{box-sizing:border-box}
+.dash button,.dash input{font-family:inherit}
+.dash button{cursor:pointer}
+.dash button:focus-visible,.dash input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.card{background:var(--glass);-webkit-backdrop-filter:blur(26px) saturate(1.5);backdrop-filter:blur(26px) saturate(1.5);border:1px solid var(--stroke);border-radius:24px;box-shadow:var(--shadow);padding:20px}
+.h2{margin:0;font-size:15px;font-weight:600;color:var(--ink2);letter-spacing:.01em}
+.lab{font-size:13px;font-weight:500;color:var(--ink3)}
+.val{font-size:32px;font-weight:600;line-height:1.1;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.valt{font-size:24px;font-weight:600;line-height:1.2;letter-spacing:-.005em}
+.unit{font-size:15px;font-weight:500;color:var(--ink3);margin-left:4px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:14px;font-weight:600;white-space:nowrap}
+.seg{appearance:none;border:0;background:transparent;color:var(--ink2);font-size:14px;font-weight:600;min-height:44px;padding:0 18px;border-radius:999px}
+.seg[aria-pressed="true"]{background:var(--seg-on);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.35)}
+</style>
+</helmet>
+<div class="dash" style="--ink:#f5f5f7;--ink2:#d0d0d8;--ink3:#a3a3b0;--glass:rgba(36,36,48,0.62);--solid:#1b1b24;--seg-on:#4a4a58;--solid-btn:rgba(255,255,255,0.08);--stroke:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.12);--shadow:0 1px 2px rgba(0,0,0,0.4),0 16px 40px rgba(0,0,0,0.35);--ok:#6fd98c;--ok-soft:rgba(111,217,140,0.14);--warn:#ffb85c;--warn-soft:rgba(255,184,92,0.16);--floor-near:#23232f;--floor-far:#14141b;--grid:#5d5d7a;--line:#050507;--sshadow:#000000;--chip:rgba(40,40,52,0.92);min-height:100vh;color:var(--ink);background:radial-gradient(1100px 700px at 8% -5%,#2a2350 0%,rgba(42,35,80,0) 60%),radial-gradient(900px 700px at 100% 10%,#13304f 0%,rgba(19,48,79,0) 60%),radial-gradient(1000px 800px at 55% 110%,#3a2230 0%,rgba(58,34,48,0) 60%),#0c0c11">
+<div style="display: contents; --accent: #6aa3ff">
+<div style="min-height: 100vh; padding: 20px 32px 24px; display: flex; flex-direction: column; gap: 20px">
+
+<header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px">
+<div style="display: flex; align-items: center; gap: 14px">
+<div style="width: 44px; height: 44px; border-radius: 13px; background: var(--accent); color: #0b0b10; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700">13</div>
+<div style="display: flex; flex-direction: column; gap: 2px">
+<div style="font-size: 20px; font-weight: 600; letter-spacing: -.01em">Group 13 car</div>
+<div class="lab">INF2004 Embedded Systems, SE13</div>
+</div>
+</div>
+
+<div class="card" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 12px 22px; border-radius: 999px; font-size: 15px; font-weight: 500">
+<span style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ok)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9a15 15 0 0 1 20 0"></path><path d="M5.5 12.5a10 10 0 0 1 13 0"></path><path d="M9 16a5 5 0 0 1 6 0"></path><circle cx="12" cy="19.5" r="1"></circle></svg>
+Online
+</span>
+<span style="color: var(--ink2)">Telemetry 2 Hz</span>
+<span style="color: var(--ink2)">Live 5 Hz</span>
+<span style="color: var(--ink2)">Last frame 0.2 s ago</span>
+</div>
+
+<div style="display: flex; align-items: center; gap: 12px">
+<span class="chip" style="border: 1px dashed var(--ink3); color: var(--ink3); font-weight: 500; font-size: 13px">Sample data</span>
+<button type="button" class="card" style="display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 18px; border-radius: 999px; font-size: 15px; font-weight: 600; color: var(--ink)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7l5 5-5 5"></path><path d="M13 17h6"></path></svg>
+Developer
+</button>
+<button type="button" aria-label="Switch to light mode" class="card" style="width: 44px; height: 44px; padding: 0; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink)">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 3v2"></path><path d="M12 19v2"></path><path d="M3 12h2"></path><path d="M19 12h2"></path><path d="M5.6 5.6l1.4 1.4"></path><path d="M17 17l1.4 1.4"></path><path d="M18.4 5.6L17 7"></path><path d="M7 17l-1.4 1.4"></path></svg>
+</button>
+</div>
+</header>
+
+<main style="flex: 1; display: flex; flex-wrap: wrap; gap: 20px; align-items: stretch">
+
+<div style="flex: 1 1 392px; max-width: 392px; display: flex; flex-direction: column; gap: 20px">
+
+<section class="card" aria-labelledby="h-control" style="display: flex; flex-direction: column; gap: 14px">
+<h2 class="h2" id="h-control">Control</h2>
+<button type="button" style="appearance: none; border: 0; width: 100%; min-height: 150px; border-radius: 20px; background: #d70015; color: #ffffff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 10px 24px rgba(215,0,21,.35), inset 0 1px 0 rgba(255,255,255,.25)">
+<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 3h7L21 8.5v7L15.5 21h-7L3 15.5v-7z"></path><rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor"></rect></svg>
+<span style="font-size: 46px; font-weight: 700; letter-spacing: .04em; line-height: 1">STOP</span>
+<span style="font-size: 14px; font-weight: 500">Always enabled</span>
+</button>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<button type="button" style="appearance: none; min-height: 72px; border-radius: 18px; background: var(--solid-btn); border: 1px solid var(--hair); color: var(--ink); font-size: 18px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true" style="color: var(--accent)"><path d="M7 5l12 7-12 7z"></path></svg>
+START
+</button>
+<button type="button" style="appearance: none; min-height: 72px; border-radius: 18px; background: var(--solid-btn); border: 1px solid var(--hair); color: var(--ink); font-size: 18px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--accent)"><path d="M4 12a8 8 0 1 0 2.5-5.8"></path><path d="M4 4v4h4"></path></svg>
+RESET
+</button>
+</div>
+</section>
+
+<section class="card" aria-labelledby="h-cmds" style="display: flex; flex-direction: column; gap: 6px">
+<h2 class="h2" id="h-cmds" style="margin-bottom: 8px">Last commands</h2>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--hair)">
+<div><div style="font-size: 16px; font-weight: 600">STOP</div><div class="lab">14:32:07</div></div>
+<span class="chip" style="background: var(--ok-soft); color: var(--ok)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Acked 118 ms</span>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--hair)">
+<div><div style="font-size: 16px; font-weight: 600">START</div><div class="lab">14:31:20</div></div>
+<span class="chip" style="background: var(--ok-soft); color: var(--ok)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Acked 142 ms</span>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0 0; border-top: 1px solid var(--hair)">
+<div><div style="font-size: 16px; font-weight: 600">MAP DCBA</div><div class="lab">14:30:44</div></div>
+<span class="chip" style="background: var(--ok-soft); color: var(--ok)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Applied</span>
+</div>
+</section>
+
+<section class="card" aria-labelledby="h-map" style="flex: 1; display: flex; flex-direction: column; gap: 14px">
+<h2 class="h2" id="h-map">Barcode letter map</h2>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 6px"><label class="lab" for="m-left">Left</label><input id="m-left" value="D" maxlength="1" style="width: 100%; height: 56px; text-align: center; font-size: 26px; font-weight: 700; border-radius: 14px; border: 1px solid var(--hair); background: var(--solid-btn); color: var(--ink)"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label class="lab" for="m-right">Right</label><input id="m-right" value="C" maxlength="1" style="width: 100%; height: 56px; text-align: center; font-size: 26px; font-weight: 700; border-radius: 14px; border: 1px solid var(--hair); background: var(--solid-btn); color: var(--ink)"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label class="lab" for="m-straight">Straight</label><input id="m-straight" value="B" maxlength="1" style="width: 100%; height: 56px; text-align: center; font-size: 26px; font-weight: 700; border-radius: 14px; border: 1px solid var(--hair); background: var(--solid-btn); color: var(--ink)"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label class="lab" for="m-uturn">U-turn</label><input id="m-uturn" value="A" maxlength="1" style="width: 100%; height: 56px; text-align: center; font-size: 26px; font-weight: 700; border-radius: 14px; border: 1px solid var(--hair); background: var(--solid-btn); color: var(--ink)"></div>
+</div>
+<button type="button" style="appearance: none; border: 0; width: 100%; min-height: 48px; border-radius: 14px; background: var(--accent); color: #0b0b10; font-size: 16px; font-weight: 600">Set map</button>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span class="chip" style="align-self: flex-start; background: var(--ok-soft); color: var(--ok)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Applied by the car</span>
+<div class="lab" style="line-height: 1.45">Kept in memory only. Sent again if the car reconnects.</div>
+</div>
+</section>
+</div>
+
+<div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+
+<section aria-labelledby="h-view" style="flex: 1; min-height: 420px; display: flex; flex-direction: column; overflow: hidden; border-radius: 24px; background: var(--solid); border: 1px solid var(--stroke); box-shadow: var(--shadow)">
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+<h2 class="h2" id="h-view" style="margin-right: 6px">Live view</h2>
+<span class="chip" style="background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent)"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="5" fill="currentColor"></circle></svg>Following line</span>
+<span class="chip" style="background: var(--hair); color: var(--ink2)">Cruising</span>
+<span class="chip" style="background: var(--warn-soft); color: var(--warn)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4"></path><path d="M12 17.5v.01"></path></svg>Obstacle ahead</span>
+</div>
+<div role="group" aria-label="Camera view" style="display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--hair)">
+<button type="button" class="seg" aria-pressed="true">Chase</button>
+<button type="button" class="seg" aria-pressed="false">Top</button>
+<button type="button" class="seg" aria-pressed="false">Side</button>
+</div>
+</div>
+<div style="position: relative; flex: 1; min-height: 360px; background: var(--floor-far)">
+<svg viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Stylised 3D view of the car on a black line, with an obstacle 312 millimetres ahead" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block">
+<defs>
+<linearGradient id="floorg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:var(--floor-near)"></stop><stop offset="1" style="stop-color:var(--floor-far)"></stop></linearGradient>
+<linearGradient id="coneg" gradientUnits="userSpaceOnUse" x1="476" y1="405" x2="540" y2="276"><stop offset="0" style="stop-color:var(--accent)" stop-opacity="0.34"></stop><stop offset="1" style="stop-color:var(--accent)" stop-opacity="0.06"></stop></linearGradient>
+<linearGradient id="fade" x1="0" y1="90" x2="0" y2="330" gradientUnits="userSpaceOnUse"><stop offset="0" style="stop-color:var(--floor-far)"></stop><stop offset="1" style="stop-color:var(--floor-far)" stop-opacity="0"></stop></linearGradient>
+<filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9"></feGaussianBlur></filter>
+</defs>
+<rect x="0" y="95" width="1000" height="505" fill="url(#floorg)"></rect>
+<path d="M-1416 542L329 97M-1345 558L349 97M-1268 575L369 98M-1187 593L389 98M-1101 612L410 99M-1008 632L431 99M-910 654L451 99M-804 678L473 100M-690 703L494 100M-567 730L515 101M-434 760L537 101M-289 792L559 102M-132 826L581 102M40 865L604 103M229 906L626 103M437 952L649 104M667 1004L672 104M924 1060L696 105M1212 1124L719 105M1538 1196L743 106M1908 1279L767 106M2334 1373L792 107M2828 1482L816 107M3408 1611L841 108M4098 1764L866 108M-1447 497L10631 2981M-1198 440L6177 1652M-1001 395L4476 1144M-842 358L3578 876M-711 328L3023 711M-600 302L2646 598M-506 281L2373 517M-425 262L2167 455M-354 246L2005 407M-292 231L1875 368M-237 219L1768 336M-188 207L1678 309M-144 197L1603 287M-104 188L1537 267M-68 180L1480 250M-35 172L1431 235M-5 165L1387 222M23 159L1348 211M48 153L1313 200M72 148L1281 191M94 143L1252 182M114 138L1226 174M133 134L1202 167M151 129L1181 161M167 126L1160 155M183 122L1142 149M197 119L1125 144" fill="none" style="stroke:var(--grid)" stroke-opacity="0.45" stroke-width="1"></path>
+<polygon points="198,899 260,913 630,103 623,103" style="fill:var(--line)"></polygon>
+<polygon points="371,607 381,609 393,585 383,583" style="fill:var(--accent)"></polygon>
+<rect x="0" y="0" width="1000" height="600" fill="url(#fade)"></rect>
+<polygon points="477,405 445,247 464,247 482,247 500,247 518,247 536,248 554,248 572,250 590,251 609,253 627,255 645,257 664,259" fill="url(#coneg)"></polygon>
+<polyline points="445,247 464,247 482,247 500,247 518,247 536,248 554,248 572,250 590,251 609,253 627,255 645,257 664,259" fill="none" style="stroke:var(--accent)" stroke-opacity="0.55" stroke-width="2" stroke-dasharray="5 6"></polyline>
+<polygon points="287,540 524,571 563,424 384,407" style="fill:var(--sshadow)" fill-opacity="0.32" filter="url(#blur)"></polygon>
+<polygon points="508,219 575,223 579,214 515,211" fill="#f6a53b"></polygon>
+<polygon points="573,279 577,268 579,214 575,223" fill="#966523"></polygon>
+<polygon points="508,275 573,279 575,223 508,219" fill="#c0812e"></polygon>
+<line x1="477" y1="405" x2="540" y2="276" style="stroke:var(--accent)" stroke-width="2"></line>
+<polygon points="290,440 292,422 296,405 302,391 309,381 316,376 347,379 353,380 358,386 362,395 364,408 364,423 362,439 359,454 354,468 348,478 342,485 336,487 305,483 298,479 294,470 291,456" fill="#202025"></polygon>
+<polygon points="323,460 326,474 330,483 336,487 342,485 349,478 354,468 359,454 362,439 364,423 364,408 362,395 358,385 353,380 347,379 341,384 334,394 329,408 325,425 323,443" fill="#2b2b32"></polygon>
+<polygon points="332,449 333,457 336,463 339,466 343,465 347,461 351,455 354,446 356,437 357,427 357,417 355,409 353,403 350,400 346,400 342,403 338,409 335,418 333,428 332,439" fill="#f2f2f6"></polygon>
+<polygon points="335,445 336,448 337,448 339,444 339,440 338,437 336,437 335,441" fill="#3a3a44"></polygon>
+<polygon points="340,456 341,459 343,458 344,454 344,450 343,447 342,448 340,451" fill="#3a3a44"></polygon>
+<polygon points="348,446 348,448 350,448 351,444 352,440 351,437 349,438 348,441" fill="#3a3a44"></polygon>
+<polygon points="350,426 351,428 353,428 354,425 354,420 353,417 352,418 350,421" fill="#3a3a44"></polygon>
+<polygon points="345,415 346,418 348,417 349,414 349,409 348,406 347,407 345,410" fill="#3a3a44"></polygon>
+<polygon points="337,424 338,427 340,427 341,423 342,419 341,416 339,416 338,420" fill="#3a3a44"></polygon>
+<polygon points="342,436 343,438 344,439 346,437 347,433 347,429 346,427 345,426 343,428 342,432" fill="#8d8d99"></polygon>
+<polygon points="304,496 491,518 538,388 395,376" fill="#407dea"></polygon>
+<polygon points="491,529 537,398 538,388 491,518" fill="#274c8e"></polygon>
+<polygon points="305,507 491,529 491,518 304,496" fill="#3261b6"></polygon>
+<polygon points="422,398 516,406 518,401 425,393" fill="#407dea"></polygon>
+<polygon points="516,415 518,410 518,401 516,406" fill="#274c8e"></polygon>
+<polygon points="422,406 516,415 516,406 422,398" fill="#3261b6"></polygon>
+<polygon points="438,395 460,397 464,389 443,387" fill="#2c2c33"></polygon>
+<polygon points="460,411 465,402 464,389 460,397" fill="#1b1b1f"></polygon>
+<polygon points="438,409 460,411 460,397 438,395" fill="#222228"></polygon>
+<polygon points="482,399 504,401 508,392 486,390" fill="#2c2c33"></polygon>
+<polygon points="504,415 508,406 508,392 504,401" fill="#1b1b1f"></polygon>
+<polygon points="482,413 504,415 504,401 482,399" fill="#222228"></polygon>
+<polygon points="444,347 485,350 491,338 452,335" fill="#3b70d3"></polygon>
+<polygon points="485,384 492,371 491,338 485,350" fill="#234480"></polygon>
+<polygon points="445,380 485,384 485,350 444,347" fill="#2e58a5"></polygon>
+<polygon points="437,319 505,323 507,320 439,315" fill="#2a5091"></polygon>
+<polygon points="505,353 507,350 507,320 505,323" fill="#1a3058"></polygon>
+<polygon points="438,348 505,353 505,323 437,319" fill="#213e71"></polygon>
+<polygon points="443,330 443,326 445,322 450,316 452,314 456,312 460,312 464,313 468,315 470,318 472,322 473,325 472,329 471,332 467,339 464,341 460,343 456,343 452,342 448,340 446,337 444,334" fill="#afb3bb"></polygon>
+<polygon points="469,332 469,335 467,339 464,341 460,343 456,343 452,342 448,340 446,337 444,334 443,330 443,326 445,322 448,320 452,318 456,318 460,319 464,321 467,324 468,328" fill="#eef2fe"></polygon>
+<polygon points="476,332 477,328 479,325 482,319 485,316 489,315 493,314 497,315 501,317 504,320 506,324 506,328 506,332 502,338 500,341 497,344 494,345 490,346 486,345 482,343 479,340 477,336" fill="#afb3bb"></polygon>
+<polygon points="503,334 502,338 500,341 497,344 494,345 490,346 485,345 482,343 479,340 477,336 476,332 477,328 479,325 482,322 485,321 489,320 494,321 497,323 500,326 502,330" fill="#eef2fe"></polygon>
+<polygon points="293,414 360,421 365,415 298,408" fill="#e2eaf6" fill-opacity="0.55" stroke="#9fb2d6" stroke-width="1" stroke-opacity="0.7"></polygon>
+<polygon points="361,428 365,422 365,415 360,421" fill="#8a8e96" fill-opacity="0.55" stroke="#9fb2d6" stroke-width="1" stroke-opacity="0.7"></polygon>
+<polygon points="293,422 361,428 360,421 293,414" fill="#b1b6c0" fill-opacity="0.55" stroke="#9fb2d6" stroke-width="1" stroke-opacity="0.7"></polygon>
+<polygon points="290,421 312,423 322,412 301,410" fill="#2c2c33"></polygon>
+<polygon points="313,439 323,427 322,412 312,423" fill="#1b1b1f"></polygon>
+<polygon points="292,437 313,439 312,423 290,421" fill="#222228"></polygon>
+<polygon points="351,439 461,450 485,400 386,391" fill="#25252b"></polygon>
+<polygon points="462,491 485,438 485,400 461,450" fill="#16161a"></polygon>
+<polygon points="354,479 462,491 461,450 351,439" fill="#1d1d22"></polygon>
+<polygon points="322,407 323,406 324,405 326,404 328,403 331,403 333,403 335,404 337,404 338,405 338,406 344,477 344,478 342,479 340,480 338,481 336,481 334,481 332,481 330,480 329,479 329,478 322,408" fill="#232328"></polygon>
+<polygon points="333,403 331,403 328,403 326,404 324,405 323,406 322,407 323,408 323,409 325,410 327,410 330,410 332,410 334,409 336,408 337,407 338,406 338,405 337,404 335,403" fill="#303037"></polygon>
+<polygon points="384,337 384,336 385,336 387,335 388,335 390,334 392,334 394,335 396,335 396,336 397,336 400,397 400,398 399,399 397,400 396,400 394,400 392,400 390,400 389,400 388,399 388,398" fill="#232328"></polygon>
+<polygon points="392,334 390,334 388,335 387,335 385,336 384,336 384,337 384,338 385,338 387,339 388,339 390,339 392,339 394,338 395,338 396,337 397,336 396,336 396,335 394,335" fill="#303037"></polygon>
+<polygon points="472,421 472,420 473,419 474,418 477,417 479,417 482,417 484,418 486,418 487,419 488,420 488,493 488,494 487,496 486,497 484,497 481,498 479,498 477,497 475,496 474,495 473,494" fill="#232328"></polygon>
+<polygon points="481,417 479,417 477,417 475,418 473,419 472,420 472,421 472,422 474,423 476,424 478,425 481,425 483,424 485,424 487,423 488,422 488,420 487,419 486,418 484,418" fill="#303037"></polygon>
+<polygon points="508,408 508,347 508,346 509,345 510,344 512,344 514,344 516,344 518,344 519,345 520,345 521,346 521,347 520,409 520,410 519,411 517,411 515,412 513,412 511,411 510,411 508,410 508,409" fill="#232328"></polygon>
+<polygon points="516,344 514,344 512,344 510,345 509,345 508,346 508,347 509,347 510,348 512,349 513,349 516,349 518,349 519,348 520,348 521,347 521,346 521,345 519,345 518,344" fill="#303037"></polygon>
+<polygon points="310,403 493,421 530,337 382,325" fill="#7c50d3"></polygon>
+<polygon points="493,428 530,342 530,337 493,421" fill="#4b3080"></polygon>
+<polygon points="311,410 493,428 493,421 310,403" fill="#603ea5"></polygon>
+<polygon points="403,374 439,377 461,341 429,339" fill="#1f705c"></polygon>
+<polygon points="439,382 461,346 461,341 439,377" fill="#134438"></polygon>
+<polygon points="404,379 439,382 439,377 403,374" fill="#185848"></polygon>
+<polygon points="338,353 468,364 472,358 344,347" fill="#eaf0fb" fill-opacity="0.5" stroke="#9fb2d6" stroke-width="1" stroke-opacity="0.7"></polygon>
+<polygon points="469,411 473,404 472,358 468,364" fill="#8e9299" fill-opacity="0.5" stroke="#9fb2d6" stroke-width="1" stroke-opacity="0.7"></polygon>
+<polygon points="342,399 469,411 468,364 338,353" fill="#b6bbc4" fill-opacity="0.5" stroke="#9fb2d6" stroke-width="1" stroke-opacity="0.7"></polygon>
+<polygon points="376,348 429,353 433,348 380,344" fill="#2fa091"></polygon>
+<polygon points="430,360 433,355 433,348 429,353" fill="#1d6158"></polygon>
+<polygon points="376,355 430,360 429,353 376,348" fill="#257d71"></polygon>
+<polygon points="517,481 518,463 519,445 522,427 525,412 528,401 531,396 565,399 567,399 568,404 568,414 568,428 567,443 566,460 564,476 562,491 560,502 558,510 556,512 521,508 519,504 518,495" fill="#202025"></polygon>
+<polygon points="554,485 554,499 554,508 556,512 558,510 560,502 562,491 564,476 566,460 567,443 568,428 568,414 568,404 567,399 565,399 563,404 561,415 558,430 556,448 555,467" fill="#2b2b32"></polygon>
+<polygon points="557,473 557,482 557,487 558,490 559,489 560,484 562,477 563,468 564,458 565,447 566,437 566,429 565,423 565,420 564,420 562,424 561,430 559,440 558,451 557,462" fill="#f2f2f6"></polygon>
+<polygon points="558,469 558,472 558,471 559,467 559,462 559,459 559,460 558,464" fill="#3a3a44"></polygon>
+<polygon points="559,479 559,482 559,481 560,478 560,473 560,470 560,471 559,475" fill="#3a3a44"></polygon>
+<polygon points="561,468 561,471 562,470 562,466 563,462 563,459 562,460 562,463" fill="#3a3a44"></polygon>
+<polygon points="563,447 563,450 564,449 564,445 565,441 565,438 564,439 564,442" fill="#3a3a44"></polygon>
+<polygon points="562,436 562,439 563,438 564,435 564,430 564,427 563,428 563,431" fill="#3a3a44"></polygon>
+<polygon points="560,447 560,450 560,449 561,445 561,440 561,437 561,438 560,442" fill="#3a3a44"></polygon>
+<polygon points="560,458 560,461 561,461 561,459 562,455 562,451 562,448 562,448 561,450 561,454" fill="#8d8d99"></polygon>
+<rect x="452" y="158" width="190" height="40" rx="20" style="fill:var(--chip)"></rect>
+<text x="547" y="184" text-anchor="middle" font-size="20" font-weight="600" font-family="Inter, system-ui, sans-serif" style="fill:var(--ink)">Obstacle 312 mm</text>
+</svg>
+<div class="lab" style="position: absolute; left: 20px; bottom: 16px; padding: 7px 14px; border-radius: 999px; background: var(--chip); color: var(--ink2)">Position is estimated from heading and wheel counts</div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="h-ev" style="display: flex; flex-direction: column; gap: 4px; padding: 16px 20px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px">
+<h2 class="h2" id="h-ev">Latest events</h2>
+<button type="button" style="appearance: none; border: 0; background: transparent; color: var(--accent); font-size: 14px; font-weight: 600; min-height: 32px; padding: 0">Open event log</button>
+</div>
+<div style="display: flex; gap: 16px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--hair)"><span class="lab" style="width: 64px; font-variant-numeric: tabular-nums">14:32:07</span><span style="font-size: 15px">Barcode D read. Turning left.</span></div>
+<div style="display: flex; gap: 16px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--hair)"><span class="lab" style="width: 64px; font-variant-numeric: tabular-nums">14:31:52</span><span style="font-size: 15px">Obstacle ahead at 312 mm.</span></div>
+<div style="display: flex; gap: 16px; align-items: baseline; padding: 8px 0 0; border-top: 1px solid var(--hair)"><span class="lab" style="width: 64px; font-variant-numeric: tabular-nums">14:31:40</span><span style="font-size: 15px">Hump crossed, peak 18 mm.</span></div>
+</section>
+</div>
+
+<div style="flex: 1 1 436px; max-width: 436px; display: flex; flex-direction: column; gap: 20px">
+
+<section class="card" aria-labelledby="h-motion" style="flex: 1; display: flex; flex-direction: column; gap: 16px">
+<h2 class="h2" id="h-motion">Motion</h2>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px">
+<div><div class="lab">Left wheel</div><div><span class="val">220</span><span class="unit">mm/s</span></div></div>
+<div><div class="lab">Right wheel</div><div><span class="val">224</span><span class="unit">mm/s</span></div></div>
+<div><div class="lab">Heading</div><div><span class="val">86.5</span><span class="unit">deg</span></div></div>
+<div><div class="lab">Distance</div><div><span class="val">1.84</span><span class="unit">m</span></div></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="h-att" style="flex: 1; display: flex; flex-direction: column; gap: 16px">
+<h2 class="h2" id="h-att">Attitude</h2>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px">
+<div><div class="lab">Pitch</div><div><span class="val">+1.5</span><span class="unit">deg</span></div></div>
+<div><div class="lab">Roll</div><div><span class="val">-0.5</span><span class="unit">deg</span></div></div>
+<div><div class="lab">Hump</div><div class="valt">None</div></div>
+<div><div class="lab">IMU</div><div class="valt">Calibrated</div></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="h-line" style="flex: 1; display: flex; flex-direction: column; gap: 16px">
+<h2 class="h2" id="h-line">Line and barcode</h2>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px">
+<div><div class="lab">Line</div><div class="valt">Centred</div></div>
+<div><div class="lab">Steering</div><div class="valt">Slight left</div></div>
+<div><div class="lab">Last barcode</div><div class="val">D</div></div>
+<div><div class="lab">Junction turn</div><div class="valt" style="display: flex; align-items: center; gap: 8px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--accent)"><path d="M19 12H5"></path><path d="M11 6l-6 6 6 6"></path></svg>Left</div></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="h-obs" style="flex: 1; display: flex; flex-direction: column; gap: 16px">
+<h2 class="h2" id="h-obs">Obstacle sensor</h2>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px">
+<div><div class="lab">Closest</div><div><span class="val">312</span><span class="unit">mm</span></div></div>
+<div><div class="lab">Width</div><div><span class="val">90</span><span class="unit">mm</span></div></div>
+<div><div class="lab">Clear left</div><div><span class="val">480</span><span class="unit">mm</span></div></div>
+<div><div class="lab">Clear right</div><div><span class="val">520</span><span class="unit">mm</span></div></div>
+</div>
+</section>
+</div>
+
+</main>
+</div>
+</div>
+</div>
+</div>
+
+</body>
+</html>
