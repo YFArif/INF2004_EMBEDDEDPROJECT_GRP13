@@ -141,6 +141,7 @@ DATA_RE = re.compile(r'<script type="application/json" id="s1-data">'
 # Content-Type). A request is looked up here by its exact path and never
 # joined to a folder, so no path can reach a file that is not listed.
 STATIC_FILES = {
+    "/tokens.css": ("tokens.css", "text/css; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     # Inter (SIL OFL 1.1): the fallback where the system font keywords do

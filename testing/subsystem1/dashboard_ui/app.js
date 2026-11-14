@@ -40,6 +40,7 @@ function send(op) {
 }
 
 el("stop").addEventListener("click", () => send("stop"));
+el("stop-mini").addEventListener("click", () => send("stop"));
 el("start").addEventListener("click", () => {
   el("start").disabled = true;
   send("start");
@@ -177,6 +178,7 @@ function upsertRow(c) {
 
 function addLog(kind, d) {
   if (!d || !d.log) { return; }
+  addLatest(d);
   const div = document.createElement("div");
   div.className = "log-" + kind;
   div.textContent = (d.t || "").slice(11) + "  " + d.log;
@@ -186,6 +188,229 @@ function addLog(kind, d) {
   }
 }
 
+// -- Appearance: Auto follows the system; Light and Dark are remembered.
+// Every localStorage access is wrapped: the page works without it.
+const THEME_KEY = "s1-theme";
+
+function readTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    return (saved === "light" || saved === "dark") ? saved : "auto";
+  } catch (e) {
+    return "auto";
+  }
+}
+
+function applyTheme(theme, save) {
+  if (theme === "auto") {
+    document.documentElement.removeAttribute("data-theme");
+  } else {
+    document.documentElement.setAttribute("data-theme", theme);
+  }
+  document.querySelectorAll("[data-theme-set]").forEach((b) => {
+    b.setAttribute("aria-pressed", String(b.dataset.themeSet === theme));
+  });
+  if (save) {
+    try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* none */ }
+  }
+}
+
+document.querySelectorAll("[data-theme-set]").forEach((b) => {
+  b.addEventListener("click", () => applyTheme(b.dataset.themeSet, true));
+});
+applyTheme(readTheme(), false);
+
+// -- Which font is in use. The system font keywords resolve to SF Pro on
+// Apple devices only. A test string is measured in "monospace", then in
+// the keywords with monospace as the fallback: the same width means the
+// keywords did not resolve, so the page falls through to Inter and needs
+// Apple's tracking values (html.font-inter in tokens.css).
+function fontPath() {
+  const probe = document.createElement("span");
+  probe.textContent = "mmmmmmmmmmlliiWW00";
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  probe.style.whiteSpace = "nowrap";
+  probe.style.fontSize = "72px";
+  document.body.appendChild(probe);
+  probe.style.fontFamily = "monospace";
+  const mono = probe.getBoundingClientRect().width;
+  probe.style.fontFamily = "-apple-system, BlinkMacSystemFont, monospace";
+  const keywords = probe.getBoundingClientRect().width;
+  probe.remove();
+  return (Math.abs(keywords - mono) > 0.5) ? "system" : "inter";
+}
+document.documentElement.classList.add("font-" + fontPath());
+
+// -- Developer drawer: closed by default. It is not modal, and the Escape
+// key stays STOP, so it has its own Close button.
+function setDrawer(open, target) {
+  el("dev-drawer").hidden = !open;
+  el("dev-open").setAttribute("aria-expanded", String(open));
+  if (open) {
+    (target || el("dev-close")).focus();
+    if (target) { target.scrollIntoView({block: "start"}); }
+  } else {
+    el("dev-open").focus();
+  }
+}
+el("dev-open").addEventListener("click",
+                                () => setDrawer(el("dev-drawer").hidden));
+el("dev-close").addEventListener("click", () => setDrawer(false));
+el("open-log").addEventListener("click", () => {
+  el("log-panel").tabIndex = -1;
+  setDrawer(true, el("log-panel"));
+});
+
+// -- Latest events: the three newest lines of the event log.
+const LATEST_KEEP = 3;
+const latest = [];
+
+function addLatest(d) {
+  latest.unshift(d);
+  latest.length = Math.min(latest.length, LATEST_KEEP);
+  const box = el("latest");
+  box.textContent = "";
+  latest.forEach((entry) => {
+    const row = document.createElement("div");
+    const when = document.createElement("span");
+    when.className = "when";
+    when.textContent = (entry.t || "").slice(11, 19);
+    row.appendChild(when);
+    row.appendChild(document.createTextNode(entry.log));
+    row.title = entry.log;
+    box.appendChild(row);
+  });
+}
+
+// -- Message rates in the header: messages received in the last 5 s.
+const RATE_WINDOW_S = 5;
+const seen = {tel: [], live: []};
+
+function rateOf(times, now) {
+  while (times.length && (now - times[0]) > RATE_WINDOW_S * 1000) {
+    times.shift();
+  }
+  return (times.length / RATE_WINDOW_S).toFixed(1);
+}
+
+function paintRates(now) {
+  text("rate-tel", "Telemetry " + rateOf(seen.tel, now) + " Hz");
+  text("rate-live", "Live " + rateOf(seen.live, now) + " Hz");
+  const marks = [feedAt.live, feedAt.tel].filter((m) => m !== null);
+  text("last-frame", marks.length ? "Last frame "
+       + ((now - Math.max(...marks)) / 1000).toFixed(1) + " s ago"
+       : "No frame yet");
+}
+
+// -- The summary cards and their derived words. docs/S1_dashboard.md
+// gives each rule; the raw value is in each word's tooltip.
+const STEER_STRAIGHT_MMS = 10;    // 5 % of S3_STEER_MAX_MMS (200 mm/s).
+const STEER_SLIGHT_MMS = 100;     // Half of S3_STEER_MAX_MMS.
+const OBSTACLE_NEAR_MM = 350;     // S5's EV_OBSTACLE_NEAR: under 35 cm.
+const CTRL_WORDS = {
+  INIT: "Starting up", CALIBRATING: "Calibrating", READY: "Ready",
+  LINE_FOLLOWING: "Following line",
+  APPROACH_JUNCTION: "Approaching junction",
+  EXECUTING_COMMAND: "Turning at junction",
+  REACQUIRE_LINE: "Finding the line again",
+  LINE_RECOVERY: "Recovering the line",
+  OBSTACLE_AVOIDANCE: "Avoiding obstacle", FAULT: "Fault",
+  FINISHED: "Finished"
+};
+const MOTION_WORDS = {
+  IDLE: "Stopped", FOLLOWING: "Cruising", MOVING: "Cruising",
+  TURNING: "Turning", ESTOP: "E-stop"
+};
+const LINE_WORDS = {
+  JUNCTION: "At junction", LOST: "Lost", DISABLED: "Off",
+  SEARCH: "Searching", UNCAL: "Not ready"
+};
+const HUMP_WORDS = {flat: "None", climbing: "Climbing",
+                    descending: "Descending"};
+
+function word(id, value, raw, bad) {
+  el(id).textContent = value;
+  el(id).title = raw;
+  el(id).classList.toggle("bad", Boolean(bad));
+}
+
+function signed(v, digits) {
+  if (typeof v !== "number") { return "-"; }
+  return (v > 0 ? "+" : "") + v.toFixed(digits);
+}
+
+function steerWord(dv) {
+  const size = Math.abs(dv);
+  if (size <= STEER_STRAIGHT_MMS) { return "Straight"; }
+  return (size <= STEER_SLIGHT_MMS ? "Slight " : "Hard ")
+    + (dv > 0 ? "right" : "left");
+}
+
+// A number with its unit, or "-" with the unit hidden.
+function measure(id, value) {
+  text(id, value || "-");
+  el(id).nextElementSibling.hidden = !value;
+}
+
+function capital(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function cardsTelemetry(t) {
+  text("m-left", num(t.speed_l_mms));
+  text("m-right", num(t.speed_r_mms));
+  text("m-dist", num(t.dist_mm / 1000, "", 2));
+  el("m-dist").title = "dist_mm " + t.dist_mm;
+  text("a-pitch", signed(t.pitch_deg, 1));
+  text("a-roll", signed(t.roll_deg, 1));
+  word("a-hump", HUMP_WORDS[t.hump_name] || capital(String(t.hump_name)),
+       "hump_state " + t.hump_name + ", hump_count " + t.hump_count
+       + ", peak_mm " + t.peak_mm, false);
+  word("a-imu", !t.b_imu_ok ? "Fault"
+       : (t.b_cal_done ? "Calibrated" : "Not calibrated"),
+       "imu_ok " + (t.b_imu_ok ? 1 : 0) + ", cal_done "
+       + (t.b_cal_done ? 1 : 0), !t.b_imu_ok);
+  const ctrl = CTRL_WORDS[t.ctrl_name] || String(t.ctrl_name);
+  text("chip-ctrl-text", ctrl);
+  el("chip-ctrl").title = "ctrl_state " + t.ctrl_name;
+  text("stage-state", ctrl);
+  const near = t.closest_mm > 0 && t.closest_mm <= OBSTACLE_NEAR_MM;
+  el("chip-obstacle").hidden = !near;
+  text("chip-obstacle-text", "Obstacle ahead, " + t.closest_mm + " mm");
+  el("chip-faults").hidden = t.faults.length === 0;
+  text("chip-faults", "Fault: " + t.faults.join(", "));
+  text("o-closest", t.closest_mm ? num(t.closest_mm) : "No echo");
+  el("o-closest-unit").hidden = !t.closest_mm;
+  el("o-closest").title = "closest_mm " + t.closest_mm + ", angle_idx "
+    + t.angle_idx + " (" + (t.angle_idx * 7.5).toFixed(1) + " deg servo)";
+  const scanned = t.width_mm || t.clear_l_mm || t.clear_r_mm;
+  measure("o-width", t.width_mm ? num(t.width_mm) : "");
+  measure("o-left", scanned ? num(t.clear_l_mm) : "");
+  measure("o-right", scanned ? num(t.clear_r_mm) : "");
+}
+
+function cardsLive(l) {
+  text("m-head", num(l.heading_deg, "", 1));
+  el("m-head").title = "Positive is left of the heading at power-up";
+  word("chip-motion", MOTION_WORDS[l.motion_name] || String(l.motion_name),
+       "motion_state " + l.motion_name + ", cmd_speed_mms "
+       + l.cmd_speed_mms, false);
+  el("chip-estop").hidden = !l.b_estop;
+  const follow = l.line_name === "FOLLOW";
+  word("l-line", follow
+       ? (Math.abs(l.steer_dv_mms) <= STEER_STRAIGHT_MMS ? "Centred"
+          : "Correcting")
+       : (LINE_WORDS[l.line_name] || String(l.line_name)),
+       "line_state " + l.line_name + ", centre " + l.centre_ir
+       + ", outer " + l.outer_ir, l.line_name === "LOST");
+  word("l-steer", steerWord(l.steer_dv_mms),
+       "steer_dv " + l.steer_dv_mms + " mm/s (positive is right)", false);
+  word("l-bc", l.bc_char || "None", l.bc_char
+       ? "bc_cmd " + l.bc_cmd_name + ", read "
+         + (l.b_bc_rev ? "backwards" : "forwards") : "bc_letter 63", false);
+  word("l-junc", l.junctions ? capital(l.junc_name) : "None yet",
+       "junc_turn " + l.junc_name + ", junctions " + l.junctions, false);
+}
+
 const STALE_S = 2;
 const IMPACT_HOLD_S = 3;
 const IMU_KEEP = 120;
@@ -193,7 +418,12 @@ const feedAt = {live: null, tel: null};
 const PANELS = [["p-s2", ["live", "tel"], "age-s2"],
                 ["p-s3", ["live"], "age-s3"],
                 ["p-s4", ["tel"], "age-s4"],
-                ["p-s5", ["tel"], "age-s5"]];
+                ["p-s5", ["tel"], "age-s5"],
+                ["c-view", ["live", "tel"], "age-view"],
+                ["c-motion", ["live", "tel"], "age-motion"],
+                ["c-att", ["tel"], "age-att"],
+                ["c-line", ["live"], "age-line"],
+                ["c-obs", ["tel"], "age-obs"]];
 let impactAt = null;
 let imu = [];
 let liveSeen = false;
@@ -231,6 +461,8 @@ function paintAges() {
   const hot = impactAt !== null && (now - impactAt) / 1000 < IMPACT_HOLD_S;
   el("s4-impact").className = hot ? "impact hot" : "impact";
   text("s4-impact", hot ? "LIFTED / OVERTURNED" : "OK");
+  el("view-impact").hidden = !hot;
+  paintRates(now);
 }
 setInterval(paintAges, 200);
 
@@ -281,6 +513,7 @@ function setTelemetry(t, ageMs) {
   text("s5-width", t.width_mm ? num(t.width_mm, "mm") : "-");
   text("s5-clear", (t.width_mm || t.clear_l_mm || t.clear_r_mm)
        ? num(t.clear_l_mm) + " / " + num(t.clear_r_mm) + " mm" : "-");
+  cardsTelemetry(t);
 }
 
 function setLive(l, ageMs) {
@@ -307,6 +540,7 @@ function setLive(l, ageMs) {
   text("s3-junc", l.junctions ? "turn " + l.junc_name : "none yet");
   text("s3-counts", "barcodes " + l.barcodes + ", rejected " + l.rejects
        + " (wraps at 16), junctions " + l.junctions + ", lost " + l.losts);
+  cardsLive(l);
 }
 
 function addTimeline(entry) {
@@ -374,6 +608,7 @@ function applySnapshot(s) {
   rows.clear();
   s.commands.forEach(upsertRow);
   el("log").textContent = "";
+  latest.length = 0;
   s.log.forEach((e) => addLog(e.kind, {t: e.t, log: e.text}));
   el("sim-panel").hidden = !sim;
   el("car-state").textContent = s.car_state || "-";
@@ -419,6 +654,7 @@ on("cmd_failed", (d) => { upsertRow(d); addLog("cmd_failed", d); });
 on("cmd_seen", (d) => addLog("cmd_seen", d));
 on("decode_error", (d) => addLog("decode_error", d));
 on("telemetry", (d) => {
+  seen.tel.push(performance.now());
   setTelemetry(d, 0);
   addLog("telemetry", d);
   imu.push([d.pitch_deg, d.roll_deg]);
@@ -426,7 +662,11 @@ on("telemetry", (d) => {
   drawImu();
   paintAges();
 });
-on("live", (d) => { setLive(d, 0); paintAges(); });
+on("live", (d) => {
+  seen.live.push(performance.now());
+  setLive(d, 0);
+  paintAges();
+});
 on("s3_events", (d) => {
   d.entries.forEach(addTimeline);
   setTally(d.tally, d.rejected);

@@ -96,7 +96,8 @@
   /* -- Liquid Glass approximation: floating controls only -------------- */
   --glass-fill: light-dark(rgba(255, 255, 255, 0.6), rgba(44, 44, 46, 0.55));
   --glass-solid: light-dark(#FFFFFF, #2C2C2E);
-  --glass-border: light-dark(rgba(60, 60, 67, 0.18), rgba(235, 235, 245, 0.16));
+  --glass-border: light-dark(rgba(60, 60, 67, 0.18),
+                             rgba(235, 235, 245, 0.16));
   --glass-highlight: light-dark(rgba(255, 255, 255, 0.9),
                                 rgba(255, 255, 255, 0.14));
   --glass-shadow: light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.5));
