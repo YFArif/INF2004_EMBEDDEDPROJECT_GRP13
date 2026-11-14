@@ -143,6 +143,11 @@ DATA_RE = re.compile(r'<script type="application/json" id="s1-data">'
 STATIC_FILES = {
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    # Inter (SIL OFL 1.1): the fallback where the system font keywords do
+    # not resolve (Windows). Its licence text is served beside it.
+    "/fonts/inter-latin-opsz-normal.woff2":
+        ("fonts/inter-latin-opsz-normal.woff2", "font/woff2"),
+    "/fonts/OFL.txt": ("fonts/OFL.txt", "text/plain; charset=utf-8"),
 }
 
 CONFIG_PATTERNS = {
