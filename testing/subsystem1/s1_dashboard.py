@@ -46,15 +46,17 @@ Run from the repository root (docs/S1_dashboard.md is the full guide):
 
 --simulate needs no broker: a fake car answers with S5's command rules
 and telemetry_task's acks, heartbeat, telemetry and live message.
---check is tests S1-U16 part A (steps A1 to A14) and S1-U24 part D (the
-map, steps D1 to D7); it exits 0 PASS, 1 FAIL, 2 INCOMPLETE (steps not
-built yet).
+--check is tests S1-U16 part A (steps A1 to A14), S1-U24 part D (the map,
+steps D1 to D7) and S1-U26 parts A and D (the page's files, the design
+tokens and the simulator scenarios, steps U1 to U4); it exits 0 PASS,
+1 FAIL, 2 INCOMPLETE (steps not built yet).
 """
 
 import argparse
 import collections
 import contextlib
 import datetime
+import hashlib
 import heapq
 import http.client
 import http.server
@@ -2448,7 +2450,9 @@ FAKE_PREFIX = "s1u16"
 A_STEPS = ["A%d" % number for number in range(1, 15)]
 # S1-U24 part D: the barcode letter map, in the same run after A14.
 D_STEPS = ["D%d" % number for number in range(1, 8)]
-ALL_STEPS = A_STEPS + D_STEPS
+# S1-U26 parts A (U1 to U3) and D (U4), in the same run after D7.
+U_STEPS = ["U%d" % number for number in range(1, 5)]
+ALL_STEPS = A_STEPS + D_STEPS + U_STEPS
 MAP_APPLIED_RE = re.compile(r"Applied on the robot: LEFT=(.) RIGHT=(.) "
                             r"STRAIGHT=(.) U-TURN=(.) "
                             r"\(acked \d\d:\d\d:\d\d\)")
@@ -3348,6 +3352,258 @@ def check_a12(ctx, state_text):
                     for name, good in ctx.digits.items())))
 
 
+# -- S1-U26 parts A and D: the page's files, tokens and scenarios ---------
+
+# Written out here, not read from the server's constants: U1 fails if the
+# server's policy or list changes without this test changing too.
+U26_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; "
+           "font-src 'self'; connect-src 'self'; img-src 'self'; "
+           "frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+U26_TYPES = {
+    "/": "text/html; charset=utf-8",
+    "/tokens.css": "text/css; charset=utf-8",
+    "/app.css": "text/css; charset=utf-8",
+    "/app.js": "text/javascript; charset=utf-8",
+    "/scene.js": "text/javascript; charset=utf-8",
+    "/fonts/inter-latin-opsz-normal.woff2": "font/woff2",
+    "/fonts/OFL.txt": "text/plain; charset=utf-8",
+    "/vendor/three/three.module.js": "text/javascript; charset=utf-8",
+    "/vendor/three/three.core.js": "text/javascript; charset=utf-8",
+    "/vendor/three/LICENSE.txt": "text/plain; charset=utf-8",
+}
+U26_NOT_FOUND = (
+    b"/index.html", b"/app.js/", b"/../s1_dashboard.py",
+    b"/%2e%2e/s1_dashboard.py", b"/..%2fs1_dashboard.py",
+    b"/.%2e/cmd_rtt.py", b"/..\\s1_dashboard.py", b"/app.js%00",
+    b"/app.js\x00.css", b"/dashboard_ui/app.js", b"/APP.JS", b"/fonts/",
+    b"/vendor/three/", b"/THIRD_PARTY_NOTICES.md", b"/fonts/../app.js")
+NOTICES_FILE = "THIRD_PARTY_NOTICES.md"
+NOTICE_ROW_RE = re.compile(r"^\| `([^`]+)` \|.*\| `([0-9a-f]{64})` \|",
+                           re.M)
+THIRD_PARTY_DIRS = ("vendor", "fonts")
+URL_RE = re.compile(rb"https?://")
+XML_NAMESPACE = b"http://www.w3.org/"
+SCN_STEP_S = 0.1                # The synthetic clock of U4.
+SCN_LEAD_S = 3.0                # Running time before the button.
+
+
+def raw_get(port, path, host=None):
+    """One GET with the path bytes exactly as given (http.client refuses
+    some of them); returns (status, {header: value}, body)."""
+    sock = socket.create_connection((BIND_ADDRESS, port), timeout=10)
+    name = host if host else "%s:%d" % (BIND_ADDRESS, port)
+    sock.sendall(b"GET " + path + b" HTTP/1.1\r\nHost: "
+                 + name.encode("ascii") + b"\r\nConnection: close\r\n\r\n")
+    data = b""
+    while True:
+        chunk = sock.recv(65536)
+        if not chunk:
+            break
+        data += chunk
+    sock.close()
+    head, _, body = data.partition(b"\r\n\r\n")
+    lines = head.decode("latin-1").split("\r\n")
+    headers = {}
+    for line in lines[1:]:
+        key, _, value = line.partition(": ")
+        headers[key.lower()] = value
+    status = int(lines[0].split(" ")[1]) if " " in lines[0] else 0
+    return status, headers, body
+
+
+def check_u1(ctx):
+    """The static route: the list, the headers, the bodies, the refusals."""
+    files = sorted(url for url in U26_TYPES if url != "/")
+    b_list = sorted(STATIC_FILES) == files
+    good = 0
+    for url, content_type in sorted(U26_TYPES.items()):
+        status, headers, body = raw_get(ctx.port, url.encode("ascii"))
+        b_body = (url == "/") or (body == (UI_DIR / url[1:]).read_bytes())
+        if ((status == 200)
+                and (headers.get("content-security-policy") == U26_CSP)
+                and (headers.get("x-content-type-options") == "nosniff")
+                and (headers.get("cache-control") == "no-store")
+                and (headers.get("content-type") == content_type)
+                and b_body):
+            good += 1
+    missing = sum(1 for path in U26_NOT_FOUND
+                  if raw_get(ctx.port, path)[0] == 404)
+    refused = sum(1 for url in files if raw_get(
+        ctx.port, url.encode("ascii"),
+        "dashboard.example:%d" % ctx.port)[0] == 403)
+    ok = (b_list and (good == len(U26_TYPES))
+          and (missing == len(U26_NOT_FOUND)) and (refused == len(files)))
+    return ok, ("STATIC_FILES is the %d URLs of the test: %s; %d of %d "
+                "responses 200 with the literal CSP, nosniff, no-store, "
+                "the fixed Content-Type and the file's bytes; %d of %d "
+                "other paths 404; %d of %d wrong-Host requests 403"
+                % (len(files), b_list, good, len(U26_TYPES), missing,
+                   len(U26_NOT_FOUND), refused, len(files)))
+
+
+def check_u2(ui_dir=None):
+    """The served files on disk: no URL outside the exemptions, and the
+    third-party files against THIRD_PARTY_NOTICES.md."""
+    ui_dir = UI_DIR if ui_dir is None else ui_dir
+    names = [INDEX_FILE] + sorted(name for name, _ in STATIC_FILES.values())
+    with_urls = []
+    for name in names:
+        if name.endswith(".txt") or name.startswith("vendor/"):
+            continue                # Licence text, or third-party code.
+        data = (ui_dir / name).read_bytes().replace(XML_NAMESPACE, b"")
+        if URL_RE.search(data):
+            with_urls.append(name)
+    rows = dict(NOTICE_ROW_RE.findall(
+        (ui_dir / NOTICES_FILE).read_text(encoding="utf-8")))
+    on_disk = sorted(
+        path.relative_to(ui_dir).as_posix() for folder in THIRD_PARTY_DIRS
+        for path in (ui_dir / folder).rglob("*") if path.is_file())
+    no_row = [name for name in on_disk if name not in rows]
+    wrong = [name for name in on_disk if (name in rows) and (
+        hashlib.sha256((ui_dir / name).read_bytes()).hexdigest()
+        != rows[name])]
+    no_file = sorted(name for name in rows if name not in on_disk)
+    ok = bool(on_disk) and not (with_urls or no_row or wrong or no_file)
+    return ok, ("%d served files, %d with a URL outside the exemptions "
+                "(licence texts, XML namespaces, vendor/)%s; %d files "
+                "under vendor/ and fonts/: %d without a row in %s, %d "
+                "whose SHA-256 differs from its row%s, %d rows without a "
+                "file"
+                % (len(names), len(with_urls),
+                   (": " + ", ".join(with_urls)) if with_urls else "",
+                   len(on_disk), len(no_row), NOTICES_FILE, len(wrong),
+                   (": " + ", ".join(wrong)) if wrong else "",
+                   len(no_file)))
+
+
+def check_u3():
+    """The design-token audit, as --token-audit runs it."""
+    ok, lines = token_audit()
+    failed = [line.strip() for line in lines[:-1] if "FAIL" in line]
+    return ok, lines[-1] + ("; " + "; ".join(failed[:3]) if failed else "")
+
+
+def scenario_run(name, b_running=True):
+    """Play one scenario on a fresh fake car with a synthetic clock.
+    Returns (payload bytes of every message, telemetry frames and live
+    messages decoded from the button on, console lines, the car, the last
+    live message before the button)."""
+    folder = tempfile.mkdtemp(prefix="s1u26-")
+    settings = Settings(None, 1883, "probe", "", "", "check")
+    car = FakeCar(settings, Scrubber(settings), folder, True)
+    lines, notes = [], []
+    car.on_line = lines.append
+    car.on_sim = lambda state, text: notes.append(text)
+    car._state = car.RUNNING if b_running else "READY"
+    clock = 100.0
+    car._advance(clock)
+    length = sum(seconds for seconds, _ in car.SCENARIOS[name])
+    lead = int(round(SCN_LEAD_S / SCN_STEP_S))
+    first = None
+    for step in range(lead + int(round((length + 2.0) / SCN_STEP_S))):
+        if step == lead:
+            first = len(lines)
+            car._scenario_start(name)
+        clock += SCN_STEP_S
+        car._advance(clock)
+        if car._scn_note is not None:
+            notes.append(car._scn_note)
+            car._scn_note = None
+        if step % 2 == 0:
+            car._send_live()
+        if step % 5 == 0:
+            car._send_telemetry()
+    shutil.rmtree(folder, ignore_errors=True)
+    payloads = [parse_sub_line(line)[3] for line in lines]
+    msgs = [s1_decode.decode(payload) for payload in payloads]
+    tel = [m for m in msgs[first:] if m["msg_type"] == s1_decode.TELEMETRY]
+    live = [m for m in msgs[first:] if m["msg_type"] == s1_decode.LIVE]
+    before = [m for m in msgs[:first] if m["msg_type"] == s1_decode.LIVE]
+    return b"".join(payloads), tel, live, notes, car, before[-1]
+
+
+def relative_headings(live):
+    """Each live heading in degrees, relative to the first, in +/-180."""
+    start = live[0]["heading_hdeg"]
+    return [((m["heading_hdeg"] - start + 360) % 720 - 360) / 2.0
+            for m in live]
+
+
+def scenario_obstacle(tel, live, before):
+    echoes = [m["closest_mm"] for m in tel if m["closest_mm"] > 0]
+    turns = relative_headings(live)
+    last = tel[-1]
+    ok = (bool(echoes) and (echoes[0] >= 550) and (min(echoes) == 150)
+          and any(m["ctrl_state"] == 8 for m in tel)
+          and (37.0 <= max(turns) <= 41.0) and (-41.0 <= min(turns) <= -37.0)
+          and (abs(turns[-1]) <= 2.0)
+          and ((last["width_mm"], last["clear_l_mm"], last["clear_r_mm"])
+               == (90, 480, 220)))
+    return ok, ("echo %s to %s mm, heading %+.1f and %+.1f, end %+.1f, "
+                "profile %d/%d/%d"
+                % (echoes[0] if echoes else "none",
+                   min(echoes) if echoes else "none", max(turns),
+                   min(turns), turns[-1], last["width_mm"],
+                   last["clear_l_mm"], last["clear_r_mm"]))
+
+
+def scenario_junction(tel, live, before):
+    # The first barcode comes with the button, so the counts are compared
+    # with the last live message before it.
+    turns = relative_headings(live)
+    barcodes = (live[-1]["barcodes"] - before["barcodes"]) & 0xFF
+    junctions = (live[-1]["junctions"] - before["junctions"]) & 0xFF
+    spins = sum(1 for m in live if (m["cmd_speed_mms"] == 0)
+                and (m["motion_state"] == 3))
+    ok = ((barcodes == 2) and (junctions == 2)
+          and (88.0 <= max(turns) <= 92.0) and (abs(turns[-1]) <= 2.0)
+          and (min(turns) >= -2.0) and (spins > 0))
+    return ok, ("barcodes +%d, junctions +%d, heading %+.1f then back to "
+                "%+.1f, %d live messages turning with commanded speed 0"
+                % (barcodes, junctions, max(turns), turns[-1], spins))
+
+
+def scenario_hump(tel, live, before):
+    pitches = [m["pitch_hdeg"] / 2.0 for m in tel]
+    humps = tel[-1]["hump_count"] - tel[0]["hump_count"]
+    ok = ((9.0 <= max(pitches) <= 12.5) and (-12.5 <= min(pitches) <= -9.0)
+          and (humps == 1))
+    return ok, ("pitch %+.1f and %+.1f, hump_count +%d"
+                % (max(pitches), min(pitches), humps))
+
+
+def scenario_lifted(tel, live, before):
+    lifted = sum(1 for m in tel if m["motion_class"] == 6)
+    stops = sum(1 for m in live if m["b_estop"])
+    ok = (lifted > 0) and (stops > 0) and (tel[-1]["motion_class"] != 6)
+    return ok, ("%d frames with class 6, %d live messages with the E-stop, "
+                "last class %d" % (lifted, stops, tel[-1]["motion_class"]))
+
+
+SCENARIO_CHECKS = {"obstacle": scenario_obstacle,
+                   "junction": scenario_junction, "hump": scenario_hump,
+                   "lifted": scenario_lifted}
+
+
+def check_u4():
+    """The scenarios: the same bytes twice, and what the frames show."""
+    parts = []
+    ok = sorted(FakeCar.SCENARIOS) == sorted(SCENARIO_CHECKS)
+    for name in sorted(SCENARIO_CHECKS):
+        first, tel, live, _, _, before = scenario_run(name)
+        b_same = first == scenario_run(name)[0]
+        good, text = SCENARIO_CHECKS[name](tel, live, before)
+        ok = ok and b_same and good
+        parts.append("%s: same bytes twice %s, %s: %s"
+                     % (name, b_same, text, "ok" if good else "FAIL"))
+    _, _, _, notes, car, _ = scenario_run("obstacle", False)
+    b_idle = (car._scn is None) and any("not running" in note
+                                        for note in notes)
+    return ok and b_idle, ("; ".join(parts) + "; pressed while READY, "
+                           "nothing plays and the console says so: %s"
+                           % b_idle)
+
+
 # -- S1-U24 part D: the barcode letter map --------------------------------
 
 def map_sends(ctx, since):
@@ -3578,8 +3834,8 @@ class CheckContext:
 
 
 def run_check(args):
-    print("S1-U16 part A and S1-U24 part D: s1_dashboard.py --check "
-          "(simulate mode, no broker)", flush=True)
+    print("S1-U16 part A, S1-U24 part D and S1-U26 parts A and D: "
+          "s1_dashboard.py --check (simulate mode, no broker)", flush=True)
     results = {}
 
     def record(step, outcome):
@@ -3621,6 +3877,10 @@ def run_check(args):
         record("D5", check_d5(ctx))
         record("D6", check_d6(ctx))
         record("D7", check_d7(ctx))
+        record("U1", check_u1(ctx))
+        record("U2", check_u2())
+        record("U3", check_u3())
+        record("U4", check_u4())
         run.stop()
         record("A11", check_a11(ctx, args_list, options_live))
         record("A12", check_a12(ctx, state_text))
@@ -3653,7 +3913,8 @@ def summarise(results):
     if missing:
         print("not run (not built yet, or the check stopped): %s"
               % " ".join(missing))
-    verdicts = [verdict_of(results, A_STEPS), verdict_of(results, D_STEPS)]
+    verdicts = [verdict_of(results, A_STEPS), verdict_of(results, D_STEPS),
+                verdict_of(results, U_STEPS)]
     if "FAIL" in verdicts:
         code = 1
     elif "INCOMPLETE" in verdicts:
@@ -3661,7 +3922,8 @@ def summarise(results):
     else:
         code = 0
     print("S1-U16 part A: %s" % verdicts[0])
-    print("S1-U24 part D: %s" % verdicts[1], flush=True)
+    print("S1-U24 part D: %s" % verdicts[1])
+    print("S1-U26 parts A and D: %s" % verdicts[2], flush=True)
     return code
 
 
@@ -3683,7 +3945,8 @@ def main():
     parser.add_argument("--banner-off", action="store_true",
                         help="run without the retained-command banner")
     parser.add_argument("--check", action="store_true",
-                        help="run tests S1-U16 part A and S1-U24 part D")
+                        help="run tests S1-U16 part A, S1-U24 part D and "
+                        "S1-U26 parts A and D")
     parser.add_argument("--token-audit", action="store_true",
                         help="check the contrast of dashboard_ui/tokens.css")
     parser.add_argument("--opts-dir", help=argparse.SUPPRESS)
