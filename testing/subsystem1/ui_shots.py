@@ -84,8 +84,8 @@ return {
 TWEAK_JS = {
     "": "return null;",
     "drawer": "document.getElementById('dev-open').click(); return null;",
-    # Shows Inter and its tracking on a machine whose system font keywords
-    # resolve. It does not exercise the detection in app.js.
+    # Shows Inter and its tracking on an Apple machine, where app.js
+    # chooses the system font. ui_font_probe.py tests the choice itself.
     "inter": ("const r = document.documentElement;"
               "r.classList.remove('font-system');"
               "r.classList.add('font-inter');"

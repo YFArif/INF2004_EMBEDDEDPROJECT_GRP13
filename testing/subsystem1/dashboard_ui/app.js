@@ -220,27 +220,19 @@ document.querySelectorAll("[data-theme-set]").forEach((b) => {
 });
 applyTheme(readTheme(), false);
 
-// -- Which font is in use. The system font keywords resolve to SF Pro on
-// Apple devices only. A test string is measured in "monospace", then in
-// the keywords with monospace as the fallback: the same width means the
-// keywords did not resolve, so the page falls through to Inter and needs
-// Apple's tracking values (html.font-inter in tokens.css).
-function fontPath() {
-  const probe = document.createElement("span");
-  probe.textContent = "mmmmmmmmmmlliiWW00";
-  probe.style.position = "absolute";
-  probe.style.visibility = "hidden";
-  probe.style.whiteSpace = "nowrap";
-  probe.style.fontSize = "72px";
-  document.body.appendChild(probe);
-  probe.style.fontFamily = "monospace";
-  const mono = probe.getBoundingClientRect().width;
-  probe.style.fontFamily = "-apple-system, BlinkMacSystemFont, monospace";
-  const keywords = probe.getBoundingClientRect().width;
-  probe.remove();
-  return (Math.abs(keywords - mono) > 0.5) ? "system" : "inter";
+// -- Which font to use, decided by platform. Apple platforms use the system
+// font keywords, which give SF Pro there. Everything else uses the
+// self-hosted Inter: html.font-inter switches the font stack to Inter and
+// applies Apple's tracking values (tokens.css). The keywords cannot be
+// probed instead: Chromium resolves -apple-system to its own system font
+// on Windows, so a width test never finds them missing.
+function applePlatform() {
+  const data = navigator.userAgentData;
+  const name = (data && data.platform) || navigator.platform || "";
+  return /^(mac|iphone|ipad|ipod|ios)/i.test(name);
 }
-document.documentElement.classList.add("font-" + fontPath());
+document.documentElement.classList.add(
+  applePlatform() ? "font-system" : "font-inter");
 
 // -- Developer drawer: closed by default. It is not modal, and the Escape
 // key stays STOP, so it has its own Close button.

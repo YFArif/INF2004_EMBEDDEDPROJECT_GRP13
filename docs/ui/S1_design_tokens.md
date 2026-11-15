@@ -142,8 +142,9 @@ S1-U26 part A in stage 4.
 
 ## 6. Type
 
-Font stack: `-apple-system, BlinkMacSystemFont, "Inter", system-ui,
-sans-serif`. The first two keywords give SF Pro on Apple devices. SF
+Font stack on Apple platforms: `-apple-system, BlinkMacSystemFont,
+"Inter", system-ui, sans-serif`. The first two keywords give SF Pro
+there. SF
 Pro's licence does not allow bundling it or linking it from a web page.
 Inter 5.2.8 (SIL OFL 1.1, variable, Latin subset) is self-hosted as the
 fallback for Windows, which is the demo laptop. See
@@ -175,13 +176,17 @@ tracking values (HIG Typography, "Tracking values"), in thousandths of
 an em: 12 px 0, 13 px -6, 15 px -16, 16 px -20, 17 px -26, 20 px -23,
 22 px -12, 28 px +14, 34 px +12, 48 px +8.
 
-How the page knows which font is in use (`fontPath()` in `app.js`): at
-load it measures a test string in `monospace`, then in `-apple-system,
-BlinkMacSystemFont, monospace`. The same width means the keywords did
-not resolve, so the page is on Inter and sets `font-inter` on `<html>`.
-Otherwise it sets `font-system`. If the Inter file then fails to load,
-the page falls to `system-ui` with Inter's tracking; that case is not
-detected.
+Which font the page uses (`applePlatform()` in `app.js`) is decided by
+platform, from `navigator.userAgentData.platform` or `navigator.platform`.
+An Apple platform (a name starting Mac, iPhone, iPad, iPod or iOS) gets
+`font-system` on `<html>` and the system font keywords. Everything else
+gets `font-inter`, which switches the font stack to `"Inter", system-ui,
+sans-serif` and applies the tracking values. The keywords cannot be
+probed by measuring text: Chromium resolves `-apple-system` to its own
+system font on Windows, so the first version of the page never loaded
+Inter there. `testing/subsystem1/ui_font_probe.py` checks both paths in
+headless Chromium. If the Inter file fails to load, the page falls to
+`system-ui` with Inter's tracking; that case is not detected.
 
 ## 7. Materials
 

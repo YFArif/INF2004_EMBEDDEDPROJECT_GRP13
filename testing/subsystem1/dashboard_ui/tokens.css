@@ -139,9 +139,10 @@
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
 
-/* Apple's SF Pro tracking table (HIG Typography), in em, for the sizes
- * above. Applied only when Inter is the font in use. */
+/* Not an Apple platform (app.js decides): Inter is the font, with Apple's
+ * SF Pro tracking table (HIG Typography), in em, for the sizes above. */
 :root.font-inter {
+  --font-ui: "Inter", system-ui, sans-serif;
   --tr-display: 0.008em;  --tr-large-title: 0.012em; --tr-title1: 0.014em;
   --tr-title2: -0.012em;  --tr-title3: -0.023em;     --tr-headline: -0.026em;
   --tr-callout: -0.02em;  --tr-subhead: -0.016em;    --tr-footnote: -0.006em;
