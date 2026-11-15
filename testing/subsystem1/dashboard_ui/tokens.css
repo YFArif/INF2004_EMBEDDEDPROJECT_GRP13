@@ -104,6 +104,37 @@
   --card-shadow: light-dark(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0));
   --scrim: light-dark(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.5));
 
+  /* -- The 3D scene. Its materials are its own (deviation 6); the floor,
+   *    grid, trail, cone and chips follow the UI tokens. scene.js reads
+   *    these: it holds no colour of its own. --------------------------- */
+  --scene-bg: var(--bg-card);
+  --scene-floor: light-dark(#F7F7FA, #232326);
+  --scene-grid: light-dark(#C7C7CC, #48484A);
+  --scene-trail: var(--accent-deco);
+  --scene-cone: var(--accent-deco);
+  --scene-obstacle: light-dark(var(--sys-orange-l), var(--sys-orange-d));
+  --scene-line-ok: var(--green-deco);
+  --scene-line-lost: var(--red-deco);
+  --scene-line-turn: var(--accent-deco);
+  --scene-line-search: var(--orange-deco);
+  --scene-line-off: var(--gray-deco);
+  --scene-chassis: #2E8FD8;
+  --scene-bracket: #2456B8;
+  --scene-board: #6B3FA0;
+  --scene-pico: #2E8B57;
+  --scene-tyre: #1C1C1E;
+  --scene-hub: #F2F2F7;
+  --scene-black: #2C2C2E;
+  --scene-metal: #B8BCC4;
+  --scene-acrylic: #DDE8F5;
+  --scene-shadow: #000000;
+  --scene-light: #FFFFFF;
+  --scene-light-ground: #8A8A90;
+  /* Chips that float over the scene: glass thick enough to stay legible
+   * over the darkest and the lightest thing that can pass behind. */
+  --glass-fill-scene: light-dark(rgba(255, 255, 255, 0.8),
+                                 rgba(44, 44, 46, 0.82));
+
   /* -- Type: iOS text styles at the default Large size, in px ---------- */
   --font-ui: -apple-system, BlinkMacSystemFont, "Inter", system-ui,
              sans-serif;
@@ -168,6 +199,7 @@
     --accent-fill: light-dark(var(--sys-blue-lc), var(--sys-blue-dc));
     --focus-ring: light-dark(var(--sys-blue-lc), var(--sys-blue-dc));
     --glass-fill: light-dark(#FFFFFF, #2C2C2E);
+    --glass-fill-scene: light-dark(#FFFFFF, #2C2C2E);
     --glass-border: light-dark(rgba(60, 60, 67, 0.6),
                                rgba(235, 235, 245, 0.5));
   }
@@ -203,6 +235,13 @@
  * @pair fg=--label-2 bg=--glass-fill over=--bg-inset min=4.5
  * @pair fg=--label bg=--glass-solid min=4.5
  * @pair fg=--label-2 bg=--glass-solid min=4.5
+ * Text on the scene chips, over the extremes of the 3D scene.
+ * @pair fg=--label bg=--glass-fill-scene over=--scene-floor min=4.5
+ * @pair fg=--label bg=--glass-fill-scene over=--scene-tyre min=4.5
+ * @pair fg=--label bg=--glass-fill-scene over=--scene-hub min=4.5
+ * @pair fg=--label bg=--glass-fill-scene over=--scene-obstacle min=4.5
+ * @pair fg=--label bg=--glass-fill-scene over=--scene-chassis min=4.5
+ * @pair fg=--label bg=--glass-fill-scene over=--scene-board min=4.5
  * Text on a neutral fill laid on a card (segmented controls, chips).
  * @pair fg=--label bg=--fill-3 over=--bg-card min=4.5
  * @pair fg=--label-2 bg=--fill-3 over=--bg-card min=4.5

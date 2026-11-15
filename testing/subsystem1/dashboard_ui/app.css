@@ -275,10 +275,15 @@ th {
   width: 8px; height: 8px; border-radius: 50%; background: currentColor;
 }
 .stage {
-  position: relative; flex: 1; min-height: 240px; display: grid;
-  place-items: center; border-top: 1px solid var(--separator);
+  position: relative; flex: 1; min-height: 300px;
+  border-top: 1px solid var(--separator); overflow: hidden;
 }
-.stage-empty { max-width: 420px; padding: 20px; text-align: center; }
+#scene { position: absolute; inset: 0; width: 100%; height: 100%;
+  display: block; }
+.stage-empty {
+  position: absolute; inset: 0; display: grid; place-content: center;
+  justify-items: center; padding: 20px; text-align: center;
+}
 .stage-state {
   font-size: var(--fs-large-title); line-height: var(--lh-large-title);
   letter-spacing: var(--tr-large-title); font-weight: 600;
@@ -286,11 +291,53 @@ th {
 }
 .impact-banner {
   position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
-  display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px;
-  border-radius: var(--radius-capsule); background: var(--stop-fill);
-  color: var(--on-stop); font-size: var(--fs-headline); font-weight: 700;
-  white-space: nowrap;
+  z-index: 2; display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 20px; border-radius: var(--radius-capsule);
+  background: var(--stop-fill); color: var(--on-stop);
+  font-size: var(--fs-headline); font-weight: 700; white-space: nowrap;
 }
+/* Chips over the 3D view: the floating layer, so they are glass. */
+.scene-chip {
+  display: inline-flex; align-items: center; min-height: 32px;
+  padding: 0 14px; border-radius: var(--radius-capsule);
+  background: var(--glass-fill-scene); color: var(--label);
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow: inset 0 1px 0 var(--glass-highlight),
+    0 4px 16px var(--glass-shadow);
+  font-size: var(--fs-footnote); line-height: var(--lh-footnote);
+  font-weight: 500; white-space: nowrap;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .scene-chip {
+    background: var(--glass-solid);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+}
+button.scene-chip { min-height: var(--target); font-weight: 600; }
+.scene-label {
+  position: absolute; left: 0; top: 0; z-index: 1;
+  font-size: var(--fs-subhead); font-weight: 600; pointer-events: none;
+}
+.scene-foot {
+  position: absolute; left: 16px; right: 16px; bottom: 12px; z-index: 1;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+}
+.scene-stale {
+  display: none; position: absolute; left: 50%; top: 50%; z-index: 2;
+  transform: translate(-50%, -50%); padding: 10px 20px;
+  border-radius: var(--radius-capsule); background: var(--glass-solid);
+  color: var(--label); border: 1px solid var(--separator-opaque);
+  font-weight: 600; text-align: center;
+}
+.stale .scene-stale { display: block; }
+.no-scene #scene, .no-scene .scene-foot, .no-scene .scene-label,
+.no-scene .scene-stale, .no-scene .cam-seg { display: none; }
+.cam-seg {
+  margin-left: auto; background: var(--fill-3);
+}
+.cam-seg button[aria-pressed="true"] { background: var(--bg-card); }
 
 /* -- Latest events ------------------------------------------------------ */
 .latest div {

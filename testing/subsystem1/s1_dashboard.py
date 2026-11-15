@@ -144,6 +144,7 @@ STATIC_FILES = {
     "/tokens.css": ("tokens.css", "text/css; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/scene.js": ("scene.js", "text/javascript; charset=utf-8"),
     # Inter (SIL OFL 1.1): the fallback where the system font keywords do
     # not resolve (Windows). Its licence text is served beside it.
     "/fonts/inter-latin-opsz-normal.woff2":
@@ -2084,7 +2085,7 @@ def run_server(args, settings, scrub):
 # -- The design-token audit (--token-audit; S1-U26 part A will call it) ---
 
 TOKEN_FILE = "tokens.css"
-TOKEN_FREE_FILES = ("app.css", "app.js", "index.html")
+TOKEN_FREE_FILES = ("app.css", "app.js", "scene.js", "index.html")
 AUDIT_CONTEXTS = (("light", False), ("dark", False), ("light", True),
                   ("dark", True))
 PAIR_RE = re.compile(r"@pair\s+fg=(--[\w-]+)\s+bg=(--[\w-]+)"

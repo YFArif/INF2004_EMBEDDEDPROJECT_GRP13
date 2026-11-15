@@ -125,8 +125,19 @@
         <span class="chip alarm" id="chip-estop" hidden>E-stop latched</span>
         <span class="chip alarm" id="chip-faults" hidden></span>
       </div>
+      <div class="seg cam-seg" role="group" aria-label="Camera view"
+        id="cam-seg">
+        <button type="button" data-cam="chase" aria-pressed="true"
+          >Chase</button>
+        <button type="button" data-cam="top" aria-pressed="false"
+          >Top</button>
+        <button type="button" data-cam="side" aria-pressed="false"
+          >Side</button>
+      </div>
     </div>
     <div class="stage" id="stage">
+      <canvas id="scene" class="vals" role="img"
+        aria-label="3D view of the car. No data yet."></canvas>
       <div class="impact-banner" id="view-impact" hidden>
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"
           fill="none" stroke="currentColor" stroke-width="2"
@@ -134,10 +145,23 @@
           <path d="M12 4.5l8.5 15h-17z"></path><path d="M12 10.5v4"></path>
           <path d="M12 17.2v.1"></path></svg>
         Lifted or overturned</div>
-      <div class="stage-empty">
+      <div class="scene-chip scene-label" id="obstacle-label" hidden></div>
+      <div class="scene-stale" id="scene-stale">No new data. The view
+        shows the last known state.</div>
+      <div class="scene-foot" id="scene-foot">
+        <span class="scene-chip" id="estimate-note"
+          title="Dead reckoning from the heading and the distance travelled. Wheel slip and lost messages add up, so it drifts. A robot restart and Clear trail start it again."
+          >Position is an estimate. It drifts.</span>
+        <span class="scene-chip" id="cone-note"
+          title="The servo angle is angle_idx x 7.5 degrees, with 90 taken as straight ahead and a 30 degree beam. None of this is measured on the car yet."
+          >Sensor direction is nominal</span>
+        <button type="button" class="scene-chip" id="trail-clear"
+          >Clear trail</button>
+      </div>
+      <div class="stage-empty" id="scene-fallback" hidden>
         <div class="stage-state" id="stage-state">-</div>
-        <p class="note">The 3D view of the car is not built yet (stage 2
-          of the redesign). The numbers on this page are live.</p>
+        <p class="note" id="scene-fallback-text">3D view unavailable. The
+          numbers on this page are live.</p>
       </div>
     </div>
   </section>
@@ -285,6 +309,14 @@
       </div>
     </section>
     <section class="panel">
+      <h3>3D view</h3>
+      <table class="kv">
+        <tr><td>frame rate</td><td id="fps">not started</td></tr>
+        <tr><td>renderer</td><td id="scene-info">-</td></tr>
+        <tr><td>estimate</td><td id="scene-pose">-</td></tr>
+      </table>
+    </section>
+    <section class="panel">
       <h3>Robot link</h3>
       <table class="kv">
         <tr><td>mode</td><td>prefix <code id="prefix"></code>, port
@@ -411,6 +443,7 @@
   </div>
 </aside>
 <script type="application/json" id="s1-data">__S1_DATA__</script>
+<script type="module" src="/scene.js" id="scene-script"></script>
 <script src="/app.js"></script>
 </body>
 </html>

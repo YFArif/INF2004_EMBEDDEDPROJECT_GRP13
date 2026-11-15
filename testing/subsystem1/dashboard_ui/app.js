@@ -4,6 +4,16 @@
 const S1_DATA = JSON.parse(document.getElementById("s1-data").textContent);
 const TOKEN = S1_DATA.token;
 const CODE39 = S1_DATA.code39;
+// The 3D view (scene.js, a module) listens here. It may load late or not
+// at all, so the last telemetry and live messages are kept for it.
+const bus = new EventTarget();
+window.s1Bus = bus;
+window.s1Last = {tel: null, live: null};
+
+function emit(name, detail) {
+  bus.dispatchEvent(new CustomEvent(name, {detail: detail}));
+}
+
 const MAP_IDS = ["map-left", "map-right", "map-straight", "map-uturn"];
 const el = (id) => document.getElementById(id);
 const rows = new Map();
@@ -217,6 +227,7 @@ function applyTheme(theme, save) {
   if (save) {
     try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* none */ }
   }
+  emit("theme", theme);
 }
 
 document.querySelectorAll("[data-theme-set]").forEach((b) => {
@@ -365,6 +376,9 @@ function cardsTelemetry(t) {
        : (t.b_cal_done ? "Calibrated" : "Not calibrated"),
        "imu_ok " + (t.b_imu_ok ? 1 : 0) + ", cal_done "
        + (t.b_cal_done ? 1 : 0), !t.b_imu_ok);
+  // Class 6 stays in the frames for as long as the stop is latched (until
+  // the E-stop clears), so the banner follows the class, with no timer.
+  el("view-impact").hidden = t.class_name !== "LIFTED_OVERTURNED";
   const ctrl = CTRL_WORDS[t.ctrl_name] || String(t.ctrl_name);
   text("chip-ctrl-text", ctrl);
   el("chip-ctrl").title = "ctrl_state " + t.ctrl_name;
@@ -457,7 +471,6 @@ function paintAges() {
   const hot = impactAt !== null && (now - impactAt) / 1000 < IMPACT_HOLD_S;
   el("s4-impact").className = hot ? "impact hot" : "impact";
   text("s4-impact", hot ? "LIFTED / OVERTURNED" : "OK");
-  el("view-impact").hidden = !hot;
   paintRates(now);
 }
 setInterval(paintAges, 200);
@@ -510,6 +523,8 @@ function setTelemetry(t, ageMs) {
   text("s5-clear", (t.width_mm || t.clear_l_mm || t.clear_r_mm)
        ? num(t.clear_l_mm) + " / " + num(t.clear_r_mm) + " mm" : "-");
   cardsTelemetry(t);
+  window.s1Last.tel = {msg: t, at: performance.now() - (ageMs || 0)};
+  emit("telemetry", window.s1Last.tel);
 }
 
 function setLive(l, ageMs) {
@@ -537,6 +552,8 @@ function setLive(l, ageMs) {
   text("s3-counts", "barcodes " + l.barcodes + ", rejected " + l.rejects
        + " (wraps at 16), junctions " + l.junctions + ", lost " + l.losts);
   cardsLive(l);
+  window.s1Last.live = {msg: l, at: performance.now() - (ageMs || 0)};
+  emit("live", window.s1Last.live);
 }
 
 function addTimeline(entry) {
@@ -638,7 +655,11 @@ on("snapshot", applySnapshot);
 on("broker", (d) => { setBroker(d); addLog("broker", d); });
 on("status", (d) => addLog("status", d));
 on("link", (d) => { setLink(d); addLog("link", d); });
-on("heartbeat", (d) => { setHeartbeat(d, 0); addLog("heartbeat", d); });
+on("heartbeat", (d) => {
+  setHeartbeat(d, 0);
+  addLog("heartbeat", d);
+  emit("heartbeat", d);
+});
 on("controls", setControls);
 on("cmd", (d) => { upsertRow(d); addLog("cmd", d); });
 on("ack", (d) => {
@@ -687,3 +708,24 @@ on("sim", (d) => {
 });
 on("map", (d) => { setMap(d); addLog("map", d); });
 on("map_ack", (d) => addLog("map_ack", d));
+
+// -- The 3D view's fallback. scene.js sets window.s1SceneReady when it is
+// drawing. If the module or three.js does not load, or there is no WebGL,
+// one line says so and every number on the page keeps working.
+const SCENE_WAIT_MS = 8000;
+
+function sceneFailed(why) {
+  el("c-view").classList.add("no-scene");
+  el("scene-fallback").hidden = false;
+  text("scene-fallback-text", "3D view unavailable (" + why
+       + "). The numbers on this page are live.");
+  text("fps", "no 3D view: " + why);
+}
+bus.addEventListener("scene-failed", (ev) => sceneFailed(ev.detail));
+el("scene-script").addEventListener(
+  "error", () => sceneFailed("its files did not load"));
+setTimeout(() => {
+  if (!window.s1SceneReady && el("scene-fallback").hidden) {
+    sceneFailed("it did not start");
+  }
+}, SCENE_WAIT_MS);
