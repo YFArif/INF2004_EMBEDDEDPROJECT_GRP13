@@ -409,8 +409,8 @@ status (robot light and text, broker light, messages per second over the
 last 5 s, age of the last frame). Left column: Control (STOP, START,
 RESET), Last commands, Barcode letter map. Centre: Live view and Latest
 events (the three newest lines of the event log). Right column: Motion,
-Attitude, Line and barcode, Obstacle sensor. The Live view holds a
-placeholder until the 3D view is built.
+Attitude, Line and barcode, Obstacle sensor. The Live view holds the 3D
+view (section 8.4).
 
 - At 1700 px wide and 900 px high or more (a 1080p browser window)
   everything fits and the page does not scroll.
@@ -454,6 +454,75 @@ panels. The thresholds are constants at the top of the cards' code in
 
 The 10 and 100 mm/s steering limits are our own choice, not S3's. They
 were not checked against the car on the track.
+
+### 8.4 The 3D view
+
+The Live view draws a stylised model of the car with three.js
+(`dashboard_ui/scene.js`; three.js 0.186.1 is in `dashboard_ui/vendor/`,
+nothing comes from the internet). The model is built from boxes and
+cylinders. It is not a scan of the car.
+
+**What drives it.** Only what the robot sends.
+
+| In the view | From | Notes |
+|---|---|---|
+| Wheel spin | `speed_l_mms`, `speed_r_mms` (telemetry, 2 Hz), eased over about 0.35 s | When the live message (5 Hz) shows `cmd_speed_mms` 0 or the E-stop flag, the spin is eased to zero at once, without waiting for the next frame. A turn on the spot has a commanded speed of 0, so the wheels are drawn at rest during it |
+| Heading | `heading` (live) | Zero is the heading at power-up, not north. Positive is left |
+| Position and trail | `dist_mm` (telemetry) with the heading | An estimate, see below |
+| Body pitch and roll | `pitch`, `roll` (telemetry), eased | Positive pitch is nose up, positive roll is left side up (`subsystem4.h`). The body follows up to 0.5 s late, because the values come at 2 Hz. That is expected |
+| Sensor head and beam | `angle_idx` (telemetry) | Servo angle = `angle_idx` x 7.5 degrees, with 90 drawn as straight ahead and a 30 degree beam. **Nominal**: the servo sweep is not measured yet, and the chip in the view says so. `angle_idx` is 0 until S5 has pinged, which draws the beam to the right |
+| Orange block and its label | `closest_mm` above 0 (telemetry), `width_mm` | No block when `closest_mm` is 0 (no echo). The beam is then drawn 400 mm long and fainter |
+| Front bar colour | `line_state` (live) | Green FOLLOW, blue JUNCTION, orange SEARCH, red LOST, grey otherwise. The words are in the Line card |
+| IR module lamps | `n_centre`, `n_outer` (live) | Brighter with the reading |
+| "Lifted or overturned" banner, one short shake | `motion_class` 6 (telemetry) | The class stays 6 while the stop is latched, until the E-stop clears, and so does the banner. The shake is skipped with reduced motion |
+
+No track is drawn ahead of the car: the track is not in the data.
+
+**The estimate.** The robot sends no position. Between two telemetry
+frames the page takes the change of `dist_mm` and moves the car that far
+along the mean of the heading at the two frames. Wheel slip, lost
+frames and the half-degree heading steps add up, so the position
+drifts. The view says "Position is an estimate. It drifts." Details:
+
+- A gap of more than 2.5 s between frames, or a step larger than the
+  speed fields allow, moves nothing.
+- `dist_mm` stops at 32767 mm. From there the step is the mean speed
+  times the time between the frames.
+- The estimate starts again at the origin when the robot restarts (the
+  heartbeat's uptime goes down), when Clear trail is pressed, and when
+  the page is reloaded: it lives in the page only.
+- The trail is the path of the estimate, a point every 10 mm, about
+  40 m long.
+
+**Cameras.** Chase (behind the car, follows the heading), Top (from
+above, the heading at power-up points up) and Side (from the car's
+right).
+
+**Stale data.** When the Live view's messages are more than 2 s old
+(the same limit as the cards) the scene dims and says "No new data. The
+view shows the last known state."
+
+**Without WebGL.** If the browser has no WebGL, or `scene.js` or
+three.js does not load, the Live view shows one line, "3D view
+unavailable", with the controller state above it. Every number on the
+page keeps working.
+
+**For a screen reader.** The canvas has a label in plain words (state,
+wheel speeds, pitch and roll, obstacle, heading, estimated position),
+refreshed every 3 s.
+
+**Performance.** The pixel ratio is capped at 1.5. There are no
+real-time shadows, only a fixed soft disc under the car. The drawing
+loop stops when the tab is hidden and when nothing is changing. The
+Developer drawer's "3D view" panel shows the frame rate, the renderer
+and the estimate. The target is at least 30 fps at 1920x1080 on the
+school laptop (ThinkPad T14 Gen 2, integrated graphics). It has not
+been measured there.
+
+**The car's dimensions** are the `CAR` constants at the top of
+`scene.js`. Three are measured (track 112 mm, rolling diameter 66.5 mm,
+axle to caster 77.5 mm, all from the firmware). Every other one is
+marked PLACEHOLDER: it was read off photos and waits for a ruler.
 
 ## 9. Operator rules
 

@@ -124,18 +124,20 @@ each token in the four contexts, lays translucent colours over the
 surface under them and computes the WCAG 2 ratio. It fails when:
 
 1. a pair is below its minimum in any context;
-2. `app.css`, `app.js` or `index.html` holds a colour literal;
+2. `app.css`, `app.js`, `scene.js` or `index.html` holds a colour
+   literal;
 3. a `color:` in `app.css` is not a token that is the text side of a
    pair.
 
-Result on 2026-11-14: 28 pairs in 4 contexts, 0 below their minimum.
+Result on 2026-11-15: 34 pairs in 4 contexts, 0 below their minimum.
 The lowest ratios are the coloured text on white in the light theme
 (4.54 to 4.59), the STOP tile (4.56) and the secondary text on a
 neutral fill over the page (4.60).
 
 Not covered by the audit: which surface a coloured text really sits on
-(rule 3 checks the token, not the place), and text drawn over the 3D
-scene, which does not exist yet.
+(rule 3 checks the token, not the place). The scene chips are checked
+over six scene colours, not over every pixel the renderer can produce
+(lighting makes some surfaces lighter or darker than their token).
 
 The audit is not part of `--check` yet. It joins `--check` as a step of
 S1-U26 part A in stage 4.
@@ -196,9 +198,14 @@ in the content layer."
 
 - The content cards and the Developer drawer are solid grouped
   surfaces: no blur and no gradient on the page.
-- Only the floating controls use `.glass`: the header status pill, the
-  Developer button and the appearance switch. The chips over the 3D
-  view will join them in stage 2.
+- Only the floating controls use glass: the header status pill, the
+  Developer button, the appearance switch and the chips over the 3D
+  view. The scene chips use a thicker fill (`--glass-fill-scene`, alpha
+  .8 and .82) so that their text stays above 4.5:1 over the darkest and
+  the lightest object that can pass behind them (the audit checks them
+  over the floor, a tyre, a hub, the obstacle, the chassis and the
+  board).
+- The 3D card itself is opaque.
 - `.glass` is `backdrop-filter: blur(24px) saturate(1.8)`, a
   translucent neutral fill, a hairline border, a faint inner top
   highlight and a soft shadow.
@@ -233,7 +240,7 @@ in the content layer."
 | 3 | Secondary and tertiary text darker than Apple's labels (alpha .76 and .58 in the light theme against .6 and .3; .4 against .3 for dark tertiary). | Apple's secondary label is 3.44:1 on white and its tertiary 1.74:1. The page needs 4.5:1 and 3:1. |
 | 4 | The STOP tile is #E9152D with white text in both themes. | Apple's default reds with white text are 3.6:1 and 3.4:1. This one is 4.56:1. |
 | 5 | Liquid Glass is approximated. | CSS has no lensing. |
-| 6 | The 3D scene's own materials and colours. | Not built yet (stage 2). Its floor and chips will use the tokens. |
+| 6 | The 3D scene's own materials and colours (`--scene-chassis`, `--scene-bracket`, `--scene-board`, `--scene-pico`, `--scene-tyre`, `--scene-hub`, `--scene-black`, `--scene-metal`, `--scene-acrylic`, the two light colours and the shadow). | They picture the real car's parts, so they are the same in both themes. The floor, grid, trail, beam, obstacle, line bar and chips use the UI tokens and change with the theme. `scene.js` holds no colour: it reads the `--scene-*` tokens. |
 | 7 | Black text on the accent fill in the dark theme. Apple uses white on its blue buttons. | White on #0091FF is 3.23:1. Black is 6.49:1. |
 | 8 | The light theme uses the increased-contrast colour values for text and for the accent fill even without `prefers-contrast: more`. | The default light values fail 4.5:1 as text on white (section 5). |
 
