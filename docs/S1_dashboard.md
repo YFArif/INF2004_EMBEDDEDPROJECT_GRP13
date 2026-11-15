@@ -630,6 +630,27 @@ The fake car applies a map with S3's rules (four Code 39 letters, not
 `*`, none twice) and prints S3's console line in the event log; Reject
 next makes it refuse the next map.
 
+**Scenarios.** Four more buttons in the Simulator panel play a fixed
+sequence of real frames, so the 3D view and the cards can be shown
+without a robot. The fake car must be running (press START first), and
+one scenario plays at a time; "Stop the scenario" ends it. A scenario
+uses no random number, so the same button always sends the same frames
+(its heading changes are added to the heading the car has when it
+starts). While it plays, the fake car's periodic events (a barcode
+every 7 s and so on) wait.
+
+| Button | What the frames show |
+|---|---|
+| Obstacle, swerve and return (17.5 s) | `closest_mm` falls from 600 to 150 mm with the sensor ahead (`angle_idx` 12); the car slows from 200 to 80 mm/s under 375 mm, then stops and sweeps the servo, which gives the profile (width 90 mm, clear left 480, clear right 220). State Avoiding obstacle: about 39 degrees left, straight, about 79 degrees right, straight, about 39 degrees left, so the heading returns. The echo is gone once the car has turned away |
+| Barcodes, left and right turn (9 s) | A barcode with the map's LEFT letter, a junction, a turn on the spot of about 90 degrees left (commanded speed 0, wheels at -73 and +73 mm/s); then the RIGHT letter, a junction and a turn of about 90 degrees right |
+| Hump (4.5 s) | Pitch up to +12 degrees (climbing), down to -12 (descending), then flat; `hump_count` rises by 1 |
+| Lifted or overturned (4 s) | `motion_class` 6 with the E-stop flag, wheels at rest, pitch 20 and roll 28 degrees. In this made-up car the latch clears by itself after 4 s; on the real car it stays until the E-stop is cleared |
+
+Only what the robot's messages can show is made up. S5's real bypass
+route is not in any message, so the swerve is a plausible shape, not
+S5's path. The fake car's wheel track is a made-up 140 mm, so its turn
+angles come from that figure.
+
 ## 13. Troubleshooting
 
 | What you see | Check |
