@@ -149,6 +149,14 @@ STATIC_FILES = {
     "/fonts/inter-latin-opsz-normal.woff2":
         ("fonts/inter-latin-opsz-normal.woff2", "font/woff2"),
     "/fonts/OFL.txt": ("fonts/OFL.txt", "text/plain; charset=utf-8"),
+    # three.js (MIT), for the 3D view. The module imports its core file by
+    # a relative path, so both keep their names in one folder.
+    "/vendor/three/three.module.js":
+        ("vendor/three/three.module.js", "text/javascript; charset=utf-8"),
+    "/vendor/three/three.core.js":
+        ("vendor/three/three.core.js", "text/javascript; charset=utf-8"),
+    "/vendor/three/LICENSE.txt":
+        ("vendor/three/LICENSE.txt", "text/plain; charset=utf-8"),
 }
 
 CONFIG_PATTERNS = {
