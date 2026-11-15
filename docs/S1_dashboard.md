@@ -466,7 +466,7 @@ cylinders. It is not a scan of the car.
 
 | In the view | From | Notes |
 |---|---|---|
-| Wheel spin | `speed_l_mms`, `speed_r_mms` (telemetry, 2 Hz), eased over about 0.35 s | When the live message (5 Hz) shows `cmd_speed_mms` 0 or the E-stop flag, the spin is eased to zero at once, without waiting for the next frame. A turn on the spot has a commanded speed of 0, so the wheels are drawn at rest during it |
+| Wheel spin | `speed_l_mms`, `speed_r_mms` (telemetry, 2 Hz), eased over about 0.35 s | When the live message (5 Hz) shows the E-stop flag, or `cmd_speed_mms` 0 while `motion_state` is not 3 (TURNING), the spin is eased to zero at once, without waiting for the next frame. In a turn on the spot the commanded speed is 0 but both wheels run, so the measured speeds keep driving the spin |
 | Heading | `heading` (live) | Zero is the heading at power-up, not north. Positive is left |
 | Position and trail | `dist_mm` (telemetry) with the heading | An estimate, see below |
 | Body pitch and roll | `pitch`, `roll` (telemetry), eased | Positive pitch is nose up, positive roll is left side up (`subsystem4.h`). The body follows up to 0.5 s late, because the values come at 2 Hz. That is expected |

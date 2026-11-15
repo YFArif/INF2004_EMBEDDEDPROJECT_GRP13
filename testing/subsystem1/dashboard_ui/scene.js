@@ -506,9 +506,13 @@ function start() {
     const msg = entry.msg;
     state.lastLive = msg;
     estimate.onHeading(msg.heading_deg);
-    // Commanded speed 0 or the E-stop: the wheels are eased to rest from
-    // this 5 Hz message, without waiting for the next 2 Hz frame.
-    state.b_hold = (msg.cmd_speed_mms === 0) || Boolean(msg.b_estop);
+    // The E-stop, or a commanded speed of 0 outside a turn: the wheels
+    // are eased to rest from this 5 Hz message, without waiting for the
+    // next 2 Hz frame. A turn on the spot (motion_state 3, TURNING) also
+    // has a commanded speed of 0, the mean of the two wheels, while both
+    // wheels run: there the measured speeds keep driving the spin.
+    state.b_hold = Boolean(msg.b_estop)
+      || ((msg.cmd_speed_mms === 0) && (msg.motion_name !== "TURNING"));
     applySpeeds();
     if ((msg.line_name !== state.lineName) || (msg.centre_ir !== state.irCentre)
         || (msg.outer_ir !== state.irOuter)) {
