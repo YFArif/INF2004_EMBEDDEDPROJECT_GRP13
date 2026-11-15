@@ -226,6 +226,9 @@ th {
   font-size: var(--fs-caption1); line-height: var(--lh-caption1);
   font-weight: 600; color: var(--label-2); border-top: 0;
 }
+/* A narrow card scrolls the table sideways: no cell wraps or is cut. */
+.cmds { min-width: max-content; }
+.cmds td, .cmds th { white-space: nowrap; padding-right: 12px; }
 .cmds td:nth-child(2) { font-weight: 600; }
 /* "queued" is blue, not green: it reached the controller, which has not
  * confirmed that it acted. Green is kept for a confirmed map. */

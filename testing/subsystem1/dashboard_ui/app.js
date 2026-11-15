@@ -163,7 +163,11 @@ function upsertRow(c) {
   const td = tr.children;
   if (c.cmd_id !== undefined) { td[0].textContent = c.cmd_id; }
   if (c.op) { td[1].textContent = c.op; }
-  if (c.sent_at) { td[2].textContent = c.sent_at.slice(11); }
+  if (c.sent_at) {
+    // To the second, so the table fits a phone; the tooltip has the rest.
+    td[2].textContent = c.sent_at.slice(11, 19);
+    td[2].title = c.sent_at.slice(11);
+  }
   if (c.state) {
     const key = c.state.startsWith("queued") ? "queued"
       : c.state.startsWith("rejected") ? "rejected"
