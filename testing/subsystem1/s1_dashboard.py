@@ -534,6 +534,72 @@ class FakeCar:
     SKIPS_PER_FIRE = 3
     HUMP_S = 3.0
     BARCODE_LETTERS = "ABCD"
+    # Scenarios (simulator buttons, S1-U26 part D): each is a list of
+    # (seconds, values) segments played while the car runs. They use no
+    # random number and no value of the free-running model above, so the
+    # same button always sends the same frames. A (from, to) pair is a
+    # straight ramp over its segment. "l", "r" and "cmd" are mm/s; with
+    # TRACK_MM 140 a wheel difference of 48 mm/s turns 39 degrees in 2 s
+    # and one of 146 mm/s turns 90 degrees in 1.5 s. "fire" names an event
+    # that happens once, when its segment starts. Only what the wire can
+    # show is made up: S5's real bypass route is not in any message.
+    _FOLLOW = {"l": 200, "r": 200, "cmd": 200}
+    _AVOID = {"ctrl": 8, "line": 3, "angle": 12}
+    SCENARIOS = {
+        "obstacle": (
+            # Approach: the echo falls from 600 mm; under 350 mm S5 slows.
+            (2.0, dict(_FOLLOW, closest=(600, 375), angle=12)),
+            (2.0, {"l": 80, "r": 80, "cmd": 80, "closest": (375, 150),
+                   "angle": 12}),
+            # Stop and sweep the servo; the scan gives the profile.
+            (1.5, dict(_AVOID, l=0, r=0, cmd=0, motion=0, closest=150,
+                       angle=(0, 24), fire="profile")),
+            # Swerve about 40 degrees left, pass, come back, straighten.
+            (2.0, dict(_AVOID, l=76, r=124, cmd=100, closest=(150, 260))),
+            (1.5, dict(_AVOID, l=120, r=120, cmd=120)),
+            (4.0, dict(_AVOID, l=124, r=76, cmd=100)),
+            (1.5, dict(_AVOID, l=120, r=120, cmd=120)),
+            (2.0, dict(_AVOID, l=76, r=124, cmd=100)),
+            (1.0, dict(_FOLLOW, angle=12)),
+        ),
+        "junction": (
+            (2.0, dict(_FOLLOW, fire="bc_left")),
+            (0.5, {"l": 80, "r": 80, "cmd": 80, "ctrl": 4, "line": 1}),
+            (1.5, {"l": -73, "r": 73, "cmd": 0, "motion": 3, "klass": 3,
+                   "ctrl": 5, "line": 1, "fire": "junc_left"}),
+            (2.0, dict(_FOLLOW, fire="bc_right")),
+            (0.5, {"l": 80, "r": 80, "cmd": 80, "ctrl": 4, "line": 1}),
+            (1.5, {"l": 73, "r": -73, "cmd": 0, "motion": 3, "klass": 3,
+                   "ctrl": 5, "line": 1, "fire": "junc_right"}),
+            (1.0, dict(_FOLLOW)),
+        ),
+        "hump": (
+            (0.5, {"l": 150, "r": 150, "cmd": 150}),
+            (0.75, {"l": 150, "r": 150, "cmd": 150, "pitch": (0, 12),
+                    "hump_state": 1, "klass": 4}),
+            (0.75, {"l": 150, "r": 150, "cmd": 150, "pitch": (12, 0),
+                    "hump_state": 1, "klass": 4}),
+            (0.75, {"l": 150, "r": 150, "cmd": 150, "pitch": (0, -12),
+                    "hump_state": 2, "klass": 5}),
+            (0.75, {"l": 150, "r": 150, "cmd": 150, "pitch": (-12, 0),
+                    "hump_state": 2, "klass": 5}),
+            (1.0, {"l": 150, "r": 150, "cmd": 150, "fire": "hump_done"}),
+        ),
+        # Picked up: S4 reports class 6 and the E-stop latches. In this
+        # made-up car the latch clears by itself after 4 s.
+        "lifted": (
+            (0.5, {"l": 0, "r": 0, "cmd": 0, "motion": 4, "klass": 6,
+                   "b_estop": True, "ctrl": 9, "line": 3,
+                   "pitch": (0, 20), "roll": (0, 28)}),
+            (3.0, {"l": 0, "r": 0, "cmd": 0, "motion": 4, "klass": 6,
+                   "b_estop": True, "ctrl": 9, "line": 3, "pitch": 20,
+                   "roll": 28}),
+            (0.5, {"l": 0, "r": 0, "cmd": 0, "motion": 4, "klass": 6,
+                   "b_estop": True, "ctrl": 9, "line": 3,
+                   "pitch": (20, 0), "roll": (28, 0)}),
+        ),
+    }
+    SCENARIO_PROFILE = {"width": 90, "clear_l": 480, "clear_r": 220}
 
     def __init__(self, settings, scrub, opts_dir, b_v5):
         self._settings = settings
@@ -586,6 +652,10 @@ class FakeCar:
         self._view = {}
         self._map = "ABCD"          # S3's default until a MAP is applied.
         self._b_drop_map_acks = False
+        self._scn = None            # [name, seconds played, segments fired].
+        self._scn_note = None       # A console line owed for a scenario.
+        self._profile = {"width": 0, "clear_l": 0, "clear_r": 0}
+        self._angle = 0
 
     def start(self):
         self._t0 = time.monotonic()
@@ -628,6 +698,9 @@ class FakeCar:
             self._next_hb = max(self._next_hb + 1.0, now + 0.5)
             self._heartbeat(now)
         self._advance(now)
+        if self._scn_note is not None:
+            note, self._scn_note = self._scn_note, None
+            self.on_sim(self._state, "fake car console: " + note)
         if self._b_connected and (now >= self._next_live):
             self._next_live = max(self._next_live + self.LIVE_S, now + 0.1)
             self._send_live()
@@ -645,7 +718,11 @@ class FakeCar:
             for key in self._hold:
                 self._hold[key] = max(0.0, self._hold[key] - dt)
             b_run = self._state == self.RUNNING
-            if b_run:
+            if (self._scn is not None) and (not b_run):
+                self._scn_note = "scenario %s ended: the car is not " \
+                    "running" % self._scn[0]
+                self._scn = None
+            if b_run and (self._scn is None):
                 self._run_s += dt
                 for name, period in self.SCRIPT:
                     if self._run_s >= self._due[name]:
@@ -656,6 +733,49 @@ class FakeCar:
             if (hump_before > 0.0) and (self._hump_left == 0.0):
                 self._hump_count += 1
             self._view = self._values(dt, b_run)
+
+    def _scenario_now(self, dt):
+        """The running scenario's values for this step, or None (model lock
+        held). Plays the segments in order and fires each one's event
+        once."""
+        if self._scn is None:
+            return None
+        name, played, fired = self._scn
+        played += dt
+        start = 0.0
+        for index, (seconds, values) in enumerate(self.SCENARIOS[name]):
+            if played < start + seconds:
+                if index >= fired:
+                    self._scn_fire(values.get("fire"))
+                    fired = index + 1
+                self._scn = [name, played, fired]
+                part = (played - start) / seconds
+                return {key: (value[0] + (value[1] - value[0]) * part
+                              if isinstance(value, tuple) else value)
+                        for key, value in values.items() if key != "fire"}
+            start += seconds
+        self._scn = None
+        self._scn_note = "scenario %s finished" % name
+        return None
+
+    def _scn_fire(self, event):
+        """One scenario event (model lock held)."""
+        if event in ("bc_left", "bc_right"):
+            # The letter the applied map gives to LEFT or to RIGHT.
+            slot = 0 if event == "bc_left" else 1
+            self._bc = {"letter": s1_decode.CODE39.index(self._map[slot]),
+                        "cmd": slot + 1, "b_rev": False,
+                        "turn": self._bc["turn"]}
+            self._s3["barcodes"] += 1
+        elif event in ("junc_left", "junc_right"):
+            self._bc["turn"] = 1 if event == "junc_left" else 2
+            self._s3["junctions"] += 1
+        elif event == "hump_done":
+            self._hump_count += 1
+        elif event == "profile":
+            self._profile = dict(self.SCENARIO_PROFILE)
+        else:
+            pass
 
     def _values(self, dt, b_run):
         """The fake car's current numbers (model lock held)."""
@@ -674,6 +794,11 @@ class FakeCar:
             measured = target + 12.0 * math.sin(2.3 * run)
         speed_l = int(measured - steer / 2.0)
         speed_r = int(measured + steer / 2.0)
+        scn = self._scenario_now(dt) if b_run else None
+        if scn is not None:
+            target, speed_l, speed_r = scn["cmd"], scn["l"], scn["r"]
+            measured = (speed_l + speed_r) / 2.0
+            steer = speed_r - speed_l
         self._dist_mm = min(self._dist_mm + measured * dt, 32767.0)
         self._heading_deg += math.degrees((speed_r - speed_l)
                                           / self.TRACK_MM) * dt
@@ -682,6 +807,8 @@ class FakeCar:
         self._enc[1] += speed_r * dt * self.COUNTS_PER_MM
         pitch = 1.5 * math.sin(2.0 * run) if b_run else 0.0
         roll = 2.0 * math.sin(0.7 * run) if b_run else 0.0
+        if scn is not None:
+            pitch, roll = scn.get("pitch", 0.0), scn.get("roll", 0.0)
         hump_state = 0
         if self._hump_left > 0.0:
             phase = self.HUMP_S - self._hump_left
@@ -727,7 +854,7 @@ class FakeCar:
         centre = int(200.0 + 30.0 * math.sin(1.7 * run)) if b_run else 0
         if b_lost:
             outer, centre = 0, 0
-        return {
+        view = {
             "motion": motion, "b_estop": b_fault, "cmd_speed": target,
             "speed_l": speed_l, "speed_r": speed_r, "steer": steer,
             "heading_hdeg": int(round(self._heading_deg * 2.0)),
@@ -741,7 +868,23 @@ class FakeCar:
             "b_overshoot": outer > 22,
             "ctrl": self.CTRL_INDEX.get(self._state, 0),
             "fault_mask": 1 if b_fault else 0,
-            "b_cal_done": self._state != "CALIBRATING"}
+            "b_cal_done": self._state != "CALIBRATING",
+            # S5's obstacle fields: all 0 until a scenario fills them.
+            "closest": 0, "angle": self._angle,
+            "width": self._profile["width"],
+            "clear_l": self._profile["clear_l"],
+            "clear_r": self._profile["clear_r"]}
+        if scn is not None:
+            # The scenario's own states replace the free-running ones.
+            view.update({key: int(scn[key]) for key in (
+                "motion", "klass", "line", "ctrl", "hump_state", "closest",
+                "angle") if key in scn})
+            view["b_estop"] = bool(scn.get("b_estop", False))
+            if view["line"] != 0:
+                view["outer"], view["centre"] = 0, 0
+                view["b_overshoot"] = False
+            self._angle = view["angle"]     # The last ping's servo angle.
+        return view
 
     def _fire(self, name):
         """One scripted or simulator-button event (model lock held)."""
@@ -794,7 +937,10 @@ class FakeCar:
             "peak_mm": 25 if humps > 0 else 0,
             "hump_count": min(humps, 15), "motion_class": view["klass"],
             "turn_dps": view["turn_dps"], "b_imu_ok": True,
-            "b_cal_done": view["b_cal_done"]}
+            "b_cal_done": view["b_cal_done"],
+            "closest_mm": view["closest"], "angle_idx": view["angle"],
+            "width_mm": view["width"], "clear_l_mm": view["clear_l"],
+            "clear_r_mm": view["clear_r"]}
         self.on_line(sub_line(False, self._topic["telemetry"],
                               pack(s1_decode.TELEMETRY, values)))
 
@@ -939,6 +1085,10 @@ class FakeCar:
         self._tel_drop = 0
         self._connect_count = 1
         self._hb_seq = 0
+        with self._model_lock:
+            self._scn = None
+            self._profile = {"width": 0, "clear_l": 0, "clear_r": 0}
+            self._angle = 0
         self.on_sim(self._state, "fake car console: power-up, CALIBRATING; "
                     "S3 NAV MAP %s (default)" % s1_decode.map_text(self._map))
         if b_quiet:
@@ -1000,6 +1150,16 @@ class FakeCar:
                         "s4_impact", "s4_hump"):
             with self._model_lock:
                 self._fire(action[3:])
+        elif action.startswith("scn_") and (
+                action[4:] in self.SCENARIOS):
+            self._scenario_start(action[4:])
+        elif action == "scn_stop":
+            with self._model_lock:
+                name = self._scn[0] if self._scn else None
+                self._scn = None
+            self.on_sim(self._state, "fake car console: " + (
+                "scenario %s stopped" % name if name else "no scenario "
+                "is running"))
         elif action in ("retained_cmd", "retained_clear"):
             # Another client publishes on <prefix>/cmd/test with retain: a
             # RESET with cmd_id 42, or the empty message that clears it.
@@ -1019,6 +1179,21 @@ class FakeCar:
         else:
             return False
         return True
+
+    def _scenario_start(self, name):
+        """Start a scenario, if the car is running and none is playing."""
+        with self._model_lock:
+            if self._state != self.RUNNING:
+                text = "scenario %s not started: the car is not running " \
+                    "(press START first)" % name
+            elif self._scn is not None:
+                text = "scenario %s not started: %s is still playing" % (
+                    name, self._scn[0])
+            else:
+                self._scn = [name, 0.0, 0]
+                text = "scenario %s started (%.1f s)" % (name, sum(
+                    seconds for seconds, _ in self.SCENARIOS[name]))
+        self.on_sim(self._state, "fake car console: " + text)
 
     def _set_connected(self, b_online):
         """Lose or regain the broker session (hotspot off, then on)."""
