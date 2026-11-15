@@ -157,6 +157,15 @@ python3 -I -B testing/subsystem1/s1_dashboard.py --simulate
 No broker and no car needed. The fake car does not model the
 line-sensor check: it accepts START without calibration.
 
+The page was redesigned in November 2026 (branch `s1-ui`, test S1-U26):
+summary cards, a 3D view of the car and a Developer drawer that holds
+the simulator, the detailed panels, the operator rules and the event
+log. In `--simulate`, press START, open the drawer and try the four
+scenario buttons (obstacle, junction, hump, lifted). The car's position
+in the 3D view is an estimate and drifts; most of the model's
+dimensions are placeholders until the car is measured.
+`docs/S1_dashboard.md` sections 8.3 to 8.5 and 12 have the details.
+
 ## 7. Known limits
 
 - On 8 and 10 Nov 2026, NFR15 (a STOP acked under 300 ms in at least

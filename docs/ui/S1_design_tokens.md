@@ -139,8 +139,9 @@ Not covered by the audit: which surface a coloured text really sits on
 over six scene colours, not over every pixel the renderer can produce
 (lighting makes some surfaces lighter or darker than their token).
 
-The audit is not part of `--check` yet. It joins `--check` as a step of
-S1-U26 part A in stage 4.
+The audit is also step U3 of `s1_dashboard.py --check` (S1-U26 part A).
+`run_dashboard_test.sh` proves that it bites: mutation M3 puts one
+colour literal into `app.css`, and U3 must fail.
 
 ## 6. Type
 

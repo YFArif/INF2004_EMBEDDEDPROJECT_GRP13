@@ -1,12 +1,15 @@
 # S1 laptop dashboard
 
 `testing/subsystem1/s1_dashboard.py` is the dashboard for the robot
-(one Python file, with its page in `testing/subsystem1/dashboard_ui/`): START, STOP and RESET, the ack for each command, an online light,
-the 1 Hz heartbeat and four telemetry panels (S2 motion, S3 line and
-barcodes, S4 motion sensor, S5 controller). It runs on the laptop that runs the broker,
-serves one page on `http://127.0.0.1:8765/` (that laptop only), and talks
-to the broker through `mosquitto_sub` and `mosquitto_pub`. Python
-standard library only. Test: S1-U16 in `testing/subsystem1/TEST_LOG.md`.
+(one Python file, with its page in `testing/subsystem1/dashboard_ui/`):
+START, STOP and RESET, the ack for each command, an online light, the
+1 Hz heartbeat, summary cards and a 3D view of the car, and four
+detailed telemetry panels (S2 motion, S3 line and barcodes, S4 motion
+sensor, S5 controller). It runs on the laptop that runs the broker,
+serves one page on `http://127.0.0.1:8765/` (that laptop only), and
+talks to the broker through `mosquitto_sub` and `mosquitto_pub`. Python
+standard library only. Tests: S1-U16, S1-U24 and S1-U26 in
+`testing/subsystem1/TEST_LOG.md`.
 
 > **First test with the wheels off the ground.** Put the robot on a stand
 > so the wheels turn freely, and keep a hand near the GP20 button.
@@ -238,7 +241,8 @@ green light.
 | `--ack-timeout S` | 2.0 | Seconds to wait for an ack |
 | `--simulate` | off | No broker, no robot: a fake car answers (section 12) |
 | `--banner-off` | off | Run without the retained-command banner |
-| `--check` | off | Run test S1-U16 part A (simulate mode) |
+| `--check` | off | Run tests S1-U16 part A, S1-U24 part D and S1-U26 parts A and D (simulate mode, 25 steps) |
+| `--token-audit` | off | Check the contrast of the page's colours (`docs/ui/S1_design_tokens.md` section 5) and stop |
 
 ## 8. What the page shows
 
@@ -255,7 +259,7 @@ green light.
 | Heartbeats lost | Gaps in the heartbeat sequence since the dashboard started (heartbeats use QoS 0, so a few can go missing). A robot restart does not count |
 | Telemetry / live lost | Gaps in each message's sequence since the dashboard started: messages the robot handed to the driver that never arrived. A gap of more than 25 is read as a restart and not counted |
 | Red banner | A retained command is stored on `<prefix>/cmd/...` (section 11) |
-| Amber banner | That retained command was cleared |
+| Orange-edged banner | That retained command was cleared |
 | "banner unavailable" (under the header) | The banner is off: `--banner-off`, an old `mosquitto_sub`, or a broker without MQTT v5 |
 
 **Buttons.** STOP is always enabled; the Escape key also sends STOP.
@@ -288,6 +292,10 @@ the ack's arrival, both on the laptop's clock, so it includes
 `mosquitto_pub`'s own start-up.
 
 ### 8.1 The telemetry panels
+
+The four detailed panels are in the Developer drawer (section 8.3). The
+summary cards and the 3D view on the main page read the same two
+messages.
 
 Two messages on `<prefix>/telemetry` feed them (layouts in
 `docs/S1_binary_frame.md`): the 2 Hz telemetry frame (type 1, 25 bytes)
@@ -523,6 +531,56 @@ been measured there.
 `scene.js`. Three are measured (track 112 mm, rolling diameter 66.5 mm,
 axle to caster 77.5 mm, all from the firmware). Every other one is
 marked PLACEHOLDER: it was read off photos and waits for a ruler.
+
+### 8.5 How the page is served and tested
+
+**Served files.** The server sends `/` (`index.html`, with the page
+token and the Code 39 table filled into a JSON data block) and the nine
+files of its list `STATIC_FILES`, each with a fixed `Content-Type`:
+`tokens.css`, `app.css`, `app.js`, `scene.js`, the Inter font and its
+licence text under `fonts/`, and three.js (two files) and its licence
+text under `vendor/three/`. A request is looked up in the list by its
+exact path. No path is ever joined to a folder, so `..`, encoded dots, a
+backslash or a NUL byte only give 404. To serve a new file, add it to
+`STATIC_FILES` and to the list in step U1 of `--check`.
+
+**Headers.** Every one of these answers carries `Cache-Control:
+no-store`, `X-Content-Type-Options: nosniff` and this
+Content-Security-Policy: `default-src 'none'; script-src 'self';
+style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self';
+frame-ancestors 'none'; base-uri 'none'; form-action 'none'`. So the
+page runs no inline script and no inline style, loads nothing from
+another site and cannot be shown inside a frame. A request with a wrong
+`Host` header gets 403, and a POST still needs the page token.
+
+**Third-party files.** Inter and three.js are listed in
+`dashboard_ui/THIRD_PARTY_NOTICES.md` with version, source, SHA-256 and
+licence. That file also says how to update one. `--check` compares each
+file under `fonts/` and `vendor/` with its SHA-256 there.
+
+**Tests** (S1-U26 in `TEST_LOG.md`). `--check` runs four steps after
+the S1-U16 and S1-U24 ones:
+
+| Step | Checks |
+|---|---|
+| U1 | The static route: the list, the headers and body of every file, 15 paths that must give 404, the wrong-Host refusal |
+| U2 | No `http://` or `https://` in a served file (licence texts, XML namespaces and `vendor/` excepted), and the third-party files against the notices |
+| U3 | The colour contrast audit (`--token-audit`) |
+| U4 | The four simulator scenarios: the same bytes twice, and what the decoded frames show |
+
+`sh testing/subsystem1/run_dashboard_test.sh` runs `--check` and then
+ten mutations, each of which one named step must catch. It takes about
+seventeen minutes.
+
+Two tools for a person, both against a `--simulate` dashboard only:
+`testing/subsystem1/ui_shots.py` saves screenshots through a headless
+Firefox (viewports, both themes, contrast, reduced transparency and
+motion, the cameras, WebGL off), and
+`testing/subsystem1/ui_font_probe.py` checks in a headless Chromium
+that a Windows machine gets Inter and a Mac gets the system font.
+
+Not tested by a program: how the page looks, the 3D picture, and the
+frame rate on the school laptop.
 
 ## 9. Operator rules
 
