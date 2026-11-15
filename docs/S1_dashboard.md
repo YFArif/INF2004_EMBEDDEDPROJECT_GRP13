@@ -470,7 +470,7 @@ cylinders. It is not a scan of the car.
 | Heading | `heading` (live) | Zero is the heading at power-up, not north. Positive is left |
 | Position and trail | `dist_mm` (telemetry) with the heading | An estimate, see below |
 | Body pitch and roll | `pitch`, `roll` (telemetry), eased | Positive pitch is nose up, positive roll is left side up (`subsystem4.h`). The body follows up to 0.5 s late, because the values come at 2 Hz. That is expected |
-| Sensor head and beam | `angle_idx` (telemetry) | Servo angle = `angle_idx` x 7.5 degrees, with 90 drawn as straight ahead and a 30 degree beam. **Nominal**: the servo sweep is not measured yet, and the chip in the view says so. `angle_idx` is 0 until S5 has pinged, which draws the beam to the right |
+| Sensor head and beam | `angle_idx` (telemetry) | Servo angle = `angle_idx` x 7.5 degrees, with 90 drawn as straight ahead and a 30 degree beam. **Nominal**: the servo sweep is not measured yet, and the chip in the view says so. `angle_idx` is 0 until S5 has pinged, which would draw the beam to the right. So the beam, the sensor's turn and the "nominal" chip stay hidden until the first frame with `closest_mm` above 0, and are hidden again when the robot restarts |
 | Orange block and its label | `closest_mm` above 0 (telemetry), `width_mm` | No block when `closest_mm` is 0 (no echo). The beam is then drawn 400 mm long and fainter |
 | Front bar colour | `line_state` (live) | Green FOLLOW, blue JUNCTION, orange SEARCH, red LOST, grey otherwise. The words are in the Line card |
 | IR module lamps | `n_centre`, `n_outer` (live) | Brighter with the reading |

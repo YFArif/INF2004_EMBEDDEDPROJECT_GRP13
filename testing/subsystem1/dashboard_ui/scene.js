@@ -464,7 +464,8 @@ function start() {
                 telL: 0, telR: 0};
   const now = {x: 0, z: 0, heading: 0, pitch: 0, roll: 0, speedL: 0,
                speedR: 0, servo: 0, camHeading: 0};
-  const state = {cam: "chase", b_hold: false, b_impact: false, shakeAt: null,
+  const state = {cam: "chase", b_hold: false, b_impact: false, b_beam: false,
+                 shakeAt: null,
                  lineName: null, irCentre: 0, irOuter: 0, closest: 0,
                  width: 0, lastTel: null, lastLive: null, uptime: null,
                  b_dirty: true, frames: 0, lastFrame: null, raf: null,
@@ -537,9 +538,15 @@ function start() {
     applySpeeds();
     want.pitch = (msg.pitch_deg || 0) * Math.PI / 180;
     want.roll = (msg.roll_deg || 0) * Math.PI / 180;
-    want.servo = ((msg.angle_idx || 0) * 7.5 - CAR.servoCentreDeg)
-      * Math.PI / 180;
     state.closest = msg.closest_mm || 0;
+    // angle_idx is 0 until S5 has pinged, and 0 would draw the beam to the
+    // car's right. So the beam and the sensor's turn wait for the first
+    // frame with an echo (closest_mm above 0).
+    if (state.closest > 0) { showBeam(true); }
+    if (state.b_beam) {
+      want.servo = ((msg.angle_idx || 0) * 7.5 - CAR.servoCentreDeg)
+        * Math.PI / 180;
+    }
     state.width = msg.width_mm || 0;
     estimate.onTelemetry(msg, entry.at);
     // Class 6 (LIFTED_OVERTURNED) stays for as long as the stop is
@@ -556,8 +563,16 @@ function start() {
     if ((state.uptime !== null) && (typeof msg.uptime_s === "number")
         && (msg.uptime_s < state.uptime)) {
       clearEstimate();            // The robot restarted.
+      showBeam(false);
     }
     if (typeof msg.uptime_s === "number") { state.uptime = msg.uptime_s; }
+  }
+
+  function showBeam(b_show) {
+    state.b_beam = b_show;
+    cone.visible = b_show;
+    byId("cone-note").hidden = !b_show;
+    if (!b_show) { want.servo = 0; }
   }
 
   function clearEstimate() {
@@ -777,6 +792,7 @@ function start() {
     + ", WebGL " + (gl.getParameter(gl.VERSION) || "")
     + ", pixel ratio " + renderer.getPixelRatio();
 
+  showBeam(false);
   repaint();
   resize();
   if (window.s1Last.live) { onLive(window.s1Last.live); }
