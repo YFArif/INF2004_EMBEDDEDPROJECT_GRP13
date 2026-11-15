@@ -58,9 +58,14 @@ SHOTS = (
     ("light_drawer_1920x950", 1920, 950, "light", {}, "drawer"),
     ("dark_drawer_1920x950", 1920, 950, "dark", {}, "drawer"),
     ("light_inter_forced_1920x950", 1920, 950, "light", {}, "inter"),
+    ("light_cam_top_1920x950", 1920, 950, "light", {}, "top"),
+    ("light_cam_side_1920x950", 1920, 950, "light", {}, "side"),
+    ("dark_cam_top_1920x950", 1920, 950, "dark", {}, "top"),
+    ("light_no_webgl_1920x950", 1920, 950, "light",
+     {"webgl.disabled": True}, ""),
 )
 ALL_PREFS = ("ui.useAccessibilityTheme", "ui.prefersReducedTransparency",
-             "ui.prefersReducedMotion")
+             "ui.prefersReducedMotion", "webgl.disabled")
 SCHEME_PREF = "layout.css.prefers-color-scheme.content-override"
 SCHEME_VALUE = {"dark": 0, "light": 1}
 REPORT_JS = """
@@ -77,13 +82,20 @@ return {
   font: root.className,
   font_family: getComputedStyle(document.body).fontFamily,
   mode: document.getElementById("mode").textContent,
-  link: document.getElementById("robot-text").textContent
+  link: document.getElementById("robot-text").textContent,
+  scene: Boolean(window.s1SceneReady),
+  scene_fallback: !document.getElementById("scene-fallback").hidden,
+  fps: document.getElementById("fps").textContent
 };
 """
 # Page tweaks are made from outside, after load, for one screenshot.
 TWEAK_JS = {
     "": "return null;",
     "drawer": "document.getElementById('dev-open').click(); return null;",
+    "top": ("document.querySelector('[data-cam=top]').click();"
+            "return null;"),
+    "side": ("document.querySelector('[data-cam=side]').click();"
+             "return null;"),
     # Shows Inter and its tracking on an Apple machine, where app.js
     # chooses the system font. ui_font_probe.py tests the choice itself.
     "inter": ("const r = document.documentElement;"
@@ -150,6 +162,9 @@ class Marionette:
         if value is None:
             self.script("Services.prefs.clearUserPref(%s);"
                         % json.dumps(name), chrome=True)
+        elif isinstance(value, bool):
+            self.script("Services.prefs.setBoolPref(%s, %s);"
+                        % (json.dumps(name), json.dumps(value)), chrome=True)
         else:
             self.script("Services.prefs.setIntPref(%s, %d);"
                         % (json.dumps(name), value), chrome=True)
@@ -209,7 +224,7 @@ def take(browser, url, shot, out_dir, stage):
     browser.call("WebDriver:Navigate", {"url": url})
     time.sleep(SETTLE_S)
     browser.script(TWEAK_JS[tweak])
-    time.sleep(0.6)
+    time.sleep(1.5)
     report = browser.script(REPORT_JS)
     if "SIMULATED" not in report["mode"]:
         raise RuntimeError("not a --simulate dashboard: no screenshot taken")
