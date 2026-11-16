@@ -392,6 +392,28 @@ s5_links_line_side (void)
 }
 
 /*!
+ * @brief S3's junction counter (IF-S3b; it only reads S3's status). S3
+ *        adds one for every junction it passes, so a junction is not
+ *        missed even when its event arrives together with a barcode.
+ *
+ * @return 0 ... 255, wrapping: compare differences only. 0 while S3 is
+ *         not in use.
+ */
+uint32_t
+s5_links_junction_count (void)
+{
+    s3_line_status_t status = {0};
+    uint32_t         count  = 0u;
+
+    if (g_b_line_used && (E_OK == s3_get_line_status(&status)))
+    {
+        count = status.junctions;
+    }
+
+    return (count);
+}
+
+/*!
  * @brief Tell whether S3 has lost the line right now (IF-S3b; it only
  *        reads S3's status). S3 raises FLG_S3_LOST once, on entering
  *        LOST; this catches a LOST entered while the event was not being

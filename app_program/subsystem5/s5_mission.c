@@ -15,11 +15,17 @@
  *   robot tipped over (EV_OVERTURNED) is a FAULT. Both are acted on while
  *   running and during the Button 2 sweep (lifted cancels it, back to
  *   READY); S4 brakes the motors itself (MF_ESTOP).
- * - A barcode command waits until EV_JUNCTION, or at most
- *   S5_JUNCTION_MAX_MM of travel (assumption A11). A newer barcode
- *   replaces an unexecuted one.
- * - An obstacle stop from any running state starts OBSTACLE_AVOIDANCE;
- *   a pending barcode command is then dropped (and logged).
+ * - A barcode command is held until the next junction S3 reports (its
+ *   event, or its junction counter moving on, so a junction arriving in
+ *   the same tick as the barcode still counts). It is kept through a
+ *   line search and through obstacle avoidance: afterwards the robot
+ *   approaches the next junction again (Anna, 2026-11-17). Junctions
+ *   while a found line is still being confirmed do not count: that is
+ *   the robot crossing the line. With S3 it never turns blind; after
+ *   NAV_GIVE_UP_MM of following without a junction the command is
+ *   cancelled. Without S3 (floor tests) it turns after S5_JUNCTION_MM
+ *   (assumption A11). A newer barcode replaces an unexecuted one.
+ * - An obstacle stop from any running state starts OBSTACLE_AVOIDANCE.
  * - Line loss: stop and sweep, first towards the side S3 last steered
  *   to, while S3 searches; FAULT if the line is not found (FR15).
  * - A line found by a search or after a bypass counts only once S3 has
@@ -48,8 +54,14 @@
  *
  * @par Calibrating S3's line sensors (FR2)
  * Button 2 in READY, with the robot on the line: S3 forgets its levels
- * and the robot turns +30, -60, +30 degrees on the spot, so both
- * sensors pass over white and black. Nothing moves at power-up.
+ * and the robot turns on the spot to headings of +15, 0, -15 and 0
+ * degrees from where it stood, so both sensors cross the 18 mm line both
+ * ways (about 33 mm each way at 15 degrees). Each turn is steered to its
+ * heading: after it, the wheels settle, S2's odometry heading is read,
+ * and more than CAL_TOL_DEG off, the robot turns by the difference, at
+ * most CAL_FIX_TRIES times. It ends where it started, still on the line
+ * for Button 1 (Sean's sweep from S3's drive test, b39ab6b; the fixed
+ * 45, -90, 45 turns drifted about 1 cm). Nothing moves at power-up.
  *
  * @par Without S3 (s5_links_line_is_ready() false)
  * A START is refused while S3 is in use but not calibrated. Switched off
@@ -71,7 +83,9 @@
 #define SLOW_NEAR_MMS       (60u)       /* Under 35 cm (FR9).            */
 #define CAL_TIMEOUT_MS      (3000u)     /* Then go on without the IMU.   */
 #define S5_JUNCTION_MM      (150)       /* TODO: measure (A11, INT-01).  */
-#define S5_JUNCTION_MAX_MM  (500)       /* With S3: then turn anyway.    */
+#define NAV_GIVE_UP_MM      (2000)      /* With S3: no junction this far */
+                                        /* after a barcode: cancel it.   */
+#define JUNC_COUNT_MASK     (0xFFu)     /* S3's 8-bit junction counter.  */
 #define REACQUIRE_MM        (300)       /* NFR10.                        */
 #define TURN_MS_PER_DEG     (20u)
 #define MOTION_SLACK_MS     (2000u)
@@ -88,7 +102,11 @@
                                         /* a barcode bar or thin cross.  */
 #define BACK_MARGIN_MM      (20)        /* Added to the measured reverse.*/
 #define BACK_MAX_MM         (250)       /* Never reverse further.        */
-#define CAL_SWEEP_STEPS     (3u)
+#define CAL_TARGETS         (4u)        /* Headings in g_cal_target_deg. */
+#define CAL_TOL_DEG         (2)         /* Further off: turn the rest.   */
+#define CAL_FIX_TRIES       (3u)        /* Corrections per heading.      */
+#define CDEG_PER_DEG        (100)
+#define CDEG_HALF_TURN      (18000)
 #define SLOW_MMS            (40u)       /* Calibration and recovery: S3  */
                                         /* car test 29 Oct, 150 abrupt.  */
 #define SLOW_MS_PER_DEG     (80u)       /* About 3 x the time at 40 mm/s.*/
@@ -127,11 +145,10 @@ static const recovery_step_t g_search[SEARCH_STEPS] =
     {false, 90}, {false, -180}, {false, 90}
 };
 
-/* Calibration sweep: left, right past the start, back to the start. 30
- * degrees left the centre sensor short of the line (log
- * 2026-11-04_1701_track: GP27 range 568, S3 needs 600).
+/* Calibration sweep: headings from the start, + = left (see
+ * "Calibrating S3's line sensors" above).
  */
-static const int16_t g_cal_sweep_deg[CAL_SWEEP_STEPS] = {45, -90, 45};
+static const int16_t g_cal_target_deg[CAL_TARGETS] = {15, 0, -15, 0};
 
 /** Everything the mission remembers between steps. The state and the
  *  flags share one word at the end (minimum-bit requirement); times and
@@ -157,11 +174,15 @@ typedef struct
                                             /* waiting for the IMU.      */
     uint32_t                wait_start_ms;  /* Current TURN, or the      */
     uint32_t                wait_limit_ms;  /* calibration, started.     */
+    int32_t                 cal_start_cdeg; /* Heading at Button 2.      */
+    uint32_t                cal_tries;      /* Corrections at this one.  */
     unsigned int            state         : 4;  /* ..._ctrl_state_t.     */
     unsigned int            b_nav_pending : 1;  /* Barcode not acted on. */
     unsigned int            b_confirming  : 1;  /* Found line not sure.  */
     unsigned int            b_bypass_find : 1;  /* Found by a bypass.    */
     unsigned int            b_black       : 1;  /* A sensor sees black.  */
+    unsigned int            junc_from     : 8;  /* S3's junction count   */
+                                                /* when approaching began*/
 } mission_t;
 
 /* The state enum must fit its field; a misfit stops the build here. */
@@ -170,8 +191,8 @@ typedef char mission_state_check[(S5_CTRL_FINISHED <= S5_CTRL_STATE_MASK)
 
 static mission_t g_mission = {0u, 0u, 0u, 0u, 0, 0u, 1, 0,
                               S5_LINKS_SIDE_NONE, 0, 0u, 0, 0, 0, 0u, 0u,
-                              0u, S5_CTRL_INIT, false, false, false,
-                              false};
+                              0u, 0, 0u, S5_CTRL_INIT, false, false,
+                              false, false, 0u};
 
 /* In test images the controller ignores events until a test arms it, so
  * the S2 tests that run first are never disturbed.
@@ -186,13 +207,16 @@ static void set_state(subsystem5_ctrl_state_t state);
 static bool is_running(void);
 static void step_calibrating(uint32_t events, uint32_t now_ms);
 static void step_cal_sweep(uint32_t events, uint32_t now_ms);
-static int32_t junction_limit_mm(void);
+static int32_t cal_error_deg(int32_t target_deg);
 static s5_links_side_t reacquire_side(void);
 static void step_running(uint32_t events, uint32_t now_ms);
 static void step_route(uint32_t events, uint32_t now_ms);
 static bool obstacle_stopped(uint32_t events, uint32_t now_ms);
 static void adjust_speed(uint32_t events);
 static void take_barcodes(void);
+static void start_approach(void);
+static bool junction_reached(uint32_t events);
+static void resume_approach(void);
 static void execute_command(uint32_t now_ms);
 static void step_turning(uint32_t events, uint32_t now_ms);
 static void start_reacquire(void);
@@ -356,8 +380,10 @@ s5_mission_calibrate (uint32_t now_ms)
         s5_links_line_recalibrate();
         s5_links_motion_release();
         set_state(S5_CTRL_CALIBRATING);
-        start_slow_turn(g_cal_sweep_deg[0], now_ms);
-        g_mission.cal_step = 1u;
+        g_mission.cal_start_cdeg = s5_links_odom_heading_cdeg();
+        g_mission.cal_tries      = 0u;
+        g_mission.cal_step       = 1u;
+        start_slow_turn(cal_error_deg(g_cal_target_deg[0]), now_ms);
     }
 }
 
@@ -451,21 +477,42 @@ step_calibrating (uint32_t events, uint32_t now_ms)
 }
 
 /*!
- * @brief The line-sensor sweep: next turn after each one; READY after
- *        the last, with S3's result logged.
+ * @brief The line-sensor sweep: after each turn, correct it if it ended
+ *        more than CAL_TOL_DEG off its heading, else turn to the next
+ *        heading; READY after the last, with S3's result logged.
  *
  * @param[in] events Mission events.
  * @param[in] now_ms Current time.
+ *
+ * NOTE: cal_step is 1 ... CAL_TARGETS: the heading being turned to.
  */
 static void
 step_cal_sweep (uint32_t events, uint32_t now_ms)
 {
     if (0u != (events & EV_MOTION_DONE))
     {
-        if (g_mission.cal_step < CAL_SWEEP_STEPS)
+        // NOTE: The cast is safe: cal_step is 1 ... CAL_TARGETS here.
+        int32_t target = g_cal_target_deg[g_mission.cal_step - 1u];
+
+        // Let the wheels stop before reading where the turn ended.
+        s5_links_motion_settle();
+
+        int32_t error = cal_error_deg(target);
+
+        if ((s5_math_abs(error) > CAL_TOL_DEG)
+            && (g_mission.cal_tries < CAL_FIX_TRIES))
         {
-            start_slow_turn(g_cal_sweep_deg[g_mission.cal_step], now_ms);
+            g_mission.cal_tries++;
+            s5_event_trace("CAL correcting: target_deg error_deg", target,
+                           error);
+            start_slow_turn(error, now_ms);
+        }
+        else if (g_mission.cal_step < CAL_TARGETS)
+        {
+            g_mission.cal_tries = 0u;
             g_mission.cal_step++;
+            start_slow_turn(cal_error_deg(g_cal_target_deg[
+                                g_mission.cal_step - 1u]), now_ms);
         }
         else
         {
@@ -558,6 +605,12 @@ step_route (uint32_t events, uint32_t now_ms)
             if (0u != (events & EV_BARCODE))
             {
                 take_barcodes();
+
+                // The junction may have come in the same tick.
+                if (junction_reached(events))
+                {
+                    execute_command(now_ms);
+                }
             }
             else if (line_is_lost(events))
             {
@@ -574,14 +627,27 @@ step_route (uint32_t events, uint32_t now_ms)
             update_line_mark();
             check_confirm();
 
+            // A newer barcode replaces the command; its junction may
+            // come in the same tick, so this is not an else.
             if (0u != (events & EV_BARCODE))
             {
                 take_barcodes();
             }
-            else if ((0u != (events & EV_JUNCTION))
-                     || (travelled >= junction_limit_mm()))
+
+            if (junction_reached(events)
+                || ((!s5_links_line_is_ready())
+                    && (travelled >= S5_JUNCTION_MM)))
             {
                 execute_command(now_ms);
+            }
+            else if (s5_links_line_is_ready()
+                     && (travelled >= NAV_GIVE_UP_MM))
+            {
+                // NOTE: The cast is safe: the command is 0 ... 3.
+                s5_event_trace("NAV cancelled, no junction: cmd travelled_mm",
+                               (int32_t) g_mission.nav_cmd, travelled);
+                g_mission.b_nav_pending = false;
+                set_state(S5_CTRL_LINE_FOLLOWING);
             }
             else if (line_is_lost(events))
             {
@@ -628,10 +694,11 @@ obstacle_stopped (uint32_t events, uint32_t now_ms)
     {
         if (g_mission.b_nav_pending)
         {
+            // Kept: after the bypass the robot approaches the next
+            // junction (resume_approach()).
             // NOTE: The cast is safe: the command is 0 ... 3.
-            s5_event_trace("NAV dropped for obstacle: cmd 0",
+            s5_event_trace("NAV kept through the obstacle: cmd 0",
                            (int32_t) g_mission.nav_cmd, 0);
-            g_mission.b_nav_pending = false;
         }
 
         s5_links_line_enable(false);
@@ -688,8 +755,71 @@ take_barcodes (void)
 
         g_mission.b_nav_pending = true;
         g_mission.nav_cmd       = msg.cmd;
-        g_mission.mark_mm       = s5_links_odom_dist_mm();
-        set_state(S5_CTRL_APPROACH_JUNCTION);
+        start_approach();
+    }
+}
+
+/*!
+ * @brief Approach the next junction for the pending command: from here,
+ *        count S3's junctions and measure the distance.
+ */
+static void
+start_approach (void)
+{
+    g_mission.junc_from = s5_links_junction_count() & JUNC_COUNT_MASK;
+    g_mission.mark_mm   = s5_links_odom_dist_mm();
+    set_state(S5_CTRL_APPROACH_JUNCTION);
+}
+
+/*!
+ * @brief With a command pending: has the robot reached a junction since
+ *        the approach began? S3's event, or its junction counter moved
+ *        on (it catches a junction whose event came with the barcode).
+ *
+ * @param[in] events Mission events.
+ *
+ * @return true if a junction counts. Never while a found line is still
+ *         being confirmed: that "junction" is the robot crossing the line
+ *         at an angle (the line-loss rules handle it); the count starts
+ *         again from there.
+ */
+static bool
+junction_reached (uint32_t events)
+{
+    uint32_t count     = s5_links_junction_count() & JUNC_COUNT_MASK;
+    bool     b_reached = false;
+
+    if (!g_mission.b_nav_pending)
+    {
+        // Nothing to do at a junction.
+    }
+    else if (g_mission.b_confirming)
+    {
+        g_mission.junc_from = count & JUNC_COUNT_MASK;
+    }
+    else
+    {
+        b_reached = (0u != (events & EV_JUNCTION))
+                    || (count != (uint32_t) g_mission.junc_from);
+    }
+
+    return (b_reached);
+}
+
+/*!
+ * @brief Following again after a line search or a bypass: with a command
+ *        still pending, approach the next junction instead (Anna,
+ *        2026-11-17: after avoiding an obstacle it forgot the turn).
+ */
+static void
+resume_approach (void)
+{
+    if (g_mission.b_nav_pending)
+    {
+        // NOTE: The cast is safe: the command is 0 ... 3.
+        s5_event_trace("NAV kept: approaching the next junction cmd 0",
+                       (int32_t) g_mission.nav_cmd, 0);
+        start_approach();
     }
 }
 
@@ -813,18 +943,6 @@ reacquire_side (void)
     }
 
     return (side);
-}
-
-/*!
- * @brief How far to drive after a barcode before turning anyway.
- *
- * @return S5_JUNCTION_MAX_MM while S3 can report the junction itself,
- *         else S5_JUNCTION_MM.
- */
-static int32_t
-junction_limit_mm (void)
-{
-    return (s5_links_line_is_ready() ? S5_JUNCTION_MAX_MM : S5_JUNCTION_MM);
 }
 
 /*!
@@ -1074,6 +1192,7 @@ step_recovery (uint32_t events, uint32_t now_ms)
         s5_links_motion_stop();
         resume_following();
         begin_confirm(false);
+        resume_approach();
     }
     else if (0u != (events & EV_MOTION_DONE))
     {
@@ -1120,6 +1239,7 @@ step_avoidance (uint32_t events, uint32_t now_ms)
         case S5_AVOID_RESUME:
             resume_following();
             begin_confirm(true);
+            resume_approach();
         break;
 
         case S5_AVOID_PLAN_ONLY:
@@ -1295,6 +1415,39 @@ finish_run (uint32_t now_ms)
 }
 
 /*!
+ * @brief The calibration sweep: the turn from S2's odometry heading now
+ *        to a heading relative to where the robot stood at Button 2.
+ *
+ * @param[in] target_deg Heading from the start, + = left.
+ *
+ * @return Whole degrees, + = left, the shorter way round.
+ */
+static int32_t
+cal_error_deg (int32_t target_deg)
+{
+    int32_t diff = (g_mission.cal_start_cdeg + (target_deg * CDEG_PER_DEG))
+                   - s5_links_odom_heading_cdeg();
+
+    if (diff > CDEG_HALF_TURN)
+    {
+        diff -= 2 * CDEG_HALF_TURN;
+    }
+    else if (diff < -CDEG_HALF_TURN)
+    {
+        diff += 2 * CDEG_HALF_TURN;
+    }
+    else
+    {
+        // Already the shorter way.
+    }
+
+    // Round to whole degrees.
+    return ((diff + ((diff >= 0) ? (CDEG_PER_DEG / 2)
+                                 : -(CDEG_PER_DEG / 2)))
+            / CDEG_PER_DEG);
+}
+
+/*!
  * @brief READY: braked, line following off, obstacle_task idle.
  */
 static void
@@ -1312,7 +1465,8 @@ enter_ready (void)
  *
  * @param[in] fault The reason.
  *
- * TODO: Buzzer pattern on GP22 (Week 6 report section 5).
+ * TODO: Buzzer pattern for a fault, through S3's buzzer function once S3
+ * offers one (S3 owns GP22, TEAM.md; Week 6 report section 5).
  */
 static void
 enter_fault (subsystem5_ctrl_fault_t fault)
