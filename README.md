@@ -256,7 +256,8 @@ the same folder). This guide does not cover them: see
 
 One command starts the S1 broker and dashboard:
 `python3 -I -B testing/subsystem1/s1_launch.py` (Windows: double-click
-`testing\subsystem1\run_dashboard.bat`).
+`testing\subsystem1\run_dashboard.bat`). First time? Start with
+`docs/S1_quickstart.md`.
 
 ---
 
