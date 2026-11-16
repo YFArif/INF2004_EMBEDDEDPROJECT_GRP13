@@ -1,0 +1,50 @@
+S1-U16 part A, S1-U24 part D and S1-U26 parts A and D run_dashboard_test.sh, 2026-11-17 04:20:19 +0800
+commit: dc95599 (clean tree)
+python: Python 3.13.7
+== stage 1: --check
+S1-U16 part A, S1-U24 part D and S1-U26 parts A and D: s1_dashboard.py --check (simulate mode, no broker)
+A1  PASS: page 200 on 127.0.0.1; refused on 1 of 1 other IPv4 addresses; wrong Host 403; no token 403; wrong token 403; text/plain 415; op as a list 400, as a number 400; page headers CSP, nosniff and no-store: True; /api/sim in live mode 404
+A3  PASS: first event snapshot; status online (retained True): True; light green 0.000 s after the first heartbeat; rssi text 'not measured'
+A4  PASS: fake car READY: True; START 200, cmd_id 0; second START 409; START disabled then enabled: True; ack matched, queued, 75.0 ms
+A5  PASS: cmd_ids 1..63 then 0..6 as expected: True; acks matched to their own id: 70 of 70; unmatched 0; no ack 0; payload and cmd event agree with the reply's cmd_id: 70 of 70
+A6  PASS: START 200; ack matched, result 1, label rejected
+A7  PASS: dropped ack: no_ack after 2.14 s; delayed ack: no_ack, then late queued (late) 3017.2 ms; doubled ack: first matched, second duplicate
+A8  PASS: light red 3.004 s after the last heartbeat; START and RESET disabled, STOP enabled: True; STOP published while red: True; green after the resume: True
+A9  PASS: offline status and red light: True, logged: True; online and green again: True; connect_count 1 -> 2 logged: True
+A2  PASS: STOP tag without disabled: True; no script line disables it: True; stop true in all 9 controls events and the snapshot: True
+A13 PASS: cmd_rtt self-test: PASS; golden ACK 158500: STOP id 5 queued; 75 ack labels all queued, rejected or reserved: True; forbidden words in 151 cmd and ack events: none
+04:20:44.221  broker: connected
+A14 PASS: 4 telemetry and 10 live events in 2 s (about 4 and 10): True; state holds both with ages under 2 s: True; one S4 impact counted once (0 -> 1): True; S3 sim events give barcode, reject, junction and lost entries and a tally: True; page has the four panels: True; tel_drop 0 before the run, then 3 in a heartbeat, 3 in /api/state, 3 (text '3') in a new page's snapshot: True; in-process probe first ok, tally ok, kinds ok, texts ok, jump ok, rebase ok, restart ok, impact ok, lost ok, hb_restart ok, hb_gap ok, seq_gap ok, low_counter ok, tel_drop_clamp ok, snapshot_text ok
+D1  PASS: Set map dcba: 200; first status 'Sending DCBA (try 1 of 3)'; payload a MAP with the reply's id 1 and DCBA: True; then 'Applied on the robot: LEFT=D RIGHT=C STRAIGHT=B U-TURN=A (acked 04:20:49)'; fake car console line: True
+D2  PASS: DDBA, D*BA, DCB, DCB?: [400, 400, 400, 400], nothing published: True; BADC with the car told to refuse: 200, 'REFUSED: the robot refused BADC and kept its map. Applied on the robot: LEFT=D RIGHT=C STRAIGHT=B U-TURN=A (acked 04:20:49)'; sends 1 (no retry); map kept for the next re-send: DCBA
+D3  PASS: offline then online: True; sent again because of online: True; applied: True; console DCBA again: True; restart seen in the heartbeat: True; sends after online: 1 (expected 1)
+D4  PASS: no status message: True; uptime went down: True; sent again because of the restart: True; applied: True; console DCBA again: True
+D5  PASS: WXYZ with every MAP ack dropped: 200; sends 3, gaps 2.21, 2.02 s; 'NOT CONFIRMED: no ack for WXYZ after 3 sends; it is sent again when the robot comes online'; sends 4 s after the third: 3
+D6  PASS: offline: True; Set map LRSU: 200, offline True, 'Robot offline: LRSU is kept and sent when it comes online', nothing published: True; online: sent True, applied True
+D7  PASS: check_no_retain refuses -r and --retain: 2 of 2; 85 publishes (8 MAP sends) all -q 1, -t s1u16/cmd/dash, -s, no retain: True; /api/map with no token 403, wrong token 403, letters as a number 400, as a list 400
+U1  PASS: STATIC_FILES is the 9 URLs of the test: True; 10 of 10 responses 200 with the literal CSP, nosniff, no-store, the fixed Content-Type and the file's bytes; 15 of 15 other paths 404; 9 of 9 wrong-Host requests 403
+U2  PASS: 10 served files, 0 with a URL outside the exemptions (licence texts, XML namespaces, vendor/); 5 files under vendor/ and fonts/: 0 without a row in THIRD_PARTY_NOTICES.md, 0 whose SHA-256 differs from its row, 0 rows without a file
+U3  PASS: token audit: 34 pairs in 4 contexts (light, dark, light more, dark more), 0 below their minimum; 0 colour literals outside tokens.css; 0 text colours outside the pairs: PASS
+U4  PASS: hump: same bytes twice True, pitch +9.5 and -9.5, hump_count +1: ok; junction: same bytes twice True, barcodes +2, junctions +2, heading +89.5 then back to +1.0, 14 live messages turning with commanded speed 0: ok; lifted: same bytes twice True, 8 frames with class 6, 20 live messages with the E-stop, last class 1: ok; obstacle: same bytes twice True, echo 588 to 150 mm, heading +39.0 and -39.5, end -1.0, profile 90/480/220: ok; pressed while READY, nothing plays and the console says so: True
+A11 PASS: 76 publishes, 0 with a wrong argument (QoS 1, topic s1u16/cmd/dash, -s, no -r or --retain, login only through -o, host scrubbed); one options file, mode 600, holding the login: True; removed after exit: True
+A12 PASS: 0 hits of the host, user or password in the page, the stream, /api/state, the log, stdout, stderr and a request handler's error; error line masked: True; handler error one masked line, no traceback: True; port and prefix from the file: True; digit-only login: json ok, number ok, masked ok
+A10 PASS: banner raised: True; in a new connection's snapshot: True; cleared: True; with --banner-off: banner unavailable: True; no banner for a retained command: True
+steps run: A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 A14 D1 D2 D3 D4 D5 D6 D7 U1 U2 U3 U4
+S1-U16 part A: PASS
+S1-U24 part D: PASS
+S1-U26 parts A and D: PASS
+stage 1: ok
+== stage 2: probe mutations
+P1 heartbeat tel_drop ignored: caught by A14 and no other step
+P2 tel_drop_text returns the plain number: caught by A14 and no other step
+N1 server's repeated-letter check removed: caught by D2 and no other step
+N2 no map re-send on online: caught by D3 D6 and no other step
+N3 no map re-send when the uptime goes down: caught by D4 and no other step
+N4 a fourth try of a map allowed: caught by D5 and no other step
+M1 /fonts/OFL.txt served from another file through ..: caught by U1 and no other step
+M2 one changed character in the vendored three.core.js: caught by U2 and no other step
+M3 a colour literal in app.css: caught by U3 and no other step
+M4 the obstacle swerve's wheel speeds changed: caught by U4 and no other step
+stage 2: 10/10 probe mutations caught (P1, P2, N1 to N4, M1 to M4)
+S1-U16 part A, S1-U24 part D and S1-U26 parts A and D: PASS (--check passed, 10/10 probe mutations caught)
+exit status: 0
