@@ -1,0 +1,71 @@
+S1-U11 run_decoder_test.sh, 2026-11-14 16:19:34 +08
+commit: f525e45
+python: Python 3.13.7
+== stage 1: golden.py --check
+golden.py --check: 25/25 vectors agree (golden.py, document 10.2, codec_vectors.c)
+stage 1: ok
+== stage 2: decoder_test.py
+test_bad_lines (__main__.CommandLine.test_bad_lines) ... ok
+test_golden_lines (__main__.CommandLine.test_golden_lines) ... ok
+test_options (__main__.CommandLine.test_options) ... ok
+test_usage (__main__.CommandLine.test_usage) ... ok
+test_command_and_ack (__main__.Describe.test_command_and_ack) ... ok
+test_fault_bits (__main__.Describe.test_fault_bits) ... ok
+test_letter_table (__main__.Describe.test_letter_table) ... ok
+test_live (__main__.Describe.test_live) ... ok
+test_telemetry (__main__.Describe.test_telemetry) ... ok
+test_telemetry_names (__main__.Describe.test_telemetry_names) ... ok
+test_bytearray (__main__.GoldenVectors.test_bytearray) ... ok
+test_count (__main__.GoldenVectors.test_count) ... ok
+test_decode (__main__.GoldenVectors.test_decode) ... ok
+test_fields (__main__.LayoutHeader.test_fields) ... ok
+test_version_types_lengths (__main__.LayoutHeader.test_version_types_lengths) ... ok
+test_differences (__main__.LiveCounters.test_differences) ... ok
+test_rebase (__main__.LiveCounters.test_rebase)
+After rebase_live() the next message is a first one again: a ... ok
+test_rebase_robot (__main__.LiveCounters.test_rebase_robot)
+After rebase_robot() every message type starts again: no lost ... ok
+test_wrap (__main__.LiveCounters.test_wrap) ... ok
+test_seq_gaps (__main__.LostFrames.test_seq_gaps) ... ok
+test_empty (__main__.Malformed.test_empty) ... ok
+test_length (__main__.Malformed.test_length) ... ok
+test_not_bytes (__main__.Malformed.test_not_bytes) ... ok
+test_type (__main__.Malformed.test_type) ... ok
+test_version (__main__.Malformed.test_version) ... ok
+test_ack_names (__main__.MapMessages.test_ack_names) ... ok
+test_command_rule_unchanged (__main__.MapMessages.test_command_rule_unchanged) ... ok
+test_describe (__main__.MapMessages.test_describe) ... ok
+test_malformed (__main__.MapMessages.test_malformed) ... ok
+test_map_bytes (__main__.MapMessages.test_map_bytes) ... ok
+test_not_judged (__main__.MapMessages.test_not_judged) ... ok
+test_raw_indices (__main__.MapMessages.test_raw_indices) ... ok
+test_tables_agree (__main__.MapMessages.test_tables_agree) ... ok
+test_padding_ignored (__main__.Padding.test_padding_ignored) ... ok
+test_rule (__main__.Reconstruction.test_rule) ... ok
+test_session (__main__.Reconstruction.test_session) ... ok
+
+----------------------------------------------------------------------
+Ran 36 tests in 0.083s
+
+OK
+stage 2: ok
+== stage 3: mutations
+M1 bit stream read little-endian: caught (FAILED (failures=52))
+M2 signed fields without the offset subtracted: caught (FAILED (failures=15))
+M3 version 0 accepted: caught (FAILED (failures=2))
+M4 longer messages accepted: caught (FAILED (failures=8))
+M5 rebase_live() keeps the counter baseline: caught (FAILED (failures=1))
+M6 rebase_robot() keeps the seq baselines: caught (FAILED (failures=1))
+N1 MAP length 6: caught (FAILED (failures=4, errors=11))
+N2 LEFT read at RIGHT's offset: caught (FAILED (failures=7))
+N3 an ack with opcode 0 named INVALID again: caught (FAILED (failures=3))
+stage 3: 9/9 mutations caught (M1 to M6, N1 to N3)
+== stage 4: drift guard (S3's Code 39 table, S1-U24)
+cc: Apple clang version 17.0.0 (clang-1700.6.4.2)
+guard: s1_decode.CODE39 matches S3 on all 44 indices
+guard: cmd_rtt.CODE39 matches S3 on all 44 indices
+guard: s3_code39_char() gives '?' for 44 to 63
+G1 s1_decode.CODE39 with - and . swapped: caught (guard: s1_decode.CODE39 differs from S3 at indices [36, 37])
+G2 cmd_rtt.CODE39 with - and . swapped: caught (guard: cmd_rtt.CODE39 differs from S3 at indices [36, 37])
+stage 4: 2/2 guard mutations caught
+S1-U11: PASS (golden.py --check ok, 36 decoder tests passed, 9/9 mutations caught, drift guard ok, 2/2 guard mutations caught)

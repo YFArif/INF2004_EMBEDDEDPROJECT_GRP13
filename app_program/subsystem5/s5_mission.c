@@ -24,6 +24,15 @@
  *   to, while S3 searches; FAULT if the line is not found (FR15).
  * - A line found by a search or after a bypass counts only once S3 has
  *   followed it for CONFIRM_MM (see "Line or barcode bar" below).
+ * - Neither sensor on black for WHITE_LOST_MM of driving also counts as
+ *   lost: S3 then still reported FOLLOW and circled slowly, and the
+ *   distance driven confirmed the line (log 2026-11-13_1444).
+ * - Lost just after a bypass found it: the robot crossed it (log
+ *   2026-11-13_1444, 56 mm), not a barcode bar. Back to where it was
+ *   seen and sweep, as for any line loss. A junction within CROSS_MM of
+ *   that hand-over counts the same: S3 holds its steering straight while
+ *   both sensors see black, so it was driving over the line (logs
+ *   2026-11-13_1538/1539).
  *
  * @par Line or barcode bar
  * A barcode lies 20 mm beside the 18 mm line and is 141 mm long (Barcode
@@ -71,6 +80,10 @@
 #define CONFIRM_MM          (120)       /* Followed this far: the line.  */
 #define REJECTS_MAX         (2u)        /* Not-the-line finds per search.*/
 #define LOST_CHECK_MM       (20)        /* Then S3's LOST state counts.  */
+#define CROSS_MM            (50)        /* Junction this soon after a    */
+                                        /* bypass hand-over: crossed it. */
+#define WHITE_LOST_MM       (100)       /* No black this far: lost (S3's */
+                                        /* own LOST comes after 40 mm).  */
 #define BLACK_STEADY_MM     (10)        /* Black this far = the line, not*/
                                         /* a barcode bar or thin cross.  */
 #define BACK_MARGIN_MM      (20)        /* Added to the measured reverse.*/
@@ -147,6 +160,7 @@ typedef struct
     unsigned int            state         : 4;  /* ..._ctrl_state_t.     */
     unsigned int            b_nav_pending : 1;  /* Barcode not acted on. */
     unsigned int            b_confirming  : 1;  /* Found line not sure.  */
+    unsigned int            b_bypass_find : 1;  /* Found by a bypass.    */
     unsigned int            b_black       : 1;  /* A sensor sees black.  */
 } mission_t;
 
@@ -156,7 +170,8 @@ typedef char mission_state_check[(S5_CTRL_FINISHED <= S5_CTRL_STATE_MASK)
 
 static mission_t g_mission = {0u, 0u, 0u, 0u, 0, 0u, 1, 0,
                               S5_LINKS_SIDE_NONE, 0, 0u, 0, 0, 0, 0u, 0u,
-                              0u, S5_CTRL_INIT, false, false, false};
+                              0u, S5_CTRL_INIT, false, false, false,
+                              false};
 
 /* In test images the controller ignores events until a test arms it, so
  * the S2 tests that run first are never disturbed.
@@ -185,7 +200,7 @@ static void step_reacquire(uint32_t events, uint32_t now_ms);
 static void start_recovery(uint32_t now_ms, bool b_reverse_first,
                            s5_links_side_t side);
 static void line_lost(uint32_t now_ms);
-static void begin_confirm(void);
+static void begin_confirm(bool b_after_bypass);
 static void check_confirm(void);
 static bool line_is_lost(uint32_t events);
 static void step_recovery(uint32_t events, uint32_t now_ms);
@@ -848,7 +863,22 @@ step_reacquire (uint32_t events, uint32_t now_ms)
 static void
 line_lost (uint32_t now_ms)
 {
-    if (g_mission.b_confirming)
+    // NOTE: The cast is safe: the flag is 0 or 1.
+    s5_event_trace("LINE lost: white_mm s3_lost",
+                   s5_links_odom_dist_mm() - g_mission.line_mark_mm,
+                   (int32_t) s5_links_line_is_lost());
+
+    if (g_mission.b_confirming && g_mission.b_bypass_find)
+    {
+        // Crossed it after the bypass: not a bar. Search forward first
+        // (S3's last side pointed back at the obstacle, log
+        // 2026-11-13_1554); a robot right of the line turns left first.
+        g_mission.b_confirming = false;
+        start_recovery(now_ms, true,
+                       s5_avoid_forward_is_left() ? S5_LINKS_SIDE_RIGHT
+                                                  : S5_LINKS_SIDE_LEFT);
+    }
+    else if (g_mission.b_confirming)
     {
         g_mission.b_confirming = false;
         g_mission.rejects++;
@@ -878,7 +908,8 @@ line_lost (uint32_t now_ms)
  * @brief While following: has the line been lost? Either S3's LOST event,
  *        or S3 still in LOST once the robot has driven LOST_CHECK_MM
  *        since FOLLOW began (S3 then holds its last steering, so the
- *        robot would circle for ever).
+ *        robot would circle for ever), or no black under either sensor
+ *        for WHITE_LOST_MM of driving (with S3 in use).
  *
  * @param[in] events Mission events.
  *
@@ -887,20 +918,35 @@ line_lost (uint32_t now_ms)
 static bool
 line_is_lost (uint32_t events)
 {
-    int32_t driven = s5_links_odom_dist_mm() - g_mission.follow_mm;
+    int32_t odom   = s5_links_odom_dist_mm();
+    int32_t driven = odom - g_mission.follow_mm;
+    bool    b_over = g_mission.b_confirming && g_mission.b_bypass_find
+                     && (0u != (events & EV_JUNCTION))
+                     && (driven < CROSS_MM);
 
-    return ((0u != (events & EV_LINE_LOST))
-            || ((driven >= LOST_CHECK_MM) && s5_links_line_is_lost()));
+    if (b_over)
+    {
+        s5_event_trace("LINE crossed after the bypass (junction): driven_mm"
+                       " 0", driven, 0);
+    }
+
+    return (b_over || (0u != (events & EV_LINE_LOST))
+            || ((driven >= LOST_CHECK_MM) && s5_links_line_is_lost())
+            || (s5_links_line_is_ready()
+                && ((odom - g_mission.line_mark_mm) >= WHITE_LOST_MM)));
 }
 
 /*!
  * @brief A search or a bypass found a line: follow it, and confirm it
  *        over CONFIRM_MM (see "Line or barcode bar" above).
+ *
+ * @param[in] b_after_bypass true if a bypass found it.
  */
 static void
-begin_confirm (void)
+begin_confirm (bool b_after_bypass)
 {
-    g_mission.b_confirming = true;
+    g_mission.b_bypass_find = b_after_bypass;
+    g_mission.b_confirming  = true;
     g_mission.confirm_mm   = s5_links_odom_dist_mm();
 }
 
@@ -1027,7 +1073,7 @@ step_recovery (uint32_t events, uint32_t now_ms)
         // Stop the sweep; resume_following() lets the wheels settle.
         s5_links_motion_stop();
         resume_following();
-        begin_confirm();
+        begin_confirm(false);
     }
     else if (0u != (events & EV_MOTION_DONE))
     {
@@ -1073,7 +1119,7 @@ step_avoidance (uint32_t events, uint32_t now_ms)
     {
         case S5_AVOID_RESUME:
             resume_following();
-            begin_confirm();
+            begin_confirm(true);
         break;
 
         case S5_AVOID_PLAN_ONLY:

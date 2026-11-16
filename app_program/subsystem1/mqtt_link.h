@@ -119,12 +119,13 @@
  */
 #define MQTT_LINK_PAYLOAD_MAX       MSG_MAX_BYTES
 
-/* Largest command payload delivered to an application, in bytes: one
- * packed COMMAND message (msg_layout.h). A longer incoming command is
- * dropped and counted in command_dropped; mqtt_link.c checks this value
- * against MSG_CMD_BYTES at compile time.
+/* Largest command payload delivered to an application, in bytes: the
+ * largest message the robot receives, MSG_IN_MAX_BYTES (msg_layout.h): a
+ * MAP is 5 bytes, a COMMAND 2. A longer incoming payload is dropped and
+ * counted in command_dropped; mqtt_link.c checks at compile time that this
+ * value is the larger of MSG_CMD_BYTES and MSG_MAP_BYTES.
  */
-#define MQTT_LINK_COMMAND_MAX       MSG_CMD_BYTES
+#define MQTT_LINK_COMMAND_MAX       MSG_IN_MAX_BYTES
 
 /* Number of messages the publish queue holds. When the queue is full a new
  * message is not queued: mqtt_link_publish() returns
@@ -225,7 +226,7 @@ typedef struct
  */
 typedef struct
 {
-    mqtt_link_state_t   state;
+    mqtt_link_state_t       state;
     int32_t                 last_error;         /* Last error or status.    */
     uint32_t                connect_count;      /* Sessions established.    */
     uint32_t                disconnect_count;   /* Sessions lost or failed. */
@@ -280,7 +281,7 @@ int32_t mqtt_link_init(void);
  *
  * @param[in] p_netif The station netif.
  */
-void mqtt_link_poll(struct netif * p_netif);
+void mqtt_link_poll(const struct netif * p_netif);
 
 /**
  * @brief Copy the driver status.
@@ -382,3 +383,4 @@ int32_t mqtt_link_receive_command(mqtt_link_command_t * p_command,
 #endif /* MQTT_LINK_H */
 
 /*** end of file ***/
+

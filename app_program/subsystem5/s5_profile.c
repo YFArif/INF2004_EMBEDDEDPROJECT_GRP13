@@ -19,9 +19,11 @@
  *    the nearest other echo beside it, looking S5_CLEAR_DEPTH_MM past
  *    the edge. With nothing seen it is S5_CLEAR_OPEN_MM.
  * 5. A side's shift (how far the rear axle moves sideways to pass) is
- *    the corrected edge (step 2) plus half the robot and
- *    S5_PATH_MARGIN_MM. The untrimmed edge made every detour about 3 cm
- *    wider than needed (logs 2026-11-11_1744/1746). It was untrimmed
+ *    the corrected edge (step 2) plus s5_profile_pass_mm(): the robot's
+ *    side (with S3's barcode sensor on the left) and S5_PATH_MARGIN_MM,
+ *    or more where the look while passing needs room to turn. The
+ *    untrimmed edge made every detour about 3 cm wider than needed
+ *    (logs 2026-11-11_1744/1746). It was untrimmed
  *    after logs 2026-11-05_0124 and _0224, where trimmed edges let the
  *    robot's side hit; then the servo's recorded angles were wrong
  *    (drv_servo.h "Reach") and the robot did not square up first.
@@ -33,8 +35,8 @@
 #include "s5_math.h"
 #include "s5_profile.h"
 
-#define HALF_PATH_MM    ((S5_ROBOT_WIDTH_MM / 2) + S5_PATH_MARGIN_MM)
 #define AHEAD_DEG       (90)
+#define PIVOT_AHEAD_MM  (S5_AXLE_TO_FRONT_MM - S5_SENSOR_SETBACK_MM)
 
 /* The packed profile must be exactly three words (no padding), and the
  * field widths must hold their largest values. A wrong size stops the
@@ -60,11 +62,15 @@ static void     find_closest(s5_profile_point_t const * p_points,
                              uint32_t count, int32_t right_deg,
                              int32_t left_deg, s5_profile_t * p_out);
 static bool     is_path_blocked(s5_profile_point_t const * p_points,
-                                uint32_t count);
+                                uint32_t count, int32_t body_deg);
 static uint32_t side_clearance(s5_profile_point_t const * p_points,
                                uint32_t count,
                                s5_profile_point_t const * p_edge,
-                               int32_t edge_raw_deg, bool b_left);
+                               int32_t edge_raw_deg, bool b_left,
+                               int32_t body_deg);
+static void     point_xy(s5_profile_point_t const * p_point,
+                         int32_t body_deg, int32_t * p_x_mm,
+                         int32_t * p_y_mm);
 
 /*!
  * @brief Tell whether a point is an obstacle hit (closer than
@@ -130,13 +136,20 @@ s5_profile_to_xy (s5_profile_point_t const * p_point,
  * @param[in]  count    Number of readings in p_points.
  * @param[in]  p_left   Result of the left (higher angle) fine sweep.
  * @param[in]  p_right  Result of the right (lower angle) fine sweep.
+ * @param[in]  body_deg The robot's body was turned this far (+ = left)
+ *                      from the heading the profile is wanted in; 0 for
+ *                      a normal scan (s5_avoid.c, "Seeing past a
+ *                      corner"). Every point is turned back about the
+ *                      rear axle first, so the edges, the shifts, the
+ *                      clearances and the path check are in that heading
+ *                      (the closest point's angle stays the servo's).
  * @param[out] p_out    The profile. seq is left as it was and depth_mm is
  *                      reset to 0, because neither comes from the scan.
  */
 void
 s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
                   s5_profile_edge_t const * p_left,
-                  s5_profile_edge_t const * p_right,
+                  s5_profile_edge_t const * p_right, int32_t body_deg,
                   s5_profile_t * p_out)
 {
     s5_profile_point_t left_pt  = p_left->last_hit;
@@ -148,8 +161,8 @@ s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
 
     // Step 1: Move each found edge inward by half the beam width.
     correct_edges(p_left, p_right, &left_pt, &right_pt);
-    s5_profile_to_xy(&left_pt, &left_x, &left_y);
-    s5_profile_to_xy(&right_pt, &right_x, &right_y);
+    point_xy(&left_pt, body_deg, &left_x, &left_y);
+    point_xy(&right_pt, body_deg, &right_x, &right_y);
 
     // Step 2: Width is the distance between the two edge points.
     int32_t  dx_mm   = left_x - right_x;
@@ -165,7 +178,7 @@ s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
     // Step 3: Closest point and whether anything blocks the path.
     find_closest(p_points, count, p_right->last_hit.angle_deg,
                  p_left->last_hit.angle_deg, p_out);
-    p_out->b_on_path = is_path_blocked(p_points, count);
+    p_out->b_on_path = is_path_blocked(p_points, count, body_deg);
 
     // Step 4: Free gap beside each edge; a side with no edge is unusable.
     p_out->b_left_edge    = p_left->b_found;
@@ -179,11 +192,24 @@ s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
     {
         p_out->clear_left_mm = side_clearance(p_points, count, &left_pt,
                                               p_left->last_hit.angle_deg,
-                                              true)
+                                              true, body_deg)
                                & S5_PROFILE_MM_MASK;
 
-        // The robot's right side must end up left of the left edge.
-        p_out->shift_left_mm = s5_profile_mm(HALF_PATH_MM - left_x)
+        // The robot ends up left of the left edge, far enough out to
+        // look at the obstacle on its right (s5_profile_pass_mm()).
+        p_out->shift_left_mm = s5_profile_mm(s5_profile_pass_mm(false)
+                                             - left_x)
+                               & S5_PROFILE_MM_MASK;
+    }
+    else
+    {
+        // Still echoing at the servo's limit: assume the obstacle ends
+        // S5_EDGE_UNSEEN_MM past that echo. The side stays unusable
+        // (no edge) unless s5_avoid.c's look past the corner finds that
+        // way free; then this shift is used.
+        p_out->shift_left_mm = s5_profile_mm((s5_profile_pass_mm(false)
+                                              - left_x)
+                                             + S5_EDGE_UNSEEN_MM)
                                & S5_PROFILE_MM_MASK;
     }
 
@@ -191,11 +217,21 @@ s5_profile_build (s5_profile_point_t const * p_points, uint32_t count,
     {
         p_out->clear_right_mm = side_clearance(p_points, count, &right_pt,
                                                p_right->last_hit.angle_deg,
-                                               false)
+                                               false, body_deg)
                                 & S5_PROFILE_MM_MASK;
 
-        // The robot's left side must end up right of the right edge.
-        p_out->shift_right_mm = s5_profile_mm(HALF_PATH_MM + right_x)
+        // The robot ends up right of the right edge, far enough out to
+        // look at the obstacle on its left.
+        p_out->shift_right_mm = s5_profile_mm(s5_profile_pass_mm(true)
+                                              + right_x)
+                                & S5_PROFILE_MM_MASK;
+    }
+    else
+    {
+        // As on the left.
+        p_out->shift_right_mm = s5_profile_mm((s5_profile_pass_mm(true)
+                                               + right_x)
+                                              + S5_EDGE_UNSEEN_MM)
                                 & S5_PROFILE_MM_MASK;
     }
 
@@ -294,6 +330,111 @@ uint32_t
 s5_profile_next_seq (uint32_t seq)
 {
     return ((seq + 1u) & S5_PROFILE_SEQ_MASK);
+}
+
+/*!
+ * @brief From the robot's centre line out to its widest point on one
+ *        side, S3's barcode sensor included.
+ *
+ * @param[in] b_left true for the left side.
+ *
+ * @return mm: 125 on the left, 70 on the right.
+ */
+int32_t
+s5_profile_half_mm (bool b_left)
+{
+    return ((S5_ROBOT_WIDTH_MM / 2) + (b_left ? S5_SIDE_EXTRA_LEFT_MM
+                                              : S5_SIDE_EXTRA_RIGHT_MM));
+}
+
+/*!
+ * @brief How far the robot's centre line passes from the obstacle's
+ *        side: the side margin, and room to turn S5_LOOK_DEG towards the
+ *        obstacle on the spot (about the rear axle's middle) and look.
+ *
+ * @param[in] b_box_left true if the obstacle is on the robot's left.
+ *
+ * @return mm: 164 with the obstacle on the right (the front corner's
+ *         swing decides), 195 on the left (the barcode sensor's 55 mm
+ *         plus the margin decide).
+ *
+ * NOTE: A point x ahead of the axle and y to the side ends up
+ * y cos(a) + x sin(a) to the side after turning a towards that side. The
+ * front corner and the barcode sensor's tip reach furthest; the body's
+ * side behind the corner reaches less.
+ */
+int32_t
+s5_profile_pass_mm (bool b_box_left)
+{
+    int32_t look_mm = s5_profile_look_reach_mm(b_box_left)
+                      + S5_LOOK_SPARE_MM;
+    int32_t pass_mm = s5_profile_half_mm(b_box_left) + S5_PATH_MARGIN_MM;
+
+    return ((look_mm > pass_mm) ? look_mm : pass_mm);
+}
+
+/*!
+ * @brief How far to the side the robot reaches when it has turned
+ *        S5_LOOK_DEG towards the obstacle on the spot: the front corner
+ *        or S3's barcode sensor's tip, whichever is further.
+ *
+ * @param[in] b_box_left true if the obstacle is on the robot's left.
+ *
+ * @return mm from the centre line it had before turning: 149 either
+ *         side with the measured robot.
+ */
+int32_t
+s5_profile_look_reach_mm (bool b_box_left)
+{
+    int32_t sin_q15 = s5_math_sin_q15(S5_LOOK_DEG);
+    int32_t cos_q15 = s5_math_cos_q15(S5_LOOK_DEG);
+    int32_t corner  = s5_math_mul_q15(S5_ROBOT_WIDTH_MM / 2, cos_q15)
+                      + s5_math_mul_q15(S5_AXLE_TO_FRONT_MM, sin_q15);
+    int32_t tip     = s5_math_mul_q15(s5_profile_half_mm(b_box_left),
+                                      cos_q15)
+                      + s5_math_mul_q15(S5_SIDE_EXTRA_AHEAD_MM, sin_q15);
+
+    return ((tip > corner) ? tip : corner);
+}
+
+/*!
+ * @brief A reading in the heading the profile is wanted in: robot-frame
+ *        coordinates (s5_profile_to_xy()), turned back by body_deg about
+ *        the rear axle.
+ *
+ * @param[in]  p_point  The reading; it must have an echo.
+ * @param[in]  body_deg How far the body was turned, + = left.
+ * @param[out] p_x_mm   Sideways offset from the servo, + = right.
+ * @param[out] p_y_mm   Distance ahead of the servo.
+ *
+ * NOTE: Turned left by b, the robot's ahead is (-sin b, cos b) and its
+ * right (cos b, sin b) in the wanted frame; the servo is
+ * PIVOT_AHEAD_MM ahead of the axle it turned about.
+ */
+static void
+point_xy (s5_profile_point_t const * p_point, int32_t body_deg,
+          int32_t * p_x_mm, int32_t * p_y_mm)
+{
+    int32_t x_mm = 0;
+    int32_t y_mm = 0;
+
+    s5_profile_to_xy(p_point, &x_mm, &y_mm);
+
+    if (0 != body_deg)
+    {
+        int32_t sin_q15 = s5_math_sin_q15(body_deg);
+        int32_t cos_q15 = s5_math_cos_q15(body_deg);
+        int32_t side_mm = x_mm;
+        int32_t fwd_mm  = y_mm + PIVOT_AHEAD_MM;
+
+        x_mm = s5_math_mul_q15(side_mm, cos_q15)
+               - s5_math_mul_q15(fwd_mm, sin_q15);
+        y_mm = (s5_math_mul_q15(side_mm, sin_q15)
+                + s5_math_mul_q15(fwd_mm, cos_q15)) - PIVOT_AHEAD_MM;
+    }
+
+    *p_x_mm = x_mm;
+    *p_y_mm = y_mm;
 }
 
 /*!
@@ -426,11 +567,12 @@ find_closest (s5_profile_point_t const * p_points, uint32_t count,
  * @param[in] p_points Scan readings.
  * @param[in] count    Number of readings.
  *
- * @return true if a hit is closer to the centre line than half the robot
- *         width plus the margin.
+ * @return true if a hit is closer to the centre line than the robot's
+ *         side on that side (s5_profile_half_mm()) plus the margin.
  */
 static bool
-is_path_blocked (s5_profile_point_t const * p_points, uint32_t count)
+is_path_blocked (s5_profile_point_t const * p_points, uint32_t count,
+                 int32_t body_deg)
 {
     bool b_blocked = false;
 
@@ -441,9 +583,13 @@ is_path_blocked (s5_profile_point_t const * p_points, uint32_t count)
             int32_t x_mm = 0;
             int32_t y_mm = 0;
 
-            s5_profile_to_xy(&p_points[idx], &x_mm, &y_mm);
+            point_xy(&p_points[idx], body_deg, &x_mm, &y_mm);
 
-            if (s5_math_abs(x_mm) < HALF_PATH_MM)
+            // x is + to the right. The barcode sensor widens the left.
+            int32_t half_mm = s5_profile_half_mm(x_mm < 0)
+                              + S5_PATH_MARGIN_MM;
+
+            if (s5_math_abs(x_mm) < half_mm)
             {
                 b_blocked = true;
             }
@@ -468,13 +614,13 @@ is_path_blocked (s5_profile_point_t const * p_points, uint32_t count)
 static uint32_t
 side_clearance (s5_profile_point_t const * p_points, uint32_t count,
                 s5_profile_point_t const * p_edge, int32_t edge_raw_deg,
-                bool b_left)
+                bool b_left, int32_t body_deg)
 {
     int32_t edge_x  = 0;
     int32_t edge_y  = 0;
     int32_t gap_min = S5_CLEAR_OPEN_MM;
 
-    s5_profile_to_xy(p_edge, &edge_x, &edge_y);
+    point_xy(p_edge, body_deg, &edge_x, &edge_y);
 
     for (uint32_t idx = 0u; idx < count; idx++)
     {
@@ -489,7 +635,7 @@ side_clearance (s5_profile_point_t const * p_points, uint32_t count,
             int32_t x_mm = 0;
             int32_t y_mm = 0;
 
-            s5_profile_to_xy(p_pt, &x_mm, &y_mm);
+            point_xy(p_pt, body_deg, &x_mm, &y_mm);
 
             int32_t gap_mm = b_left ? (edge_x - x_mm) : (x_mm - edge_x);
 

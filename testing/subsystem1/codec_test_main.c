@@ -14,7 +14,10 @@
  * - the 17 pitch/roll rounding cases of section 3.3 and the heading
  *   cases of section 3A.1;
  * - every field at its minimum and maximum;
- * - the wrap, reconstruction, clamp and reject cases of section 10.1.
+ * - the wrap, reconstruction, clamp and reject cases of section 10.1;
+ * - S1-U24 part A, in three groups of its own ("map golden vectors",
+ *   "map round trip", "map rejects"): the MAP message of section 5, so
+ *   the counts of the groups above stay as they were.
  *
  * @par How
  * Every encode writes into a buffer of exactly the message length, and
@@ -56,10 +59,19 @@
 /* Number of golden vectors in section 10.2 of the document. */
 #define GOLDEN_COUNT            21U
 
-/* Version nibble values used by the reject cases. */
+/* Version nibble values used by the reject cases. The reserved type was
+ * 7 until 7 became MAP (S1-U24); 8 is the first reserved type now.
+ */
 #define BAD_VERSION_LOW         0U
 #define BAD_VERSION_HIGH        2U
-#define RESERVED_TYPE           7U
+#define RESERVED_TYPE           8U
+
+/* S1-U24: the MAP golden vectors, the letters in a MAP, and the Code 39
+ * indices S3 accepts (0 to 43).
+ */
+#define MAP_GOLDEN_COUNT        4U
+#define MAP_LETTERS             4U
+#define CODE39_COUNT            44U
 
 /* Message types in test_rejects(). */
 #define MSG_DESC_COUNT          6U
@@ -115,6 +127,7 @@ typedef union
     msg_codec_event_t       evt;
     msg_codec_command_t     cmd;
     msg_codec_ack_t         ack;
+    msg_codec_map_t         map;
 } any_out_t;
 
 /** Calls into the codec for one message type, with untyped pointers. */
@@ -267,9 +280,9 @@ static int64_t  tel_get(const msg_codec_telemetry_t * p_tel,
                         tel_field_t field);
 static void     tel_set(msg_codec_telemetry_t * p_tel, tel_field_t field,
                         int64_t value);
-static bool     put_matches(put_fn_t put, const void * p_in, uint32_t len,
+static bool     put_matches(put_fn_t p_put, const void * p_in, uint32_t len,
                             const uint8_t * p_expect);
-static bool     get_exact(get_fn_t get, const uint8_t * p_bytes,
+static bool     get_exact(get_fn_t p_get, const uint8_t * p_bytes,
                           uint32_t len, void * p_out);
 static bool     tel_same(const msg_codec_telemetry_t * p_a,
                          const msg_codec_telemetry_t * p_b,
@@ -336,6 +349,19 @@ static void     reject_get(const msg_desc_t * p_msg, const uint8_t * p_buf,
 static void     reject_put(const msg_desc_t * p_msg);
 static void     test_rejects_one(const msg_desc_t * p_msg);
 static void     test_rejects(void);
+static bool     get_map(const uint8_t * p_buf, uint32_t len, void * p_out);
+static uint32_t put_map(const void * p_in, uint8_t * p_buf,
+                        uint32_t buf_len);
+static bool     map_same(const msg_codec_map_t * p_a,
+                         const msg_codec_map_t * p_b);
+static bool     map_zero(const msg_codec_map_t * p_map);
+static void     map_set_letter(msg_codec_map_t * p_map, uint32_t slot,
+                               uint8_t value);
+static bool     map_round_trip_one(uint32_t slot, uint32_t index);
+static void     test_map_golden(void);
+static void     test_map_round_trip(void);
+static void     test_map_rejects(void);
+static void     test_map_type(void);
 
 /*!
  * @brief Run every test group and report the result.
@@ -388,6 +414,19 @@ main (void)
 
     group_begin("rejects");
     test_rejects();
+    group_end();
+
+    group_begin("map golden vectors");
+    test_map_golden();
+    group_end();
+
+    group_begin("map round trip");
+    test_map_round_trip();
+    group_end();
+
+    group_begin("map rejects");
+    test_map_rejects();
+    test_map_type();
     group_end();
 
     if (0U == g_failures)
@@ -1144,20 +1183,20 @@ unwrap16 (uint32_t prev_full, uint32_t low16)
 /*!
  * @brief Put into a buffer of exactly len bytes and compare the result.
  *
- * @param[in] put      The put adapter.
+ * @param[in] p_put    The put adapter.
  * @param[in] p_in     Fields to encode.
  * @param[in] len      Message length.
  * @param[in] p_expect Expected bytes.
  *
- * @return True if put returned len and wrote exactly p_expect.
+ * @return True if p_put returned len and wrote exactly p_expect.
  */
 static bool
-put_matches (put_fn_t put, const void * p_in, uint32_t len,
+put_matches (put_fn_t p_put, const void * p_in, uint32_t len,
              const uint8_t * p_expect)
 {
     uint8_t * p_buf = alloc_copy(NULL, len, 0U);
     bool      b_ok = (NULL != p_buf)
-                     && (len == put(p_in, p_buf, len))
+                     && (len == p_put(p_in, p_buf, len))
                      && (0 == memcmp(p_buf, p_expect, len));
 
     free(p_buf);
@@ -1168,19 +1207,19 @@ put_matches (put_fn_t put, const void * p_in, uint32_t len,
 /*!
  * @brief Get from a copy of the bytes in a buffer of exactly len bytes.
  *
- * @param[in]  get     The get adapter.
+ * @param[in]  p_get   The get adapter.
  * @param[in]  p_bytes Bytes to decode.
  * @param[in]  len     Message length.
  * @param[out] p_out   Receives the fields.
  *
- * @return What get returned (false if malloc failed).
+ * @return What p_get returned (false if malloc failed).
  */
 static bool
-get_exact (get_fn_t get, const uint8_t * p_bytes, uint32_t len,
+get_exact (get_fn_t p_get, const uint8_t * p_bytes, uint32_t len,
            void * p_out)
 {
     uint8_t * p_buf = alloc_copy(p_bytes, len, len);
-    bool      b_ok = (NULL != p_buf) && get(p_buf, len, p_out);
+    bool      b_ok = (NULL != p_buf) && p_get(p_buf, len, p_out);
 
     free(p_buf);
 
@@ -1305,7 +1344,7 @@ test_golden_tel (void)
 {
     uint32_t                    count = 0U;
     const codec_vectors_tel_t * p_vec = codec_vectors_tel(&count);
-    msg_codec_telemetry_t       in;
+    msg_codec_telemetry_t       tel_in;
     any_out_t                   out;
     uint32_t                    idx;
 
@@ -1313,8 +1352,8 @@ test_golden_tel (void)
 
     for (idx = 0U; idx < count; idx++)
     {
-        tel_input(&p_vec[idx], &in);
-        check(put_matches(put_tel, &in, MSG_TEL_BYTES, p_vec[idx].bytes),
+        tel_input(&p_vec[idx], &tel_in);
+        check(put_matches(put_tel, &tel_in, MSG_TEL_BYTES, p_vec[idx].bytes),
               "put gives the document's bytes", p_vec[idx].p_label);
         check(get_exact(get_tel, p_vec[idx].bytes, MSG_TEL_BYTES, &out)
               && tel_same(&out.tel, &p_vec[idx].out, TF_NONE),
@@ -1411,13 +1450,13 @@ test_fault_constants (void)
         MSG_FAULT_STALL, MSG_FAULT_ENCODER, MSG_FAULT_IMU,
         MSG_FAULT_NO_ECHO, MSG_FAULT_WIFI
     };
-    static const char * const labels[5] =
+    static const char * const p_labels[5] =
     {
         "TEL-F0", "TEL-F1", "TEL-F2", "TEL-F3", "TEL-F4"
     };
     const codec_vectors_tel_t * p_base = tel_find("TEL-2");
     const codec_vectors_tel_t * p_vec;
-    msg_codec_telemetry_t       in;
+    msg_codec_telemetry_t       tel_in;
     msg_codec_telemetry_t       out;
     uint8_t                     bytes[MSG_TEL_BYTES];
     uint32_t                    idx;
@@ -1426,13 +1465,13 @@ test_fault_constants (void)
 
     for (idx = 0U; (NULL != p_base) && (idx < 5U); idx++)
     {
-        p_vec = tel_find(labels[idx]);
-        tel_input(p_base, &in);
-        in.fault_mask = faults[idx];
-        check((NULL != p_vec) && tel_round_trip(&in, &out, bytes)
+        p_vec = tel_find(p_labels[idx]);
+        tel_input(p_base, &tel_in);
+        tel_in.fault_mask = faults[idx];
+        check((NULL != p_vec) && tel_round_trip(&tel_in, &out, bytes)
               && (0 == memcmp(bytes, p_vec->bytes, MSG_TEL_BYTES))
               && (out.fault_mask == (1U << idx)),
-              "MSG_FAULT constant gives the one-hot vector", labels[idx]);
+              "MSG_FAULT constant gives the one-hot vector", p_labels[idx]);
     }
 }
 
@@ -1443,7 +1482,7 @@ static void
 test_rounding (void)
 {
     const codec_vectors_tel_t * p_base = tel_find("TEL-2");
-    msg_codec_telemetry_t       in;
+    msg_codec_telemetry_t       tel_in;
     msg_codec_telemetry_t       out;
     uint8_t                     bytes[MSG_TEL_BYTES];
     const uint32_t              count =
@@ -1459,10 +1498,10 @@ test_rounding (void)
         check(hdeg == g_round_cases[idx].hdeg, "cdeg_to_hdeg result",
               "3.3 table row");
 
-        tel_input(p_base, &in);
-        in.pitch_hdeg = hdeg;
-        in.roll_hdeg = hdeg;
-        check(tel_round_trip(&in, &out, bytes)
+        tel_input(p_base, &tel_in);
+        tel_in.pitch_hdeg = hdeg;
+        tel_in.roll_hdeg = hdeg;
+        check(tel_round_trip(&tel_in, &out, bytes)
               && (g_round_cases[idx].stored
                   == read_bits(bytes, MSG_TEL_PITCH_POS, MSG_TEL_PITCH_BITS))
               && (g_round_cases[idx].stored
@@ -1480,7 +1519,7 @@ test_rounding (void)
 static void
 test_min_max (void)
 {
-    static const msg_codec_heartbeat_t hb[2] =
+    static const msg_codec_heartbeat_t hb_in[2] =
     {
         { 0U, 0U, 0, 0U, 0U, 0U, 0U },
         { 255U, 65535U, -127, 255U, 255U, 255U, 255U }
@@ -1497,7 +1536,8 @@ test_min_max (void)
 
     for (idx = 0U; idx < 2U; idx++)
     {
-        check(hb_round_trip(&hb[idx], &out.hb) && hb_same(&out.hb, &hb[idx]),
+        check(hb_round_trip(&hb_in[idx], &out.hb)
+              && hb_same(&out.hb, &hb_in[idx]),
               "heartbeat round trip", (0U == idx) ? "min" : "max");
         check(evt_round_trip(&evt[idx], &out.evt)
               && evt_same(&out.evt, &evt[idx]),
@@ -1541,7 +1581,7 @@ test_wrap (void)
     static const uint32_t       t_out[3] = { 16777215U, 0U, 0xABCDEFU };
     static const uint32_t       up_in[3] = { 65535U, 65536U, 70000U };
     msg_codec_telemetry_t       tel;
-    msg_codec_heartbeat_t       hb = { 255U, 0U, 0, 0U, 0U, 0U, 0U };
+    msg_codec_heartbeat_t       hb_in = { 255U, 0U, 0, 0U, 0U, 0U, 0U };
     msg_codec_event_t           evt = { { 1U, { 2U, 3U } }, 0U };
     msg_codec_command_t         cmd = { MSG_OP_STOP, 63U };
     msg_codec_ack_t             ack = { MSG_OP_STOP, 63U, MSG_ACK_ACCEPTED };
@@ -1563,11 +1603,11 @@ test_wrap (void)
               "telemetry seq after 255 is 0", "seq");
     }
 
-    check(hb_round_trip(&hb, &out.hb) && (255U == out.hb.seq),
+    check(hb_round_trip(&hb_in, &out.hb) && (255U == out.hb.seq),
           "heartbeat seq 255", "seq");
     /* Same wrap as the telemetry counter above: 255 + 1 narrows to 0. */
-    hb.seq = (uint8_t)(hb.seq + 1U);
-    check(hb_round_trip(&hb, &out.hb) && (0U == out.hb.seq),
+    hb_in.seq = (uint8_t)(hb_in.seq + 1U);
+    check(hb_round_trip(&hb_in, &out.hb) && (0U == out.hb.seq),
           "heartbeat seq after 255 is 0", "seq");
 
     for (idx = 0U; idx < 3U; idx++)
@@ -1575,8 +1615,8 @@ test_wrap (void)
         evt.t_ms = t_in[idx];
         check(evt_round_trip(&evt, &out.evt) && (t_out[idx] == out.evt.t_ms),
               "t_ms keeps its low 24 bits", "t_ms");
-        hb.uptime_s = up_in[idx];
-        check(hb_round_trip(&hb, &out.hb) && (65535U == out.hb.uptime_s),
+        hb_in.uptime_s = up_in[idx];
+        check(hb_round_trip(&hb_in, &out.hb) && (65535U == out.hb.uptime_s),
               "uptime_s saturates at 65535", "uptime_s");
     }
 
@@ -1636,15 +1676,15 @@ static void
 test_tel_cases (const tel_case_t * p_cases, uint32_t count)
 {
     const codec_vectors_tel_t * p_base = tel_find("TEL-1");
-    msg_codec_telemetry_t       in;
+    msg_codec_telemetry_t       tel_in;
     msg_codec_telemetry_t       out;
     uint32_t                    idx;
 
     for (idx = 0U; (NULL != p_base) && (idx < count); idx++)
     {
-        tel_input(p_base, &in);
-        tel_set(&in, p_cases[idx].field, p_cases[idx].value);
-        check(tel_round_trip(&in, &out, NULL)
+        tel_input(p_base, &tel_in);
+        tel_set(&tel_in, p_cases[idx].field, p_cases[idx].value);
+        check(tel_round_trip(&tel_in, &out, NULL)
               && (p_cases[idx].expect == tel_get(&out, p_cases[idx].field))
               && tel_same(&out, &p_base->out, p_cases[idx].field),
               "field decodes as expected, others unchanged",
@@ -1659,36 +1699,36 @@ static void
 test_clamps_other (void)
 {
     static const uint32_t counts[2] = { 256U, 0xFFFFFFFFU };
-    msg_codec_heartbeat_t hb = { 42U, 1234U, -67, 3U, 1U, 0U, 2U };
+    msg_codec_heartbeat_t hb_in = { 42U, 1234U, -67, 3U, 1U, 0U, 2U };
     msg_codec_heartbeat_t expect;
     msg_codec_command_t   cmd = { 4U, 5U };
     msg_codec_ack_t       ack = { 2U, 5U, 4U };
     any_out_t             out;
     uint32_t              idx;
 
-    expect = hb;
-    hb.rssi_dbm = 5;
+    expect = hb_in;
+    hb_in.rssi_dbm = 5;
     expect.rssi_dbm = 0;
-    check(hb_round_trip(&hb, &out.hb) && hb_same(&out.hb, &expect),
+    check(hb_round_trip(&hb_in, &out.hb) && hb_same(&out.hb, &expect),
           "rssi +5 dBm sends 0", "rssi");
-    hb.rssi_dbm = -128;
+    hb_in.rssi_dbm = -128;
     expect.rssi_dbm = -127;
-    check(hb_round_trip(&hb, &out.hb) && hb_same(&out.hb, &expect),
+    check(hb_round_trip(&hb_in, &out.hb) && hb_same(&out.hb, &expect),
           "rssi -128 dBm clamps to -127", "rssi");
-    hb.rssi_dbm = -67;
+    hb_in.rssi_dbm = -67;
     expect.rssi_dbm = -67;
 
     for (idx = 0U; idx < 2U; idx++)
     {
-        hb.connect_count = counts[idx];
-        hb.tel_drop = counts[idx];
-        hb.evt_drop = counts[idx];
-        hb.cmd_reject = counts[idx];
+        hb_in.connect_count = counts[idx];
+        hb_in.tel_drop = counts[idx];
+        hb_in.evt_drop = counts[idx];
+        hb_in.cmd_reject = counts[idx];
         expect.connect_count = 255U;
         expect.tel_drop = 255U;
         expect.evt_drop = 255U;
         expect.cmd_reject = 255U;
-        check(hb_round_trip(&hb, &out.hb) && hb_same(&out.hb, &expect),
+        check(hb_round_trip(&hb_in, &out.hb) && hb_same(&out.hb, &expect),
               "heartbeat counters saturate at 255", "counters");
     }
 
@@ -1826,14 +1866,14 @@ test_rejects_one (const msg_desc_t * p_msg)
 static void
 test_rejects (void)
 {
-    uint32_t                    n = 0U;
+    uint32_t                    count = 0U;
 
-    const codec_vectors_tel_t *       p_tel = codec_vectors_tel(&n);
-    const codec_vectors_liv_t * const p_liv = codec_vectors_liv(&n);
-    const codec_vectors_hb_t *        p_hb = codec_vectors_hb(&n);
-    const codec_vectors_evt_t *       p_evt = codec_vectors_evt(&n);
-    const codec_vectors_cmd_t *       p_cmd = codec_vectors_cmd(&n);
-    const codec_vectors_ack_t *       p_ack = codec_vectors_ack(&n);
+    const codec_vectors_tel_t *       p_tel = codec_vectors_tel(&count);
+    const codec_vectors_liv_t * const p_liv = codec_vectors_liv(&count);
+    const codec_vectors_hb_t *        p_hb = codec_vectors_hb(&count);
+    const codec_vectors_evt_t *       p_evt = codec_vectors_evt(&count);
+    const codec_vectors_cmd_t *       p_cmd = codec_vectors_cmd(&count);
+    const codec_vectors_ack_t *       p_ack = codec_vectors_ack(&count);
     const msg_desc_t                  msgs[MSG_DESC_COUNT] =
     {
         { "telemetry", MSG_TEL_BYTES, MSG_TYPE_TELEMETRY, get_tel, put_tel,
@@ -1863,4 +1903,304 @@ test_rejects (void)
           "opcode 0 rejected, cmd_id still returned", "command");
 }
 
+/* S1-U24 part A: the MAP message. -------------------------------------- */
+
+/* Letter positions in wire order: LEFT, RIGHT, STRAIGHT, U-TURN. */
+static const uint32_t g_map_pos[MAP_LETTERS] =
+{
+    MSG_MAP_LEFT_POS, MSG_MAP_RIGHT_POS, MSG_MAP_STRAIGHT_POS,
+    MSG_MAP_UTURN_POS
+};
+
+/* Letters held fixed while one slot runs through every index. */
+static const uint8_t g_map_fixed[MAP_LETTERS] = { 5U, 17U, 29U, 41U };
+
+/* Slot names, for the failure lines. */
+static const char * const gp_map_names[MAP_LETTERS] =
+{
+    "LEFT", "RIGHT", "STRAIGHT", "U-TURN"
+};
+
+/*!
+ * @brief Adapter: map get with an untyped output pointer.
+ */
+static bool
+get_map (const uint8_t * p_buf, uint32_t len, void * p_out)
+{
+    msg_codec_map_t * p_map = p_out;
+
+    return (msg_codec_get_map(p_buf, len, p_map));
+}
+
+/*!
+ * @brief Adapter: map put with an untyped input pointer.
+ */
+static uint32_t
+put_map (const void * p_in, uint8_t * p_buf, uint32_t buf_len)
+{
+    const msg_codec_map_t * p_map = p_in;
+
+    return (msg_codec_put_map(p_map, p_buf, buf_len));
+}
+
+/*!
+ * @brief Compare two maps field by field.
+ *
+ * @param[in] p_a First.
+ * @param[in] p_b Second.
+ *
+ * @return True if every field is equal.
+ */
+static bool
+map_same (const msg_codec_map_t * p_a, const msg_codec_map_t * p_b)
+{
+    return ((p_a->cmd_id == p_b->cmd_id)
+            && (p_a->letter_left == p_b->letter_left)
+            && (p_a->letter_right == p_b->letter_right)
+            && (p_a->letter_straight == p_b->letter_straight)
+            && (p_a->letter_uturn == p_b->letter_uturn));
+}
+
+/*!
+ * @brief Say whether every field of a map is 0, as get leaves it after a
+ *        refusal.
+ *
+ * @param[in] p_map The map.
+ *
+ * @return True if all five fields are 0.
+ */
+static bool
+map_zero (const msg_codec_map_t * p_map)
+{
+    return ((0U == p_map->cmd_id) && (0U == p_map->letter_left)
+            && (0U == p_map->letter_right)
+            && (0U == p_map->letter_straight)
+            && (0U == p_map->letter_uturn));
+}
+
+/*!
+ * @brief Set one letter of a map by its slot number.
+ *
+ * @param[out] p_map The map.
+ * @param[in]  slot  0 LEFT, 1 RIGHT, 2 STRAIGHT, 3 U-TURN.
+ * @param[in]  value The Code 39 index.
+ */
+static void
+map_set_letter (msg_codec_map_t * p_map, uint32_t slot, uint8_t value)
+{
+    switch (slot)
+    {
+        case 0U:
+            p_map->letter_left = value;
+            break;
+        case 1U:
+            p_map->letter_right = value;
+            break;
+        case 2U:
+            p_map->letter_straight = value;
+            break;
+        case 3U:
+            p_map->letter_uturn = value;
+            break;
+        default:
+            /* Not a slot: nothing to set. */
+            break;
+    }
+}
+
+/*!
+ * @brief One round trip: index in one slot, the fixed letters in the
+ *        others, put then get, and every letter read back at its offset
+ *        with this file's own bit reader.
+ *
+ * @param[in] slot  0 LEFT, 1 RIGHT, 2 STRAIGHT, 3 U-TURN.
+ * @param[in] index Code 39 index, 0 to 43.
+ *
+ * @return True if the fields and the stored bits are right.
+ */
+static bool
+map_round_trip_one (uint32_t slot, uint32_t index)
+{
+    msg_codec_map_t map_in;
+    msg_codec_map_t out;
+    uint8_t *       p_buf = alloc_copy(NULL, MSG_MAP_BYTES, 0U);
+    uint32_t        other;
+    uint32_t        expect;
+    bool            b_ok = (NULL != p_buf);
+
+    /* index is at most 43, so index + 1 and index fit uint8_t. */
+    map_in.cmd_id = (uint8_t)(index + 1U);
+    for (other = 0U; other < MAP_LETTERS; other++)
+    {
+        map_set_letter(&map_in, other, g_map_fixed[other]);
+    }
+    map_set_letter(&map_in, slot, (uint8_t)index);
+
+    b_ok = b_ok && (MSG_MAP_BYTES == msg_codec_put_map(&map_in, p_buf,
+                                                       MSG_MAP_BYTES))
+           && msg_codec_get_map(p_buf, MSG_MAP_BYTES, &out)
+           && map_same(&out, &map_in)
+           && (0U == read_bits(p_buf, MSG_MAP_DATA_BITS,
+                               (MSG_MAP_BYTES * 8U) - MSG_MAP_DATA_BITS));
+
+    for (other = 0U; b_ok && (other < MAP_LETTERS); other++)
+    {
+        expect = (other == slot) ? index : g_map_fixed[other];
+        b_ok = (expect == read_bits(p_buf, g_map_pos[other],
+                                    MSG_MAP_LEFT_BITS));
+    }
+
+    free(p_buf);
+
+    return (b_ok);
+}
+
+/*!
+ * @brief MAP-1 to MAP-4: encode and decode, exact bytes and fields.
+ */
+static void
+test_map_golden (void)
+{
+    static const uint8_t        dcba[MSG_MAP_BYTES] =
+    {
+        0x17U, 0x24U, 0xD3U, 0x0BU, 0x28U
+    };
+    uint32_t                    n_map = 0U;
+    const codec_vectors_map_t * p_map = codec_vectors_map(&n_map);
+    any_out_t                   out;
+    uint32_t                    idx;
+
+    check(MAP_GOLDEN_COUNT == n_map, "4 map golden vectors", "all");
+
+    for (idx = 0U; idx < n_map; idx++)
+    {
+        check(put_matches(put_map, &p_map[idx].in, MSG_MAP_BYTES,
+                          p_map[idx].bytes)
+              && get_exact(get_map, p_map[idx].bytes, MSG_MAP_BYTES, &out)
+              && map_same(&out.map, &p_map[idx].out),
+              "bytes and fields match", p_map[idx].p_label);
+    }
+
+    check((n_map > 0U)
+          && (0 == memcmp(p_map[0].bytes, dcba, MSG_MAP_BYTES)),
+          "MAP-1 is DCBA with id 9: 17 24 D3 0B 28", "MAP-1");
+}
+
+/*!
+ * @brief Every Code 39 index S3 accepts (0 to 43) in each of the four
+ *        slots, the other three held fixed.
+ */
+static void
+test_map_round_trip (void)
+{
+    uint32_t slot;
+    uint32_t index;
+    bool     b_ok;
+
+    for (slot = 0U; slot < MAP_LETTERS; slot++)
+    {
+        for (index = 0U; index < CODE39_COUNT; index++)
+        {
+            b_ok = map_round_trip_one(slot, index);
+            if (!b_ok)
+            {
+                (void)printf("map round trip: index %" PRIu32 "\n", index);
+            }
+            check(b_ok, "round trip, read back at its offset",
+                  gp_map_names[slot]);
+        }
+    }
+}
+
+/*!
+ * @brief The reject cases of every message type, for the MAP, then the
+ *        cases only a MAP has: every field 0 after a refusal, a COMMAND
+ *        header on 5 bytes, padding written as 0 and ignored on get, and
+ *        the put clamps.
+ */
+static void
+test_map_rejects (void)
+{
+    static const uint8_t        clamped[MSG_MAP_BYTES] =
+    {
+        0x17U, 0x03U, 0xFFU, 0xFFU, 0xFCU
+    };
+    uint32_t                    n_map = 0U;
+    const codec_vectors_map_t * p_map = codec_vectors_map(&n_map);
+    const msg_desc_t            desc =
+    {
+        "map", MSG_MAP_BYTES, MSG_TYPE_MAP, get_map, put_map, true,
+        &p_map[0].in, p_map[0].bytes
+    };
+    uint8_t                     buf[MSG_MAP_BYTES + 1U];
+    msg_codec_map_t             map_in = { 64U, 255U, 64U, 200U, 99U };
+    msg_codec_map_t             out;
+    msg_codec_map_t             first;
+
+    test_rejects_one(&desc);
+    (void)memcpy(buf, p_map[0].bytes, MSG_MAP_BYTES);
+    (void)memset(&out, (int)MARK_BYTE, sizeof(out));
+    check(!msg_codec_get_map(buf, 0U, &out) && map_zero(&out),
+          "length 0 refused, every field 0", "map");
+    (void)memset(&out, (int)MARK_BYTE, sizeof(out));
+    check(!msg_codec_get_map(buf, MSG_MAP_BYTES - 1U, &out)
+          && map_zero(&out), "length 4 refused, every field 0", "map");
+    buf[MSG_MAP_BYTES] = 0U;
+    (void)memset(&out, (int)MARK_BYTE, sizeof(out));
+    check(!msg_codec_get_map(buf, MSG_MAP_BYTES + 1U, &out)
+          && map_zero(&out), "length 6 refused, every field 0", "map");
+    buf[0] = (uint8_t)((BAD_VERSION_HIGH << 4U) | MSG_TYPE_MAP);
+    (void)memset(&out, (int)MARK_BYTE, sizeof(out));
+    check(!msg_codec_get_map(buf, MSG_MAP_BYTES, &out) && map_zero(&out),
+          "version 2 refused, every field 0", "map");
+    buf[0] = (uint8_t)((MSG_LAYOUT_VERSION << 4U) | MSG_TYPE_COMMAND);
+    (void)memset(&out, (int)MARK_BYTE, sizeof(out));
+    check(!msg_codec_get_map(buf, MSG_MAP_BYTES, &out) && map_zero(&out),
+          "type 4 (COMMAND) on 5 bytes refused, every field 0", "map");
+
+    /* Padding: written as 0 (checked in the round trip too), ignored on
+     * get: MAP-1 with both padding bits set still reads as MAP-1.
+     */
+    (void)memcpy(buf, p_map[0].bytes, MSG_MAP_BYTES);
+    buf[MSG_MAP_BYTES - 1U] = (uint8_t)(buf[MSG_MAP_BYTES - 1U] | 0x03U);
+    check(msg_codec_get_map(buf, MSG_MAP_BYTES, &out)
+          && msg_codec_get_map(p_map[0].bytes, MSG_MAP_BYTES, &first)
+          && map_same(&out, &first),
+          "padding bits ignored on get", "MAP-1");
+
+    /* Put: cmd_id 64 wraps to 0, every letter above 63 clamps to 63, and
+     * the padding stays 0.
+     */
+    check((MSG_MAP_BYTES == msg_codec_put_map(&map_in, buf, MSG_MAP_BYTES))
+          && (0 == memcmp(buf, clamped, MSG_MAP_BYTES)),
+          "cmd_id 64 wraps to 0, letters clamp to 63, padding 0", "map");
+}
+
+/*!
+ * @brief msg_codec_get_type(): the type field of byte 0, whatever the
+ *        rest; 0 for a NULL buffer or a length of 0.
+ */
+static void
+test_map_type (void)
+{
+    static const uint8_t        cmd1[MSG_CMD_BYTES] = { 0x14U, 0x85U };
+    static const uint8_t        all_ones[1] = { 0xFFU };
+    uint32_t                    n_map = 0U;
+    const codec_vectors_map_t * p_map = codec_vectors_map(&n_map);
+
+    check(MSG_TYPE_MAP == msg_codec_get_type(p_map[0].bytes, MSG_MAP_BYTES),
+          "MAP-1 is type 7", "get_type");
+    check(MSG_TYPE_MAP == msg_codec_get_type(p_map[0].bytes, 1U),
+          "type read from byte 0 alone", "get_type");
+    check(MSG_TYPE_COMMAND == msg_codec_get_type(cmd1, MSG_CMD_BYTES),
+          "CMD-1 is type 4", "get_type");
+    check(15U == msg_codec_get_type(all_ones, 1U), "0xFF is type 15",
+          "get_type");
+    check(0U == msg_codec_get_type(NULL, MSG_MAP_BYTES), "NULL buffer: 0",
+          "get_type");
+    check(0U == msg_codec_get_type(p_map[0].bytes, 0U), "length 0: 0",
+          "get_type");
+}
+
 /*** end of file ***/
+

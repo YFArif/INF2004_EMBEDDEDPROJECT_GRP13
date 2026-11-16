@@ -1,7 +1,8 @@
 """S1-U11: host test of the dashboard decoder.
 
 Tests app_program/subsystem1/dashboard/s1_decode.py against the layout in
-docs/S1_binary_frame.md. The 21 golden vectors are not copied here: their
+docs/S1_binary_frame.md. The 25 golden vectors (21, plus the 4 MAP
+vectors of S1-U24) are not copied here: their
 bytes and the values msg_codec_get_*() must return ("out") are read from
 testing/subsystem1/codec_vectors.c, the file the C test S1-U05 uses, and
 golden.py --check (stage 1 of run_decoder_test.sh) confirms that file
@@ -15,6 +16,9 @@ the mutations):
 
 S1_DECODE_DIR, if set, is the folder s1_decode.py is loaded from; the
 runner points it at mutated copies.
+
+The class MapMessages is S1-U24 part B (the MAP message and
+cmd_rtt.map_bytes()); the other classes are S1-U11's.
 """
 import ast
 import json
@@ -31,15 +35,18 @@ DECODER_DIR = Path(os.environ.get(
 VECTORS_C = ROOT / "testing" / "subsystem1" / "codec_vectors.c"
 LAYOUT_H = ROOT / "app_program" / "subsystem1" / "msg_layout.h"
 
+sys.path.insert(0, str(ROOT / "testing" / "subsystem1"))
 sys.path.insert(0, str(DECODER_DIR))
+import cmd_rtt  # noqa: E402 (the path is set just above)
 import s1_decode as dec  # noqa: E402 (the path is set just above)
 
-GOLDEN_COUNT = 21
+GOLDEN_COUNT = 25
 
 # The C arrays in codec_vectors.c and the message type of each.
 ARRAYS = (("g_tel", dec.TELEMETRY), ("g_liv", dec.LIVE),
           ("g_hb", dec.HEARTBEAT),
-          ("g_evt", dec.EVENT), ("g_cmd", dec.COMMAND), ("g_ack", dec.ACK))
+          ("g_evt", dec.EVENT), ("g_cmd", dec.COMMAND), ("g_ack", dec.ACK),
+          ("g_map", dec.MAP))
 
 TOKEN = re.compile(r'\s*(?:("(?:[^"\\]|\\.)*")|(\.[A-Za-z_]\w*)|([{}=,])'
                    r'|(-?(?:0[xX][0-9A-Fa-f]+|\d+))[uU]?|(true|false))')
@@ -187,8 +194,10 @@ class Malformed(unittest.TestCase):
                 self.assertEqual(self.reason(bad), "version")
 
     def test_type(self):
+        # 7 was reserved until it became MAP (S1-U24); 8 is the first
+        # reserved type now.
         data = vector("TEL-1")[2]
-        for msg_type in (0, 7, 15):
+        for msg_type in (0, 8, 15):
             with self.subTest(msg_type=msg_type):
                 bad = bytes([0x10 | msg_type]) + data[1:]
                 self.assertEqual(self.reason(bad), "type")
@@ -405,7 +414,8 @@ class Describe(unittest.TestCase):
                                  ("CMD-3", "opcode_name", "RESET"),
                                  ("CMD-4", "opcode_name", "INVALID"),
                                  ("ACK-1", "result_name", "queued"),
-                                 ("ACK-2", "result_name", "rejected")):
+                                 ("ACK-2", "opcode_name", "MAP"),
+                                 ("ACK-2", "result_name", "refused")):
             with self.subTest(label=label):
                 shown = dec.describe(dec.decode(vector(label)[2]))
                 self.assertEqual(shown[key], name)
@@ -452,9 +462,14 @@ class LayoutHeader(unittest.TestCase):
         dec.COMMAND: {"opcode": "CMD_OPCODE", "cmd_id": "CMD_ID"},
         dec.ACK: {"opcode": "ACK_OPCODE", "cmd_id": "ACK_ID",
                   "result": "ACK_RESULT"},
+        dec.MAP: {"cmd_id": "MAP_ID", "letter_left": "MAP_LEFT",
+                  "letter_right": "MAP_RIGHT",
+                  "letter_straight": "MAP_STRAIGHT",
+                  "letter_uturn": "MAP_UTURN"},
     }
     SHORT = {dec.TELEMETRY: "TEL", dec.LIVE: "LIV", dec.HEARTBEAT: "HB",
-             dec.EVENT: "EVT", dec.COMMAND: "CMD", dec.ACK: "ACK"}
+             dec.EVENT: "EVT", dec.COMMAND: "CMD", dec.ACK: "ACK",
+             dec.MAP: "MAP"}
 
     @classmethod
     def setUpClass(cls):
@@ -504,6 +519,79 @@ class LayoutHeader(unittest.TestCase):
                 "MSG_%s_DATA_BITS" % self.SHORT[msg_type]))
 
 
+class MapMessages(unittest.TestCase):
+    """S1-U24 part B: the MAP message, its ack and cmd_rtt.map_bytes()."""
+
+    def reason(self, data):
+        with self.assertRaises(dec.DecodeError) as caught:
+            dec.decode(data)
+        return caught.exception.reason
+
+    def test_raw_indices(self):
+        msg = dec.decode(bytes.fromhex("1724D30B28"))
+        self.assertEqual((msg["type"], msg["cmd_id"], msg["letter_left"],
+                          msg["letter_right"], msg["letter_straight"],
+                          msg["letter_uturn"]), ("MAP", 9, 13, 12, 11, 10))
+        self.assertNotIn("valid", msg)
+
+    def test_not_judged(self):
+        # MAP-3 holds index 63 four times: decoded as it is, not refused.
+        msg = dec.decode(vector("MAP-3")[2])
+        self.assertEqual([msg[name] for name, _ in dec.MAP_SLOTS],
+                         [63, 63, 63, 63])
+        self.assertEqual(dec.describe(msg)["letters"], "????")
+
+    def test_describe(self):
+        for label, letters in (("MAP-1", "DCBA"), ("MAP-2", "0000"),
+                               ("MAP-4", "09-Z")):
+            with self.subTest(label=label):
+                shown = dec.describe(dec.decode(vector(label)[2]))
+                self.assertEqual(shown["letters"], letters)
+        shown = dec.describe(dec.decode(vector("MAP-1")[2]))
+        self.assertEqual(shown["map_text"],
+                         "LEFT=D RIGHT=C STRAIGHT=B U-TURN=A")
+
+    def test_malformed(self):
+        data = vector("MAP-1")[2]
+        self.assertEqual(self.reason(data[:4]), "length")
+        self.assertEqual(self.reason(data + b"\x00"), "length")
+        self.assertEqual(self.reason(bytes([0x27]) + data[1:]), "version")
+
+    def test_ack_names(self):
+        for hex_text, op_name, result_name in (
+                ("150900", "MAP", "applied"), ("150940", "MAP", "refused"),
+                ("150040", "INVALID", "rejected"),
+                ("158500", "STOP", "queued")):
+            with self.subTest(ack=hex_text):
+                shown = dec.describe(dec.decode(bytes.fromhex(hex_text)))
+                self.assertEqual((shown["opcode_name"], shown["result_name"]),
+                                 (op_name, result_name))
+
+    def test_command_rule_unchanged(self):
+        stop = dec.decode(vector("CMD-1")[2])
+        op0 = dec.decode(vector("CMD-4")[2])
+        self.assertTrue(stop["valid"])
+        self.assertFalse(op0["valid"])
+        self.assertEqual(dec.describe(op0)["opcode_name"], "INVALID")
+        self.assertEqual(dec.OPCODE_NAMES[0], "INVALID")
+
+    def test_map_bytes(self):
+        self.assertEqual(cmd_rtt.map_bytes("DCBA", 9),
+                         bytes.fromhex("1724D30B28"))
+        self.assertEqual(cmd_rtt.map_bytes("09-Z", 33), vector("MAP-4")[2])
+        msg = dec.decode(cmd_rtt.map_bytes("DDBA", 10))
+        self.assertEqual(dec.map_letters(msg), "DDBA")
+        self.assertEqual(msg["cmd_id"], 10)
+        for bad in ("DCB", "DCBAE", "DC?A", "dcba", ["D", "C", "B", "A"]):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    cmd_rtt.map_bytes(bad, 9)
+
+    def test_tables_agree(self):
+        self.assertEqual(cmd_rtt.CODE39, dec.CODE39)
+        self.assertEqual(len(dec.CODE39), 44)
+
+
 class CommandLine(unittest.TestCase):
     """s1_decode.py reads hex lines from stdin and prints JSON lines."""
 
@@ -514,7 +602,7 @@ class CommandLine(unittest.TestCase):
             input=text, capture_output=True, text=True, timeout=60)
 
     def test_golden_lines(self):
-        lines = ["# the 21 golden vectors", ""]
+        lines = ["# the 25 golden vectors", ""]
         lines += [data.hex(" ").upper() for _, _, data, _, _ in VECTORS]
         lines[-1] = lines[-1].replace(" ", ":")
         result = self.run_cli("\n".join(lines) + "\n")

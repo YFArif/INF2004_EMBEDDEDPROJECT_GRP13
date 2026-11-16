@@ -1,0 +1,50 @@
+S1-U05 run_codec_test.sh, 2026-11-14 16:19:24 +08
+commit: f525e45
+cc: Apple clang version 17.0.0 (clang-1700.6.4.2)
+python: Python 3.13.7
+== stage 1: build (strict warnings as errors, UBSan/ASan)
+stage 1: ok, no warnings
+== stage 2: run
+S1-U05 msg_codec host test (layout version 1)
+group golden vectors: 41 checks, 0 failed
+group rounding: 35 checks, 0 failed
+group min and max: 42 checks, 0 failed
+group wrap: 22 checks, 0 failed
+group reconstruction: 4 checks, 0 failed
+group clamps: 44 checks, 0 failed
+group live: 31 checks, 0 failed
+group rejects: 79 checks, 0 failed
+group map golden vectors: 6 checks, 0 failed
+group map round trip: 176 checks, 0 failed
+group map rejects: 26 checks, 0 failed
+RESULT: all passed (506 checks)
+stage 2: ok
+== stage 3: golden.py --check
+golden.py --check: 25/25 vectors agree (golden.py, document 10.2, codec_vectors.c)
+stage 3: ok
+== stage 4: mutations
+C1 MSG_TEL_ROLL_POS 115 -> 116: caught by a compile-time check
+C2 MSG_TEL_BYTES 25 -> 26: caught by a compile-time check
+C3 MSG_EVENT_ARG_BYTES 2 -> 3: caught by a compile-time check
+C4 MSG_TEL_TURN_BITS 10 -> 17: caught by a compile-time check
+C5 MSG_LIV_STEER_POS 43 -> 44: caught by a compile-time check
+C6 MSG_LIV_BYTES 14 -> 15: caught by a compile-time check
+R1 bit order reversed in put_field: caught by the test (RESULT: 347 FAILED)
+R2 put_modulo clamps instead of wrapping: caught by the test (RESULT: 53 FAILED)
+R3 put_unsigned clamp removed: caught by the test (RESULT: 34 FAILED)
+R4 put_signed offset 2^bits instead of 2^(bits-1): caught by the test (RESULT: 90 FAILED)
+R5 rounding half step 25 -> 24: caught by the test (RESULT: 62 FAILED)
+R6 header_ok length check always true: caught by the test (AddressSanitizer: heap-buffer-overflow)
+R7 heading limit 18000 -> 17000: caught by the test (RESULT: 9 FAILED)
+N1 MAP put swaps LEFT and RIGHT: caught by the test (RESULT: 176 FAILED)
+N2 MSG_MAP_BYTES 5 -> 6 (10 padding bits): caught by a compile-time check
+N3 MSG_TYPE_MAP 7 -> 8: caught by the test (RESULT: 10 FAILED)
+N4 MSG_MAP_LEFT_POS 14 -> 15 (a letter off by one bit): caught by a compile-time check
+N5 MAP get checks the COMMAND length: caught by the test (RESULT: 182 FAILED)
+stage 4: 18/18 mutations caught (C1 to C6, R1 to R7, N1 to N5)
+== stage 5: target compile
+arm-none-eabi-gcc (Arm GNU Toolchain 15.3.Rel1 (Build arm-15.149)) 15.3.1 20260627
+   text	   data	    bss	    dec	    hex	filename
+   5904	      0	      0	   5904	   1710	msg_codec.o
+stage 5: ok, no warnings
+S1-U05: PASS (506 checks, 25/25 vectors agree, 18/18 mutations caught, target compile ok)

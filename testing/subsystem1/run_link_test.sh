@@ -3,7 +3,8 @@
 #
 # run_link_test.sh -- S1-U09: host test of app_program/subsystem1/mqtt_link.c
 # with the caps taken from msg_layout.h (MQTT_LINK_PAYLOAD_MAX 25,
-# MQTT_LINK_COMMAND_MAX 2) and a topic ID in the publish record.
+# MQTT_LINK_COMMAND_MAX 5, the MAP; 2 until the MAP) and a topic ID in the
+# publish record.
 #
 # Run from the repository root, with PICO_SDK_PATH pointing at a Pico SDK
 # that has lib/lwip checked out:
@@ -194,8 +195,9 @@ mutate ()
     fi
 }
 
-mutate L1 mqtt_link.h 's/\(MQTT_LINK_COMMAND_MAX  *\)MSG_CMD_BYTES$/\13U/' \
-    mqtt_link_check_caps_t "MQTT_LINK_COMMAND_MAX MSG_CMD_BYTES -> 3U"
+mutate L1 mqtt_link.h \
+    's/\(MQTT_LINK_COMMAND_MAX  *\)MSG_IN_MAX_BYTES$/\16U/' \
+    mqtt_link_check_caps_t "MQTT_LINK_COMMAND_MAX MSG_IN_MAX_BYTES -> 6U"
 mutate L2 mqtt_link.h 's/\(MQTT_LINK_PAYLOAD_MAX  *\)MSG_MAX_BYTES$/\124U/' \
     mqtt_link_check_caps_t "MQTT_LINK_PAYLOAD_MAX MSG_MAX_BYTES -> 24U"
 LONG=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

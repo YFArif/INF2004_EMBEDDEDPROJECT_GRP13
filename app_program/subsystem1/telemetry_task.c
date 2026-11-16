@@ -6,7 +6,8 @@
  *
  * @brief S1's telemetry_task (see telemetry_task.h): takes each dashboard
  *        command from the MQTT driver, posts it to S5 with
- *        subsystem5_command_post(), publishes its ack on <prefix>/ack, and,
+ *        subsystem5_command_post() (or, for a MAP, gives its letters to S3
+ *        with s3_set_nav_map()), publishes its ack on <prefix>/ack, and,
  *        while the session is up, publishes the heartbeat once a second,
  *        the telemetry frame at 2 Hz and the live message at 5 Hz.
  *
@@ -34,7 +35,7 @@
  * @par Kernel and driver calls
  * This file makes them all; the logic that needs none is in s1_telem.c,
  * which the host test S1-U14 runs with stubs in place of
- * subsystem5_command_post(), subsystem5_fault_set() and
+ * subsystem5_command_post(), s3_set_nav_map(), subsystem5_fault_set() and
  * subsystem5_fault_clear().
  */
 
@@ -112,7 +113,7 @@ typedef uint8_t telemetry_task_check_map_t[((MSG_FAULT_STALL == S5_FAULT_STALL)
  * spare. The widest line, in characters:
  *   "S1: wifi fault " 15 + "clear" 5 + " link=" 6 + "-2147483648" 11
  *   + " mqtt=" 6 + state 1 (0 to 4) + " stale=" 7 + 1 (0 or 1)
- *   + " mask=0x" 8 + 2 (at most 1f) + "\n" 1 = 63,
+ *   + " mask=0x" 8 + 2 (at most 1f) + a newline 1 = 63,
  * plus the NUL tm_sprintf() writes = 64 bytes. 80 leaves 16 bytes spare.
  */
 #define WIFI_LINE_BYTES             80U
@@ -127,7 +128,7 @@ typedef uint8_t telemetry_task_check_map_t[((MSG_FAULT_STALL == S5_FAULT_STALL)
 static uint64_t         g_stack[STACK_WORDS];
 
 /* Written by telemetry_task only. */
-static s1_telem_stats_t g_stats;
+static s1_telem_stats_t g_stats = {0U};
 static uint8_t          g_hb_seq = 0U;
 static uint8_t          g_tel_seq = 0U;
 static uint8_t          g_live_seq = 0U;
@@ -142,6 +143,7 @@ static msg_codec_live_t      g_live;
 
 static void     telemetry_task(INT stacd, void * p_exinf);
 static int32_t  post_to_s5(uint8_t opcode, uint8_t cmd_id);
+static int32_t  apply_map(const char * p_letters);
 static void     handle_command(const mqtt_link_command_t * p_cmd);
 static void     update_wifi_fault(void);
 static void     print_wifi_change(int32_t link_status,
@@ -157,6 +159,7 @@ static void     publish_periodic(const uint8_t * p_buf, uint16_t len,
 static uint32_t now_msec(void);
 static uint32_t uptime_s(void);
 #if S1_TELEM_STACK_REPORT
+static uint32_t telemetry_task_stack_used(void);
 static void     report_stack(void);
 #endif
 
@@ -172,7 +175,7 @@ int32_t
 telemetry_task_start (void)
 {
     T_CTSK   ctsk = {0};
-    ID       tid = 0;
+    ID       h_task = 0;
     ER       result = E_OK;
     uint32_t idx = 0U;
 
@@ -184,25 +187,25 @@ telemetry_task_start (void)
     /* NOTE: The casts are safe: telemetry_task has the kernel's task entry
      * signature, which FP stands for, and the stack is 2048 bytes.
      */
-    ctsk.tskatr = TA_HLNG | TA_RNG3 | TA_USERBUF;
-    ctsk.task = (FP)telemetry_task;
+    ctsk.tskatr  = TA_HLNG | TA_RNG3 | TA_USERBUF;
+    ctsk.task    = (FP)telemetry_task;
     ctsk.itskpri = TELEMETRY_TASK_PRI;
-    ctsk.stksz = (SZ)sizeof(g_stack);
-    ctsk.bufptr = g_stack;
+    ctsk.stksz   = (SZ)sizeof(g_stack);
+    ctsk.bufptr  = g_stack;
 #if TK_SUPPORT_SMP
     ctsk.tskatr |= TA_ASSPRC;
     ctsk.assprc = TP_PRC1;
 #endif
 
-    tid = tk_cre_tsk(&ctsk);
+    h_task = tk_cre_tsk(&ctsk);
 
-    if (tid < E_OK)
+    if (h_task < E_OK)
     {
-        result = tid;
+        result = h_task;
     }
     else
     {
-        result = tk_sta_tsk(tid, 0);
+        result = tk_sta_tsk(h_task, 0);
     }
 
     if (E_OK == result)
@@ -215,27 +218,6 @@ telemetry_task_start (void)
      * conversion keeps every value.
      */
     return ((int32_t)result);
-}
-
-/*!
- * @brief How much of telemetry_task's stack has been used so far.
- *
- * @return Bytes from the top of the stack to the deepest word written.
- */
-uint32_t
-telemetry_task_stack_used (void)
-{
-    uint32_t untouched = 0U;
-
-    /* The stack grows down: count the words at the bottom that still hold
-     * the fill pattern.
-     */
-    while ((untouched < STACK_WORDS) && (STACK_FILL == g_stack[untouched]))
-    {
-        untouched++;
-    }
-
-    return ((STACK_WORDS - untouched) * 8U);
 }
 
 /*!
@@ -290,7 +272,9 @@ telemetry_task (INT stacd, void * p_exinf)
         else
         {
             /* A kernel error: wait one pass rather than spin. The cast is
-             * safe: 50 ms fits the kernel's TMO.
+             * safe: 50 ms fits the kernel's TMO. The (void) drops
+             * tk_dly_tsk()'s result: a wait that ends early only brings
+             * the next pass forward.
              */
             g_stats.rx_error = s1_telem_sat_add(g_stats.rx_error, 1U);
             (void)tk_dly_tsk((TMO)TELEMETRY_TASK_RX_WAIT_MSEC);
@@ -346,7 +330,29 @@ post_to_s5 (uint8_t opcode, uint8_t cmd_id)
 }
 
 /*!
- * @brief Post one received command and publish its ack.
+ * @brief Give one received map to S3: the map function given to s1_telem.c.
+ *
+ * s3_set_nav_map() takes mtx_s3 with TMO_FEVR, so it may wait while S3's
+ * line or barcode task holds that mutex, and it prints one console line
+ * with tm_printf() on this task's stack (S1-U25 measures the stack).
+ *
+ * @param[in] p_letters The letters for LEFT, RIGHT, STRAIGHT and U-TURN,
+ *                      then a NUL.
+ *
+ * @return 0 (E_OK) when S3 applied the map; E_PAR when it refused it (the
+ *         old map is kept); another negative kernel error from the mutex.
+ */
+static int32_t
+apply_map (const char * p_letters)
+{
+    /* ER is the kernel's W, a signed 32-bit integer on this port, so the
+     * conversion keeps every value.
+     */
+    return ((int32_t)s3_set_nav_map(p_letters));
+}
+
+/*!
+ * @brief Act on one received command or map and publish its ack.
  *
  * The ack goes out at QoS 1 whether or not the session is up; if the
  * publish queue is full it is dropped and counted.
@@ -359,7 +365,7 @@ handle_command (const mqtt_link_command_t * p_cmd)
     s1_telem_pub_t ack = {MQTT_LINK_TOPIC_ACK, MQTT_LINK_QOS_1, false, 0U,
                           {0U}};
 
-    if (s1_telem_on_command(p_cmd, post_to_s5, &g_stats, &ack))
+    if (s1_telem_on_command(p_cmd, post_to_s5, apply_map, &g_stats, &ack))
     {
         if (MQTT_LINK_OK != mqtt_link_publish(ack.topic, ack.payload,
                                               ack.len, ack.qos,
@@ -616,7 +622,7 @@ send_periodic (bool b_tel_due, bool b_live_due)
     mqtt_link_status_t status;
     const bool         b_fresh = mqtt_link_get_status(&status);
 
-    if (b_fresh && s1_telem_hb_should_publish(status.state, status.b_stale))
+    if (b_fresh && (s1_telem_hb_should_publish(status.state, status.b_stale)))
     {
         collect_sources(&g_src);
 
@@ -721,6 +727,9 @@ now_msec (void)
 {
     SYSTIM otm;
 
+    /* The (void) drops tk_get_otm()'s result, which is always E_OK in this
+     * kernel (kernel/tkernel/time_calls.c).
+     */
     (void)tk_get_otm(&otm);
 
     /* otm.lo is the kernel's UW, an unsigned 32-bit integer on this port,
@@ -741,6 +750,9 @@ uptime_s (void)
     SYSTIM   otm;
     uint32_t seconds = UINT32_MAX;
 
+    /* The (void) drops tk_get_otm()'s result, which is always E_OK in this
+     * kernel (kernel/tkernel/time_calls.c).
+     */
     (void)tk_get_otm(&otm);
 
     if (0 == otm.hi)
@@ -756,6 +768,27 @@ uptime_s (void)
 
 #if S1_TELEM_STACK_REPORT
 /*!
+ * @brief How much of telemetry_task's stack has been used so far.
+ *
+ * @return Bytes from the top of the stack to the deepest word written.
+ */
+static uint32_t
+telemetry_task_stack_used (void)
+{
+    uint32_t untouched = 0U;
+
+    /* The stack grows down: count the words at the bottom that still hold
+     * the fill pattern.
+     */
+    while ((untouched < STACK_WORDS) && (STACK_FILL == g_stack[untouched]))
+    {
+        untouched++;
+    }
+
+    return ((STACK_WORDS - untouched) * 8U);
+}
+
+/*!
  * @brief Print the stack high-water mark (S1_TELEM_STACK_REPORT builds).
  */
 static void
@@ -764,7 +797,8 @@ report_stack (void)
     UB line[REPORT_LINE_MAX];
 
     /* The casts are safe: the format string is ASCII, and both values
-     * are at most 2048, which an unsigned int holds.
+     * are at most 2048, which an unsigned int holds. The (void) drops the
+     * length tm_sprintf() returns, which is not needed.
      */
     (void)tm_sprintf(line, (const UB *)"S1: telemetry_task stack %u of %u B\n",
                      (unsigned int)telemetry_task_stack_used(),
@@ -776,3 +810,4 @@ report_stack (void)
 #endif /* TM_MQTT */
 
 /*** end of file ***/
+

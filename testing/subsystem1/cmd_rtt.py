@@ -20,7 +20,12 @@ Modes:
   raw               --raw 1409: publish these hex bytes once and print the
                     ACK received within --wait seconds, or that none came.
   selftest          --selftest: check this script's own packing and
-                    parsing against golden vector CMD-1 (14 85).
+                    parsing against golden vectors CMD-1 (14 85) and
+                    MAP-1 (17 24 D3 0B 28).
+  map               --map DCBA --id 9: print the 5 bytes of a MAP (the
+                    barcode letters for LEFT, RIGHT, STRAIGHT, U-TURN) as
+                    hex, and exit; no broker needed. --raw publishes them.
+                    The dashboard packs its maps with map_bytes() too.
 
 The ACKs are collected by one mosquitto_sub for the whole run and read
 after it is stopped, so pipe buffering cannot delay a time stamp.
@@ -43,15 +48,53 @@ import time
 
 HDR_COMMAND = 0x14          # Version 1, type 4.
 HDR_ACK = 0x15              # Version 1, type 5.
+HDR_MAP = 0x17              # Version 1, type 7.
 OPCODES = {"start": 1, "stop": 2, "reset": 3}
 NAMES = {0: "INVALID", 1: "START", 2: "STOP", 3: "RESET"}
 RESULTS = {0: "queued", 1: "rejected"}
+# An ack with opcode 0 and an id above 0 answers a MAP (the dashboard never
+# sends a MAP with id 0); its result 0 means S3 applied the map.
+MAP_RESULTS = {0: "applied", 1: "refused"}
 STAMP_FORMAT = "@Y-@m-@dT@H:@M:@S.@N %x"
+
+# S3's Code 39 index (s3_code39.c): the symbol at each index, 0 to 43. The
+# same table is in s1_decode.py; S1-U24's drift guard checks both against
+# S3's own s3_code39_char().
+CODE39 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. *$/+%"
+MAP_LETTERS = 4
 
 
 def command_bytes(opcode, cmd_id):
     """Pack a COMMAND: header, then opcode (2 bits) and cmd_id (6 bits)."""
     return bytes([HDR_COMMAND, ((opcode & 0x03) << 6) | (cmd_id & 0x3F)])
+
+
+def map_bytes(letters, cmd_id):
+    """Pack a MAP (docs/S1_binary_frame.md section 5): header, cmd_id
+    (6 bits), the Code 39 index of the letter for LEFT, RIGHT, STRAIGHT and
+    U-TURN (6 bits each, in that order), then 2 padding bits.
+
+    The letters are not judged beyond being in the table: S3 refuses a
+    repeated letter and '*'. Raises ValueError for anything but a string of
+    4 characters from CODE39 (upper case).
+    """
+    if (not isinstance(letters, str)) or (len(letters) != MAP_LETTERS):
+        raise ValueError("a map is a string of exactly 4 letters")
+    value = cmd_id & 0x3F
+    for letter in letters:
+        index = CODE39.find(letter)
+        if index < 0:
+            raise ValueError("%r is not a Code 39 character" % letter)
+        value = (value << 6) | index
+    return bytes([HDR_MAP]) + (value << 2).to_bytes(4, "big")
+
+
+def ack_names(opcode, cmd_id, result):
+    """(opcode name, result name) of an ack: a MAP's when the opcode is 0
+    and the id is not."""
+    if (opcode == 0) and (cmd_id != 0):
+        return "MAP", MAP_RESULTS.get(result, "reserved %d" % result)
+    return NAMES[opcode], RESULTS.get(result, "reserved %d" % result)
 
 
 def parse_ack(hex_text):
@@ -176,10 +219,18 @@ def run_raw(args):
         print("raw %s: no ack within %.1f s" % (payload.hex(), args.wait))
         return 1
     for when, (ack_op, ack_id, result) in acks:
+        op_name, result_name = ack_names(ack_op, ack_id, result)
         print("raw %s: ack opcode %d (%s), id %d, %s, after %.1f ms"
-              % (payload.hex(), ack_op, NAMES[ack_op], ack_id,
-                 RESULTS.get(result, "reserved %d" % result),
+              % (payload.hex(), ack_op, op_name, ack_id, result_name,
                  (when - t_sent).total_seconds() * 1000.0))
+    return 0
+
+
+def run_map(args):
+    try:
+        print(map_bytes(args.map.upper(), args.id).hex())
+    except ValueError as err:
+        sys.exit("cmd_rtt: %s" % err)
     return 0
 
 
@@ -189,7 +240,10 @@ def run_selftest():
           and parse_ack("150040") == (0, 0, 1)
           and parse_ack("1485") is None
           and parse_line("2026-11-01T10:00:00.123456789 158500")
-          == (datetime.datetime(2026, 11, 1, 10, 0, 0, 123456), (2, 5, 0)))
+          == (datetime.datetime(2026, 11, 1, 10, 0, 0, 123456), (2, 5, 0))
+          and map_bytes("DCBA", 9) == bytes.fromhex("1724d30b28")
+          and ack_names(0, 9, 0) == ("MAP", "applied")
+          and ack_names(0, 0, 1) == ("INVALID", "rejected"))
     print("cmd_rtt selftest: %s" % ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
@@ -206,11 +260,19 @@ def main():
     parser.add_argument("--settle", type=float, default=1.0)
     parser.add_argument("--limit-ms", type=int, default=300)
     parser.add_argument("--raw")
+    parser.add_argument("--map", help="print a MAP's bytes as hex and exit")
+    parser.add_argument("--id", type=int, default=1,
+                        help="cmd_id for --map, 1 to 63")
     parser.add_argument("--selftest", action="store_true")
     args = parser.parse_args()
 
     if args.selftest:
         return run_selftest()
+    if args.map is not None:
+        if not 1 <= args.id <= 63:
+            sys.exit("cmd_rtt: --id must be 1 to 63 (0 reads as an "
+                     "unread command's ack)")
+        return run_map(args)
     for tool in ("mosquitto_sub", "mosquitto_pub"):
         if shutil.which(tool) is None:
             sys.exit("cmd_rtt: %s is not on the PATH" % tool)

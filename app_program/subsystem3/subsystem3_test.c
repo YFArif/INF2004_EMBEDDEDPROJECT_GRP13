@@ -6,6 +6,8 @@
  */
 
 #include "subsystem3.h"
+#include "s3_code39.h"
+#include "s3_private.h"
 #include "../test_report.h"
 
 #if APP_TEST
@@ -39,6 +41,18 @@ EXPORT void subsystem3_test(void)
 		   after.received > 0 && after.min <= after.max &&
 		   after.min >= 0 && after.max <= 100,
 		   "min <= max, both within 0..100");
+
+	/* S3-U11: the day-of letter map changes live, through the same call
+	   S1 makes from another task (IF-S3f); a bad map keeps the old one. */
+	TEST_CHECK("S3-U11",
+		   (E_OK == s3_set_nav_map("DCBA")) &&
+		   (S3_NAV_LEFT == s3_nav_lookup('D')) &&
+		   (S3_NAV_UTURN == s3_nav_lookup('A')) &&
+		   (E_PAR == s3_set_nav_map("DDBA")) &&
+		   (S3_NAV_LEFT == s3_nav_lookup('D')) &&
+		   (E_OK == s3_set_nav_map("ABCD")) &&
+		   (S3_NAV_LEFT == s3_nav_lookup('A')),
+		   "map DCBA applied at once, bad map refused, ABCD restored");
 
 	TEST_SUMMARY("subsystem3");
 }

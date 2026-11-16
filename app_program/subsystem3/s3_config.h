@@ -83,6 +83,8 @@
                                         /* finished pass this often.     */
 #define S3_BC_COOLDOWN_MS       (1500u) /* Ignore further barcodes this  */
                                         /* long after publishing one.    */
+#define S3_BC_BEEP_MS           (80u)   /* GP22 buzzer per decoded code; */
+                                        /* 0 = no beep.                  */
 #define S3_NAV_MBF_DEPTH        (4u)    /* mbf_nav holds 4 messages.     */
 #define S3_NAV_MBF_HEADER       (4u)    /* Kernel header per message.    */
 

@@ -44,6 +44,8 @@ void    s5_links_motion_move(int32_t dist_mm, uint16_t speed_mms);
 void    s5_links_motion_turn(int32_t angle_deg, uint16_t speed_mms);
 void    s5_links_motion_estop(void);
 int32_t s5_links_odom_dist_mm(void);
+int32_t s5_links_bend_deg(int32_t ahead_mm);
+int32_t s5_links_odom_heading_cdeg(void);
 
 /* S3: line following and barcodes. */
 void            s5_links_line_use(bool b_used);

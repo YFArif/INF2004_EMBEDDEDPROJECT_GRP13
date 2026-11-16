@@ -1,8 +1,12 @@
 """S1 laptop dashboard: START, STOP and RESET, their acks, the heartbeat
-and the robot's telemetry (S2 motion, S3 line, S4 IMU, S5 state).
+and the robot's telemetry (S2 motion, S3 line, S4 IMU, S5 state), and the
+barcode letter map (MAP) for S3.
 
 Serves one page on http://127.0.0.1:8765/ (this machine only) and pushes
-live updates to it with server-sent events. It reaches the broker through
+live updates to it with server-sent events. The page is three files in
+dashboard_ui/ next to this file (index.html, app.css, app.js), served from
+a fixed list (STATIC_FILES); nothing else on disk can be requested. It
+reaches the broker through
 mosquitto_sub (one for the whole run) and mosquitto_pub (one per command),
 and reuses the message code that is already tested: cmd_rtt.command_bytes()
 packs the commands (S1-U06 helper) and s1_decode decodes everything the
@@ -14,6 +18,15 @@ retain flag, so the robot would run a retained command again after every
 reconnect (docs/MQTT.md section 1.1). An ack with result 0 means "queued
 for S5", not carried out: S5's verdict is on the robot's console only
 until the event channel is built (the S5 panel shows the state change).
+
+The barcode letter map (S1-U24): four letters for LEFT, RIGHT, STRAIGHT and
+U-TURN, packed by cmd_rtt.map_bytes() and sent like a command, never
+retained. The robot applies it with S3's s3_set_nav_map() and acks result 0
+("applied") or 1 ("refused"). S3 forgets the map at every reset, so the
+server keeps the last map in memory (never on disk) and sends it again
+whenever the robot's status turns "online" and whenever the heartbeat's
+uptime goes down; each round is sent at most MAP_TRIES times, MAP_RETRY_S
+apart, until it is acked.
 
 The telemetry panels read two messages on <prefix>/telemetry: the 2 Hz
 telemetry frame (type 1) and the 5 Hz live message (type 6), both defined
@@ -33,14 +46,17 @@ Run from the repository root (docs/S1_dashboard.md is the full guide):
 
 --simulate needs no broker: a fake car answers with S5's command rules
 and telemetry_task's acks, heartbeat, telemetry and live message.
---check is test S1-U16 part A;
-it exits 0 PASS, 1 FAIL, 2 INCOMPLETE (steps not built yet).
+--check is tests S1-U16 part A (steps A1 to A14), S1-U24 part D (the map,
+steps D1 to D7) and S1-U26 parts A and D (the page's files, the design
+tokens and the simulator scenarios, steps U1 to U4); it exits 0 PASS,
+1 FAIL, 2 INCOMPLETE (steps not built yet).
 """
 
 import argparse
 import collections
 import contextlib
 import datetime
+import hashlib
 import heapq
 import http.client
 import http.server
@@ -48,6 +64,7 @@ import io
 import json
 import math
 import os
+import pathlib
 import queue
 import random
 import re
@@ -103,12 +120,47 @@ COUNTER_JUMP_MAX = {"barcodes": 4, "junctions": 4, "losts": 4, "rejects": 3}
 SEQ_GAP_MAX = 25                # About 5 s of live messages.
 TEL_DROP_MAX = 255              # tel_drop is 8 bits and clamps here.
 RETAINED_TEST_SUFFIX = "cmd/test"
+MAP_TRIES = 3                   # Sends of one map before NOT CONFIRMED.
+MAP_RETRY_S = 2.0               # Between two sends of one map.
+MAP_ID_MAX = 63                 # MAP ids run 1 to 63; 0 is never sent.
+MAP_WHY = {"set": "set on this page", "online": "the robot came online",
+           "restart": "the robot restarted (its uptime went down)"}
 SUB_FORMAT = "@Y-@m-@dT@H:@M:@S.@N %r %t %x"
 LABELS = {0: "queued", 1: "rejected"}
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
-PAGE_CSP = ("default-src 'none'; script-src 'unsafe-inline'; "
-            "style-src 'unsafe-inline'; connect-src 'self'; img-src 'self'; "
+PAGE_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; "
+            "font-src 'self'; connect-src 'self'; img-src 'self'; "
             "frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+# The page's files. pathlib resolves the folder from this file, so it does
+# not depend on the working directory or on the path separator (Windows).
+UI_DIR = pathlib.Path(__file__).resolve().parent / "dashboard_ui"
+INDEX_FILE = "index.html"
+INDEX_TYPE = "text/html; charset=utf-8"
+DATA_MARK = "__S1_DATA__"       # In index.html: replaced by page_data().
+DATA_RE = re.compile(r'<script type="application/json" id="s1-data">'
+                     r'(.*?)</script>', re.S)
+# Every other file the server can send: URL path -> (file name in UI_DIR,
+# Content-Type). A request is looked up here by its exact path and never
+# joined to a folder, so no path can reach a file that is not listed.
+STATIC_FILES = {
+    "/tokens.css": ("tokens.css", "text/css; charset=utf-8"),
+    "/app.css": ("app.css", "text/css; charset=utf-8"),
+    "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/scene.js": ("scene.js", "text/javascript; charset=utf-8"),
+    # Inter (SIL OFL 1.1): the fallback where the system font keywords do
+    # not resolve (Windows). Its licence text is served beside it.
+    "/fonts/inter-latin-opsz-normal.woff2":
+        ("fonts/inter-latin-opsz-normal.woff2", "font/woff2"),
+    "/fonts/OFL.txt": ("fonts/OFL.txt", "text/plain; charset=utf-8"),
+    # three.js (MIT), for the 3D view. The module imports its core file by
+    # a relative path, so both keep their names in one folder.
+    "/vendor/three/three.module.js":
+        ("vendor/three/three.module.js", "text/javascript; charset=utf-8"),
+    "/vendor/three/three.core.js":
+        ("vendor/three/three.core.js", "text/javascript; charset=utf-8"),
+    "/vendor/three/LICENSE.txt":
+        ("vendor/three/LICENSE.txt", "text/plain; charset=utf-8"),
+}
 
 CONFIG_PATTERNS = {
     "host": r'MQTT_LINK_CFG_BROKER_HOST\s+"([^"]*)"',
@@ -122,6 +174,20 @@ CONFIG_PATTERNS = {
 def now_text():
     """This machine's local time, ISO, to the millisecond."""
     return datetime.datetime.now().isoformat(timespec="milliseconds")
+
+
+def map_check(letters):
+    """S3's rules for a map (s3_nav_set_map()), on upper-case letters: None
+    if S3 would take it, else why not. The page checks the same, but the
+    server does not trust the page."""
+    if len(letters) != cmd_rtt.MAP_LETTERS:
+        return "a map is exactly 4 letters"
+    for letter in letters:
+        if (letter not in s1_decode.CODE39) or (letter == "*"):
+            return "%r is not a Code 39 letter S3 takes" % letter
+    if len(set(letters)) != cmd_rtt.MAP_LETTERS:
+        return "each letter may be used once"
+    return None
 
 
 def age_ms(now, then):
@@ -448,6 +514,13 @@ class FakeCar:
     reports 3 more skipped messages in tel_drop, which clamps at 255 as the
     robot's does. The fake car's own state is also in the
     simulator panel; a real car's state is in the S5 panel.
+
+    A MAP is applied with S3's rules (s3_nav_set_map(): 4 letters, Code 39
+    but not '*', no letter twice, upper or lower case) and acked "applied"
+    or "refused"; a refused map leaves the old one. "reboot" restarts the
+    car: the broker sees it go, its map is ABCD again (S3's default), and
+    it comes back online 2 s later with its uptime from 0. "reboot_quiet"
+    restarts it with no status message, so only the uptime shows it.
     """
 
     CAL_S = 3.0
@@ -463,6 +536,72 @@ class FakeCar:
     SKIPS_PER_FIRE = 3
     HUMP_S = 3.0
     BARCODE_LETTERS = "ABCD"
+    # Scenarios (simulator buttons, S1-U26 part D): each is a list of
+    # (seconds, values) segments played while the car runs. They use no
+    # random number and no value of the free-running model above, so the
+    # same button always sends the same frames. A (from, to) pair is a
+    # straight ramp over its segment. "l", "r" and "cmd" are mm/s; with
+    # TRACK_MM 140 a wheel difference of 48 mm/s turns 39 degrees in 2 s
+    # and one of 146 mm/s turns 90 degrees in 1.5 s. "fire" names an event
+    # that happens once, when its segment starts. Only what the wire can
+    # show is made up: S5's real bypass route is not in any message.
+    _FOLLOW = {"l": 200, "r": 200, "cmd": 200}
+    _AVOID = {"ctrl": 8, "line": 3, "angle": 12}
+    SCENARIOS = {
+        "obstacle": (
+            # Approach: the echo falls from 600 mm; under 350 mm S5 slows.
+            (2.0, dict(_FOLLOW, closest=(600, 375), angle=12)),
+            (2.0, {"l": 80, "r": 80, "cmd": 80, "closest": (375, 150),
+                   "angle": 12}),
+            # Stop and sweep the servo; the scan gives the profile.
+            (1.5, dict(_AVOID, l=0, r=0, cmd=0, motion=0, closest=150,
+                       angle=(0, 24), fire="profile")),
+            # Swerve about 40 degrees left, pass, come back, straighten.
+            (2.0, dict(_AVOID, l=76, r=124, cmd=100, closest=(150, 260))),
+            (1.5, dict(_AVOID, l=120, r=120, cmd=120)),
+            (4.0, dict(_AVOID, l=124, r=76, cmd=100)),
+            (1.5, dict(_AVOID, l=120, r=120, cmd=120)),
+            (2.0, dict(_AVOID, l=76, r=124, cmd=100)),
+            (1.0, dict(_FOLLOW, angle=12)),
+        ),
+        "junction": (
+            (2.0, dict(_FOLLOW, fire="bc_left")),
+            (0.5, {"l": 80, "r": 80, "cmd": 80, "ctrl": 4, "line": 1}),
+            (1.5, {"l": -73, "r": 73, "cmd": 0, "motion": 3, "klass": 3,
+                   "ctrl": 5, "line": 1, "fire": "junc_left"}),
+            (2.0, dict(_FOLLOW, fire="bc_right")),
+            (0.5, {"l": 80, "r": 80, "cmd": 80, "ctrl": 4, "line": 1}),
+            (1.5, {"l": 73, "r": -73, "cmd": 0, "motion": 3, "klass": 3,
+                   "ctrl": 5, "line": 1, "fire": "junc_right"}),
+            (1.0, dict(_FOLLOW)),
+        ),
+        "hump": (
+            (0.5, {"l": 150, "r": 150, "cmd": 150}),
+            (0.75, {"l": 150, "r": 150, "cmd": 150, "pitch": (0, 12),
+                    "hump_state": 1, "klass": 4}),
+            (0.75, {"l": 150, "r": 150, "cmd": 150, "pitch": (12, 0),
+                    "hump_state": 1, "klass": 4}),
+            (0.75, {"l": 150, "r": 150, "cmd": 150, "pitch": (0, -12),
+                    "hump_state": 2, "klass": 5}),
+            (0.75, {"l": 150, "r": 150, "cmd": 150, "pitch": (-12, 0),
+                    "hump_state": 2, "klass": 5}),
+            (1.0, {"l": 150, "r": 150, "cmd": 150, "fire": "hump_done"}),
+        ),
+        # Picked up: S4 reports class 6 and the E-stop latches. In this
+        # made-up car the latch clears by itself after 4 s.
+        "lifted": (
+            (0.5, {"l": 0, "r": 0, "cmd": 0, "motion": 4, "klass": 6,
+                   "b_estop": True, "ctrl": 9, "line": 3,
+                   "pitch": (0, 20), "roll": (0, 28)}),
+            (3.0, {"l": 0, "r": 0, "cmd": 0, "motion": 4, "klass": 6,
+                   "b_estop": True, "ctrl": 9, "line": 3, "pitch": 20,
+                   "roll": 28}),
+            (0.5, {"l": 0, "r": 0, "cmd": 0, "motion": 4, "klass": 6,
+                   "b_estop": True, "ctrl": 9, "line": 3,
+                   "pitch": (20, 0), "roll": (28, 0)}),
+        ),
+    }
+    SCENARIO_PROFILE = {"width": 90, "clear_l": 480, "clear_r": 220}
 
     def __init__(self, settings, scrub, opts_dir, b_v5):
         self._settings = settings
@@ -513,6 +652,12 @@ class FakeCar:
         self._bc = {"letter": s1_decode.LETTER_NONE, "cmd": 0,
                     "b_rev": False, "turn": 0}
         self._view = {}
+        self._map = "ABCD"          # S3's default until a MAP is applied.
+        self._b_drop_map_acks = False
+        self._scn = None            # [name, seconds played, segments fired].
+        self._scn_note = None       # A console line owed for a scenario.
+        self._profile = {"width": 0, "clear_l": 0, "clear_r": 0}
+        self._angle = 0
 
     def start(self):
         self._t0 = time.monotonic()
@@ -555,6 +700,9 @@ class FakeCar:
             self._next_hb = max(self._next_hb + 1.0, now + 0.5)
             self._heartbeat(now)
         self._advance(now)
+        if self._scn_note is not None:
+            note, self._scn_note = self._scn_note, None
+            self.on_sim(self._state, "fake car console: " + note)
         if self._b_connected and (now >= self._next_live):
             self._next_live = max(self._next_live + self.LIVE_S, now + 0.1)
             self._send_live()
@@ -572,7 +720,11 @@ class FakeCar:
             for key in self._hold:
                 self._hold[key] = max(0.0, self._hold[key] - dt)
             b_run = self._state == self.RUNNING
-            if b_run:
+            if (self._scn is not None) and (not b_run):
+                self._scn_note = "scenario %s ended: the car is not " \
+                    "running" % self._scn[0]
+                self._scn = None
+            if b_run and (self._scn is None):
                 self._run_s += dt
                 for name, period in self.SCRIPT:
                     if self._run_s >= self._due[name]:
@@ -583,6 +735,49 @@ class FakeCar:
             if (hump_before > 0.0) and (self._hump_left == 0.0):
                 self._hump_count += 1
             self._view = self._values(dt, b_run)
+
+    def _scenario_now(self, dt):
+        """The running scenario's values for this step, or None (model lock
+        held). Plays the segments in order and fires each one's event
+        once."""
+        if self._scn is None:
+            return None
+        name, played, fired = self._scn
+        played += dt
+        start = 0.0
+        for index, (seconds, values) in enumerate(self.SCENARIOS[name]):
+            if played < start + seconds:
+                if index >= fired:
+                    self._scn_fire(values.get("fire"))
+                    fired = index + 1
+                self._scn = [name, played, fired]
+                part = (played - start) / seconds
+                return {key: (value[0] + (value[1] - value[0]) * part
+                              if isinstance(value, tuple) else value)
+                        for key, value in values.items() if key != "fire"}
+            start += seconds
+        self._scn = None
+        self._scn_note = "scenario %s finished" % name
+        return None
+
+    def _scn_fire(self, event):
+        """One scenario event (model lock held)."""
+        if event in ("bc_left", "bc_right"):
+            # The letter the applied map gives to LEFT or to RIGHT.
+            slot = 0 if event == "bc_left" else 1
+            self._bc = {"letter": s1_decode.CODE39.index(self._map[slot]),
+                        "cmd": slot + 1, "b_rev": False,
+                        "turn": self._bc["turn"]}
+            self._s3["barcodes"] += 1
+        elif event in ("junc_left", "junc_right"):
+            self._bc["turn"] = 1 if event == "junc_left" else 2
+            self._s3["junctions"] += 1
+        elif event == "hump_done":
+            self._hump_count += 1
+        elif event == "profile":
+            self._profile = dict(self.SCENARIO_PROFILE)
+        else:
+            pass
 
     def _values(self, dt, b_run):
         """The fake car's current numbers (model lock held)."""
@@ -601,6 +796,11 @@ class FakeCar:
             measured = target + 12.0 * math.sin(2.3 * run)
         speed_l = int(measured - steer / 2.0)
         speed_r = int(measured + steer / 2.0)
+        scn = self._scenario_now(dt) if b_run else None
+        if scn is not None:
+            target, speed_l, speed_r = scn["cmd"], scn["l"], scn["r"]
+            measured = (speed_l + speed_r) / 2.0
+            steer = speed_r - speed_l
         self._dist_mm = min(self._dist_mm + measured * dt, 32767.0)
         self._heading_deg += math.degrees((speed_r - speed_l)
                                           / self.TRACK_MM) * dt
@@ -609,6 +809,8 @@ class FakeCar:
         self._enc[1] += speed_r * dt * self.COUNTS_PER_MM
         pitch = 1.5 * math.sin(2.0 * run) if b_run else 0.0
         roll = 2.0 * math.sin(0.7 * run) if b_run else 0.0
+        if scn is not None:
+            pitch, roll = scn.get("pitch", 0.0), scn.get("roll", 0.0)
         hump_state = 0
         if self._hump_left > 0.0:
             phase = self.HUMP_S - self._hump_left
@@ -654,7 +856,7 @@ class FakeCar:
         centre = int(200.0 + 30.0 * math.sin(1.7 * run)) if b_run else 0
         if b_lost:
             outer, centre = 0, 0
-        return {
+        view = {
             "motion": motion, "b_estop": b_fault, "cmd_speed": target,
             "speed_l": speed_l, "speed_r": speed_r, "steer": steer,
             "heading_hdeg": int(round(self._heading_deg * 2.0)),
@@ -668,7 +870,23 @@ class FakeCar:
             "b_overshoot": outer > 22,
             "ctrl": self.CTRL_INDEX.get(self._state, 0),
             "fault_mask": 1 if b_fault else 0,
-            "b_cal_done": self._state != "CALIBRATING"}
+            "b_cal_done": self._state != "CALIBRATING",
+            # S5's obstacle fields: all 0 until a scenario fills them.
+            "closest": 0, "angle": self._angle,
+            "width": self._profile["width"],
+            "clear_l": self._profile["clear_l"],
+            "clear_r": self._profile["clear_r"]}
+        if scn is not None:
+            # The scenario's own states replace the free-running ones.
+            view.update({key: int(scn[key]) for key in (
+                "motion", "klass", "line", "ctrl", "hump_state", "closest",
+                "angle") if key in scn})
+            view["b_estop"] = bool(scn.get("b_estop", False))
+            if view["line"] != 0:
+                view["outer"], view["centre"] = 0, 0
+                view["b_overshoot"] = False
+            self._angle = view["angle"]     # The last ping's servo angle.
+        return view
 
     def _fire(self, name):
         """One scripted or simulator-button event (model lock held)."""
@@ -721,7 +939,10 @@ class FakeCar:
             "peak_mm": 25 if humps > 0 else 0,
             "hump_count": min(humps, 15), "motion_class": view["klass"],
             "turn_dps": view["turn_dps"], "b_imu_ok": True,
-            "b_cal_done": view["b_cal_done"]}
+            "b_cal_done": view["b_cal_done"],
+            "closest_mm": view["closest"], "angle_idx": view["angle"],
+            "width_mm": view["width"], "clear_l_mm": view["clear_l"],
+            "clear_r_mm": view["clear_r"]}
         self.on_line(sub_line(False, self._topic["telemetry"],
                               pack(s1_decode.TELEMETRY, values)))
 
@@ -786,14 +1007,18 @@ class FakeCar:
         """telemetry_task and S5 handling one command from the broker."""
         if not self._b_connected:
             return
-        if len(payload) > 2:
-            # The driver drops it before the codec: no ack, counted.
+        if len(payload) > s1_decode.LENGTHS[s1_decode.MAP]:
+            # Over the driver's cap, MQTT_LINK_COMMAND_MAX (5 B, the MAP):
+            # dropped before the codec, no ack, counted.
             self._cmd_reject += 1
             return
         try:
             msg = s1_decode.decode(payload)
         except s1_decode.DecodeError:
             msg = None
+        if (msg is not None) and (msg["msg_type"] == s1_decode.MAP):
+            self._take_map(msg)
+            return
         if (msg is None) or (msg["msg_type"] != s1_decode.COMMAND):
             opcode, cmd_id, b_valid = 0, 0, False
         else:
@@ -822,6 +1047,67 @@ class FakeCar:
         self._after(delay, self._deliver, self._topic["ack"], ack)
         if mode == "dup":
             self._after(delay + 0.05, self._deliver, self._topic["ack"], ack)
+
+    def _take_map(self, msg):
+        """telemetry_task and S3 handling one MAP: s3_set_nav_map()."""
+        letters = s1_decode.map_letters(msg)
+        mode, self._next_mode = self._next_mode, None
+        b_ok = (mode != "reject") and (self._s3_rules(letters))
+        if b_ok:
+            self._map = letters.upper()
+        else:
+            self._cmd_reject += 1
+        self.on_sim(self._state, "fake car console: S3 NAV MAP %s: %s"
+                    % ("set" if b_ok else "REJECTED (kept)",
+                       s1_decode.map_text(self._map)))
+        ack = pack(s1_decode.ACK, {"opcode": s1_decode.ACK_OP_MAP,
+                                   "cmd_id": msg["cmd_id"],
+                                   "result": 0 if b_ok else 1})
+        if self._b_drop_map_acks or (mode == "drop"):
+            self.on_sim(self._state, "simulator: this MAP ack is dropped")
+            return
+        self._after(self._rng.uniform(0.03, 0.12), self._deliver,
+                    self._topic["ack"], ack)
+
+    @staticmethod
+    def _s3_rules(letters):
+        """s3_nav_set_map(): 4 Code 39 letters, not '*', none twice."""
+        upper = letters.upper()
+        return ((len(upper) == 4) and (len(set(upper)) == 4)
+                and all((c in s1_decode.CODE39) and (c != "*")
+                        for c in upper))
+
+    def _reboot(self, b_quiet):
+        """Power-cycle the car: S3's map back to ABCD, uptime from 0."""
+        self._t0 = time.monotonic()
+        self._uptime0 = 0
+        self._state = "CALIBRATING"
+        self._map = "ABCD"
+        self._cmd_reject = 0
+        self._tel_drop = 0
+        self._connect_count = 1
+        self._hb_seq = 0
+        with self._model_lock:
+            self._scn = None
+            self._profile = {"width": 0, "clear_l": 0, "clear_r": 0}
+            self._angle = 0
+        self.on_sim(self._state, "fake car console: power-up, CALIBRATING; "
+                    "S3 NAV MAP %s (default)" % s1_decode.map_text(self._map))
+        if b_quiet:
+            # The session survives in this make-believe case: no status
+            # message, only the heartbeat's uptime shows the restart.
+            self._next_hb = time.monotonic() + 0.5
+            return
+        self._b_connected = False
+        self._after(0.5, self._deliver_live_retained, self._topic["status"],
+                    b"offline")
+        self._after(2.0, self._boot_online)
+
+    def _boot_online(self):
+        """The rebooted car joins the WiFi and connects again."""
+        self._b_connected = True
+        self._deliver_live_retained(self._topic["status"], b"online")
+        self._next_hb = time.monotonic() + 0.5
 
     def _mission(self, opcode):
         """The rules of s5_mission_command(): True if S5 would accept."""
@@ -856,12 +1142,26 @@ class FakeCar:
             self._next_mode = action[:-len("_next")]
         elif action in ("offline", "online"):
             self._set_connected(action == "online")
+        elif action in ("reboot", "reboot_quiet"):
+            self._reboot(action == "reboot_quiet")
+        elif action in ("map_ack_drop", "map_ack_keep"):
+            self._b_drop_map_acks = (action == "map_ack_drop")
         elif action in ("fault", "gp20"):
             self._car_action(action)
         elif action in ("s3_barcode", "s3_reject", "s3_junction", "s3_lost",
                         "s4_impact", "s4_hump"):
             with self._model_lock:
                 self._fire(action[3:])
+        elif action.startswith("scn_") and (
+                action[4:] in self.SCENARIOS):
+            self._scenario_start(action[4:])
+        elif action == "scn_stop":
+            with self._model_lock:
+                name = self._scn[0] if self._scn else None
+                self._scn = None
+            self.on_sim(self._state, "fake car console: " + (
+                "scenario %s stopped" % name if name else "no scenario "
+                "is running"))
         elif action in ("retained_cmd", "retained_clear"):
             # Another client publishes on <prefix>/cmd/test with retain: a
             # RESET with cmd_id 42, or the empty message that clears it.
@@ -881,6 +1181,21 @@ class FakeCar:
         else:
             return False
         return True
+
+    def _scenario_start(self, name):
+        """Start a scenario, if the car is running and none is playing."""
+        with self._model_lock:
+            if self._state != self.RUNNING:
+                text = "scenario %s not started: the car is not running " \
+                    "(press START first)" % name
+            elif self._scn is not None:
+                text = "scenario %s not started: %s is still playing" % (
+                    name, self._scn[0])
+            else:
+                self._scn = [name, 0.0, 0]
+                text = "scenario %s started (%.1f s)" % (name, sum(
+                    seconds for seconds, _ in self.SCENARIOS[name]))
+        self.on_sim(self._state, "fake car console: " + text)
 
     def _set_connected(self, b_online):
         """Lose or regain the broker session (hotspot off, then on)."""
@@ -976,6 +1291,13 @@ class Dashboard:
         self.impact_at = None
         self.b_impact_prev = False
         self.car_state = None
+        # The map is kept in memory only, never written to disk.
+        self.map = {"state": "none", "letters": None, "confirmed": None,
+                    "acked_at": None, "refused": None, "cmd_id": None,
+                    "tries": 0, "why": None}
+        self.map_next_id = 1
+        self.map_next_send = None
+        self.map_acked_mono = None
         self.log_file = None
         if log_path:
             self.log_file = open(log_path, "a", encoding="utf-8")
@@ -1048,6 +1370,7 @@ class Dashboard:
                 "car_state": self.car_state, "banner": self.banner,
                 "banner_why": self.banner_why,
                 "retained_cmd": [dict(e) for e in self.retained.values()],
+                "map": self.map_view(),
                 "t": now_text()}
         return self.scrub.obj(snap)
 
@@ -1124,6 +1447,8 @@ class Dashboard:
         self.emit("status", {"value": value, "retained": b_retained,
                              "log": "robot status: %s%s" % (
                                  value, " (retained)" if b_retained else "")})
+        if value == "online":
+            self.map_trigger("online")
 
     def on_telemetry(self, suffix, data):
         try:
@@ -1249,6 +1574,7 @@ class Dashboard:
             if msg["uptime_s"] < old["uptime_s"]:
                 notes.append("uptime went back: the robot restarted")
                 self.session.rebase_robot()
+                self.map_trigger("restart", time.monotonic() - msg["uptime_s"])
                 # feed() compared this seq with the previous run's.
                 msg["lost_before"] = 0
                 self.emit("s3_events", {
@@ -1285,6 +1611,9 @@ class Dashboard:
         if msg["msg_type"] != s1_decode.ACK:
             self.emit("note", {"log": "%s message on ack ignored"
                                       % msg["type"]})
+            return
+        if s1_decode.ack_is_map(msg):
+            self.on_map_ack(msg)
             return
         cmd_id, opcode, result = msg["cmd_id"], msg["opcode"], msg["result"]
         name = s1_decode.OPCODE_NAMES[opcode]
@@ -1427,6 +1756,165 @@ class Dashboard:
             return 502, {"error": "not published: %s" % err}
         return 200, {"cmd_id": cmd_id, "n": rec["n"]}
 
+    # -- the barcode letter map -------------------------------------------
+
+    def map_status(self):
+        """The one status line of the map control."""
+        m = self.map
+        applied = None
+        if m["confirmed"] is not None:
+            applied = "Applied on the robot: %s (acked %s)" % (
+                s1_decode.map_text(m["confirmed"]), m["acked_at"])
+        state = m["state"]
+        if state == "sending":
+            text = "Sending %s" % m["letters"]
+            if m["tries"] > 0:
+                text += " (try %d of %d)" % (m["tries"], MAP_TRIES)
+        elif state == "applied":
+            text = applied
+        elif state == "offline":
+            text = ("Robot offline: %s is kept and sent when it comes "
+                    "online" % m["letters"])
+        elif state == "not_confirmed":
+            text = ("NOT CONFIRMED: no ack for %s after %d sends; it is sent "
+                    "again when the robot comes online"
+                    % (m["letters"], MAP_TRIES))
+        elif state == "refused":
+            text = "REFUSED: the robot refused %s and kept its map" % (
+                m["refused"])
+            if applied is not None:
+                text += ". " + applied
+        else:
+            text = "No map set (robot uses its default)"
+        return text
+
+    def map_view(self):
+        view = dict(self.map)
+        view["status"] = self.map_status()
+        return view
+
+    def emit_map(self, text, payload_hex=None):
+        """One "map" event with the whole state (lock held)."""
+        data = self.map_view()
+        data["log"] = text
+        if payload_hex is not None:
+            data["hex"] = payload_hex
+        self.emit("map", data)
+
+    def set_map(self, letters):
+        """POST /api/map. Returns (HTTP status, reply)."""
+        if not isinstance(letters, str):
+            return 400, {"error": "letters must be a string of 4 Code 39 "
+                                  "characters"}
+        letters = letters.upper()
+        why = map_check(letters)
+        with self.lock:
+            if why is not None:
+                self.emit("note", {"log": "map not sent: %s" % why})
+                return 400, {"error": "map not sent: %s" % why}
+            self.map["letters"] = letters
+            self.map["refused"] = None
+            if self.status["value"] != "online":
+                self.map.update(state="offline", cmd_id=None, tries=0,
+                                why=None)
+                self.map_next_send = None
+                self.emit_map("map %s kept: the robot is offline" % letters)
+                return 200, {"offline": True, "status": self.map_status()}
+            self.map_start("set")
+        self.map_pump()
+        with self.lock:
+            return 200, {"offline": False, "cmd_id": self.map["cmd_id"],
+                         "status": self.map_status()}
+
+    def map_start(self, why):
+        """Begin a round of sends with a new id, 1 to 63 (lock held)."""
+        cmd_id = self.map_next_id
+        self.map_next_id = (cmd_id % MAP_ID_MAX) + 1
+        self.map.update(state="sending", cmd_id=cmd_id, tries=0, why=why)
+        self.map_next_send = time.monotonic()
+
+    def map_trigger(self, why, boot_mono=None):
+        """Send the kept map again: S3 forgets it at every reset (lock
+        held). boot_mono, for a restart, is the latest the robot can have
+        booted; a map acked since then is not sent again."""
+        if self.map["letters"] is None:
+            return
+        if self.map["state"] == "sending":
+            return
+        if ((boot_mono is not None) and (self.map_acked_mono is not None)
+                and (self.map_acked_mono >= boot_mono)):
+            return
+        self.map_start(why)
+        self.emit_map("map %s to be sent again: %s"
+                      % (self.map["letters"], MAP_WHY[why]))
+
+    def map_take_due(self):
+        """The payload of a try that is due, or None (lock held)."""
+        now = time.monotonic()
+        m = self.map
+        if ((m["state"] != "sending") or (self.map_next_send is None)
+                or (now < self.map_next_send)):
+            return None
+        if m["tries"] >= MAP_TRIES:
+            m["state"] = "not_confirmed"
+            self.map_next_send = None
+            self.emit_map("map %s: no ack after %d sends"
+                          % (m["letters"], MAP_TRIES))
+            return None
+        m["tries"] += 1
+        self.map_next_send = now + MAP_RETRY_S
+        payload = cmd_rtt.map_bytes(m["letters"], m["cmd_id"])
+        self.emit_map("sent MAP %s id %d, try %d of %d (%s)"
+                      % (m["letters"], m["cmd_id"], m["tries"], MAP_TRIES,
+                         MAP_WHY[m["why"]]), payload.hex())
+        return payload
+
+    def map_pump(self):
+        """Publish the map if a try is due (call without the lock)."""
+        with self.lock:
+            payload = self.map_take_due()
+        if payload is None:
+            return
+        try:
+            self.link.publish(payload)
+        except LinkError as err:
+            with self.lock:
+                self.emit("note", {"log": "map not published: %s" % err})
+
+    def on_map_ack(self, msg):
+        """An ack with opcode 0 and an id above 0: a MAP's (lock held)."""
+        m = self.map
+        cmd_id, result = msg["cmd_id"], msg["result"]
+        label = s1_decode.MAP_RESULT_NAMES.get(result, "reserved %d" % result)
+        if cmd_id != m["cmd_id"]:
+            self.emit("map_ack", {"cmd_id": cmd_id, "result": result,
+                                  "label": label, "match": "unmatched",
+                                  "log": "ack MAP id %d: %s, not a map this "
+                                         "dashboard sent" % (cmd_id, label)})
+            return
+        if m["state"] not in ("sending", "not_confirmed"):
+            self.emit("map_ack", {"cmd_id": cmd_id, "result": result,
+                                  "label": label, "match": "duplicate",
+                                  "log": "duplicate ack MAP id %d: %s"
+                                         % (cmd_id, label)})
+            return
+        self.map_next_send = None
+        if result == 0:
+            m.update(state="applied", confirmed=m["letters"],
+                     acked_at=time.strftime("%H:%M:%S"))
+            self.map_acked_mono = time.monotonic()
+            text = "ack MAP id %d: applied, %s" % (
+                cmd_id, s1_decode.map_text(m["letters"]))
+        elif result == 1:
+            m.update(state="refused", refused=m["letters"],
+                     letters=m["confirmed"])
+            text = "ack MAP id %d: REFUSED %s, not retried" % (
+                cmd_id, m["refused"])
+        else:
+            m["state"] = "not_confirmed"
+            text = "ack MAP id %d: %s" % (cmd_id, label)
+        self.emit_map(text)
+
     def sim(self, action):
         if self.mode != "simulate":
             return 404, {"error": "not in simulate mode"}
@@ -1457,6 +1945,7 @@ class Dashboard:
                 if now - rec["resolved_mono"] > RECENT_KEEP_S:
                     del self.recent[cmd_id]
             self.update_derived()
+        self.map_pump()
 
     def robot_light(self, now):
         value = self.status["value"]
@@ -1553,7 +2042,8 @@ class Server(http.server.ThreadingHTTPServer):
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    """The page, the event stream and the two POST endpoints."""
+    """The page and its files, the event stream and the three POST
+    endpoints."""
 
     server_version = "s1_dashboard"
     sys_version = ""
@@ -1565,7 +2055,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return self.headers.get("Host", "") in self.server.allowed_hosts
 
     def _reply(self, status, body, content_type, csp=None):
-        data = body.encode("utf-8")
+        data = body if isinstance(body, bytes) else body.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
@@ -1585,8 +2075,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not self._host_ok():
             self._json(403, {"error": "wrong Host header"})
         elif path == "/":
-            page = PAGE.replace("__TOKEN__", json.dumps(self.server.token))
-            self._reply(200, page, "text/html; charset=utf-8", PAGE_CSP)
+            page = self.server.index.replace(DATA_MARK,
+                                             page_data(self.server.token))
+            self._reply(200, page, INDEX_TYPE, PAGE_CSP)
+        elif path in self.server.static:
+            data, content_type = self.server.static[path]
+            self._reply(200, data, content_type, PAGE_CSP)
         elif path == "/events":
             self._events(dash)
         elif path == "/api/state":
@@ -1645,783 +2139,41 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                               "reset"})
                 else:
                     self._json(*dash.send(op))
+            elif path == "/api/map":
+                self._json(*dash.set_map(body.get("letters")))
             elif path == "/api/sim":
                 self._json(*dash.sim(body.get("action")))
             else:
                 self._json(404, {"error": "not found"})
 
 
-PAGE = r"""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>S1 dashboard</title>
-<style>
-:root {
-  --bg: #f4f5f7; --panel: #ffffff; --text: #1c2230; --muted: #5d6677;
-  --line: #d8dce4; --green: #1e9e57; --red: #d23f3f; --grey: #9aa2b1;
-  --amber: #d79a00; --stop: #c62828; --queued: #3a6ea5;
-  --btn: #2c3e57; --btn-edge: #0f1b2b;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #13161b; --panel: #1c2027; --text: #e5e8ee; --muted: #9aa2b1;
-    --line: #2d333d; --queued: #7fa6d6; --btn: #3b5373;
-    --btn-edge: #a9bbd1;
-  }
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0; background: var(--bg); color: var(--text);
-  font: 15px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-}
-header {
-  display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
-  padding: 10px 16px; background: var(--panel);
-  border-bottom: 1px solid var(--line);
-}
-header strong { font-size: 17px; }
-code { font-size: 14px; }
-.muted { color: var(--muted); }
-.badge { padding: 2px 8px; border-radius: 6px; font-weight: 700; }
-.badge.sim { background: var(--amber); color: #000; }
-.badge.live { background: var(--green); color: #fff; }
-main {
-  display: grid; grid-template-columns: minmax(280px, 1fr)
-  minmax(320px, 1.15fr); gap: 16px; padding: 16px;
-}
-.full { grid-column: 1 / -1; }
-@media (max-width: 820px) { main { grid-template-columns: 1fr; } }
-.panel {
-  background: var(--panel); border: 1px solid var(--line);
-  border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;
-}
-h2 { font-size: 15px; margin: 0 0 8px; }
-#stop {
-  width: 100%; height: 40vh; min-height: 220px; border: 0;
-  border-radius: 14px; background: var(--stop); color: #fff;
-  font-size: 60px; font-weight: 800; letter-spacing: 6px; cursor: pointer;
-}
-#stop:active { filter: brightness(0.85); }
-.pair {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-  margin-top: 12px;
-}
-.pair button {
-  width: 100%; height: 64px; font-size: 21px; font-weight: 700;
-  border-radius: 10px; border: 2px solid var(--btn-edge);
-  background: var(--btn); color: #fff; cursor: pointer;
-}
-.pair button:disabled { opacity: 0.4; cursor: not-allowed; }
-.reason {
-  min-height: 2.6em; margin-top: 4px; font-size: 13px;
-  color: var(--muted);
-}
-.note { margin: -4px 0 8px; font-size: 13px; }
-#why { min-height: 1.4em; margin: 8px 2px 14px; }
-.light {
-  display: inline-block; width: 14px; height: 14px; border-radius: 50%;
-  background: var(--grey); vertical-align: -2px;
-}
-.light.big { width: 30px; height: 30px; vertical-align: middle; }
-.light.green { background: var(--green); }
-.light.red { background: var(--red); }
-.bigline { font-size: 19px; font-weight: 600; margin-bottom: 10px; }
-table { width: 100%; border-collapse: collapse; }
-td, th {
-  text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line);
-  font-variant-numeric: tabular-nums;
-}
-.kv td:first-child { color: var(--muted); width: 45%; }
-.bad { color: var(--red); font-weight: 700; }
-.st-queued, .log-ack_queued { color: var(--queued); }
-.log-ack_other { color: var(--red); }
-.st-rejected, .st-no-ack, .st-publish-failed { color: var(--red); }
-ul { margin: 0; padding-left: 20px; }
-li { margin-bottom: 4px; }
-#log {
-  max-height: 38vh; overflow: auto; font-size: 13px;
-  font-family: ui-monospace, Menlo, monospace;
-}
-#log div { padding: 1px 0; border-bottom: 1px dotted var(--line); }
-.log-no_ack, .log-cmd_failed, .log-decode_error { color: var(--red); }
-.log-sim, .log-cmd_seen { color: var(--muted); }
-.log-telemetry { color: var(--red); font-weight: 700; }
-.log-retained_cmd { color: var(--red); font-weight: 700; }
-.sim-buttons button { margin: 4px 6px 0 0; }
-.tgrid {
-  display: grid; gap: 16px; grid-column: 1 / -1;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-}
-.tgrid .panel { margin-bottom: 0; }
-.age { font-size: 12px; font-weight: 400; color: var(--muted); }
-.panel.stale .vals { opacity: 0.4; }
-.panel.stale .age { color: var(--red); font-weight: 700; }
-.flag {
-  display: inline-block; padding: 1px 8px; border-radius: 6px;
-  font-size: 14px; font-weight: 700; background: var(--red); color: #fff;
-  vertical-align: 2px;
-}
-.flag[hidden] { display: none; }
-.impact {
-  margin: 2px 0 6px; padding: 12px 8px; text-align: center;
-  border: 2px solid var(--line); border-radius: 10px; font-size: 34px;
-  font-weight: 800; letter-spacing: 4px; color: var(--muted);
-}
-.impact.hot { background: var(--red); border-color: var(--red); color: #fff; }
-.letter {
-  display: inline-block; min-width: 1.4em; margin-left: 10px;
-  padding: 0 6px; text-align: center; border: 2px solid var(--line);
-  border-radius: 8px; font-size: 26px; font-weight: 800;
-}
-.bar {
-  height: 10px; margin-top: 2px; border: 1px solid var(--line);
-  border-radius: 5px; overflow: hidden;
-}
-.bar i { display: block; width: 0; height: 100%; background: var(--queued); }
-.tally { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
-.tally span {
-  padding: 1px 8px; border: 1px solid var(--line); border-radius: 6px;
-  font-variant-numeric: tabular-nums;
-}
-#timeline {
-  max-height: 180px; overflow: auto; font-size: 13px;
-  font-family: ui-monospace, Menlo, monospace;
-}
-#timeline div { padding: 1px 0; border-bottom: 1px dotted var(--line); }
-.tl-reject, .tl-lost { color: var(--red); }
-.tl-junction { color: var(--queued); }
-.tl-note { color: var(--muted); }
-#imu {
-  width: 100%; height: 90px; margin-top: 8px; border: 1px solid var(--line);
-  border-radius: 6px;
-}
-#imu line { stroke: var(--line); stroke-width: 1; }
-#imu polyline {
-  fill: none; stroke-width: 1.6; vector-effect: non-scaling-stroke;
-}
-#g-pitch { stroke: var(--queued); }
-#g-roll { stroke: var(--amber); stroke-dasharray: 5 3; }
-#banner { display: none; padding: 10px 16px; font-weight: 600; }
-#banner.warn { display: block; background: var(--red); color: #fff; }
-#banner.done { display: block; background: var(--amber); color: #000; }
-</style>
-</head>
-<body>
-<header>
-  <strong>S1 dashboard</strong>
-  <span id="mode" class="badge">...</span>
-  <span>prefix <code id="prefix"></code></span>
-  <span>port <code id="port"></code></span>
-  <span class="muted">broker from <span id="source"></span></span>
-  <span><span id="broker-light" class="light"></span>
-    broker <span id="broker-text">waiting</span></span>
-  <span id="banner-off" class="muted"></span>
-  <span id="stream" class="bad"></span>
-</header>
-<div id="banner"></div>
-<main>
-<section>
-  <button id="stop" type="button" title="The Escape key also sends STOP"
-    >STOP</button>
-  <div class="pair">
-    <div>
-      <button id="start" type="button" disabled>START</button>
-      <div id="start-why" class="reason"></div>
-    </div>
-    <div>
-      <button id="reset" type="button" disabled>RESET</button>
-      <div id="reset-why" class="reason"></div>
-    </div>
-  </div>
-  <p id="why" class="muted"></p>
-  <div class="panel">
-    <h2>Last commands</h2>
-    <p class="note muted">queued = sent to the robot's controller, not
-      confirmed</p>
-    <table>
-      <thead><tr><th>id</th><th>command</th><th>sent</th><th>result</th>
-        <th>round trip</th></tr></thead>
-      <tbody id="cmds"></tbody>
-    </table>
-  </div>
-</section>
-<section>
-  <div class="panel">
-    <h2>Robot link</h2>
-    <div class="bigline"><span id="robot-light" class="light big"></span>
-      <span id="robot-text">no status from the robot</span></div>
-    <table class="kv">
-      <tr><td>heartbeat age</td><td id="age">none yet</td></tr>
-      <tr><td>uptime</td><td id="uptime">-</td></tr>
-      <tr><td>connect_count</td><td id="connect">-</td></tr>
-      <tr><td>cmd_reject</td><td id="reject">-</td></tr>
-      <tr><td>rssi</td><td id="rssi">-</td></tr>
-      <tr><td>tel_drop / evt_drop</td><td id="drops">-</td></tr>
-      <tr><td>heartbeats lost</td><td id="lost">-</td></tr>
-      <tr><td>telemetry / live lost</td><td id="msg-lost">-</td></tr>
-    </table>
-  </div>
-  <div class="panel">
-    <h2>Operator rules</h2>
-    <ul>
-      <li>First test with the wheels off the ground.</li>
-      <li>START runs the robot only from READY. In FINISHED, START only
-        returns to READY; the next START runs.</li>
-      <li>START is refused while running, while calibrating (up to 3 s
-        after power-up, or after Button 2) and in FAULT (send RESET
-        first).</li>
-      <li>STOP is always accepted: it ends a run in FINISHED, and does
-        nothing when the robot is not running. This button, the Escape
-        key and the GP20 button all stop the robot.</li>
-      <li>RESET works only from FAULT or FINISHED, back to READY with the
-        motors braked.</li>
-      <li>After a GP20 start the robot is running, so a dashboard START
-        is refused; STOP still works. GP20 held for 2 s is RESET.</li>
-      <li>TEST=1 images ignore START, STOP and RESET until an S5 test
-        step arms the controller.</li>
-      <li>"queued" means S5 received the command, not that it acted.
-        S5's verdict is on the robot's console only (EVT 0x65 a=opcode
-        b=1 or 0) until the event channel is built; the S5 panel shows
-        the state change. "rejected" means S1 refused the command or
-        could not hand it to S5.</li>
-      <li>A command sent while the robot is offline is lost: no ack.</li>
-    </ul>
-  </div>
-  <div class="panel" id="sim-panel" hidden>
-    <h2>Simulator</h2>
-    <div>fake car state: <b id="car-state">-</b>
-      <span class="muted">(a real car's state is in the S5 panel)</span>
-    </div>
-    <div class="sim-buttons">
-      <button type="button" data-sim="hb_pause">Pause heartbeat</button>
-      <button type="button" data-sim="hb_resume">Resume heartbeat</button>
-      <button type="button" data-sim="offline">Go offline</button>
-      <button type="button" data-sim="online">Come back online</button>
-      <button type="button" data-sim="fault">Stall fault</button>
-      <button type="button" data-sim="gp20">GP20 press</button>
-      <button type="button" data-sim="reject_next">Reject next</button>
-      <button type="button" data-sim="drop_next">Drop next ack</button>
-      <button type="button" data-sim="delay_next">Delay next ack 3 s
-        </button>
-      <button type="button" data-sim="dup_next">Send next ack twice
-        </button>
-      <button type="button" data-sim="retained_cmd">Retained command
-        </button>
-      <button type="button" data-sim="retained_clear">Clear retained
-        </button>
-      <button type="button" data-sim="s4_impact">S4 lifted/overturned</button>
-      <button type="button" data-sim="s4_hump">S4 hump</button>
-      <button type="button" data-sim="s3_barcode">S3 barcode</button>
-      <button type="button" data-sim="s3_reject">S3 barcode rejected
-        </button>
-      <button type="button" data-sim="s3_junction">S3 junction</button>
-      <button type="button" data-sim="s3_lost">S3 line lost</button>
-    </div>
-  </div>
-</section>
-<section class="tgrid">
-  <div class="panel" id="p-s2">
-    <h2>S2 motion <span class="age" id="age-s2"></span></h2>
-    <div class="vals">
-      <div class="bigline"><span id="s2-state">-</span>
-        <span id="s2-estop" class="flag" hidden>E-STOP</span>
-        <span id="s2-stall" class="flag" hidden>STALL</span></div>
-      <table class="kv">
-        <tr><td>commanded speed</td><td id="s2-cmd">-</td></tr>
-        <tr><td>measured speed</td><td id="s2-speed">-</td></tr>
-        <tr><td>left / right wheel</td><td id="s2-wheels">-</td></tr>
-        <tr><td>distance</td><td id="s2-dist">-</td></tr>
-        <tr><td>heading (wheel odometry)</td><td id="s2-head">-</td></tr>
-        <tr><td>fault bits</td><td id="s2-faults">-</td></tr>
-      </table>
-    </div>
-  </div>
-  <div class="panel" id="p-s3">
-    <h2>S3 line and barcodes <span class="age" id="age-s3"></span></h2>
-    <div class="vals">
-      <div class="bigline"><span id="s3-state">-</span>
-        <span id="s3-letter" class="letter">-</span></div>
-      <table class="kv">
-        <tr><td>outer sensors</td><td><span id="s3-outer">-</span>
-          <div class="bar"><i id="s3-outer-bar"></i></div></td></tr>
-        <tr><td>centre sensors</td><td><span id="s3-centre">-</span>
-          <div class="bar"><i id="s3-centre-bar"></i></div></td></tr>
-        <tr><td>steering</td><td id="s3-steer">-</td></tr>
-        <tr><td>OUTER rule</td><td id="s3-over">-</td></tr>
-        <tr><td>last barcode</td><td id="s3-bc">none yet</td></tr>
-        <tr><td>last junction</td><td id="s3-junc">none yet</td></tr>
-        <tr><td>robot counts</td><td id="s3-counts">-</td></tr>
-      </table>
-      <h2>Barcodes accepted, by letter</h2>
-      <div class="tally" id="s3-tally">none yet</div>
-      <div class="muted">rejected: <b id="s3-rejected">0</b> (S3 sends a
-        count, not the letter)</div>
-      <h2>Timeline</h2>
-      <div id="timeline"></div>
-    </div>
-  </div>
-  <div class="panel" id="p-s4">
-    <h2>S4 motion sensor <span class="age" id="age-s4"></span></h2>
-    <div class="vals">
-      <div class="impact" id="s4-impact">OK</div>
-      <div class="muted" id="s4-impacts">lift/overturn stops: 0</div>
-      <table class="kv">
-        <tr><td>pitch / roll</td><td id="s4-angles">-</td></tr>
-        <tr><td>turn rate</td><td id="s4-turn">-</td></tr>
-        <tr><td>motion class</td><td id="s4-class">-</td></tr>
-        <tr><td>hump</td><td id="s4-hump">-</td></tr>
-        <tr><td>humps / peak height</td><td id="s4-humps">-</td></tr>
-        <tr><td>IMU</td><td id="s4-imu">-</td></tr>
-      </table>
-      <svg id="imu" viewBox="0 0 240 90" preserveAspectRatio="none"
-        role="img" aria-label="pitch and roll, last 60 seconds">
-        <line x1="0" y1="45" x2="240" y2="45"></line>
-        <polyline id="g-pitch" points=""></polyline>
-        <polyline id="g-roll" points=""></polyline>
-      </svg>
-      <div class="note muted">pitch (solid) and roll (dashed), last 60 s,
-        scale +/-32 degrees</div>
-    </div>
-  </div>
-  <div class="panel" id="p-s5">
-    <h2>S5 controller <span class="age" id="age-s5"></span></h2>
-    <div class="vals">
-      <div class="bigline" id="s5-state">-</div>
-      <table class="kv">
-        <tr><td>calibration</td><td id="s5-cal">-</td></tr>
-        <tr><td>fault bits</td><td id="s5-faults">-</td></tr>
-        <tr><td>closest obstacle</td><td id="s5-closest">-</td></tr>
-        <tr><td>gap width</td><td id="s5-width">-</td></tr>
-        <tr><td>clear left / right</td><td id="s5-clear">-</td></tr>
-      </table>
-    </div>
-  </div>
-</section>
-<section class="panel full">
-  <h2>Event log</h2>
-  <div id="log"></div>
-</section>
-</main>
-<script>
-"use strict";
-const TOKEN = __TOKEN__;
-const el = (id) => document.getElementById(id);
-const rows = new Map();
-let hbBase = null;
-let lastControls = {start: false, reset: false, start_why: "",
-                    reset_why: ""};
+def page_data(token):
+    """The JSON that replaces DATA_MARK in index.html: the page token and
+    the Code 39 table. "<" is escaped so that no value can close the
+    element that holds it."""
+    data = {"token": token, "code39": s1_decode.CODE39}
+    return json.dumps(data).replace("<", "\\u003c")
 
-function post(path, body) {
-  return fetch(path, {
-    method: "POST",
-    headers: {"Content-Type": "application/json", "X-S1-Token": TOKEN},
-    body: JSON.stringify(body)
-  }).then((r) => r.json().then((j) => ({status: r.status, body: j})))
-    .catch((e) => ({status: 0, body: {error: String(e)}}));
-}
 
-function setControls(c) {
-  lastControls = c;
-  el("start").disabled = !c.start;
-  el("reset").disabled = !c.reset;
-  el("start-why").textContent = c.start ? "" : (c.start_why || "");
-  el("reset-why").textContent = c.reset ? "" : (c.reset_why || "");
-}
-
-function send(op) {
-  post("/api/cmd", {op: op}).then((r) => {
-    el("why").textContent = "";
-    if (r.status !== 200) {
-      setControls(lastControls);
-      el("why").textContent = (r.body && r.body.error) ? r.body.error
-        : "not sent (HTTP " + r.status + ")";
-    }
-  });
-}
-
-el("stop").addEventListener("click", () => send("stop"));
-el("start").addEventListener("click", () => {
-  el("start").disabled = true;
-  send("start");
-});
-el("reset").addEventListener("click", () => {
-  el("reset").disabled = true;
-  send("reset");
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    e.preventDefault();
-    send("stop");
-  }
-});
-document.querySelectorAll("[data-sim]").forEach((b) => {
-  b.addEventListener("click", () => post("/api/sim",
-                                         {action: b.dataset.sim}));
-});
-
-function setLight(id, color, big) {
-  el(id).className = "light" + (big ? " big " : " ") + color;
-}
-
-function setBroker(b) {
-  const up = b && b.state === "up";
-  setLight("broker-light", up ? "green" : "red", false);
-  el("broker-text").textContent = up ? "connected" : "not connected";
-}
-
-function setLink(l) {
-  setLight("robot-light", l.light, true);
-  el("robot-text").textContent = l.reason;
-}
-
-function uptime(s) {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor(s / 60) % 60;
-  const x = s % 60;
-  return h + ":" + String(m).padStart(2, "0") + ":"
-    + String(x).padStart(2, "0");
-}
-
-function setHeartbeat(h, ageMs) {
-  if (!h) {
-    hbBase = null;
-    return;
-  }
-  hbBase = performance.now() - ageMs;
-  el("uptime").textContent = uptime(h.uptime_s);
-  el("connect").textContent = h.connect_count;
-  el("reject").textContent = h.cmd_reject;
-  el("rssi").textContent = h.rssi_text;
-  el("drops").textContent = h.tel_drop_text + " / " + h.evt_drop;
-  el("lost").textContent = h.lost_total;
-}
-
-setInterval(() => {
-  if (hbBase === null) {
-    el("age").textContent = "none yet";
-    el("age").className = "";
-    return;
-  }
-  const age = (performance.now() - hbBase) / 1000;
-  el("age").textContent = age.toFixed(1) + " s";
-  el("age").className = age > 3 ? "bad" : "";
-}, 200);
-
-function upsertRow(c) {
-  let tr = rows.get(c.n);
-  if (!tr) {
-    tr = document.createElement("tr");
-    for (let i = 0; i < 5; i++) {
-      tr.appendChild(document.createElement("td"));
-    }
-    el("cmds").prepend(tr);
-    rows.set(c.n, tr);
-    while (el("cmds").children.length > 20) {
-      const last = el("cmds").lastElementChild;
-      rows.forEach((v, k) => { if (v === last) { rows.delete(k); } });
-      last.remove();
-    }
-  }
-  const td = tr.children;
-  if (c.cmd_id !== undefined) { td[0].textContent = c.cmd_id; }
-  if (c.op) { td[1].textContent = c.op; }
-  if (c.sent_at) { td[2].textContent = c.sent_at.slice(11); }
-  if (c.state) {
-    const key = c.state.startsWith("queued") ? "queued"
-      : c.state.startsWith("rejected") ? "rejected"
-      : c.state.replace(/\s+/g, "-");
-    td[3].textContent = c.state;
-    td[3].className = "st-" + key;
-  }
-  if (typeof c.rtt_ms === "number") {
-    td[4].textContent = c.rtt_ms.toFixed(1) + " ms";
-  }
-}
-
-function addLog(kind, d) {
-  if (!d || !d.log) { return; }
-  const div = document.createElement("div");
-  div.className = "log-" + kind;
-  div.textContent = (d.t || "").slice(11) + "  " + d.log;
-  el("log").prepend(div);
-  while (el("log").children.length > 300) {
-    el("log").lastElementChild.remove();
-  }
-}
-
-const STALE_S = 2;
-const IMPACT_HOLD_S = 3;
-const IMU_KEEP = 120;
-const feedAt = {live: null, tel: null};
-const PANELS = [["p-s2", ["live", "tel"], "age-s2"],
-                ["p-s3", ["live"], "age-s3"],
-                ["p-s4", ["tel"], "age-s4"],
-                ["p-s5", ["tel"], "age-s5"]];
-let impactAt = null;
-let imu = [];
-let liveSeen = false;
-const msgLost = {tel: 0, live: 0};
-
-function markFeed(feed, ageMs) {
-  feedAt[feed] = (ageMs === null || ageMs === undefined) ? null
-    : performance.now() - ageMs;
-}
-
-function text(id, value) { el(id).textContent = value; }
-
-function num(v, unit, digits) {
-  return (typeof v === "number") ? v.toFixed(digits || 0) + (unit ? " " + unit : "")
-    : "-";
-}
-
-function list(names) { return names.length ? names.join(", ") : "none"; }
-
-function paintAges() {
-  const now = performance.now();
-  PANELS.forEach(([panel, feeds, ageId]) => {
-    const marks = feeds.map((f) => feedAt[f]);
-    let stale = true;
-    let label = "no data yet";
-    if (marks.every((m) => m !== null)) {
-      const age = (now - Math.min(...marks)) / 1000;
-      stale = age > STALE_S;
-      label = stale ? "no data for " + age.toFixed(1) + " s"
-        : "updated " + age.toFixed(1) + " s ago";
-    }
-    el(panel).classList.toggle("stale", stale);
-    text(ageId, label);
-  });
-  const hot = impactAt !== null && (now - impactAt) / 1000 < IMPACT_HOLD_S;
-  el("s4-impact").className = hot ? "impact hot" : "impact";
-  text("s4-impact", hot ? "LIFTED / OVERTURNED" : "OK");
-}
-setInterval(paintAges, 200);
-
-function drawImu() {
-  const x = (i) => 240 - (imu.length - 1 - i) * 2;
-  const y = (v) => 45 - Math.max(-32, Math.min(32, v)) * 45 / 32;
-  [["g-pitch", 0], ["g-roll", 1]].forEach(([id, k]) => {
-    el(id).setAttribute("points", imu.map((p, i) =>
-      x(i).toFixed(1) + "," + y(p[k]).toFixed(1)).join(" "));
-  });
-}
-
-function setMsgLost() {
-  text("msg-lost", msgLost.tel + " / " + msgLost.live);
-}
-
-function setTelemetry(t, ageMs) {
-  if (!t) { return; }
-  markFeed("tel", ageMs);
-  msgLost.tel = t.lost_total;
-  setMsgLost();
-  if (!liveSeen) { text("s2-state", t.motion_name); }
-  text("s2-speed", num(t.speed_mms, "mm/s"));
-  text("s2-wheels", num(t.speed_l_mms) + " / " + num(t.speed_r_mms)
-       + " mm/s");
-  text("s2-dist", num(t.dist_mm, "mm") + " (" + num(t.dist_mm / 1000, "m", 2)
-       + ")");
-  text("s2-faults", list(t.faults));
-  el("s2-faults").className = t.faults.length ? "bad" : "";
-  el("s2-stall").hidden = !t.faults.includes("stall");
-  el("s4-impacts").textContent = "lift/overturn stops: " + t.impact_count
-    + (t.impact_at ? " (last at " + t.impact_at.slice(11, 19) + ")" : "");
-  if (t.b_impact) { impactAt = performance.now() - (ageMs || 0); }
-  text("s4-angles", num(t.pitch_deg, "°", 1) + " / "
-       + num(t.roll_deg, "°", 1));
-  text("s4-turn", num(t.turn_dps, "deg/s"));
-  text("s4-class", t.class_name);
-  text("s4-hump", t.hump_name);
-  text("s4-humps", t.hump_count + " / " + num(t.peak_mm, "mm"));
-  text("s4-imu", t.b_imu_ok ? "ok" : "NOT OK");
-  el("s4-imu").className = t.b_imu_ok ? "" : "bad";
-  text("s5-state", t.ctrl_name);
-  text("s5-cal", t.b_cal_done ? "done" : "not done");
-  text("s5-faults", list(t.faults));
-  el("s5-faults").className = t.faults.length ? "bad" : "";
-  text("s5-closest", t.closest_mm ? num(t.closest_mm, "mm") + " at "
-       + num(t.angle_idx * 7.5, "\u00b0", 1) + " (servo)" : "none");
-  text("s5-width", t.width_mm ? num(t.width_mm, "mm") : "-");
-  text("s5-clear", (t.width_mm || t.clear_l_mm || t.clear_r_mm)
-       ? num(t.clear_l_mm) + " / " + num(t.clear_r_mm) + " mm" : "-");
-}
-
-function setLive(l, ageMs) {
-  if (!l) { return; }
-  markFeed("live", ageMs);
-  msgLost.live = l.lost_total;
-  setMsgLost();
-  liveSeen = true;
-  text("s2-state", l.motion_name);
-  el("s2-estop").hidden = !l.b_estop;
-  text("s2-cmd", num(l.cmd_speed_mms, "mm/s"));
-  text("s2-head", num(l.heading_deg, "°", 1));
-  text("s3-state", l.line_name);
-  el("s3-state").className = (l.line_name === "LOST") ? "bad" : "";
-  text("s3-letter", l.bc_char || "-");
-  text("s3-outer", num(l.outer_ir) + " of 255");
-  el("s3-outer-bar").style.width = (l.outer_ir * 100 / 255) + "%";
-  text("s3-centre", num(l.centre_ir) + " of 255");
-  el("s3-centre-bar").style.width = (l.centre_ir * 100 / 255) + "%";
-  text("s3-steer", num(l.steer_dv_mms, "mm/s"));
-  text("s3-over", l.b_overshoot ? "on" : "off");
-  text("s3-bc", l.bc_char ? l.bc_char + ": " + l.bc_cmd_name + ", read "
-       + (l.b_bc_rev ? "backwards" : "forwards") : "none yet");
-  text("s3-junc", l.junctions ? "turn " + l.junc_name : "none yet");
-  text("s3-counts", "barcodes " + l.barcodes + ", rejected " + l.rejects
-       + " (wraps at 16), junctions " + l.junctions + ", lost " + l.losts);
-}
-
-function addTimeline(entry) {
-  const div = document.createElement("div");
-  div.className = "tl-" + entry.kind;
-  div.textContent = entry.t.slice(11, 21) + "  " + entry.text;
-  el("timeline").prepend(div);
-  while (el("timeline").children.length > 100) {
-    el("timeline").lastElementChild.remove();
-  }
-}
-
-function setTally(tally, rejected) {
-  const box = el("s3-tally");
-  box.textContent = "";
-  const symbols = Object.keys(tally).sort();
-  if (symbols.length === 0) { box.textContent = "none yet"; }
-  symbols.forEach((k) => {
-    const chip = document.createElement("span");
-    chip.textContent = k + " × " + tally[k];
-    box.appendChild(chip);
-  });
-  text("s3-rejected", rejected);
-}
-
-const banner = {state: "ok", why: "", entries: new Map()};
-
-function renderBanner() {
-  const box = el("banner");
-  const all = Array.from(banner.entries.values());
-  const open = all.filter((e) => !e.cleared);
-  el("banner-off").textContent = banner.state === "ok" ? ""
-    : "retained-command banner unavailable: " + banner.why;
-  if ((banner.state !== "ok") || (all.length === 0)) {
-    box.className = "";
-    box.textContent = "";
-  } else if (open.length > 0) {
-    box.className = "warn";
-    box.textContent = "WARNING: a retained command is stored on "
-      + open.map((e) => el("prefix").textContent + "/" + e.topic_suffix
-                 + " (" + e.hex + ", since " + e.at.slice(11) + ")")
-        .join(", ")
-      + ". The robot would run it again after every reconnect. Clear it:"
-      + " docs/S1_dashboard.md, \"Clearing a retained command\".";
-  } else {
-    box.className = "done";
-    box.textContent = "Retained command cleared: "
-      + all.map((e) => e.topic_suffix + " at " + e.cleared_at.slice(11))
-        .join(", ") + ".";
-  }
-}
-
-function applySnapshot(s) {
-  const sim = s.mode === "simulate";
-  el("mode").textContent = sim ? "SIMULATED (no robot)" : "LIVE";
-  el("mode").className = "badge " + (sim ? "sim" : "live");
-  el("prefix").textContent = s.prefix;
-  el("port").textContent = s.port;
-  el("source").textContent = s.config_source;
-  setBroker(s.broker);
-  setLink(s.link);
-  setControls(s.controls);
-  setHeartbeat(s.heartbeat, s.hb_age_ms || 0);
-  el("cmds").textContent = "";
-  rows.clear();
-  s.commands.forEach(upsertRow);
-  el("log").textContent = "";
-  s.log.forEach((e) => addLog(e.kind, {t: e.t, log: e.text}));
-  el("sim-panel").hidden = !sim;
-  el("car-state").textContent = s.car_state || "-";
-  liveSeen = false;
-  imu = s.imu_history.slice();
-  drawImu();
-  setTelemetry(s.telemetry, s.tel_age_ms);
-  setLive(s.live, s.live_age_ms);
-  if (!s.telemetry) { markFeed("tel", null); }
-  if (!s.live) { markFeed("live", null); }
-  el("timeline").textContent = "";
-  s.s3_timeline.forEach(addTimeline);
-  setTally(s.s3_tally, s.s3_rejected);
-  paintAges();
-  banner.state = s.banner;
-  banner.why = s.banner_why || "";
-  banner.entries = new Map(s.retained_cmd.map((e) => [e.topic_suffix, e]));
-  renderBanner();
-}
-
-const es = new EventSource("/events");
-es.onopen = () => { el("stream").textContent = ""; };
-es.onerror = () => {
-  el("stream").textContent = "dashboard server not reachable: retrying";
-};
-function on(name, fn) {
-  es.addEventListener(name, (ev) => fn(JSON.parse(ev.data)));
-}
-on("snapshot", applySnapshot);
-on("broker", (d) => { setBroker(d); addLog("broker", d); });
-on("status", (d) => addLog("status", d));
-on("link", (d) => { setLink(d); addLog("link", d); });
-on("heartbeat", (d) => { setHeartbeat(d, 0); addLog("heartbeat", d); });
-on("controls", setControls);
-on("cmd", (d) => { upsertRow(d); addLog("cmd", d); });
-on("ack", (d) => {
-  if (d.n !== undefined) { upsertRow(d); }
-  addLog(d.result === 0 ? "ack_queued" : "ack_other", d);
-});
-on("no_ack", (d) => { upsertRow(d); addLog("no_ack", d); });
-on("cmd_failed", (d) => { upsertRow(d); addLog("cmd_failed", d); });
-on("cmd_seen", (d) => addLog("cmd_seen", d));
-on("decode_error", (d) => addLog("decode_error", d));
-on("telemetry", (d) => {
-  setTelemetry(d, 0);
-  addLog("telemetry", d);
-  imu.push([d.pitch_deg, d.roll_deg]);
-  if (imu.length > IMU_KEEP) { imu.shift(); }
-  drawImu();
-  paintAges();
-});
-on("live", (d) => { setLive(d, 0); paintAges(); });
-on("s3_events", (d) => {
-  d.entries.forEach(addTimeline);
-  setTally(d.tally, d.rejected);
-});
-on("event", (d) => addLog("event", d));
-on("note", (d) => addLog("note", d));
-on("retained_cmd", (d) => {
-  banner.entries.set(d.topic_suffix, d);
-  renderBanner();
-  addLog("retained_cmd", d);
-});
-on("banner", (d) => {
-  banner.state = d.banner;
-  banner.why = d.why;
-  banner.entries.clear();
-  renderBanner();
-  addLog("banner", d);
-});
-on("sim", (d) => {
-  el("car-state").textContent = d.car_state || "-";
-  addLog("sim", d);
-});
-</script>
-</body>
-</html>
-"""
+def load_static():
+    """Read the page's files once: (index.html as text, {URL path:
+    (bytes, Content-Type)}). A missing file stops the start-up."""
+    index = (UI_DIR / INDEX_FILE).read_text(encoding="utf-8")
+    if index.count(DATA_MARK) != 1:
+        raise RuntimeError("%s must hold %s exactly once"
+                           % (INDEX_FILE, DATA_MARK))
+    static = {url: ((UI_DIR / name).read_bytes(), content_type)
+              for url, (name, content_type) in STATIC_FILES.items()}
+    return index, static
 
 
 def make_server(dash, http_port):
-    """The HTTP server on 127.0.0.1, with a fresh page token."""
+    """The HTTP server on 127.0.0.1, with a fresh page token and the
+    page's files read from dashboard_ui/."""
+    index, static = load_static()
     server = Server((BIND_ADDRESS, http_port), Handler)
+    server.index = index
+    server.static = static
     port = server.server_address[1]
     server.dash = dash
     server.token = secrets.token_hex(16)
@@ -2507,6 +2259,186 @@ def run_server(args, settings, scrub):
     return 0
 
 
+# -- The design-token audit (--token-audit; S1-U26 part A will call it) ---
+
+TOKEN_FILE = "tokens.css"
+TOKEN_FREE_FILES = ("app.css", "app.js", "scene.js", "index.html")
+AUDIT_CONTEXTS = (("light", False), ("dark", False), ("light", True),
+                  ("dark", True))
+PAIR_RE = re.compile(r"@pair\s+fg=(--[\w-]+)\s+bg=(--[\w-]+)"
+                     r"(?:\s+over=(--[\w-]+))?\s+min=([0-9.]+)")
+DECL_RE = re.compile(r"(--[\w-]+)\s*:\s*([^;{}]+);")
+COLOUR_LITERAL_RE = re.compile(
+    r"(?<![&\w])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b"
+    r"|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(")
+COLOUR_NAME_RE = re.compile(
+    r":\s*(?:white|black|red|green|blue|gray|grey|silver|orange|yellow)\b")
+COLOUR_PROP_RE = re.compile(r"(?<![\w-])color\s*:\s*([^;}]+)")
+COLOUR_PLAIN = ("inherit", "currentColor", "currentcolor")
+
+
+def css_block(text, start):
+    """The text between the first "{" at or after start and its "}"."""
+    opened = text.index("{", start)
+    return text[opened + 1:text.index("}", opened)]
+
+
+def token_tables(css):
+    """({token: value} of the base :root block, the same for the
+    prefers-contrast: more block). Comments are removed first."""
+    plain = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    base = dict(DECL_RE.findall(css_block(plain, plain.index(":root {"))))
+    media = plain.index("@media (prefers-contrast: more)")
+    more = dict(DECL_RE.findall(css_block(plain,
+                                          plain.index(":root {", media))))
+    return base, more
+
+
+def split_args(text):
+    """Split a function's arguments at the commas outside brackets."""
+    parts, depth, last = [], 0, 0
+    for index, char in enumerate(text):
+        depth += (char == "(") - (char == ")")
+        if (char == ",") and (depth == 0):
+            parts.append(text[last:index].strip())
+            last = index + 1
+    parts.append(text[last:].strip())
+    return parts
+
+
+def colour_of(value, table, scheme, depth=0):
+    """(r, g, b, alpha) of a token value in one colour scheme. Raises
+    ValueError for anything that is not a colour."""
+    value = " ".join(value.split())
+    if depth > 8:
+        raise ValueError("tokens refer to each other in a circle")
+    if value.startswith("var(") and value.endswith(")"):
+        name = value[4:-1].strip()
+        if name not in table:
+            raise ValueError("unknown token %s" % name)
+        return colour_of(table[name], table, scheme, depth + 1)
+    if value.startswith("light-dark(") and value.endswith(")"):
+        parts = split_args(value[11:-1])
+        if len(parts) != 2:
+            raise ValueError("light-dark() needs two values: %s" % value)
+        return colour_of(parts[0 if scheme == "light" else 1], table,
+                         scheme, depth + 1)
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+        return tuple(int(value[i:i + 2], 16) for i in (1, 3, 5)) + (1.0,)
+    match = re.fullmatch(r"rgba?\(([^()]*)\)", value)
+    if match is not None:
+        numbers = [float(part) for part in split_args(match.group(1))]
+        if len(numbers) in (3, 4):
+            return tuple(numbers[:3]) + (numbers[3] if len(numbers) == 4
+                                         else 1.0,)
+    raise ValueError("not a colour: %s" % value)
+
+
+def colour_over(top, under):
+    """Lay a colour with alpha over an opaque one."""
+    alpha = top[3]
+    return tuple(top[i] * alpha + under[i] * (1.0 - alpha)
+                 for i in range(3)) + (1.0,)
+
+
+def luminance(colour):
+    """WCAG 2 relative luminance of an opaque sRGB colour."""
+    def linear(channel):
+        channel /= 255.0
+        if channel <= 0.04045:
+            return channel / 12.92
+        return ((channel + 0.055) / 1.055) ** 2.4
+    return (0.2126 * linear(colour[0]) + 0.7152 * linear(colour[1])
+            + 0.0722 * linear(colour[2]))
+
+
+def contrast(first, second):
+    """WCAG 2 contrast ratio of two opaque colours."""
+    high, low = sorted((luminance(first), luminance(second)), reverse=True)
+    return (high + 0.05) / (low + 0.05)
+
+
+def pair_ratio(pair, table, scheme):
+    """The contrast ratio of one @pair in one context."""
+    fg_name, bg_name, over_name, _ = pair
+    back = colour_of("var(%s)" % bg_name, table, scheme)
+    if back[3] < 1.0:
+        if not over_name:
+            raise ValueError("%s is translucent: the pair needs over="
+                             % bg_name)
+        under = colour_of("var(%s)" % over_name, table, scheme)
+        if under[3] < 1.0:
+            raise ValueError("%s must be opaque" % over_name)
+        back = colour_over(back, under)
+    fore = colour_over(colour_of("var(%s)" % fg_name, table, scheme), back)
+    return contrast(fore, back)
+
+
+def token_audit(ui_dir=None):
+    """Check the design tokens. Returns (ok, lines to print).
+
+    1. Every "@pair" of tokens.css reaches its minimum WCAG contrast ratio
+       in the four contexts (light, dark, each with prefers-contrast:
+       more).
+    2. No other page file holds a colour literal.
+    3. Every "color:" in app.css is a token that is the text side of a
+       pair, so no text colour escapes check 1.
+    """
+    ui_dir = UI_DIR if ui_dir is None else ui_dir
+    css = (ui_dir / TOKEN_FILE).read_text(encoding="utf-8")
+    base, more = token_tables(css)
+    pairs = PAIR_RE.findall(css)
+    lines, failures = [], 0
+    for pair in pairs:
+        ratios = []
+        for scheme, b_more in AUDIT_CONTEXTS:
+            table = dict(base, **more) if b_more else base
+            try:
+                ratios.append(pair_ratio(pair, table, scheme))
+            except ValueError as err:
+                ratios.append(0.0)
+                lines.append("  error: %s" % err)
+        b_good = min(ratios) >= float(pair[3])
+        failures += 0 if b_good else 1
+        lines.append("  %s %s on %s%s: %s (min %s)"
+                     % ("ok  " if b_good else "FAIL", pair[0], pair[1],
+                        (" over " + pair[2]) if pair[2] else "",
+                        " ".join("%.2f" % ratio for ratio in ratios),
+                        pair[3]))
+    literals = 0
+    for name in TOKEN_FREE_FILES:
+        text = (ui_dir / name).read_text(encoding="utf-8")
+        found = COLOUR_LITERAL_RE.findall(text)
+        if name.endswith(".css"):
+            found += COLOUR_NAME_RE.findall(text)
+        literals += len(found)
+        if found:
+            lines.append("  FAIL %s holds %d colour literals, first %r"
+                         % (name, len(found), found[0]))
+    text_tokens = {pair[0] for pair in pairs}
+    loose = []
+    app_css = re.sub(r"/\*.*?\*/", "",
+                     (ui_dir / "app.css").read_text(encoding="utf-8"),
+                     flags=re.S)
+    for value in COLOUR_PROP_RE.findall(app_css):
+        value = value.strip()
+        match = re.fullmatch(r"var\((--[\w-]+)\)", value)
+        if value in COLOUR_PLAIN:
+            pass
+        elif (match is None) or (match.group(1) not in text_tokens):
+            loose.append(value)
+    if loose:
+        lines.append("  FAIL app.css text colours outside the pairs: %s"
+                     % ", ".join(sorted(set(loose))))
+    ok = bool(pairs) and (failures == 0) and (literals == 0) and (not loose)
+    lines.append("token audit: %d pairs in 4 contexts (light, dark, light "
+                 "more, dark more), %d below their minimum; %d colour "
+                 "literals outside %s; %d text colours outside the pairs: %s"
+                 % (len(pairs), failures, literals, TOKEN_FILE,
+                    len(set(loose)), "PASS" if ok else "FAIL"))
+    return ok, lines
+
+
 # -- S1-U16 part A: --check ---------------------------------------------
 
 FAKE_HOST = "203.0.113.77"      # TEST-NET-3: a documentation address.
@@ -2515,7 +2447,16 @@ FAKE_PASSWORD = "p-s1u16-secret"
 FAKE_DIGITS = "1234"            # A login of digits only (A12).
 FAKE_PORT = 1884
 FAKE_PREFIX = "s1u16"
-ALL_STEPS = ["A%d" % number for number in range(1, 15)]
+A_STEPS = ["A%d" % number for number in range(1, 15)]
+# S1-U24 part D: the barcode letter map, in the same run after A14.
+D_STEPS = ["D%d" % number for number in range(1, 8)]
+# S1-U26 parts A (U1 to U3) and D (U4), in the same run after D7.
+U_STEPS = ["U%d" % number for number in range(1, 5)]
+ALL_STEPS = A_STEPS + D_STEPS + U_STEPS
+MAP_APPLIED_RE = re.compile(r"Applied on the robot: LEFT=(.) RIGHT=(.) "
+                            r"STRAIGHT=(.) U-TURN=(.) "
+                            r"\(acked \d\d:\d\d:\d\d\)")
+DCBA_LINE = "S3 NAV MAP set: LEFT=D RIGHT=C STRAIGHT=B U-TURN=A"
 # Measured between client receipts: allow 0.1 s of jitter below the 3 s limit.
 A8_RED_MIN_S = 2.9
 A8_RED_MAX_S = 3.5
@@ -3411,19 +3352,490 @@ def check_a12(ctx, state_text):
                     for name, good in ctx.digits.items())))
 
 
+# -- S1-U26 parts A and D: the page's files, tokens and scenarios ---------
+
+# Written out here, not read from the server's constants: U1 fails if the
+# server's policy or list changes without this test changing too.
+U26_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; "
+           "font-src 'self'; connect-src 'self'; img-src 'self'; "
+           "frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+U26_TYPES = {
+    "/": "text/html; charset=utf-8",
+    "/tokens.css": "text/css; charset=utf-8",
+    "/app.css": "text/css; charset=utf-8",
+    "/app.js": "text/javascript; charset=utf-8",
+    "/scene.js": "text/javascript; charset=utf-8",
+    "/fonts/inter-latin-opsz-normal.woff2": "font/woff2",
+    "/fonts/OFL.txt": "text/plain; charset=utf-8",
+    "/vendor/three/three.module.js": "text/javascript; charset=utf-8",
+    "/vendor/three/three.core.js": "text/javascript; charset=utf-8",
+    "/vendor/three/LICENSE.txt": "text/plain; charset=utf-8",
+}
+U26_NOT_FOUND = (
+    b"/index.html", b"/app.js/", b"/../s1_dashboard.py",
+    b"/%2e%2e/s1_dashboard.py", b"/..%2fs1_dashboard.py",
+    b"/.%2e/cmd_rtt.py", b"/..\\s1_dashboard.py", b"/app.js%00",
+    b"/app.js\x00.css", b"/dashboard_ui/app.js", b"/APP.JS", b"/fonts/",
+    b"/vendor/three/", b"/THIRD_PARTY_NOTICES.md", b"/fonts/../app.js")
+NOTICES_FILE = "THIRD_PARTY_NOTICES.md"
+NOTICE_ROW_RE = re.compile(r"^\| `([^`]+)` \|.*\| `([0-9a-f]{64})` \|",
+                           re.M)
+THIRD_PARTY_DIRS = ("vendor", "fonts")
+URL_RE = re.compile(rb"https?://")
+XML_NAMESPACE = b"http://www.w3.org/"
+SCN_STEP_S = 0.1                # The synthetic clock of U4.
+SCN_LEAD_S = 3.0                # Running time before the button.
+
+
+def raw_get(port, path, host=None):
+    """One GET with the path bytes exactly as given (http.client refuses
+    some of them); returns (status, {header: value}, body)."""
+    sock = socket.create_connection((BIND_ADDRESS, port), timeout=10)
+    name = host if host else "%s:%d" % (BIND_ADDRESS, port)
+    sock.sendall(b"GET " + path + b" HTTP/1.1\r\nHost: "
+                 + name.encode("ascii") + b"\r\nConnection: close\r\n\r\n")
+    data = b""
+    while True:
+        chunk = sock.recv(65536)
+        if not chunk:
+            break
+        data += chunk
+    sock.close()
+    head, _, body = data.partition(b"\r\n\r\n")
+    lines = head.decode("latin-1").split("\r\n")
+    headers = {}
+    for line in lines[1:]:
+        key, _, value = line.partition(": ")
+        headers[key.lower()] = value
+    status = int(lines[0].split(" ")[1]) if " " in lines[0] else 0
+    return status, headers, body
+
+
+def check_u1(ctx):
+    """The static route: the list, the headers, the bodies, the refusals."""
+    files = sorted(url for url in U26_TYPES if url != "/")
+    b_list = sorted(STATIC_FILES) == files
+    good = 0
+    for url, content_type in sorted(U26_TYPES.items()):
+        status, headers, body = raw_get(ctx.port, url.encode("ascii"))
+        b_body = (url == "/") or (body == (UI_DIR / url[1:]).read_bytes())
+        if ((status == 200)
+                and (headers.get("content-security-policy") == U26_CSP)
+                and (headers.get("x-content-type-options") == "nosniff")
+                and (headers.get("cache-control") == "no-store")
+                and (headers.get("content-type") == content_type)
+                and b_body):
+            good += 1
+    missing = sum(1 for path in U26_NOT_FOUND
+                  if raw_get(ctx.port, path)[0] == 404)
+    refused = sum(1 for url in files if raw_get(
+        ctx.port, url.encode("ascii"),
+        "dashboard.example:%d" % ctx.port)[0] == 403)
+    ok = (b_list and (good == len(U26_TYPES))
+          and (missing == len(U26_NOT_FOUND)) and (refused == len(files)))
+    return ok, ("STATIC_FILES is the %d URLs of the test: %s; %d of %d "
+                "responses 200 with the literal CSP, nosniff, no-store, "
+                "the fixed Content-Type and the file's bytes; %d of %d "
+                "other paths 404; %d of %d wrong-Host requests 403"
+                % (len(files), b_list, good, len(U26_TYPES), missing,
+                   len(U26_NOT_FOUND), refused, len(files)))
+
+
+def check_u2(ui_dir=None):
+    """The served files on disk: no URL outside the exemptions, and the
+    third-party files against THIRD_PARTY_NOTICES.md."""
+    ui_dir = UI_DIR if ui_dir is None else ui_dir
+    names = [INDEX_FILE] + sorted(name for name, _ in STATIC_FILES.values())
+    with_urls = []
+    for name in names:
+        if name.endswith(".txt") or name.startswith("vendor/"):
+            continue                # Licence text, or third-party code.
+        data = (ui_dir / name).read_bytes().replace(XML_NAMESPACE, b"")
+        if URL_RE.search(data):
+            with_urls.append(name)
+    rows = dict(NOTICE_ROW_RE.findall(
+        (ui_dir / NOTICES_FILE).read_text(encoding="utf-8")))
+    on_disk = sorted(
+        path.relative_to(ui_dir).as_posix() for folder in THIRD_PARTY_DIRS
+        for path in (ui_dir / folder).rglob("*") if path.is_file())
+    no_row = [name for name in on_disk if name not in rows]
+    wrong = [name for name in on_disk if (name in rows) and (
+        hashlib.sha256((ui_dir / name).read_bytes()).hexdigest()
+        != rows[name])]
+    no_file = sorted(name for name in rows if name not in on_disk)
+    ok = bool(on_disk) and not (with_urls or no_row or wrong or no_file)
+    return ok, ("%d served files, %d with a URL outside the exemptions "
+                "(licence texts, XML namespaces, vendor/)%s; %d files "
+                "under vendor/ and fonts/: %d without a row in %s, %d "
+                "whose SHA-256 differs from its row%s, %d rows without a "
+                "file"
+                % (len(names), len(with_urls),
+                   (": " + ", ".join(with_urls)) if with_urls else "",
+                   len(on_disk), len(no_row), NOTICES_FILE, len(wrong),
+                   (": " + ", ".join(wrong)) if wrong else "",
+                   len(no_file)))
+
+
+def check_u3():
+    """The design-token audit, as --token-audit runs it."""
+    ok, lines = token_audit()
+    failed = [line.strip() for line in lines[:-1] if "FAIL" in line]
+    return ok, lines[-1] + ("; " + "; ".join(failed[:3]) if failed else "")
+
+
+def scenario_run(name, b_running=True):
+    """Play one scenario on a fresh fake car with a synthetic clock.
+    Returns (payload bytes of every message, telemetry frames and live
+    messages decoded from the button on, console lines, the car, the last
+    live message before the button)."""
+    folder = tempfile.mkdtemp(prefix="s1u26-")
+    settings = Settings(None, 1883, "probe", "", "", "check")
+    car = FakeCar(settings, Scrubber(settings), folder, True)
+    lines, notes = [], []
+    car.on_line = lines.append
+    car.on_sim = lambda state, text: notes.append(text)
+    car._state = car.RUNNING if b_running else "READY"
+    clock = 100.0
+    car._advance(clock)
+    length = sum(seconds for seconds, _ in car.SCENARIOS[name])
+    lead = int(round(SCN_LEAD_S / SCN_STEP_S))
+    first = None
+    for step in range(lead + int(round((length + 2.0) / SCN_STEP_S))):
+        if step == lead:
+            first = len(lines)
+            car._scenario_start(name)
+        clock += SCN_STEP_S
+        car._advance(clock)
+        if car._scn_note is not None:
+            notes.append(car._scn_note)
+            car._scn_note = None
+        if step % 2 == 0:
+            car._send_live()
+        if step % 5 == 0:
+            car._send_telemetry()
+    shutil.rmtree(folder, ignore_errors=True)
+    payloads = [parse_sub_line(line)[3] for line in lines]
+    msgs = [s1_decode.decode(payload) for payload in payloads]
+    tel = [m for m in msgs[first:] if m["msg_type"] == s1_decode.TELEMETRY]
+    live = [m for m in msgs[first:] if m["msg_type"] == s1_decode.LIVE]
+    before = [m for m in msgs[:first] if m["msg_type"] == s1_decode.LIVE]
+    return b"".join(payloads), tel, live, notes, car, before[-1]
+
+
+def relative_headings(live):
+    """Each live heading in degrees, relative to the first, in +/-180."""
+    start = live[0]["heading_hdeg"]
+    return [((m["heading_hdeg"] - start + 360) % 720 - 360) / 2.0
+            for m in live]
+
+
+def scenario_obstacle(tel, live, before):
+    echoes = [m["closest_mm"] for m in tel if m["closest_mm"] > 0]
+    turns = relative_headings(live)
+    last = tel[-1]
+    ok = (bool(echoes) and (echoes[0] >= 550) and (min(echoes) == 150)
+          and any(m["ctrl_state"] == 8 for m in tel)
+          and (37.0 <= max(turns) <= 41.0) and (-41.0 <= min(turns) <= -37.0)
+          and (abs(turns[-1]) <= 2.0)
+          and ((last["width_mm"], last["clear_l_mm"], last["clear_r_mm"])
+               == (90, 480, 220)))
+    return ok, ("echo %s to %s mm, heading %+.1f and %+.1f, end %+.1f, "
+                "profile %d/%d/%d"
+                % (echoes[0] if echoes else "none",
+                   min(echoes) if echoes else "none", max(turns),
+                   min(turns), turns[-1], last["width_mm"],
+                   last["clear_l_mm"], last["clear_r_mm"]))
+
+
+def scenario_junction(tel, live, before):
+    # The first barcode comes with the button, so the counts are compared
+    # with the last live message before it.
+    turns = relative_headings(live)
+    barcodes = (live[-1]["barcodes"] - before["barcodes"]) & 0xFF
+    junctions = (live[-1]["junctions"] - before["junctions"]) & 0xFF
+    spins = sum(1 for m in live if (m["cmd_speed_mms"] == 0)
+                and (m["motion_state"] == 3))
+    ok = ((barcodes == 2) and (junctions == 2)
+          and (88.0 <= max(turns) <= 92.0) and (abs(turns[-1]) <= 2.0)
+          and (min(turns) >= -2.0) and (spins > 0))
+    return ok, ("barcodes +%d, junctions +%d, heading %+.1f then back to "
+                "%+.1f, %d live messages turning with commanded speed 0"
+                % (barcodes, junctions, max(turns), turns[-1], spins))
+
+
+def scenario_hump(tel, live, before):
+    pitches = [m["pitch_hdeg"] / 2.0 for m in tel]
+    humps = tel[-1]["hump_count"] - tel[0]["hump_count"]
+    ok = ((9.0 <= max(pitches) <= 12.5) and (-12.5 <= min(pitches) <= -9.0)
+          and (humps == 1))
+    return ok, ("pitch %+.1f and %+.1f, hump_count +%d"
+                % (max(pitches), min(pitches), humps))
+
+
+def scenario_lifted(tel, live, before):
+    lifted = sum(1 for m in tel if m["motion_class"] == 6)
+    stops = sum(1 for m in live if m["b_estop"])
+    ok = (lifted > 0) and (stops > 0) and (tel[-1]["motion_class"] != 6)
+    return ok, ("%d frames with class 6, %d live messages with the E-stop, "
+                "last class %d" % (lifted, stops, tel[-1]["motion_class"]))
+
+
+SCENARIO_CHECKS = {"obstacle": scenario_obstacle,
+                   "junction": scenario_junction, "hump": scenario_hump,
+                   "lifted": scenario_lifted}
+
+
+def check_u4():
+    """The scenarios: the same bytes twice, and what the frames show."""
+    parts = []
+    ok = sorted(FakeCar.SCENARIOS) == sorted(SCENARIO_CHECKS)
+    for name in sorted(SCENARIO_CHECKS):
+        first, tel, live, _, _, before = scenario_run(name)
+        b_same = first == scenario_run(name)[0]
+        good, text = SCENARIO_CHECKS[name](tel, live, before)
+        ok = ok and b_same and good
+        parts.append("%s: same bytes twice %s, %s: %s"
+                     % (name, b_same, text, "ok" if good else "FAIL"))
+    _, _, _, notes, car, _ = scenario_run("obstacle", False)
+    b_idle = (car._scn is None) and any("not running" in note
+                                        for note in notes)
+    return ok and b_idle, ("; ".join(parts) + "; pressed while READY, "
+                           "nothing plays and the console says so: %s"
+                           % b_idle)
+
+
+# -- S1-U24 part D: the barcode letter map --------------------------------
+
+def map_sends(ctx, since):
+    """(time, data) of every map send (a "map" event with the payload)."""
+    with ctx.stream.cond:
+        return [(when, data) for when, name, data in ctx.stream.events[since:]
+                if (name == "map") and data.get("hex")]
+
+
+def wait_map(ctx, pred, timeout, since):
+    return ctx.stream.wait_for("map", pred, timeout, since)
+
+
+def console_line(ctx, text, timeout, since):
+    """The fake car's console line holding text, as a "sim" event."""
+    return ctx.stream.wait_for("sim", lambda d: text in d.get("log", ""),
+                               timeout, since)
+
+
+def check_d1(ctx):
+    since = ctx.stream.mark()
+    status, reply = post_json(ctx, "/api/map", {"letters": "dcba"})
+    sent = wait_map(ctx, lambda d: bool(d.get("hex")), 2.0, since)
+    applied = wait_map(ctx, lambda d: d["state"] == "applied", 3.0, since)
+    console = console_line(ctx, DCBA_LINE, 3.0, since)
+    b_payload, first = False, ""
+    if sent is not None:
+        first = sent[2]["status"]
+        msg = s1_decode.decode(bytes.fromhex(sent[2]["hex"]))
+        b_payload = ((msg["msg_type"] == s1_decode.MAP)
+                     and (1 <= msg["cmd_id"] <= 63)
+                     and (msg["cmd_id"] == reply.get("cmd_id"))
+                     and (s1_decode.map_letters(msg) == "DCBA"))
+    text = applied[2]["status"] if applied else ""
+    match = MAP_APPLIED_RE.fullmatch(text)
+    b_text = (match is not None) and (match.groups() == ("D", "C", "B", "A"))
+    ok = ((status == 200) and first.startswith("Sending") and b_payload
+          and b_text and (console is not None))
+    return ok, ("Set map dcba: %d; first status %r; payload a MAP with the "
+                "reply's id %s and DCBA: %s; then %r; fake car console line: "
+                "%s" % (status, first, reply.get("cmd_id"), b_payload, text,
+                        console is not None))
+
+
+def check_d2(ctx):
+    since = ctx.stream.mark()
+    codes = [post_json(ctx, "/api/map", {"letters": bad})[0]
+             for bad in ("DDBA", "D*BA", "DCB", "DCB?")]
+    # Let any map that went out anyway reach the car and be answered
+    # before the car is told to refuse the next one.
+    time.sleep(1.0)
+    b_none = not map_sends(ctx, since)
+    post_json(ctx, "/api/sim", {"action": "reject_next"})
+    since = ctx.stream.mark()
+    status, _ = post_json(ctx, "/api/map", {"letters": "BADC"})
+    refused = wait_map(ctx, lambda d: d["state"] == "refused", 3.0, since)
+    time.sleep(3.0)
+    sends = map_sends(ctx, since)
+    text = refused[2]["status"] if refused else ""
+    b_text = (text.startswith("REFUSED") and ("BADC" in text)
+              and (MAP_APPLIED_RE.search(text) is not None)
+              and ("LEFT=D RIGHT=C STRAIGHT=B U-TURN=A" in text))
+    _, state_text = http_call(ctx.port, "GET", "/api/state")
+    kept = json.loads(state_text)["map"]["letters"]
+    ok = ((codes == [400, 400, 400, 400]) and b_none and (status == 200)
+          and b_text and (len(sends) == 1) and (kept == "DCBA"))
+    return ok, ("DDBA, D*BA, DCB, DCB?: %s, nothing published: %s; BADC "
+                "with the car told to refuse: %d, %r; sends %d (no retry); "
+                "map kept for the next re-send: %s"
+                % (codes, b_none, status, text, len(sends), kept))
+
+
+def check_d3(ctx):
+    since = ctx.stream.mark()
+    post_json(ctx, "/api/sim", {"action": "reboot"})
+    off = ctx.stream.wait_for("status", lambda d: d["value"] == "offline",
+                              3.0, since)
+    online = ctx.stream.wait_for("status", lambda d: d["value"] == "online",
+                                 5.0, since)
+    at = online[0] if online else since
+    resend = wait_map(ctx, lambda d: bool(d.get("hex"))
+                      and (d.get("why") == "online"), 3.0, at)
+    applied = wait_map(ctx, lambda d: d["state"] == "applied", 3.0,
+                       resend[0] if resend else at)
+    console = console_line(ctx, DCBA_LINE, 3.0, at)
+    restart = ctx.stream.wait_for("heartbeat", lambda d: "uptime went back"
+                                  in d.get("log", ""), 4.0, at)
+    time.sleep(2.0)
+    sends = map_sends(ctx, at)
+    ok = ((off is not None) and (online is not None) and (resend is not None)
+          and (applied is not None) and (console is not None)
+          and (restart is not None) and (len(sends) == 1))
+    return ok, ("offline then online: %s; sent again because of online: %s; "
+                "applied: %s; console DCBA again: %s; restart seen in the "
+                "heartbeat: %s; sends after online: %d (expected 1)"
+                % ((off is not None) and (online is not None),
+                   resend is not None, applied is not None,
+                   console is not None, restart is not None, len(sends)))
+
+
+def check_d4(ctx):
+    since = ctx.stream.mark()
+    post_json(ctx, "/api/sim", {"action": "reboot_quiet"})
+    restart = ctx.stream.wait_for("heartbeat", lambda d: "uptime went back"
+                                  in d.get("log", ""), 4.0, since)
+    resend = wait_map(ctx, lambda d: bool(d.get("hex"))
+                      and (d.get("why") == "restart"), 3.0, since)
+    applied = wait_map(ctx, lambda d: d["state"] == "applied", 3.0,
+                       resend[0] if resend else since)
+    console = console_line(ctx, DCBA_LINE, 3.0, since)
+    statuses = ctx.stream.all_of("status", since)
+    ok = ((restart is not None) and (resend is not None)
+          and (applied is not None) and (console is not None)
+          and (not statuses))
+    return ok, ("no status message: %s; uptime went down: %s; sent again "
+                "because of the restart: %s; applied: %s; console DCBA "
+                "again: %s" % (not statuses, restart is not None,
+                               resend is not None, applied is not None,
+                               console is not None))
+
+
+def check_d5(ctx):
+    post_json(ctx, "/api/sim", {"action": "map_ack_drop"})
+    since = ctx.stream.mark()
+    status, _ = post_json(ctx, "/api/map", {"letters": "WXYZ"})
+    gave_up = wait_map(ctx, lambda d: d["state"] == "not_confirmed", 9.0,
+                       since)
+    sends = map_sends(ctx, since)
+    if sends:
+        time.sleep(max(0.0, sends[-1][0] + 4.0 - time.monotonic()))
+    later = map_sends(ctx, since)
+    post_json(ctx, "/api/sim", {"action": "map_ack_keep"})
+    gaps = [b[0] - a[0] for a, b in zip(sends, sends[1:])]
+    b_gaps = (len(gaps) == 2) and all(1.7 <= gap <= 2.5 for gap in gaps)
+    text = gave_up[2]["status"] if gave_up else ""
+    ok = ((status == 200) and text.startswith("NOT CONFIRMED")
+          and (len(sends) == 3) and (len(later) == 3) and b_gaps)
+    return ok, ("WXYZ with every MAP ack dropped: %d; sends %d, gaps %s s; "
+                "%r; sends 4 s after the third: %d"
+                % (status, len(sends),
+                   ", ".join("%.2f" % gap for gap in gaps) or "none", text,
+                   len(later)))
+
+
+def check_d6(ctx):
+    since = ctx.stream.mark()
+    post_json(ctx, "/api/sim", {"action": "offline"})
+    off = ctx.stream.wait_for("status", lambda d: d["value"] == "offline",
+                              3.0, since)
+    since = ctx.stream.mark()
+    status, reply = post_json(ctx, "/api/map", {"letters": "LRSU"})
+    kept = wait_map(ctx, lambda d: d["state"] == "offline", 1.0, since)
+    time.sleep(0.5)
+    b_none = not map_sends(ctx, since)
+    since = ctx.stream.mark()
+    post_json(ctx, "/api/sim", {"action": "online"})
+    online = ctx.stream.wait_for("status", lambda d: d["value"] == "online",
+                                 3.0, since)
+    resend = wait_map(ctx, lambda d: bool(d.get("hex"))
+                      and (d.get("why") == "online")
+                      and (d.get("letters") == "LRSU"), 3.0, since)
+    applied = wait_map(ctx, lambda d: (d["state"] == "applied")
+                       and (d.get("confirmed") == "LRSU"), 3.0, since)
+    text = kept[2]["status"] if kept else ""
+    ok = ((off is not None) and (status == 200)
+          and (reply.get("offline") is True) and text.startswith(
+              "Robot offline") and b_none and (online is not None)
+          and (resend is not None) and (applied is not None))
+    return ok, ("offline: %s; Set map LRSU: %d, offline %s, %r, nothing "
+                "published: %s; online: sent %s, applied %s"
+                % (off is not None, status, reply.get("offline"), text,
+                   b_none, resend is not None, applied is not None))
+
+
+def check_d7(ctx):
+    settings = Settings(FAKE_HOST, FAKE_PORT, FAKE_PREFIX, FAKE_USER,
+                        FAKE_PASSWORD, "check")
+    argv = pub_args(settings, None)
+    refused = 0
+    for extra in (["-r"], ["--retain"]):
+        try:
+            check_no_retain(argv + extra)
+        except RuntimeError:
+            refused += 1
+    _, text = http_call(ctx.port, "GET", "/api/state")
+    args_list = json.loads(text).get("publish_args", [])
+    n_map = len(map_sends(ctx, 0))
+    topic = FAKE_PREFIX + "/" + CMD_SUFFIX
+    b_args = (len(args_list) >= n_map) and all(
+        ("-q" in a) and (a[a.index("-q") + 1] == "1") and ("-t" in a)
+        and (a[a.index("-t") + 1] == topic) and ("-s" in a)
+        and ("-r" not in a) and ("--retain" not in a) for a in args_list)
+    st_none, _ = http_call(ctx.port, "POST", "/api/map", {"letters": "DCBA"})
+    st_bad, _ = http_call(ctx.port, "POST", "/api/map", {"letters": "DCBA"},
+                          {"X-S1-Token": "0" * 32})
+    st_num, _ = post_json(ctx, "/api/map", {"letters": 5})
+    st_list, _ = post_json(ctx, "/api/map", {"letters": ["D", "C", "B", "A"]})
+    ok = ((refused == 2) and (n_map > 0) and b_args and (st_none == 403)
+          and (st_bad == 403) and (st_num == 400) and (st_list == 400))
+    return ok, ("check_no_retain refuses -r and --retain: %d of 2; %d "
+                "publishes (%d MAP sends) all -q 1, -t %s, -s, no retain: "
+                "%s; /api/map with no token %d, wrong token %d, letters as a "
+                "number %d, as a list %d"
+                % (refused, len(args_list), n_map, topic, b_args, st_none,
+                   st_bad, st_num, st_list))
+
+
 class CheckContext:
     def __init__(self, run):
         self.run = run
         self.port = run.port
-        _, self.page = http_call(run.port, "GET", "/")
-        match = re.search(r'const TOKEN = "([0-9a-f]+)";', self.page)
-        self.token = match.group(1) if match else ""
+        _, index = http_call(run.port, "GET", "/")
+        match = DATA_RE.search(index)
+        try:
+            self.token = json.loads(match.group(1))["token"]
+        except (AttributeError, ValueError, KeyError, TypeError):
+            self.token = ""
+        # "The page" in A2, A12 and A14 is everything the server can send
+        # for it: index.html as served, then every file of STATIC_FILES.
+        parts = [index]
+        for url in sorted(STATIC_FILES):
+            status, text = http_call(run.port, "GET", url)
+            if status != 200:
+                raise RuntimeError("GET %s gave %d" % (url, status))
+            parts.append(text)
+        self.page = "\n".join(parts)
         self.stream = Stream(run.port)
 
 
 def run_check(args):
-    print("S1-U16 part A: s1_dashboard.py --check (simulate mode, no "
-          "broker)", flush=True)
+    print("S1-U16 part A, S1-U24 part D and S1-U26 parts A and D: "
+          "s1_dashboard.py --check (simulate mode, no broker)", flush=True)
     results = {}
 
     def record(step, outcome):
@@ -3458,6 +3870,17 @@ def run_check(args):
         record("A2", check_a2(ctx))
         record("A13", check_a13(ctx))
         record("A14", check_a14(ctx))
+        record("D1", check_d1(ctx))
+        record("D2", check_d2(ctx))
+        record("D3", check_d3(ctx))
+        record("D4", check_d4(ctx))
+        record("D5", check_d5(ctx))
+        record("D6", check_d6(ctx))
+        record("D7", check_d7(ctx))
+        record("U1", check_u1(ctx))
+        record("U2", check_u2())
+        record("U3", check_u3())
+        record("U4", check_u4())
         run.stop()
         record("A11", check_a11(ctx, args_list, options_live))
         record("A12", check_a12(ctx, state_text))
@@ -3473,21 +3896,34 @@ def run_check(args):
     return summarise(results)
 
 
+def verdict_of(results, steps):
+    """PASS, FAIL or INCOMPLETE for one test's steps."""
+    ran = [step for step in steps if step in results]
+    if not all(results[step][0] for step in ran):
+        return "FAIL"
+    if len(ran) < len(steps):
+        return "INCOMPLETE"
+    return "PASS"
+
+
 def summarise(results):
     ran = [step for step in ALL_STEPS if step in results]
     missing = [step for step in ALL_STEPS if step not in results]
-    passed = all(results[step][0] for step in ran)
     print("steps run: %s" % (" ".join(ran) or "none"))
     if missing:
         print("not run (not built yet, or the check stopped): %s"
               % " ".join(missing))
-    if not passed:
-        verdict, code = "FAIL", 1
-    elif missing:
-        verdict, code = "INCOMPLETE", 2
+    verdicts = [verdict_of(results, A_STEPS), verdict_of(results, D_STEPS),
+                verdict_of(results, U_STEPS)]
+    if "FAIL" in verdicts:
+        code = 1
+    elif "INCOMPLETE" in verdicts:
+        code = 2
     else:
-        verdict, code = "PASS", 0
-    print("S1-U16 part A: %s" % verdict, flush=True)
+        code = 0
+    print("S1-U16 part A: %s" % verdicts[0])
+    print("S1-U24 part D: %s" % verdicts[1])
+    print("S1-U26 parts A and D: %s" % verdicts[2], flush=True)
     return code
 
 
@@ -3509,10 +3945,17 @@ def main():
     parser.add_argument("--banner-off", action="store_true",
                         help="run without the retained-command banner")
     parser.add_argument("--check", action="store_true",
-                        help="run test S1-U16 part A")
+                        help="run tests S1-U16 part A, S1-U24 part D and "
+                        "S1-U26 parts A and D")
+    parser.add_argument("--token-audit", action="store_true",
+                        help="check the contrast of dashboard_ui/tokens.css")
     parser.add_argument("--opts-dir", help=argparse.SUPPRESS)
     args = parser.parse_args()
     try:
+        if args.token_audit:
+            ok, lines = token_audit()
+            print("\n".join(lines), flush=True)
+            return 0 if ok else 1
         if args.check:
             return run_check(args)
         return serve(args)
