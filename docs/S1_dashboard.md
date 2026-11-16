@@ -1,12 +1,15 @@
 # S1 laptop dashboard
 
-`testing/subsystem1/s1_dashboard.py` is a one-file dashboard for the
-robot: START, STOP and RESET, the ack for each command, an online light,
-the 1 Hz heartbeat and four telemetry panels (S2 motion, S3 line and
-barcodes, S4 motion sensor, S5 controller). It runs on the laptop that runs the broker,
-serves one page on `http://127.0.0.1:8765/` (that laptop only), and talks
-to the broker through `mosquitto_sub` and `mosquitto_pub`. Python
-standard library only. Test: S1-U16 in `testing/subsystem1/TEST_LOG.md`.
+`testing/subsystem1/s1_dashboard.py` is the dashboard for the robot
+(one Python file, with its page in `testing/subsystem1/dashboard_ui/`):
+START, STOP and RESET, the ack for each command, an online light, the
+1 Hz heartbeat, summary cards and a 3D view of the car, and four
+detailed telemetry panels (S2 motion, S3 line and barcodes, S4 motion
+sensor, S5 controller). It runs on the laptop that runs the broker,
+serves one page on `http://127.0.0.1:8765/` (that laptop only), and
+talks to the broker through `mosquitto_sub` and `mosquitto_pub`. Python
+standard library only. Tests: S1-U16, S1-U24 and S1-U26 in
+`testing/subsystem1/TEST_LOG.md`.
 
 > **First test with the wheels off the ground.** Put the robot on a stand
 > so the wheels turn freely, and keep a hand near the GP20 button.
@@ -238,7 +241,8 @@ green light.
 | `--ack-timeout S` | 2.0 | Seconds to wait for an ack |
 | `--simulate` | off | No broker, no robot: a fake car answers (section 12) |
 | `--banner-off` | off | Run without the retained-command banner |
-| `--check` | off | Run test S1-U16 part A (simulate mode) |
+| `--check` | off | Run tests S1-U16 part A, S1-U24 part D and S1-U26 parts A and D (simulate mode, 25 steps) |
+| `--token-audit` | off | Check the contrast of the page's colours (`docs/ui/S1_design_tokens.md` section 5) and stop |
 
 ## 8. What the page shows
 
@@ -255,16 +259,16 @@ green light.
 | Heartbeats lost | Gaps in the heartbeat sequence since the dashboard started (heartbeats use QoS 0, so a few can go missing). A robot restart does not count |
 | Telemetry / live lost | Gaps in each message's sequence since the dashboard started: messages the robot handed to the driver that never arrived. A gap of more than 25 is read as a restart and not counted |
 | Red banner | A retained command is stored on `<prefix>/cmd/...` (section 11) |
-| Amber banner | That retained command was cleared |
-| "banner unavailable" (top bar) | The banner is off: `--banner-off`, an old `mosquitto_sub`, or a broker without MQTT v5 |
+| Orange-edged banner | That retained command was cleared |
+| "banner unavailable" (under the header) | The banner is off: `--banner-off`, an old `mosquitto_sub`, or a broker without MQTT v5 |
 
 **Buttons.** STOP is always enabled; the Escape key also sends STOP.
 START and RESET are enabled only while the robot light is green, and
 START (or RESET) stays disabled until the ack of the previous one
 arrives, so a double click cannot run the robot from FINISHED. An
-enabled START or RESET is lit (white text, visible border); a disabled
-one is dimmed and shows the reason underneath, for example "online,
-waiting for a heartbeat". The buttons are decided by the robot light only, not by the S5
+enabled START or RESET has full-strength text; a disabled one is dimmed
+and shows the reason underneath, for example "online, waiting for a
+heartbeat". The buttons are decided by the robot light only, not by the S5
 panel: a START sent while the robot calibrates is acked "queued" and
 refused by S5 (section 9).
 
@@ -288,6 +292,10 @@ the ack's arrival, both on the laptop's clock, so it includes
 `mosquitto_pub`'s own start-up.
 
 ### 8.1 The telemetry panels
+
+The four detailed panels are in the Developer drawer (section 8.3). The
+summary cards and the 3D view on the main page read the same two
+messages.
 
 Two messages on `<prefix>/telemetry` feed them (layouts in
 `docs/S1_binary_frame.md`): the 2 Hz telemetry frame (type 1, 25 bytes)
@@ -395,6 +403,185 @@ PowerShell, `[IO.File]::WriteAllBytes("$PWD\map.bin",
 in place of `-s`. A map sent this way is not sent again by the dashboard
 after a restart.
 
+### 8.3 Layout, appearance and the derived words
+
+The page is `index.html`, `tokens.css`, `app.css` and `app.js` in
+`testing/subsystem1/dashboard_ui/`, with the Inter font and its licence
+in `fonts/`. The server sends only the files in its fixed list
+(`STATIC_FILES` in `s1_dashboard.py`). The look follows Apple's Human
+Interface Guidelines; `docs/ui/S1_design_tokens.md` lists every colour
+and size and where it comes from.
+
+**Layout.** Header: the group, the SIMULATED or LIVE badge, and the link
+status (robot light and text, broker light, messages per second over the
+last 5 s, age of the last frame). Left column: Control (STOP, START,
+RESET), Last commands, Barcode letter map. Centre: Live view and Latest
+events (the three newest lines of the event log). Right column: Motion,
+Attitude, Line and barcode, Obstacle sensor. The Live view holds the 3D
+view (section 8.4).
+
+- At 1700 px wide and 900 px high or more (a 1080p browser window)
+  everything fits and the page does not scroll.
+- From 1280 px: three columns; the page may scroll. From 760 px: two
+  columns, the number cards below. Narrower: one column, STOP first.
+- STOP is the first stop of the Tab key. The Developer button and the
+  appearance switch come last.
+
+**Appearance.** Auto (the default) follows the system's light or dark
+setting. Light and Dark override it and are remembered in the browser's
+`localStorage`; the page works the same if that is not available. The
+page also follows the system settings for increased contrast, reduced
+transparency and reduced motion.
+
+**Developer drawer.** The Developer button opens a panel on the right.
+It is closed when the page loads. It holds the Simulator (`--simulate`
+only), the Robot link figures of section 8, the four detailed panels of
+section 8.1, the Operator rules and the full Event log. The Escape key
+stays STOP, so the drawer has its own Close button. On a narrow screen
+the drawer covers the page and shows its own STOP button.
+
+**Derived words.** Some cards show a word worked out from the decoded
+fields. The raw values are in the word's tooltip and in the detailed
+panels. The thresholds are constants at the top of the cards' code in
+`app.js`.
+
+| Word | Where | Rule |
+|---|---|---|
+| Starting up, Calibrating, Ready, Following line, Approaching junction, Turning at junction, Finding the line again, Recovering the line, Avoiding obstacle, Fault, Finished | Live view, first chip | `ctrl_state` 0 to 10 (telemetry), one word each. "Following line" is `ctrl_state` 3, LINE_FOLLOWING |
+| Stopped, Cruising, Turning, E-stop | Live view, second chip | `motion_state` (live): 0 IDLE is Stopped; 1 FOLLOWING and 2 MOVING are Cruising; 3 TURNING; 4 ESTOP |
+| Obstacle ahead, N mm | Live view, orange chip | `closest_mm` above 0 and at most 350 (telemetry). 350 mm is S5's own "near" limit (`EV_OBSTACLE_NEAR`: under 35 cm). 0 means no echo, so no chip |
+| E-stop latched | Live view, red chip | the E-stop flag of the live message |
+| Fault: names | Live view, red chip | any bit of `fault_mask` (telemetry) |
+| Lifted or overturned | Live view, red banner | `motion_class` 6, held for 3 s as in the S4 panel |
+| Centred, Correcting | Line | `line_state` 0 FOLLOW (live). Centred: `steer_dv` within 10 mm/s of zero, so the line controller asks for no correction. Otherwise Correcting |
+| At junction, Lost, Off, Searching, Not ready | Line | `line_state` 1 JUNCTION, 2 LOST, 3 DISABLED, 4 SEARCH, 5 UNCAL |
+| Straight, Slight left or right, Hard left or right | Steering | `steer_dv` (live, positive is a turn right): at most 10 mm/s in size is Straight; at most 100 is Slight; above is Hard. S3's full lock is 200 mm/s (`S3_STEER_MAX_MMS`), so the limits are 5 % and 50 % of it |
+| None, Climbing, Descending | Hump | `hump_state` 0, 1, 2 (telemetry) |
+| Calibrated, Not calibrated, Fault | IMU | Fault: `imu_ok` 0. Otherwise by `cal_done` |
+| None, None yet, No echo | Last barcode, Junction turn, Closest | `bc_letter` 63; `junctions` 0; `closest_mm` 0 |
+
+The 10 and 100 mm/s steering limits are our own choice, not S3's. They
+were not checked against the car on the track.
+
+### 8.4 The 3D view
+
+The Live view draws a stylised model of the car with three.js
+(`dashboard_ui/scene.js`; three.js 0.186.1 is in `dashboard_ui/vendor/`,
+nothing comes from the internet). The model is built from boxes and
+cylinders. It is not a scan of the car.
+
+**What drives it.** Only what the robot sends.
+
+| In the view | From | Notes |
+|---|---|---|
+| Wheel spin | `speed_l_mms`, `speed_r_mms` (telemetry, 2 Hz), eased over about 0.35 s | When the live message (5 Hz) shows the E-stop flag, or `cmd_speed_mms` 0 while `motion_state` is not 3 (TURNING), the spin is eased to zero at once, without waiting for the next frame. In a turn on the spot the commanded speed is 0 but both wheels run, so the measured speeds keep driving the spin |
+| Heading | `heading` (live) | Zero is the heading at power-up, not north. Positive is left |
+| Position and trail | `dist_mm` (telemetry) with the heading | An estimate, see below |
+| Body pitch and roll | `pitch`, `roll` (telemetry), eased | Positive pitch is nose up, positive roll is left side up (`subsystem4.h`). The body follows up to 0.5 s late, because the values come at 2 Hz. That is expected |
+| Sensor head and beam | `angle_idx` (telemetry) | Servo angle = `angle_idx` x 7.5 degrees, with 90 drawn as straight ahead and a 30 degree beam. **Nominal**: the servo sweep is not measured yet, and the chip in the view says so. `angle_idx` is 0 until S5 has pinged, which would draw the beam to the right. So the beam, the sensor's turn and the "nominal" chip stay hidden until the first frame with `closest_mm` above 0, and are hidden again when the robot restarts |
+| Orange block and its label | `closest_mm` above 0 (telemetry), `width_mm` | No block when `closest_mm` is 0 (no echo). The beam is then drawn 400 mm long and fainter |
+| Front bar colour | `line_state` (live) | Green FOLLOW, blue JUNCTION, orange SEARCH, red LOST, grey otherwise. The words are in the Line card |
+| IR module lamps | `n_centre`, `n_outer` (live) | Brighter with the reading |
+| "Lifted or overturned" banner, one short shake | `motion_class` 6 (telemetry) | The class stays 6 while the stop is latched, until the E-stop clears, and so does the banner. The shake is skipped with reduced motion |
+
+No track is drawn ahead of the car: the track is not in the data.
+
+**The estimate.** The robot sends no position. Between two telemetry
+frames the page takes the change of `dist_mm` and moves the car that far
+along the mean of the heading at the two frames. Wheel slip, lost
+frames and the half-degree heading steps add up, so the position
+drifts. The view says "Position is an estimate. It drifts." Details:
+
+- A gap of more than 2.5 s between frames, or a step larger than the
+  speed fields allow, moves nothing.
+- `dist_mm` stops at 32767 mm. From there the step is the mean speed
+  times the time between the frames.
+- The estimate starts again at the origin when the robot restarts (the
+  heartbeat's uptime goes down), when Clear trail is pressed, and when
+  the page is reloaded: it lives in the page only.
+- The trail is the path of the estimate, a point every 10 mm, about
+  40 m long.
+
+**Cameras.** Chase (behind the car, follows the heading), Top (from
+above, the heading at power-up points up) and Side (from the car's
+right).
+
+**Stale data.** When the Live view's messages are more than 2 s old
+(the same limit as the cards) the scene dims and says "No new data. The
+view shows the last known state."
+
+**Without WebGL.** If the browser has no WebGL, or `scene.js` or
+three.js does not load, the Live view shows one line, "3D view
+unavailable", with the controller state above it. Every number on the
+page keeps working.
+
+**For a screen reader.** The canvas has a label in plain words (state,
+wheel speeds, pitch and roll, obstacle, heading, estimated position),
+refreshed every 3 s.
+
+**Performance.** The pixel ratio is capped at 1.5. There are no
+real-time shadows, only a fixed soft disc under the car. The drawing
+loop stops when the tab is hidden and when nothing is changing. The
+Developer drawer's "3D view" panel shows the frame rate, the renderer
+and the estimate. The target is at least 30 fps at 1920x1080 on the
+school laptop (ThinkPad T14 Gen 2, integrated graphics). It has not
+been measured there.
+
+**The car's dimensions** are the `CAR` constants at the top of
+`scene.js`. Three are measured (track 112 mm, rolling diameter 66.5 mm,
+axle to caster 77.5 mm, all from the firmware). Every other one is
+marked PLACEHOLDER: it was read off photos and waits for a ruler.
+
+### 8.5 How the page is served and tested
+
+**Served files.** The server sends `/` (`index.html`, with the page
+token and the Code 39 table filled into a JSON data block) and the nine
+files of its list `STATIC_FILES`, each with a fixed `Content-Type`:
+`tokens.css`, `app.css`, `app.js`, `scene.js`, the Inter font and its
+licence text under `fonts/`, and three.js (two files) and its licence
+text under `vendor/three/`. A request is looked up in the list by its
+exact path. No path is ever joined to a folder, so `..`, encoded dots, a
+backslash or a NUL byte only give 404. To serve a new file, add it to
+`STATIC_FILES` and to the list in step U1 of `--check`.
+
+**Headers.** Every one of these answers carries `Cache-Control:
+no-store`, `X-Content-Type-Options: nosniff` and this
+Content-Security-Policy: `default-src 'none'; script-src 'self';
+style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self';
+frame-ancestors 'none'; base-uri 'none'; form-action 'none'`. So the
+page runs no inline script and no inline style, loads nothing from
+another site and cannot be shown inside a frame. A request with a wrong
+`Host` header gets 403, and a POST still needs the page token.
+
+**Third-party files.** Inter and three.js are listed in
+`dashboard_ui/THIRD_PARTY_NOTICES.md` with version, source, SHA-256 and
+licence. That file also says how to update one. `--check` compares each
+file under `fonts/` and `vendor/` with its SHA-256 there.
+
+**Tests** (S1-U26 in `TEST_LOG.md`). `--check` runs four steps after
+the S1-U16 and S1-U24 ones:
+
+| Step | Checks |
+|---|---|
+| U1 | The static route: the list, the headers and body of every file, 15 paths that must give 404, the wrong-Host refusal |
+| U2 | No `http://` or `https://` in a served file (licence texts, XML namespaces and `vendor/` excepted), and the third-party files against the notices |
+| U3 | The colour contrast audit (`--token-audit`) |
+| U4 | The four simulator scenarios: the same bytes twice, and what the decoded frames show |
+
+`sh testing/subsystem1/run_dashboard_test.sh` runs `--check` and then
+ten mutations, each of which one named step must catch. It takes about
+seventeen minutes.
+
+Two tools for a person, both against a `--simulate` dashboard only:
+`testing/subsystem1/ui_shots.py` saves screenshots through a headless
+Firefox (viewports, both themes, contrast, reduced transparency and
+motion, the cameras, WebGL off), and
+`testing/subsystem1/ui_font_probe.py` checks in a headless Chromium
+that a Windows machine gets Inter and a Mac gets the system font.
+
+Not tested by a program: how the page looks, the 3D picture, and the
+frame rate on the school laptop.
+
 ## 9. Operator rules
 
 These are S5's rules (`s5_mission_command()` in
@@ -500,6 +687,27 @@ values are made up; only the formats and rates are real.
 The fake car applies a map with S3's rules (four Code 39 letters, not
 `*`, none twice) and prints S3's console line in the event log; Reject
 next makes it refuse the next map.
+
+**Scenarios.** Four more buttons in the Simulator panel play a fixed
+sequence of real frames, so the 3D view and the cards can be shown
+without a robot. The fake car must be running (press START first), and
+one scenario plays at a time; "Stop the scenario" ends it. A scenario
+uses no random number, so the same button always sends the same frames
+(its heading changes are added to the heading the car has when it
+starts). While it plays, the fake car's periodic events (a barcode
+every 7 s and so on) wait.
+
+| Button | What the frames show |
+|---|---|
+| Obstacle, swerve and return (17.5 s) | `closest_mm` falls from 600 to 150 mm with the sensor ahead (`angle_idx` 12); the car slows from 200 to 80 mm/s under 375 mm, then stops and sweeps the servo, which gives the profile (width 90 mm, clear left 480, clear right 220). State Avoiding obstacle: about 39 degrees left, straight, about 79 degrees right, straight, about 39 degrees left, so the heading returns. The echo is gone once the car has turned away |
+| Barcodes, left and right turn (9 s) | A barcode with the map's LEFT letter, a junction, a turn on the spot of about 90 degrees left (commanded speed 0, wheels at -73 and +73 mm/s); then the RIGHT letter, a junction and a turn of about 90 degrees right |
+| Hump (4.5 s) | Pitch up to +12 degrees (climbing), down to -12 (descending), then flat; `hump_count` rises by 1 |
+| Lifted or overturned (4 s) | `motion_class` 6 with the E-stop flag, wheels at rest, pitch 20 and roll 28 degrees. In this made-up car the latch clears by itself after 4 s; on the real car it stays until the E-stop is cleared |
+
+Only what the robot's messages can show is made up. S5's real bypass
+route is not in any message, so the swerve is a plausible shape, not
+S5's path. The fake car's wheel track is a made-up 140 mm, so its turn
+angles come from that figure.
 
 ## 13. Troubleshooting
 
