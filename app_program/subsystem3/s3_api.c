@@ -15,6 +15,7 @@
 
 #include "../app.h"
 
+#include "drv_barcode.h"
 #include "s3_api.h"
 #include "s3_code39.h"
 #include "s3_config.h"
@@ -162,6 +163,17 @@ s3_get_steer_sp (H * p_dv_mms, UB * p_seq)
     *p_dv_mms = (H) dv;
     *p_seq    = (UB) ((word >> SP_SEQ_POS) & SP_SEQ_MASK);
     return (0u != (word & SP_VALID_BIT)) ? TRUE : FALSE;
+}
+
+/*!
+ * @brief A barcode pass is being read right now. At a junction, wait for
+ *        it (up to ~2 s) before deciding: the letter is only published
+ *        after 1.5 s of quiet (S3 drive test, car 5 Nov). Any task.
+ */
+BOOL
+s3_barcode_reading (void)
+{
+    return drv_barcode_reading() ? TRUE : FALSE;
 }
 
 /*!
