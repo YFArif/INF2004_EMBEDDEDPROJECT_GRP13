@@ -191,7 +191,10 @@ sys_interval 5
 | `persistence false` | Nothing survives a broker restart, a stray retained command included |
 | `sys_interval 5` | `$SYS/broker/uptime` every 5 s: it keeps the dashboard's broker light green |
 
-Start it, and leave the window open:
+On the manual route, start it in its own window and leave the window
+open. `-v` prints every message there and applies to this route only:
+the launcher of section 7 runs mosquitto without it and writes to a
+broker log file instead.
 
 ```bash
 mosquitto -c ~/s1-broker/mosquitto.conf -v
@@ -205,7 +208,51 @@ mosquitto -c ~/s1-broker/mosquitto.conf -v
 
 ## 7. Start the dashboard
 
-From the repository root:
+**One command** (`testing/subsystem1/s1_launch.py`, test S1-U23) starts
+the broker of section 6 and the dashboard together, from the
+repository root:
+
+```bash
+python3 -I -B testing/subsystem1/s1_launch.py
+```
+
+It finds mosquitto (the PATH, then the Homebrew folders or
+`C:\Program Files\mosquitto`), creates `~/s1-broker/mosquitto.conf`
+with the four lines of section 6 if it is missing (it never changes an
+existing one), and refuses to start while port 1883 or 8765 already
+answers. It then runs the broker and the dashboard with `--host
+127.0.0.1 --prefix robot` and a new `--log` file in `~/s1-broker` for
+every session, and opens the page. It warns if that log is still empty
+15 s after the start and at exit. Ctrl-C stops the dashboard and the
+broker. Options: `--prefix`, `--workdir`, `--http-port`,
+`--no-browser`, `--simulate` (no broker), `--show-address` (prints the
+laptop's address for section 4); anything after `--` goes to the
+dashboard. Exit status: the dashboard's, or 2 (mosquitto is missing),
+3 (the broker did not start), 4 (a port is in use). On Windows, see
+section 15.
+
+**Watching the broker.** The launcher starts mosquitto without `-v` and
+writes its output to the broker log path it prints, not to a window;
+that log still shows every client that connects. To follow it on
+macOS:
+
+```bash
+tail -f ~/s1-broker/broker-<time>.log
+```
+
+In Windows PowerShell, write the `%USERPROFILE%` that the launcher
+prints as `$env:USERPROFILE`:
+
+```powershell
+Get-Content "$env:USERPROFILE\s1-broker\broker-<time>.log" -Wait -Tail 20
+```
+
+A `New client connected from` line with an address other than
+127.0.0.1 means the car reached the broker. The log holds device
+addresses (and, on macOS, your user name), so never share or commit
+it.
+
+The manual way below is the fallback. From the repository root:
 
 ```bash
 python3 -I -B testing/subsystem1/s1_dashboard.py
@@ -753,6 +800,18 @@ with no robot: every check in 15.5 passed. Not tested on Windows: a robot
 connecting through Windows Firewall, building the firmware (`README.md`
 section 1 says to use WSL), and the items in 15.6.
 
+**One command.** Double-click `testing\subsystem1\run_dashboard.bat`,
+or run `py -3 -I -B testing/subsystem1/s1_launch.py` in PowerShell from
+the repository root (section 7). It finds mosquitto in
+`C:\Program Files\mosquitto` without the PATH line of 15.1, refuses to
+start while the mosquitto service holds port 1883 (stop it as in 15.2),
+starts the broker and the dashboard, and opens the page. The window
+stays open only if the launcher stops on an error. Ctrl-C stops both;
+Windows may then ask "Terminate batch job (Y/N)?", and either answer
+is fine. If Windows asks about mosquitto, allow Private networks only
+(15.4). Not yet run on Windows (S1-U23 part C). The manual steps below
+are the fallback.
+
 Run the broker and the dashboard in a normal PowerShell window on
 Windows itself. Every command below is for PowerShell, from the repository
 root unless it says otherwise.
@@ -835,7 +894,10 @@ New-Item -ItemType Directory -Force "$HOME\s1-broker" | Out-Null
 Set-Content -Path "$HOME\s1-broker\mosquitto.conf" -Value "listener 1883","allow_anonymous true","persistence false","sys_interval 5" -Encoding ascii
 ```
 
-Start the broker and leave the window open:
+On the manual route, start the broker and leave the window open. `-v`
+applies to this route only: the launcher (section 7) runs mosquitto
+without it and writes to a broker log file, which you follow with
+`Get-Content` as shown there.
 
 ```powershell
 mosquitto -c "$HOME\s1-broker\mosquitto.conf" -v
@@ -843,7 +905,7 @@ mosquitto -c "$HOME\s1-broker\mosquitto.conf" -v
 
 It prints "Opening ipv4 listen socket on port 1883" and "mosquitto version
 2.x.x running". The log's times are seconds since 1970. When the dashboard
-connects, the log shows `New client connected from 127.0.0.1:... as
+connects, the window shows `New client connected from 127.0.0.1:... as
 s1dash-<number>`; the number is the process id of the dashboard's
 `mosquitto_sub`, which changes every time you restart the dashboard.
 

@@ -79,7 +79,64 @@ harmless. If the hotspot address changes, rebuild and reflash.
 
 ## 3. A session
 
-Hotspot on and the laptop joined first. Use one terminal window per
+Hotspot on and the laptop joined first. Then one command, from the
+repository root, starts the broker and the dashboard and opens the
+page:
+
+```bash
+python3 -I -B testing/subsystem1/s1_launch.py
+```
+
+On Windows, double-click `testing\subsystem1\run_dashboard.bat`, or
+run the same command with `py -3` instead of `python3`. The launcher
+keeps the broker's config and a new log for each session in
+`~/s1-broker`, prints the page address, the log paths and "Ctrl-C to
+quit", warns if the log is still empty after 15 s, and stops both on
+Ctrl-C. It refuses to start while another broker or dashboard is
+running: stop that one first (on Windows it is usually the mosquitto
+service: `Stop-Service mosquitto` in an administrator PowerShell).
+`--show-address` prints the laptop's address for `mqtt_config.h`; do
+not paste it anywhere.
+
+**Broker log.** The launcher writes the broker's output to the broker
+log path it prints, not to a window. To watch it on macOS, in a
+second terminal:
+
+```bash
+tail -f ~/s1-broker/broker-<time>.log
+```
+
+In Windows PowerShell, write the `%USERPROFILE%` that the launcher
+prints as `$env:USERPROFILE`:
+
+```powershell
+Get-Content "$env:USERPROFILE\s1-broker\broker-<time>.log" -Wait -Tail 20
+```
+
+A `New client connected from` line with an address other than
+127.0.0.1 means the car reached the broker. The log holds device
+addresses (and, on macOS, your user name), so never share or commit
+it.
+
+**Console** (S5's verdicts). With only one Pico plugged in, this waits
+for the car's USB port, then prints the console until Ctrl-C:
+
+```bash
+until ls /dev | grep -q '^cu\.usbmodem'; do sleep 0.2; done; cat /dev/cu.usbmodem*
+```
+
+To catch the boot lines, keep this order: start the console command
+first, then plug in USB, then switch the battery on. Then wait for the
+green robot light.
+
+**Demo day: the barcode letter map.** Type the day's letters in the
+dashboard's map boxes (LEFT, RIGHT, STRAIGHT, U-TURN) and press Set map.
+Set it after every power cycle of the car and wait for "Applied on the
+robot: ..." before START. The dashboard sends it again by itself when the
+car comes back, but check that it says Applied. Details:
+`docs/S1_dashboard.md` section 8.2.
+
+**Without the launcher** (the fallback): use one terminal window per
 command that keeps running, each in the repository root.
 
 **Broker.** Its config lives outside the repository
@@ -104,24 +161,6 @@ mosquitto -c ~/s1-broker/mosquitto.conf -v
 ```bash
 python3 -I -B testing/subsystem1/s1_dashboard.py --host 127.0.0.1 --prefix robot
 ```
-
-**Console** (S5's verdicts). With only one Pico plugged in, this waits
-for the car's USB port, then prints the console until Ctrl-C:
-
-```bash
-until ls /dev | grep -q '^cu\.usbmodem'; do sleep 0.2; done; cat /dev/cu.usbmodem*
-```
-
-To catch the boot lines, keep this order: start the console command
-first, then plug in USB, then switch the battery on. Then wait for the
-green robot light.
-
-**Demo day: the barcode letter map.** Type the day's letters in the
-dashboard's map boxes (LEFT, RIGHT, STRAIGHT, U-TURN) and press Set map.
-Set it after every power cycle of the car and wait for "Applied on the
-robot: ..." before START. The dashboard sends it again by itself when the
-car comes back, but check that it says Applied. Details:
-`docs/S1_dashboard.md` section 8.2.
 
 ## 4. Calibrate before START
 
