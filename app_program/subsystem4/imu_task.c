@@ -407,6 +407,19 @@ imu_cycle (uint32_t events)
         {
             imu_cal_step();
         }
+        else if (g_imu.b_impact)
+        {
+            // Stopped (impact, lifted or overturned) until MF_ESTOP
+            // clears: the robot is being handled, so no humps are counted
+            // (2026-11-18: two false humps after a lift). Drop any hump
+            // in progress so it does not finish after the reset.
+            g_imu.hump      = S4_HUMP_FLAT;
+            g_imu.hold      = 0u;
+            g_imu.h_mm      = 0.0f;
+            g_imu.b_side    = false;
+            g_imu.side_hold = 0u;
+            imu_lift_check();
+        }
         else
         {
             imu_hump(&odom);
