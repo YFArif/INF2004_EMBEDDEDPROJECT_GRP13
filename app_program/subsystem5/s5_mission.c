@@ -23,6 +23,12 @@
  *   in the first CROSS_MM after a found line do not count: that is the
  *   robot crossing the line. At the junction the robot drives
  *   JUNC_FWD_MM on before a turn, so it turns about the crossing.
+ *   The robot stops at every junction, as Sean's drive test does (Anna,
+ *   2026-11-18). S3 publishes a letter only about 1.5 s after the
+ *   barcode, so a junction soon after one comes first: at a junction
+ *   with no command waiting while S3 is still reading a barcode, the
+ *   robot waits up to BARCODE_WAIT_MS for it, then acts on it at this
+ *   junction (Sean's handover 2.3); none: straight on after the stop.
  *   With S3 it never turns blind; after
  *   NAV_GIVE_UP_MM of following without a junction the command is
  *   cancelled. Without S3 (floor tests) it turns after S5_JUNCTION_MM
@@ -103,6 +109,9 @@
                                         /* past; measured sensor-to-axle */
                                         /* 133 less the roll on stop).   */
 #define JUNC_FWD_MMS        (60u)       /* As in Sean's drive test.      */
+#define BARCODE_WAIT_MS     (2000u)     /* Junction while a barcode is   */
+                                        /* still being read: wait this   */
+                                        /* long for it (Sean's value).   */
 #define NAV_GIVE_UP_MM      (2000)      /* With S3: no junction this far */
                                         /* after a barcode: cancel it.   */
 #define JUNC_COUNT_MASK     (0xFFu)     /* S3's 8-bit junction counter.  */
@@ -206,6 +215,8 @@ typedef struct
                                                 /* junction before the   */
                                                 /* turn.                 */
     unsigned int            b_black       : 1;  /* A sensor sees black.  */
+    unsigned int            b_wait_code   : 1;  /* Stopped at a junction,*/
+                                                /* waiting for a barcode.*/
     unsigned int            junc_from     : 8;  /* S3's junction count   */
                                                 /* when approaching began*/
 } mission_t;
@@ -217,7 +228,7 @@ typedef char mission_state_check[(S5_CTRL_FINISHED <= S5_CTRL_STATE_MASK)
 static mission_t g_mission = {0u, 0u, 0u, 0u, 0, 0u, 1, 0,
                               S5_LINKS_SIDE_NONE, 0, 0u, 0, 0, 0, 0u, 0u,
                               0u, 0, 0u, S5_CTRL_INIT, false, false,
-                              false, false, false, 0u};
+                              false, false, false, false, 0u};
 
 /* In test images the controller ignores events until a test arms it, so
  * the S2 tests that run first are never disturbed.
@@ -246,6 +257,9 @@ static void take_barcodes(void);
 static void start_approach(void);
 static bool junction_reached(uint32_t events);
 static void resume_approach(void);
+static void step_following(uint32_t events, uint32_t now_ms);
+static bool junction_now(uint32_t events);
+static void step_wait_code(uint32_t events, uint32_t now_ms);
 static void execute_command(uint32_t now_ms);
 static void step_turning(uint32_t events, uint32_t now_ms);
 static void start_reacquire(void);
@@ -662,27 +676,14 @@ step_route (uint32_t events, uint32_t now_ms)
     switch ((subsystem5_ctrl_state_t) g_mission.state)
     {
         case S5_CTRL_LINE_FOLLOWING:
-            adjust_speed(events);
-            update_line_mark();
-            check_confirm();
-
-            if (0u != (events & EV_BARCODE))
+            if (g_mission.b_wait_code)
             {
-                take_barcodes();
-
-                // The junction may have come in the same tick.
-                if (junction_reached(events))
-                {
-                    execute_command(now_ms);
-                }
-            }
-            else if (line_is_lost(events))
-            {
-                line_lost(now_ms);
+                // Stopped at a junction for a barcode: no speed changes.
+                step_wait_code(events, now_ms);
             }
             else
             {
-                // Keep following.
+                step_following(events, now_ms);
             }
         break;
 
@@ -765,6 +766,7 @@ obstacle_stopped (uint32_t events, uint32_t now_ms)
                            (int32_t) g_mission.nav_cmd, 0);
         }
 
+        g_mission.b_wait_code = false;
         s5_links_line_enable(false);
         s5_avoid_start(now_ms);
         set_state(S5_CTRL_OBSTACLE_AVOIDANCE);
@@ -885,6 +887,119 @@ junction_reached (uint32_t events)
     }
 
     return (b_reached);
+}
+
+/*!
+ * @brief LINE_FOLLOWING: S3 follows the line; take barcodes, wait at a
+ *        junction for a barcode still being read, and watch for line
+ *        loss.
+ *
+ * @param[in] events Mission events.
+ * @param[in] now_ms Current time.
+ */
+static void
+step_following (uint32_t events, uint32_t now_ms)
+{
+    adjust_speed(events);
+    update_line_mark();
+    check_confirm();
+
+    if (0u != (events & EV_BARCODE))
+    {
+        take_barcodes();
+
+        // The junction may have come in the same tick.
+        if (junction_reached(events))
+        {
+            execute_command(now_ms);
+        }
+    }
+    else if (junction_now(events))
+    {
+        // Stop and decide at every junction, as Sean's drive test does:
+        // brake and let the wheels stop first.
+        s5_links_motion_settle();
+
+        if (s5_links_barcode_reading())
+        {
+            // Its letter is not out yet: wait for it here.
+            // NOTE: The cast is safe: the wait is 2000 ms.
+            s5_event_trace("NAV junction while a barcode is read: waiting "
+                           "ms 0", (int32_t) BARCODE_WAIT_MS, 0);
+            g_mission.b_wait_code   = true;
+            g_mission.wait_start_ms = now_ms;
+        }
+        else
+        {
+            s5_event_trace("NAV junction, no command: straight on 0 0", 0,
+                           0);
+            resume_following();
+        }
+    }
+    else if (line_is_lost(events))
+    {
+        line_lost(now_ms);
+    }
+    else
+    {
+        // Keep following.
+    }
+}
+
+/*!
+ * @brief A junction under the robot now (S3's event), not counting the
+ *        first CROSS_MM after a found line (crossing it at an angle).
+ *
+ * @param[in] events Mission events.
+ *
+ * @return true for a real junction.
+ */
+static bool
+junction_now (uint32_t events)
+{
+    bool b_crossing = g_mission.b_confirming
+                      && ((s5_links_odom_dist_mm() - g_mission.confirm_mm)
+                          < CROSS_MM);
+
+    return ((0u != (events & EV_JUNCTION)) && (!b_crossing));
+}
+
+/*!
+ * @brief Stopped at a junction while S3 reads a barcode (see the file
+ *        comment): act on its command here when it comes, else go on
+ *        straight after BARCODE_WAIT_MS.
+ *
+ * @param[in] events Mission events.
+ * @param[in] now_ms Current time.
+ */
+static void
+step_wait_code (uint32_t events, uint32_t now_ms)
+{
+    if (0u != (events & EV_BARCODE))
+    {
+        g_mission.b_wait_code = false;
+        take_barcodes();
+
+        if (g_mission.b_nav_pending)
+        {
+            // The robot is at the junction the barcode was for.
+            execute_command(now_ms);
+        }
+        else
+        {
+            resume_following();
+        }
+    }
+    else if ((now_ms - g_mission.wait_start_ms) >= BARCODE_WAIT_MS)
+    {
+        s5_event_trace("NAV no barcode came: straight on 0 0", 0, 0);
+        g_mission.b_wait_code = false;
+        resume_following();
+    }
+    else
+    {
+        // Still waiting.
+    }
 }
 
 /*!
@@ -1426,6 +1541,7 @@ start_run (uint32_t now_ms)
     g_mission.barcodes      = 0u;
     g_mission.b_nav_pending = false;
     g_mission.b_confirming  = false;
+    g_mission.b_wait_code   = false;
     g_mission.rejects       = 0u;
 
     if (!s5_links_line_is_ready())

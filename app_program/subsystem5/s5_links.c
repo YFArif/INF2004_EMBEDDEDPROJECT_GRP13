@@ -398,6 +398,20 @@ s5_links_line_side (void)
 }
 
 /*!
+ * @brief Tell whether S3 is reading a barcode right now: its letter comes
+ *        only about 1.5 s after the pass ends (s3_barcode_reading(),
+ *        Sean 2026-11-18).
+ *
+ * @return true while a pass is under the barcode sensor; false while S3
+ *         is not in use.
+ */
+bool
+s5_links_barcode_reading (void)
+{
+    return (g_b_line_used && (FALSE != s3_barcode_reading()));
+}
+
+/*!
  * @brief S3's junction counter (IF-S3b; it only reads S3's status). S3
  *        adds one for every junction it passes, so a junction is not
  *        missed even when its event arrives together with a barcode.

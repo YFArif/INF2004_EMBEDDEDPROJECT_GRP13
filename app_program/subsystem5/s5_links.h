@@ -59,6 +59,7 @@ bool            s5_links_line_sees_black(void);
 bool            s5_links_line_is_lost(void);
 bool            s5_links_line_is_locked(void);
 uint32_t        s5_links_junction_count(void);
+bool            s5_links_barcode_reading(void);
 uint32_t        s5_links_line_events(void);
 bool            s5_links_nav_take(subsystem5_nav_msg_t * p_msg);
 
