@@ -10,9 +10,9 @@
  * The only call is cyw43_utk_get_status(), the one read TEAM.md section 3
  * allows a task to make. Nothing here calls the radio driver or lwIP.
  *
- * NOTE: Use CYW43_LINK_UP, not a number. The comment in cyw43_utk.h calls 2
- * "joined + got an IP", but in cyw43.h 2 is CYW43_LINK_NOIP and CYW43_LINK_UP
- * is 3.
+ * NOTE: Use CYW43_LINK_UP, not a number. Until branch s1-fr17 the comment in
+ * cyw43_utk.h called 2 "joined + got an IP", but in cyw43.h 2 is
+ * CYW43_LINK_NOIP and CYW43_LINK_UP is 3.
  */
 
 #include "s1_radio.h"
