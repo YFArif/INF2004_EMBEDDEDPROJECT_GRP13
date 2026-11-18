@@ -24,7 +24,7 @@
 #define LIGHT 900U           /* sensor moved off the line    (250)       */
 #define STEP  3000U          /* 3 mm per step = 0.30 m/s at 10 ms       */
 #define DT    10000U         /* 10 ms                                    */
-#define KP    S3_LN_KP_X100
+#define KP    60            /* Formula tests: P only (fresh() sets 60/0/0) */
 #define E_DARK (-607)       /* DARK (750) stretched to 857 (EDGE_FULL), */
                              /* guard LIGHT 250: e = 250 - 857          */
 
@@ -63,9 +63,13 @@ static void calibrate (s3_line_t * p_ln, s3_line_out_t * p_o)
     (void)lr(p_ln, MID, MID, 0U, 5, p_o);
 }
 
+/* Formula tests use P only (Kp 60, no D, no boost), the defaults these
+ * tests were written for; the car defaults are checked in S3-L43. */
 static void fresh (s3_line_t * p_ln, s3_line_out_t * p_o)
 {
     s3_line_init(p_ln, S3_LN_L_ON_RIGHT);
+    s3_line_set_gains(p_ln, KP, 0);
+    s3_line_set_shape(p_ln, 0);
     calibrate(p_ln, p_o);
 }
 
@@ -76,6 +80,12 @@ int main (void)
     s3_ir_cal_t   c;
     int           i, ev, ok;
     int32_t       s_p, s_pd;
+
+    /* L43: built-in defaults are the car-proven set (12 Nov), so S3 steers
+            right even before S5 sends its tuning */
+    s3_line_init(&ln, S3_LN_L_ON_RIGHT);
+    check("S3-L43", (25 == ln.kp_x100) && (25 == ln.kd_x100) &&
+          (250 == ln.boost_x100), "defaults Kp 25, Kd 25, boost 250");
 
     /* L01: never steer before both sensors have seen white and black */
     s3_line_init(&ln, S3_LN_L_ON_RIGHT);
