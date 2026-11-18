@@ -172,6 +172,8 @@ void s3_set_line_shape(INT boost_x100);             /* 0 = off (default). */
 void s3_set_steer_max(INT dv_mms);                  /* 1 ... 511 mm/s.    */
 void s3_request_recalibrate(void);
 ER   s3_set_nav_map(char const * p_map);            /* Tasks only.        */
+BOOL s3_barcode_reading(void);  /* A pass is under the barcode sensor now: */
+                                /* its result comes ~1.5 s after it ends.  */
 
 /* ------------------------------------------------- called by subsystem3.c */
 ER   s3_init(void);
