@@ -71,14 +71,23 @@
  * and met a box on the curve only 10 cm away (logs 2026-11-12_2213 and
  * _2218). So before each forward ping the servo turns towards where the
  * robot will be STOP_BELOW_MM along its current curve
- * (s5_links_bend_deg(), from the wheel speeds), smoothed over pings by
- * BEND_SMOOTH and limited to BEND_MAX_DEG. Moving the servo pauses the
- * pinging while it settles (drv_servo.c), so it only moves once the aim
- * has changed by BEND_STEP_DEG. On straights it stays straight ahead.
+ * (s5_links_bend_deg(), from the wheel speeds), limited to BEND_MAX_DEG.
+ * Calm aiming (Anna, 2026-11-18: the servo chased S3's left-right
+ * steering, each move drew current and the turns looked jittery): the
+ * bend is smoothed hard (1/BEND_SMOOTH per ping, about half a second),
+ * the aim is one of 0, +-AIM_LEVEL_DEG, +-2 x, +-3 x, a new one is taken
+ * only after AIM_AGREE_PINGS pings ask for it and AIM_HOLD_MS after the
+ * last change, and the servo moves AIM_STEP_DEG per ping towards it.
+ * Moving the servo pauses the pinging while it settles (drv_servo.c). On
+ * straights it stays straight ahead.
  */
 #define BEND_MAX_DEG        (30)        /* Furthest it looks into a bend.*/
-#define BEND_STEP_DEG       (5)         /* Smaller change: no servo move.*/
-#define BEND_SMOOTH         (4)         /* 1/4 of the change per ping.   */
+#define BEND_SMOOTH         (8)         /* 1/8 of the change per ping.   */
+#define BEND_X16            (16)        /* Smoothed bend in 1/16 deg.    */
+#define AIM_LEVEL_DEG       (10)        /* Aims 0, 10, 20, 30 each way.  */
+#define AIM_AGREE_PINGS     (3u)        /* Pings asking for a new aim.   */
+#define AIM_HOLD_MS         (500u)      /* Least time between changes.   */
+#define AIM_STEP_DEG        (5)         /* Servo move per ping.          */
 #define NEAR_PINGS          (3u)
 #define CLEAR_PINGS         (3u)
 #define STOP_PINGS          (2u)
@@ -172,8 +181,12 @@ static subsystem5_obst_status_t g_status         = {0};
 static uint32_t                 g_near_run       = 0u;
 static uint32_t                 g_clear_run      = 0u;
 static uint32_t                 g_stop_run       = 0u;
-static int32_t                  g_bend_deg       = 0;   /* Smoothed aim  */
-                                                        /* off ahead.    */
+static int32_t                  g_bend_x16       = 0;   /* Smoothed bend,*/
+                                                        /* 1/16 deg.     */
+static int32_t                  g_aim_deg        = 0;   /* Aim taken.    */
+static int32_t                  g_aim_want       = 0;   /* Aim asked for.*/
+static uint32_t                 g_aim_agree      = 0u;  /* Pings asking. */
+static uint32_t                 g_aim_since_ms   = 0u;  /* Aim taken at. */
 static int32_t                  g_track_mm       = 0;   /* Last near echo. */
 static int32_t                  g_track_odom_mm  = 0;   /* Odom at it.     */
 static s5_profile_t             g_profile        = {0};
@@ -833,7 +846,11 @@ static void
 enter_monitoring (void)
 {
     point_servo(DRV_SERVO_AHEAD_DEG);
-    g_bend_deg     = 0;
+    g_bend_x16     = 0;
+    g_aim_deg      = 0;
+    g_aim_want     = 0;
+    g_aim_agree    = 0u;
+    g_aim_since_ms = subsystem5_now_ms();
     g_near_run     = 0u;
     g_clear_run    = 0u;
     g_stop_run     = 0u;
@@ -849,8 +866,8 @@ static void
 aim_into_bend (void)
 {
     // NOTE: The cast is safe: STOP_BELOW_MM is a few hundred mm.
-    int32_t target = s5_links_bend_deg((int32_t) STOP_BELOW_MM);
-    int32_t change = 0;
+    int32_t  target = s5_links_bend_deg((int32_t) STOP_BELOW_MM);
+    uint32_t now_ms = subsystem5_now_ms();
 
     if (target > BEND_MAX_DEG)
     {
@@ -865,23 +882,53 @@ aim_into_bend (void)
         // Already inside the limits.
     }
 
-    // Smooth out S3's steering wobble; small leftovers go straight to
-    // the target so the aim settles exactly.
-    change = target - g_bend_deg;
+    // Smooth out S3's steering wobble (fixed point, so small changes are
+    // not lost to rounding).
+    g_bend_x16 += ((target * BEND_X16) - g_bend_x16) / BEND_SMOOTH;
 
-    if (s5_math_abs(change) < BEND_SMOOTH)
+    // The nearest aim level, rounded half away from zero.
+    int32_t step_x16 = AIM_LEVEL_DEG * BEND_X16;
+    int32_t level    = ((g_bend_x16 + ((g_bend_x16 >= 0) ? (step_x16 / 2)
+                                                        : -(step_x16 / 2)))
+                        / step_x16) * AIM_LEVEL_DEG;
+
+    if (level == g_aim_want)
     {
-        g_bend_deg = target;
+        g_aim_agree = (g_aim_agree < AIM_AGREE_PINGS) ? (g_aim_agree + 1u)
+                                                      : AIM_AGREE_PINGS;
     }
     else
     {
-        g_bend_deg += change / BEND_SMOOTH;
+        g_aim_want  = level;
+        g_aim_agree = 1u;
     }
 
-    if (s5_math_abs((DRV_SERVO_AHEAD_DEG + g_bend_deg) - drv_servo_angle())
-        >= BEND_STEP_DEG)
+    if ((g_aim_want != g_aim_deg) && (g_aim_agree >= AIM_AGREE_PINGS)
+        && ((now_ms - g_aim_since_ms) >= AIM_HOLD_MS))
     {
-        point_servo(DRV_SERVO_AHEAD_DEG + g_bend_deg);
+        g_aim_deg      = g_aim_want;
+        g_aim_since_ms = now_ms;
+    }
+
+    // Towards the aim in small steps.
+    int32_t move = (DRV_SERVO_AHEAD_DEG + g_aim_deg) - drv_servo_angle();
+
+    if (move > AIM_STEP_DEG)
+    {
+        move = AIM_STEP_DEG;
+    }
+    else if (move < -AIM_STEP_DEG)
+    {
+        move = -AIM_STEP_DEG;
+    }
+    else
+    {
+        // The last step, or none.
+    }
+
+    if (0 != move)
+    {
+        point_servo(drv_servo_angle() + move);
     }
 }
 

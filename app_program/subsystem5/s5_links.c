@@ -58,6 +58,7 @@
 
 /* false: the S5 floor tests drive without S3 (s5_links_line_use()). */
 static volatile bool g_b_line_used = true;
+static uint16_t      g_tuned_mms   = 0u;     /* S3 last tuned for this.  */
 
 static int16_t clamp_to_int16(int32_t value, int32_t limit);
 static void    wait_wheels_still(void);
@@ -121,8 +122,13 @@ s5_links_motion_settle (void)
 void
 s5_links_motion_follow (uint16_t speed_mms)
 {
-    if (g_b_line_used)
+    // Tune S3 only when the speed changes: S3 restarts its steering's D
+    // term on every new gain setting, a small steering kick each time
+    // (it was re-sent on every near/clear event, Anna 2026-11-18).
+    if (g_b_line_used && (speed_mms != g_tuned_mms))
     {
+        g_tuned_mms = speed_mms;
+
         // NOTE: The cast is safe: speeds are at most a few hundred mm/s.
         s3_set_line_gains(LINE_KP_X100, LINE_KD_X100);
         s3_set_line_shape(LINE_BOOST_X100);

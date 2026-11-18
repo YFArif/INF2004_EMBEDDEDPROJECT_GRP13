@@ -20,8 +20,10 @@
  *   the same tick as the barcode still counts). It is kept through a
  *   line search and through obstacle avoidance: afterwards the robot
  *   approaches the next junction again (Anna, 2026-11-17). Junctions
- *   while a found line is still being confirmed do not count: that is
- *   the robot crossing the line. With S3 it never turns blind; after
+ *   in the first CROSS_MM after a found line do not count: that is the
+ *   robot crossing the line. At the junction the robot drives
+ *   JUNC_FWD_MM on before a turn, so it turns about the crossing.
+ *   With S3 it never turns blind; after
  *   NAV_GIVE_UP_MM of following without a junction the command is
  *   cancelled. Without S3 (floor tests) it turns after S5_JUNCTION_MM
  *   (assumption A11). A newer barcode replaces an unexecuted one.
@@ -30,9 +32,12 @@
  *   to, while S3 searches; FAULT if the line is not found (FR15).
  * - A line found by a search or after a bypass counts only once S3 has
  *   followed it for CONFIRM_MM (see "Line or barcode bar" below).
- * - Neither sensor on black for WHITE_LOST_MM of driving also counts as
- *   lost: S3 then still reported FOLLOW and circled slowly, and the
- *   distance driven confirmed the line (log 2026-11-13_1444).
+ * - Just after a bypass handed the line over, neither sensor on black
+ *   for WHITE_LOST_MM of driving also counts as lost: S3 then still
+ *   reported FOLLOW and circled slowly, and the distance driven confirmed
+ *   the line (log 2026-11-13_1444). Not while plainly following: on
+ *   curves S3 drives on white for a moment, and this stopped the robot
+ *   (Anna, 2026-11-18); there S3's own LOST counts.
  * - Lost just after a bypass found it: the robot crossed it (log
  *   2026-11-13_1444, 56 mm), not a barcode bar. Back to where it was
  *   seen and sweep, as for any line loss. A junction within CROSS_MM of
@@ -58,8 +63,9 @@
  * degrees from where it stood, so both sensors cross the 18 mm line both
  * ways (about 33 mm each way at 15 degrees). Each turn is steered to its
  * heading: after it, the wheels settle, S2's odometry heading is read,
- * and more than CAL_TOL_DEG off, the robot turns by the difference, at
- * most CAL_FIX_TRIES times. It ends where it started, still on the line
+ * and CAL_TOL_CDEG or more off, the robot turns by the difference, at
+ * most CAL_FIX_TRIES times (3 tries with the turn itself, as Sean's).
+ * It ends where it started, still on the line
  * for Button 1 (Sean's sweep from S3's drive test, b39ab6b; the fixed
  * 45, -90, 45 turns drifted about 1 cm).
  * As in Sean's drive test, it also calibrates by itself (Anna,
@@ -89,6 +95,14 @@
 #define SLOW_NEAR_MMS       (60u)       /* Under 35 cm (FR9).            */
 #define CAL_TIMEOUT_MS      (3000u)     /* Then go on without the IMU.   */
 #define S5_JUNCTION_MM      (150)       /* TODO: measure (A11, INT-01).  */
+#define JUNC_FWD_MM         (125)       /* Junction seen by the line     */
+                                        /* sensors: drive this far so the*/
+                                        /* rear axle is on the crossing, */
+                                        /* then turn (Sean's car value,  */
+                                        /* 5 Nov: 60 too early, 150 25 mm*/
+                                        /* past; measured sensor-to-axle */
+                                        /* 133 less the roll on stop).   */
+#define JUNC_FWD_MMS        (60u)       /* As in Sean's drive test.      */
 #define NAV_GIVE_UP_MM      (2000)      /* With S3: no junction this far */
                                         /* after a barcode: cancel it.   */
 #define JUNC_COUNT_MASK     (0xFFu)     /* S3's 8-bit junction counter.  */
@@ -109,8 +123,10 @@
 #define BACK_MARGIN_MM      (20)        /* Added to the measured reverse.*/
 #define BACK_MAX_MM         (250)       /* Never reverse further.        */
 #define CAL_TARGETS         (4u)        /* Headings in g_cal_target_deg. */
-#define CAL_TOL_DEG         (2)         /* Further off: turn the rest.   */
-#define CAL_FIX_TRIES       (3u)        /* Corrections per heading.      */
+#define CAL_TOL_CDEG        (200)       /* 2 deg or more off: turn the   */
+                                        /* rest (Sean's drive test).     */
+#define CAL_FIX_TRIES       (2u)        /* Corrections per heading: 3    */
+                                        /* tries with the turn itself.   */
 #define CDEG_PER_DEG        (100)
 #define CDEG_HALF_TURN      (18000)
 #define SLOW_MMS            (40u)       /* Calibration and recovery: S3  */
@@ -186,6 +202,9 @@ typedef struct
     unsigned int            b_nav_pending : 1;  /* Barcode not acted on. */
     unsigned int            b_confirming  : 1;  /* Found line not sure.  */
     unsigned int            b_bypass_find : 1;  /* Found by a bypass.    */
+    unsigned int            b_junc_fwd    : 1;  /* Driving onto the      */
+                                                /* junction before the   */
+                                                /* turn.                 */
     unsigned int            b_black       : 1;  /* A sensor sees black.  */
     unsigned int            junc_from     : 8;  /* S3's junction count   */
                                                 /* when approaching began*/
@@ -198,7 +217,7 @@ typedef char mission_state_check[(S5_CTRL_FINISHED <= S5_CTRL_STATE_MASK)
 static mission_t g_mission = {0u, 0u, 0u, 0u, 0, 0u, 1, 0,
                               S5_LINKS_SIDE_NONE, 0, 0u, 0, 0, 0, 0u, 0u,
                               0u, 0, 0u, S5_CTRL_INIT, false, false,
-                              false, false, 0u};
+                              false, false, false, 0u};
 
 /* In test images the controller ignores events until a test arms it, so
  * the S2 tests that run first are never disturbed.
@@ -214,6 +233,8 @@ static bool is_running(void);
 static void step_calibrating(uint32_t events, uint32_t now_ms);
 static void step_cal_sweep(uint32_t events, uint32_t now_ms);
 static int32_t cal_error_deg(int32_t target_deg);
+static int32_t cal_error_cdeg(int32_t target_deg);
+static int32_t command_turn_deg(void);
 static void start_cal_sweep(uint32_t now_ms);
 static bool cal_needed(void);
 static s5_links_side_t reacquire_side(void);
@@ -521,7 +542,7 @@ step_calibrating (uint32_t events, uint32_t now_ms)
 
 /*!
  * @brief The line-sensor sweep: after each turn, correct it if it ended
- *        more than CAL_TOL_DEG off its heading, else turn to the next
+ *        CAL_TOL_CDEG or more off its heading, else turn to the next
  *        heading; READY after the last, with S3's result logged.
  *
  * @param[in] events Mission events.
@@ -542,7 +563,7 @@ step_cal_sweep (uint32_t events, uint32_t now_ms)
 
         int32_t error = cal_error_deg(target);
 
-        if ((s5_math_abs(error) > CAL_TOL_DEG)
+        if ((s5_math_abs(cal_error_cdeg(target)) >= CAL_TOL_CDEG)
             && (g_mission.cal_tries < CAL_FIX_TRIES))
         {
             g_mission.cal_tries++;
@@ -760,19 +781,29 @@ obstacle_stopped (uint32_t events, uint32_t now_ms)
 static void
 adjust_speed (uint32_t events)
 {
+    uint32_t speed = g_mission.speed_mms;
+
     if (0u != (events & EV_OBSTACLE_NEAR))
     {
-        g_mission.speed_mms = slow_mms();
-        s5_links_motion_follow(slow_mms());
+        speed = slow_mms();
     }
     else if (0u != (events & EV_OBSTACLE_CLEAR))
     {
-        g_mission.speed_mms = cruise_mms();
-        s5_links_motion_follow(cruise_mms());
+        speed = cruise_mms();
     }
     else
     {
         // No change.
+    }
+
+    // Only a real change is sent: a repeated FOLLOW disturbed the
+    // steering on curves (slow and cruise are both 50 mm/s now).
+    if (speed != g_mission.speed_mms)
+    {
+        g_mission.speed_mms = speed;
+
+        // NOTE: The cast is safe: speeds are a few hundred mm/s at most.
+        s5_links_motion_follow((uint16_t) speed);
     }
 }
 
@@ -821,10 +852,12 @@ start_approach (void)
  *
  * @param[in] events Mission events.
  *
- * @return true if a junction counts. Never while a found line is still
- *         being confirmed: that "junction" is the robot crossing the line
- *         at an angle (the line-loss rules handle it); the count starts
- *         again from there.
+ * @return true if a junction counts. Never in the first CROSS_MM after
+ *         a line was found by a search or a bypass: that "junction" is
+ *         the robot crossing the line at an angle (the line-loss rules
+ *         handle it); the count starts again from there. A junction
+ *         5 ... 12 cm after the find counts (it was ignored until the line
+ *         was confirmed, Anna 2026-11-18).
  */
 static bool
 junction_reached (uint32_t events)
@@ -836,8 +869,13 @@ junction_reached (uint32_t events)
     {
         // Nothing to do at a junction.
     }
-    else if (g_mission.b_confirming)
+    else if (g_mission.b_confirming
+             && ((s5_links_odom_dist_mm() - g_mission.confirm_mm)
+                 < CROSS_MM))
     {
+        // Within CROSS_MM of the find a "junction" is the robot crossing
+        // the line (the hand-over lines the robot up, so later ones are
+        // real): start the count again from here.
         g_mission.junc_from = count & JUNC_COUNT_MASK;
     }
     else
@@ -874,6 +912,41 @@ resume_approach (void)
 static void
 execute_command (uint32_t now_ms)
 {
+    int32_t angle_deg = command_turn_deg();
+
+    g_mission.b_nav_pending = false;
+    s5_links_line_enable(false);
+    s5_links_motion_stop();
+    set_state(S5_CTRL_EXECUTING_COMMAND);
+
+    if (0 == angle_deg)
+    {
+        start_reacquire();
+    }
+    else
+    {
+        // The line sensors are on the crossing, the rear axle the robot
+        // turns about is still behind it: drive onto it first, then turn
+        // (step_turning()).
+        // NOTE: The cast is safe: JUNC_FWD_MM is a few hundred mm.
+        uint32_t dist = (uint32_t) JUNC_FWD_MM;
+
+        g_mission.b_junc_fwd    = true;
+        s5_links_motion_move(JUNC_FWD_MM, (uint16_t) JUNC_FWD_MMS);
+        g_mission.wait_start_ms = now_ms;
+        g_mission.wait_limit_ms = ((dist * MS_PER_S) / JUNC_FWD_MMS)
+                                  + MOTION_SLACK_MS;
+    }
+}
+
+/*!
+ * @brief The turn for the command taken at the junction.
+ *
+ * @return Degrees, + = left; 0 for STRAIGHT.
+ */
+static int32_t
+command_turn_deg (void)
+{
     int32_t angle_deg = 0;
 
     switch (g_mission.nav_cmd)
@@ -895,19 +968,7 @@ execute_command (uint32_t now_ms)
         break;
     }
 
-    g_mission.b_nav_pending = false;
-    s5_links_line_enable(false);
-    s5_links_motion_stop();
-    set_state(S5_CTRL_EXECUTING_COMMAND);
-
-    if (0 == angle_deg)
-    {
-        start_reacquire();
-    }
-    else
-    {
-        start_turn(angle_deg, now_ms);
-    }
+    return (angle_deg);
 }
 
 /*!
@@ -919,7 +980,13 @@ execute_command (uint32_t now_ms)
 static void
 step_turning (uint32_t events, uint32_t now_ms)
 {
-    if (0u != (events & EV_MOTION_DONE))
+    if ((0u != (events & EV_MOTION_DONE)) && g_mission.b_junc_fwd)
+    {
+        // The rear axle is on the crossing now: turn.
+        g_mission.b_junc_fwd = false;
+        start_turn(command_turn_deg(), now_ms);
+    }
+    else if (0u != (events & EV_MOTION_DONE))
     {
         start_reacquire();
     }
@@ -1093,7 +1160,8 @@ line_is_lost (uint32_t events)
 
     return (b_over || (0u != (events & EV_LINE_LOST))
             || ((driven >= LOST_CHECK_MM) && s5_links_line_is_lost())
-            || (s5_links_line_is_ready()
+            || (s5_links_line_is_ready() && g_mission.b_confirming
+                && g_mission.b_bypass_find
                 && ((odom - g_mission.line_mark_mm) >= WHITE_LOST_MM)));
 }
 
@@ -1468,6 +1536,24 @@ finish_run (uint32_t now_ms)
 static int32_t
 cal_error_deg (int32_t target_deg)
 {
+    int32_t diff = cal_error_cdeg(target_deg);
+
+    // Round to whole degrees.
+    return ((diff + ((diff >= 0) ? (CDEG_PER_DEG / 2)
+                                 : -(CDEG_PER_DEG / 2)))
+            / CDEG_PER_DEG);
+}
+
+/*!
+ * @brief As cal_error_deg(), in 1/100 degree (for the tolerance).
+ *
+ * @param[in] target_deg Heading from the start, + = left.
+ *
+ * @return 1/100 degree, + = left, -18000 ... 18000.
+ */
+static int32_t
+cal_error_cdeg (int32_t target_deg)
+{
     int32_t diff = (g_mission.cal_start_cdeg + (target_deg * CDEG_PER_DEG))
                    - s5_links_odom_heading_cdeg();
 
@@ -1484,10 +1570,7 @@ cal_error_deg (int32_t target_deg)
         // Already the shorter way.
     }
 
-    // Round to whole degrees.
-    return ((diff + ((diff >= 0) ? (CDEG_PER_DEG / 2)
-                                 : -(CDEG_PER_DEG / 2)))
-            / CDEG_PER_DEG);
+    return (diff);
 }
 
 /*!
