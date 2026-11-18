@@ -1,0 +1,531 @@
+---- Opened the serial port COM3 ----
+
+
+microT-Kernel Version 3.00
+
+
+=== micro T-Kernel on Raspberry Pi Pico W (spec 0x6300, product 0x0003) ===
+dual-core (SMP) build, usermain on core 0
+encoder: GP16/GP17 edge interrupt on core 1
+motion_task: core 1, period 20 ms
+all subsystems started
+
+[S5] EVT 0x60 a=1 b=0
+wifi: cyw43_utk_task starting (proc 1)
+S3 RUN: barcode DOUT=GP7 AOUT=ADC2, Left IR=ADC0 (GP26), Centre=ADC1 (GP27), line sensors: single edge, GP27 on the LEFT edge, GP26 guard RIGHT
+wifi: cyw43_init() ...
+wifi: cyw43_init() returned, bringing interface up ...
+S3 TIME line step max 148 us, period -1-0 us, sampler isr max 55 us
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 160-160  GP26 3152-3152
+[S5] CAL auto: robot centred on the line, it turns left and right by itself 0 0 0 0
+S3 RECALIBRATE: sweep both sensors over white and black
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 165-176  GP26 3152-3152
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 165-176  GP26 3152-3166
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 164-176  GP26 3152-3166
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 164-176  GP26 454-3174
+S3 LINE  GP27=WHITE    0  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 164-176  GP26 174-3174
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 164-176  GP26 168-3174
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 164-176  GP26 168-3174
+S3 LINE  GP27=WHITE    0  GP26=BLACK  966  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 163-176  GP26 168-3174
+S3 LINE  GP27=WHITE    0  GP26=BLACK  992  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 163-176  GP26 168-3174
+S3 LINE  GP27=WHITE    0  GP26=BLACK  987  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 163-176  GP26 168-3174
+S3 LINE  GP27=BLACK 1000  GP26=BLACK  966  -> turn STRAIGHT    0 mm/s  UNCALIBRATED (sweep both sensors over white and black)   cal GP27 163-176  GP26 168-3174
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    2  -> turn LEFT       50 mm/s  FOLLOW (one sensor off line)   cal GP27 163-2264  GP26 168-3174
+S3 LINE  GP27=WHITE   16  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  OFF LINE -> searching LEFT   cal GP27 163-2924  GP26 168-3174
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  OFF LINE -> searching LEFT   cal GP27 163-2924  GP26 168-3174
+
+S4 IMU: LSM303DLHC on I2C0 SDA=GP4 SCL=GP5
+S4 terrain stored in 8 B (43 bits); unpacked 14 B
+S4 ACC CTRL1=0x77 CTRL4=0xa8 PASS; MAG id=48 34 33 PASS
+S4 CAL start: keep the robot still and level for 2 s
+S3 LINE  GP27=WHITE    0  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  OFF LINE -> searching LEFT   cal GP27 163-2924  GP26 168-3174
+S4 CAL robot moved (spread 130 mg, speed 7 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 48 mg, speed 8 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 50 mg, speed 6 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 70 mg, speed 5 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=-27 r=-343 f=-4 l=-50 u=834 af=0 h=0 pk=0 hs=0 cl=0 w=664 hd=1 n=8 dxy=118 run=2913 late=45 ok=1 cal=0
+S3 LINE  GP27=WHITE   10  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  OFF LINE -> searching LEFT   cal GP27 163-2924  GP26 168-3174
+S4 CAL robot moved (spread 100 mg, speed -10 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 CAL robot moved (spread 170 mg, speed -4 mm/s), starting again
+S4 CAL start: keep the robot still and level for 2 s
+S4 p=176 S4 p=-8 r=0 f=5 l=-10 u=832 af=0 h=0 pk=0 hs=0 cl=0 w=0 hd=12 n=9 dxy=21 run=2955 late=3977 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  992  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 165-2974  GP26 168-3095
+S4 p=-2 r=23 f=10 l=-6 u=834 af=0 h=0 pk=0 hs=0 cl=0 w=0 hd=12 n=8 dxy=21 run=2637 late=1285 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  993  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 166-2974  GP26 168-3091
+S4 p=11 r=-6 f=14 l=-14 u=832 af=0 h=0 pk=0 hs=0 cl=0 w=0 hd=12 n=8 dxy=21 run=2649 late=1214 ok=1 cal=1
+S3 TIME line step max 324 us, period 9664-10371 us, sampler isr max 49 us
+S3 LINE  GP27=WHITE    3  GP26=BLACK  993  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 166-2974  GP26 168-3091
+S4 p=8 r=-10 f=12 l=-16 u=844 af=0 h=0 pk=0 hs=0 cl=0 w=0 hd=12 n=8 dxy=22 run=2641 late=1608 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=BLACK  993  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 166-2974  GP26 168-3091
+S4 p=0 r=-6 f=4 l=-16 u=834 af=0 h=0 pk=0 hs=0 cl=0 w=0 hd=12 n=8 dxy=22 run=2639 late=1227 ok=1 cal=1
+S3 LINE  GP27=WHITE    0  GP26=BLACK  993  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 166-2974  GP26 168-3091
+S4 p=10 r=-7 f=14 l=-12 u=832 af=0 h=0 pk=0 hs=0 cl=0 w=0 hd=12 n=8 dxy=21 run=2635 late=1261 ok=1 cal=1
+S3 LINE  GP27=WHITE    3  GP26=BLACK  993  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 166-2974  GP26 168-3091
+S4 DRIVE TEST: driving 800 mm in 0 s
+S4 DRIVE TEST: go
+S4 D 1 -10 4 1 0
+S4 D 2 -21 2 1 0
+S4 D 3 -9 0 1 0
+S4 D 4 -34 -1 1 0
+S4 D 5 -49 2 2 0
+S4 D 6 -108 27 3 0
+S4 p=-108 r=27 f=10 l=2 u=814 af=430 h=0 pk=0 hs=0 cl=0 w=-1483 hd=12 n=8 dxy=135 run=2912 late=1279 ok=1 cal=1
+S4 D 7 368 -26 4 0
+S3 LINE  GP27=WHITE    3  GP26=BLACK  982  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 167-2974  GP26 168-3090
+S4 CLASS ACCELERATING t=15963 ms
+S4 D 8 325 13 5 1
+S4 D 9 182 -2 7 0
+S4 D 10 66 -82 9 0
+S4 D 11 152 -26 11 0
+S4 D 12 206 -40 13 0
+S4 D 13 126 -28 16 0
+S4 D 14 -131 -99 19 0
+S4 D 15 -92 -49 22 0
+S4 D 16 37 -80 24 0
+S4 p=37 r=-80 f=112 l=-41 u=889 af=370 h=0 pk=0 hs=0 cl=2 w=0 hd=12 n=7 dxy=465 run=2752 late=1573 ok=1 cal=1
+S4 D 17 -34 -17 27 0
+S3 LINE  GP27=WHITE    3  GP26=BLACK  993  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 167-2974  GP26 168-3090
+S4 D 18 40 -31 30 0
+S4 D 19 -122 -36 33 0
+S4 D 20 -36 -91 36 0
+S4 D 21 43 -46 39 0
+S4 D 22 47 -2 42 0
+S4 CLASS MOVING t=16262 ms
+S4 D 23 35 -19 45 0
+S4 D 24 23 -57 49 0
+S4 D 25 18 -38 52 0
+S4 D 26 21 -55 55 0
+S4 p=21 r=-55 f=13 l=-29 u=845 af=0 h=0 pk=0 hs=0 cl=1 w=-255 hd=12 n=7 dxy=249 run=2736 late=1416 ok=1 cal=1
+S4 D 27 1 -19 58 0
+S3 LINE  GP27=WHITE    0  GP26=BLACK  873  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 167-2974  GP26 168-3090
+S4 D 28 60 -68 61 0
+S4 D 29 5 -33 64 0
+S4 D 30 57 -71 67 0
+S4 D 31 58 -22 70 0
+S4 D 32 149 -71 73 0
+S4 D 33 109 -86 76 0
+S4 D 34 141 -53 79 0
+S4 D 35 126 -105 82 0
+S4 D 36 135 17 85 0
+S4 p=135 r=17 f=27 l=43 u=832 af=-50 h=0 pk=0 hs=0 cl=1 w=306 hd=12 n=7 dxy=201 run=2774 late=1421 ok=1 cal=1
+S4 D 37 168 -99 88 0
+S3 LINE  GP27=WHITE    3  GP26=WHITE  188  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 167-2974  GP26 168-3090
+S4 D 38 77 -31 91 0
+S4 D 39 181 -74 94 0
+S4 D 40 102 -88 97 0
+S4 D 41 82 25 100 0
+S4 D 42 99 -59 103 0
+S4 D 43 26 -5 106 0
+S4 D 44 24 -69 109 0
+S4 D 45 78 -47 112 0
+S4 D 46 105 -92 115 0
+S4 p=105 r=-92 f=34 l=-46 u=828 af=-10 h=0 pk=0 hs=0 cl=1 w=-102 hd=12 n=8 dxy=176 run=2570 late=1756 ok=1 cal=1
+S4 D 47 64 -3 118 0
+S3 LINE  GP27=WHITE   26  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 167-2974  GP26 168-3090
+S4 D 48 3 -51 121 0
+S4 D 49 141 -43 124 0
+S4 D 50 293 -97 127 1
+S4 D 51 12 -44 130 0
+S4 D 52 141 -33 133 0
+S4 D 53 186 116 136 0
+S4 D 54 321 151 139 1
+S4 D 55 219 -116 141 2
+S4 D 56 231 -25 144 3
+S4 p=231 r=-25 f=48 l=24 u=846 af=0 h=3 pk=0 hs=0 cl=1 w=204 hd=11 n=8 dxy=269 run=2551 late=1408 ok=1 cal=1
+S4 D 57 139 -69 147 0
+S3 LINE  GP27=EDGE   630  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 167-2974  GP26 168-3090
+S4 D 58 -46 -146 150 0
+S4 D 59 123 -164 153 0
+S4 D 60 -1 -137 156 0
+S4 D 61 10 -140 159 0
+S4 D 62 -2 -186 162 0
+S4 D 63 30 -151 165 0
+S4 D 64 74 -225 168 0
+S4 D 65 -97 -217 171 0
+S4 D 66 -52 -190 174 0
+S4 p=-52 r=-190 f=20 l=-28 u=814 af=0 h=0 pk=0 hs=0 cl=1 w=562 hd=12 n=8 dxy=232 run=2542 late=1433 ok=1 cal=1
+S4 D 67 -134 -327 177 0
+S3 LINE  GP27=BLACK 1000  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 168-2994  GP26 170-3090
+S4 D 68 -48 -227 180 0
+S4 D 69 -18 -361 182 0
+S4 D 70 -53 -322 185 0
+S4 D 71 -311 -337 188 -1
+S4 D 72 -145 -346 191 0
+S4 HUMP one wheel up (right side)
+S4 D 73 -97 -370 194 0
+S4 D 74 -270 -376 196 0
+S4 D 75 -360 -345 199 -2
+S4 D 76 -228 -460 202 -4
+S4 p=-228 r=-460 f=26 l=-136 u=862 af=-80 h=-4 pk=0 hs=0 cl=1 w=1074 hd=14 n=8 dxy=241 run=2674 late=1410 ok=1 cal=1
+S4 D 77 -118 -384 204 0
+S3 LINE  GP27=BLACK  957  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 168-3602  GP26 170-3090
+S4 D 78 -157 -475 207 0
+S4 D 79 -217 -422 210 -1
+S4 D 80 -291 -487 212 -2
+S4 D 81 -241 -469 215 -3
+S4 D 82 -288 -529 217 -4
+S4 D 83 -282 -519 220 -5
+S4 D 84 -227 -536 223 -7
+S4 D 85 -165 -580 225 0
+S4 D 86 -185 -649 228 0
+S4 p=-185 r=-649 f=-30 l=-134 u=802 af=-30 h=0 pk=0 hs=0 cl=1 w=1023 hd=15 n=8 dxy=197 run=2582 late=1464 ok=1 cal=1
+S4 D 87 -337 -744 230 -1
+S3 LINE  GP27=WHITE   11  GP26=BLACK  939  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 168-3602  GP26 170-3090
+S4 D 88 -250 -665 233 -2
+S4 D 89 -283 -801 236 -3
+S4 D 90 -242 -829 239 -5
+S4 D 91 -286 -753 242 -6
+S4 D 92 -229 -665 245 -7
+S4 D 93 -111 -643 248 0
+S4 D 94 -180 -582 251 0
+S4 D 95 -57 -642 254 0
+S4 D 96 -23 -622 257 0
+S4 p=-23 r=-622 f=38 l=-90 u=792 af=190 h=0 pk=0 hs=0 cl=1 w=-1074 hd=16 n=8 dxy=197 run=2562 late=1452 ok=1 cal=1
+S4 D 97 -231 -655 261 -1
+S3 LINE  GP27=WHITE    2  GP26=BLACK  988  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 168-3602  GP26 170-3090
+S4 D 98 -121 -556 264 0
+S4 D 99 -221 -578 268 -1
+S4 D 100 -159 -580 271 0
+S4 D 101 -51 -557 275 0
+S4 D 102 -254 -670 278 -1
+S4 D 103 -256 -448 282 -3
+S4 D 104 -43 -660 285 0
+S4 D 105 -99 -428 288 0
+S4 D 106 -307 -517 292 -2
+S4 p=-307 r=-517 f=-118 l=-120 u=780 af=40 h=-2 pk=0 hs=0 cl=1 w=-1994 hd=12 n=8 dxy=316 run=2616 late=1435 ok=1 cal=1
+S4 D 107 1 -530 295 0
+S3 LINE  GP27=BLACK  808  GP26=WHITE   18  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 168-3602  GP26 170-3090
+S4 D 108 -84 -412 299 0
+S4 D 109 -98 -502 302 0
+S4 D 110 -250 -297 306 -1
+S4 D 111 -70 -441 309 0
+S4 D 112 -101 -263 312 0
+S4 D 113 -252 -296 315 -1
+S4 D 114 -135 -268 319 0
+S4 D 115 -112 -218 322 0
+S4 D 116 -157 -236 325 0
+S4 p=-157 r=-236 f=-40 l=-56 u=838 af=-50 h=0 pk=0 hs=0 cl=1 w=-306 hd=10 n=8 dxy=284 run=2556 late=1439 ok=1 cal=1
+S4 D 117 -273 -134 329 -1
+S3 LINE  GP27=EDGE   729  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 170-3602  GP26 170-3084
+S4 D 118 6 -206 332 0
+S4 D 119 -197 -156 335 0
+S4 D 120 5 -156 338 0
+S4 D 121 -196 -248 341 0
+S4 D 122 -67 81 344 0
+S4 D 123 267 86 347 1
+S4 D 124 240 117 350 2
+S4 D 125 44 -28 353 0
+S4 HUMP #1 (one wheel) peak=10 mm roll_avg=488 roll_max=829 cdeg over 162 mm (run peak 10 mm)
+S4 D 126 -101 15 356 0
+S4 p=-101 r=15 f=-78 l=8 u=796 af=-110 h=0 pk=10 hs=0 cl=1 w=-153 hd=10 n=8 dxy=324 run=2917 late=1440 ok=1 cal=1
+S4 D 127 181 -47 359 0
+S3 LINE  GP27=EDGE   645  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 170-3602  GP26 170-3084
+S4 D 128 81 -10 362 0
+S4 D 129 -55 -5 365 0
+S4 D 130 -22 -103 368 0
+S4 D 131 -22 25 371 0
+S4 D 132 180 -77 374 0
+S4 D 133 -61 -22 377 0
+S4 D 134 -31 2 380 0
+S4 D 135 -43 -61 383 0
+S4 D 136 13 1 386 0
+S4 p=13 r=1 f=36 l=14 u=814 af=20 h=0 pk=10 hs=0 cl=1 w=358 hd=11 n=8 dxy=262 run=2584 late=1826 ok=1 cal=1
+S4 D 137 104 -8 389 0
+S3 LINE  GP27=EDGE   542  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 170-3602  GP26 170-3084
+S4 D 138 51 13 392 0
+S4 D 139 -2 35 395 0
+S4 D 140 -63 -21 398 0
+S4 D 141 127 44 401 0
+S4 D 142 39 -17 404 0
+S4 D 143 -49 -8 407 0
+S4 D 144 -118 -55 410 0
+S4 D 145 -97 23 413 0
+S4 D 146 68 -63 416 0
+S4 p=68 r=-63 f=92 l=-62 u=862 af=-20 h=0 pk=10 hs=0 cl=1 w=511 hd=11 n=8 dxy=202 run=2563 late=1458 ok=1 cal=1
+S4 D 147 -111 -15 419 0
+S3 LINE  GP27=WHITE   57  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 170-3602  GP26 170-3084
+S4 D 148 -115 -80 422 0
+S4 D 149 -42 -53 425 0
+S4 D 150 50 -60 427 0
+S4 D 151 34 -61 430 0
+S4 D 152 -3 -92 433 0
+S4 D 153 80 -80 436 0
+S4 D 154 -21 -88 440 0
+S4 D 155 30 -4 443 0
+S4 D 156 27 -61 446 0
+S4 p=27 r=-61 f=16 l=-48 u=854 af=50 h=0 pk=10 hs=0 cl=1 w=869 hd=12 n=8 dxy=222 run=2774 late=1434 ok=1 cal=1
+S4 D 157 8 21 449 0
+S3 LINE  GP27=EDGE   295  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 170-3602  GP26 170-3084
+S4 D 158 -4 -34 452 0
+S4 D 159 31 3 455 0
+S4 D 160 3 69 458 0
+S4 D 161 7 -121 461 0
+S4 D 162 -18 -1 464 0
+S4 D 163 76 -74 467 0
+S4 D 164 118 -23 470 0
+S4 D 165 55 -6 473 0
+S4 D 166 23 -54 476 0
+S4 p=23 r=-54 f=-2 l=-42 u=832 af=10 h=0 pk=10 hs=0 cl=1 w=-51 hd=12 n=8 dxy=243 run=2602 late=1404 ok=1 cal=1
+S4 D 167 -24 1 479 0
+S3 LINE  GP27=EDGE   346  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 192-3520  GP26 170-3023
+S4 D 168 -47 -158 482 0
+S4 D 169 7 9 485 0
+S4 D 170 80 -135 488 0
+S4 D 171 -90 -58 491 0
+S4 D 172 -8 -126 494 0
+S4 D 173 -26 -76 497 0
+S4 D 174 57 -84 500 0
+S4 D 175 -16 -97 503 0
+S4 D 176 178 -31 506 0
+S4 p=178 r=-31 f=122 l=12 u=876 af=-40 h=0 pk=10 hs=0 cl=1 w=920 hd=13 n=8 dxy=273 run=2553 late=1446 ok=1 cal=1
+S3 TIME barcode decode 2372 us (both paths)
+S4 D 177 80 -42 509 0
+S3 LINE  GP27=EDGE   735  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 192-3520  GP26 170-3023
+S4 D 178 -418 -13 512 -2
+S4 D 179 -165 -60 515 0
+S4 D 180 -39 12 518 0
+S4 D 181 -35 31 522 0
+S4 D 182 -126 7 525 0
+S4 D 183 -95 -3 528 0
+S4 D 184 15 16 531 0
+S4 D 185 -1 -14 534 0
+S4 D 186 -23 -52 536 0
+S4 p=-23 r=-52 f=-6 l=-36 u=802 af=-10 h=0 pk=10 hs=0 cl=1 w=-869 hd=13 n=8 dxy=338 run=2572 late=1545 ok=1 cal=1
+S4 D 187 -82 35 540 0
+S3 LINE  GP27=WHITE    0  GP26=BLACK  966  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 192-3520  GP26 170-3023
+S4 D 188 32 -61 542 0
+S4 D 189 -21 147 546 0
+S4 D 190 167 -83 548 0
+S4 D 191 -42 -80 552 0
+S4 D 192 -308 -49 555 -1
+S4 D 193 -272 -64 558 -3
+S4 D 194 -71 -53 561 0
+S4 D 195 -202 -66 564 -1
+S4 D 196 -192 -126 567 0
+S4 p=-192 r=-126 f=-20 l=-59 u=848 af=-40 h=0 pk=10 hs=0 cl=1 w=1483 hd=13 n=7 dxy=252 run=2606 late=1461 ok=1 cal=1
+S4 D 197 -153 -179 570 0
+S3 LINE  GP27=WHITE    1  GP26=WHITE    2  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3520  GP26 170-3023
+S4 D 198 -258 -74 573 -1
+S4 D 199 -277 -96 576 -2
+S4 D 200 -151 49 579 0
+S4 D 201 -129 131 582 0
+S4 D 202 -81 131 585 0
+S4 D 203 -90 79 589 0
+S4 D 204 -47 103 592 0
+S4 D 205 -75 171 596 0
+S4 LIFTED: up=1280 mg (rest 832) p=-111 r=204 cdeg -> MF_ESTOP, EV_LIFTED
+S4 CLASS LIFTED t=19923 ms
+S4 LIFT/OVERTURN STOP braked 313 us after the sample
+S4 D 206 -111 204 599 0
+S4 p=-111 r=204 f=-11 l=48 u=1280 af=260 h=0 pk=10 hs=0 cl=6 w=-204 hd=13 n=7 dxy=210 run=3333 late=1396 ok=1 cal=1
+S4 D 207 -129 127 602 0
+S3 LINE  GP27=EDGE   589  GP26=EDGE   691  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3520  GP26 170-3023
+S4 D 208 -66 26 605 0
+S4 D 209 26 33 606 0
+S4 D 210 40 7 607 0
+S4 D 211 5 8 607 0
+S4 D 212 -21 -28 607 0
+S4 D 213 -54 -125 607 0
+S4 D 214 -81 -203 607 0
+S4 D 215 -183 -274 607 0
+S4 D 216 -364 -367 607 0
+S4 p=-364 r=-367 f=-160 l=-116 u=898 af=-240 h=0 pk=10 hs=0 cl=6 w=204 hd=13 n=7 dxy=158 run=2836 late=1925 ok=1 cal=1
+S4 D 217 -574 -405 607 0
+S3 TIME line step max 335 us, period 9726-10278 us, sampler isr max 53 us
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3699  GP26 170-3672
+S4 D 218 -696 -404 607 0
+S4 D 219 -796 -407 607 0
+S4 HUMP one wheel up (right side)
+S4 D 220 -817 -420 607 0
+S4 HUMP climbing (nose down)
+S4 D 221 -669 -368 607 0
+S4 D 222 -534 -389 607 0
+S4 D 223 -521 -447 607 0
+S4 D 224 -476 -485 607 0
+S4 D 225 -391 -414 607 0
+S4 D 226 -303 -301 607 0
+S4 p=-303 r=-301 f=2 l=-6 u=688 af=0 h=0 pk=10 hs=1 cl=6 w=0 hd=13 n=7 dxy=117 run=2689 late=1836 ok=1 cal=1
+S4 D 227 -293 -204 607 0
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3699  GP26 170-3672
+S4 D 228 -497 -64 607 0
+S4 D 229 -640 145 607 0
+S4 D 230 -626 462 607 0
+S4 D 231 -568 873 607 0
+S4 D 232 -440 1257 607 0
+S4 D 233 -291 1752 607 0
+S3 TIME barcode decode 1104 us (both paths)
+S4 D 234 -217 2084 607 0
+S4 D 235 -184 2404 607 0
+S4 D 236 -159 2669 607 0
+S4 p=-159 r=2669 f=-2 l=230 u=344 af=0 h=0 pk=10 hs=1 cl=6 w=0 hd=13 n=8 dxy=105 run=2590 late=1346 ok=1 cal=1
+S4 D 237 -96 2967 607 0
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3699  GP26 170-3672
+S4 D 238 -120 3294 607 0
+S4 HUMP #2 peak=9 mm theta_max=669 cdeg L.sin=9 mm integrated=0 mm (run peak 10 mm)
+S4 D 239 -173 3555 607 0
+S4 D 240 -161 3587 607 0
+S4 D 241 2 3261 607 0
+S4 D 242 223 2894 607 0
+S4 D 243 380 2540 607 0
+S4 D 244 458 2210 607 0
+S4 D 245 467 1990 607 0
+S4 D 246 337 1790 607 0
+S4 p=337 r=1790 f=0 l=154 u=792 af=0 h=0 pk=10 hs=0 cl=6 w=0 hd=13 n=8 dxy=113 run=2925 late=1287 ok=1 cal=1
+S4 D 247 147 1519 607 0
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3699  GP26 170-3672
+S4 D 248 58 1349 607 0
+S4 D 249 9 1259 607 0
+S4 D 250 -160 1185 607 0
+S4 D 251 -376 1109 607 0
+S4 D 252 -580 1039 607 0
+S4 D 253 -671 959 607 0
+S4 D 254 -692 925 607 0
+S4 D 255 -723 783 607 0
+S4 HUMP climbing (nose down)
+S4 D 256 -697 620 607 0
+S4 p=-697 r=620 f=-82 l=6 u=834 af=0 h=0 pk=10 hs=1 cl=6 w=0 hd=13 n=8 dxy=127 run=2712 late=1437 ok=1 cal=1
+S4 D 257 -547 545 607 0
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3699  GP26 170-3672
+S4 D 258 -431 520 607 0
+S4 D 259 -389 413 607 0
+S4 D 260 -364 308 607 0
+S4 D 261 -290 230 607 0
+S4 D 262 -235 192 607 0
+S4 D 263 -220 212 607 0
+S4 D 264 -220 172 607 0
+S4 D 265 -179 130 607 0
+S4 D 266 -145 89 607 0
+S4 p=-145 r=89 f=2 l=-20 u=910 af=0 h=0 pk=10 hs=1 cl=6 w=0 hd=13 n=8 dxy=95 run=2598 late=1433 ok=1 cal=1
+S4 D 267 -148 76 607 0
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3699  GP26 170-3672
+S4 D 268 -177 63 607 0
+S4 HUMP #3 peak=9 mm theta_max=697 cdeg L.sin=9 mm integrated=0 mm (run peak 10 mm)
+S4 D 269 -182 69 607 0
+S4 D 270 -173 71 607 0
+S4 D 271 -166 78 607 0
+S4 D 272 -135 65 607 0
+S4 D 273 -100 61 607 0
+S4 D 274 -96 34 607 0
+S4 D 275 -133 17 607 0
+S4 D 276 -111 16 607 0
+S4 p=-111 r=16 f=2 l=-12 u=864 af=0 h=0 pk=10 hs=0 cl=6 w=0 hd=13 n=8 dxy=33 run=2816 late=1296 ok=1 cal=1
+S4 D 277 -68 27 607 0
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3699  GP26 170-3672
+S4 D 278 -74 13 607 0
+S4 D 279 -73 3 607 0
+S4 D 280 -75 14 607 0
+S4 D 281 -74 22 607 0
+S4 D 282 -154 9 607 0
+S4 D 283 -244 10 607 0
+S4 D 284 -200 76 607 0
+S4 D 285 -104 133 607 0
+S4 D 286 -104 135 607 0
+S4 p=-104 r=135 f=-8 l=8 u=872 af=0 h=0 pk=10 hs=0 cl=6 w=0 hd=13 n=9 dxy=71 run=2815 late=1440 ok=1 cal=1
+S4 D 287 -117 104 607 0
+S3 LINE  GP27=BLACK 1000  GP26=BLACK 1000  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3699  GP26 170-3672
+S4 D 288 -35 132 607 0
+S4 D 289 37 161 607 0
+S4 D 290 48 147 607 0
+S4 D 291 56 89 607 0
+S4 D 292 55 33 607 0
+S4 D 293 68 37 607 0
+S4 D 294 117 69 607 0
+S4 D 295 116 68 607 0
+S4 D 296 83 39 607 0
+S4 p=83 r=39 f=6 l=-22 u=902 af=0 h=0 pk=10 hs=0 cl=6 w=0 hd=13 n=8 dxy=71 run=2574 late=1367 ok=1 cal=1
+S4 D 297 71 51 607 0
+S3 LINE  GP27=BLACK  971  GP26=BLACK  975  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3699  GP26 170-3686
+S4 D 298 68 95 607 0
+S4 D 299 -18 119 607 0
+S4 D 300 -133 112 607 0
+S4 D 301 -159 132 607 0
+S4 D 302 -204 160 607 0
+S4 D 303 -288 217 607 0
+S4 D 304 -302 282 607 0
+S4 D 305 -275 250 607 0
+S4 D 306 -251 210 607 0
+S4 p=-251 r=210 f=-20 l=0 u=924 af=0 h=0 pk=10 hs=0 cl=6 w=0 hd=13 n=8 dxy=74 run=2591 late=1314 ok=1 cal=1
+S4 D 307 -217 195 607 0
+S3 LINE  GP27=EDGE   541  GP26=EDGE   474  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3699  GP26 170-3686
+S4 D 308 -180 187 607 0
+S4 D 309 -152 163 607 0
+S4 D 310 -116 154 607 0
+S4 D 311 -6 280 607 0
+S4 D 312 123 274 607 0
+S4 D 313 -101 215 607 0
+S4 D 314 -83 123 607 0
+S4 D 315 -154 83 607 0
+S4 D 316 -206 84 607 0
+S4 p=-206 r=84 f=-44 l=0 u=819 af=0 h=0 pk=10 hs=0 cl=6 w=0 hd=13 n=9 dxy=374 run=2790 late=1486 ok=1 cal=1
+S4 D 317 -164 102 607 0
+S3 LINE  GP27=WHITE   28  GP26=WHITE    6  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 171-3699  GP26 170-3686
+S4 D 318 -3 75 607 0
+S4 D 319 149 -18 607 0
+S4 D 320 261 -66 607 0
+S4 D 321 135 -261 607 0
+S4 D 322 13 -180 607 0
+S4 D 323 -120 -160 607 0
+S4 D 324 -334 -185 607 0
+S4 D 325 -248 -211 607 0
+S4 D 326 -173 -223 607 0
+S4 p=-173 r=-223 f=12 l=-52 u=848 af=-40 h=0 pk=10 hs=0 cl=6 w=0 hd=12 n=8 dxy=180 run=2815 late=1607 ok=1 cal=1
+S4 D 327 -139 -213 607 0
+S3 LINE  GP27=WHITE   31  GP26=WHITE    5  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 179-3695  GP26 174-3686
+S4 D 328 -142 -210 607 0
+S4 D 329 -109 -197 607 0
+S4 D 330 -103 -160 607 0
+S4 D 331 -146 -212 607 0
+S4 D 332 -140 -190 607 0
+S3 TIME barcode decode 1293 us (both paths)
+S4 D 333 -103 -160 607 0
+S4 D 334 -74 -146 607 0
+S4 D 335 -103 -169 607 0
+S4 D 336 -131 -129 607 0
+S4 p=-131 r=-129 f=-24 l=-14 u=842 af=0 h=0 pk=10 hs=0 cl=6 w=0 hd=12 n=8 dxy=211 run=2587 late=1333 ok=1 cal=1
+S4 D 337 -72 -125 607 0
+S3 LINE  GP27=WHITE   31  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 179-3695  GP26 174-3686
+S4 D 338 -58 -103 607 0
+S4 D 339 -98 -96 607 0
+S4 D 340 -69 -92 607 0
+S4 D 341 -56 -91 607 0
+S4 D 342 -72 -106 607 0
+S4 D 343 -61 -99 607 0
+S4 D 344 -53 -103 607 0
+S4 D 345 -60 -109 607 0
+S4 D 346 -59 -101 607 0
+S4 p=-59 r=-101 f=0 l=-24 u=840 af=0 h=0 pk=10 hs=0 cl=6 w=0 hd=12 n=8 dxy=44 run=2587 late=1425 ok=1 cal=1
+S4 D 347 -58 -104 607 0
+S3 LINE  GP27=WHITE   26  GP26=WHITE    5  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 179-3695  GP26 174-3686
+S4 D 348 -58 -97 607 0
+S4 D 349 -60 -98 607 0
+S4 D 350 -62 -99 607 0
+S4 D 351 -63 -89 607 0
+S4 D 352 -61 -92 607 0
+S4 D 353 -60 -92 607 0
+S4 D 354 -59 -102 607 0
+S4 D 355 -58 -112 607 0
+S4 D 356 -58 -99 607 0
+S4 p=-58 r=-99 f=0 l=-22 u=850 af=0 h=0 pk=10 hs=0 cl=6 w=0 hd=12 n=8 dxy=17 run=2785 late=1568 ok=1 cal=1
+S4 D 357 -58 -102 607 0
+S3 LINE  GP27=WHITE   26  GP26=WHITE    0  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 179-3695  GP26 174-3686
+S4 D 358 -58 -102 607 0
+S4 D 359 -58 -102 607 0
+S4 D 360 -58 -105 607 0
+S4 D 361 -58 -106 607 0
+S4 D 362 -58 -88 607 0
+S4 D 363 -58 -91 607 0
+S4 D 364 -58 -90 607 0
+S4 D 365 -60 -93 607 0
+S4 D 366 -59 -90 607 0
+S4 p=-59 r=-90 f=0 l=-25 u=841 af=0 h=0 pk=10 hs=0 cl=6 w=0 hd=12 n=7 dxy=17 run=2789 late=1347 ok=1 cal=1
+S4 D 367 -58 -83 607 0
+S3 LINE  GP27=WHITE   31  GP26=WHITE    5  -> turn STRAIGHT    0 mm/s  DISABLED (LF_ENABLE clear)   cal GP27 179-3695  GP26 174-3686
+S4 D 368 -58 -83 607 0
+S4 D 369 -58 -77 607 0
+S4 D 370 -58 -86 607 0
+---- Closed the serial port COM3 ----
