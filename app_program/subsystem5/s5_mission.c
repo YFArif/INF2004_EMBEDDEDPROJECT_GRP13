@@ -61,7 +61,13 @@
  * and more than CAL_TOL_DEG off, the robot turns by the difference, at
  * most CAL_FIX_TRIES times. It ends where it started, still on the line
  * for Button 1 (Sean's sweep from S3's drive test, b39ab6b; the fixed
- * 45, -90, 45 turns drifted about 1 cm). Nothing moves at power-up.
+ * 45, -90, 45 turns drifted about 1 cm).
+ * As in Sean's drive test, it also calibrates by itself (Anna,
+ * 2026-11-18): once at power-up, as soon as S4's IMU calibration is done
+ * (the robot must stand centred on the line), and when Button 1 is
+ * pressed while S3 is not calibrated (then press Button 1 again). Not in
+ * test images (the controller is not armed there) or with S3 switched
+ * off.
  *
  * @par Without S3 (s5_links_line_is_ready() false)
  * A START is refused while S3 is in use but not calibrated. Switched off
@@ -208,6 +214,8 @@ static bool is_running(void);
 static void step_calibrating(uint32_t events, uint32_t now_ms);
 static void step_cal_sweep(uint32_t events, uint32_t now_ms);
 static int32_t cal_error_deg(int32_t target_deg);
+static void start_cal_sweep(uint32_t now_ms);
+static bool cal_needed(void);
 static s5_links_side_t reacquire_side(void);
 static void step_running(uint32_t events, uint32_t now_ms);
 static void step_route(uint32_t events, uint32_t now_ms);
@@ -314,14 +322,15 @@ s5_mission_command (uint8_t opcode, uint32_t now_ms)
     }
     else if (S5_CMD_START == opcode)
     {
-        if ((S5_CTRL_READY == state) && s5_links_line_is_used()
-            && (!s5_links_line_is_ready()))
+        if ((S5_CTRL_READY == state) && cal_needed())
         {
             // Without calibrated line sensors the robot would drive
             // straight with no line to follow or find (log
-            // 2026-11-04_1701_track: it ended at a wall).
-            s5_event_trace("RUN refused: line sensors not calibrated, "
-                           "press Button 2 on the line:", 0, 0);
+            // 2026-11-04_1701_track: it ended at a wall). So calibrate
+            // first, as Sean's drive test does; the run is not started.
+            s5_event_trace("RUN not started: calibrating first, press "
+                           "Button 1 again after CAL YES:", 0, 0);
+            start_cal_sweep(now_ms);
         }
         else if (S5_CTRL_READY == state)
         {
@@ -377,14 +386,38 @@ s5_mission_calibrate (uint32_t now_ms)
 {
     if (g_b_armed && (S5_CTRL_READY == g_mission.state))
     {
-        s5_links_line_recalibrate();
-        s5_links_motion_release();
-        set_state(S5_CTRL_CALIBRATING);
-        g_mission.cal_start_cdeg = s5_links_odom_heading_cdeg();
-        g_mission.cal_tries      = 0u;
-        g_mission.cal_step       = 1u;
-        start_slow_turn(cal_error_deg(g_cal_target_deg[0]), now_ms);
+        start_cal_sweep(now_ms);
     }
+}
+
+/*!
+ * @brief Start the line-sensor sweep (see "Calibrating S3's line
+ *        sensors"): S3 forgets its levels, then the first turn.
+ *
+ * @param[in] now_ms Current time.
+ */
+static void
+start_cal_sweep (uint32_t now_ms)
+{
+    s5_links_line_recalibrate();
+    s5_links_motion_release();
+    set_state(S5_CTRL_CALIBRATING);
+    g_mission.cal_start_cdeg = s5_links_odom_heading_cdeg();
+    g_mission.cal_tries      = 0u;
+    g_mission.cal_step       = 1u;
+    start_slow_turn(cal_error_deg(g_cal_target_deg[0]), now_ms);
+}
+
+/*!
+ * @brief Tell whether S3's line sensors still need calibrating: S3 is in
+ *        use (not a floor test) and not calibrated yet.
+ *
+ * @return true if a sweep is needed before a run.
+ */
+static bool
+cal_needed (void)
+{
+    return (s5_links_line_is_used() && (!s5_links_line_is_ready()));
 }
 
 /*!
@@ -468,7 +501,17 @@ step_calibrating (uint32_t events, uint32_t now_ms)
                            (int32_t) CAL_TIMEOUT_MS, 0);
         }
 
-        enter_ready();
+        if (g_b_armed && cal_needed())
+        {
+            // As Sean's drive test: calibrate by itself at power-up.
+            s5_event_trace("CAL auto: robot centred on the line, it turns "
+                           "left and right by itself 0 0", 0, 0);
+            start_cal_sweep(now_ms);
+        }
+        else
+        {
+            enter_ready();
+        }
     }
     else
     {
