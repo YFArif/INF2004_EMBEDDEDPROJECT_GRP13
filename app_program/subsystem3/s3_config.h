@@ -59,7 +59,7 @@
  *  Line following
  * --------------------------------------------------------------------- */
 #define S3_LINE_PERIOD_MS       (10u)   /* Cyclic handler period.        */
-#define S3_STEER_MAX_MMS        (200)   /* Default steer_sp at full lock */
+#define S3_STEER_MAX_MMS        (50)    /* Default steer_sp at full lock */
                                         /* (s3_set_steer_max() changes   */
                                         /* it; keep it near the base     */
                                         /* speed: S2 applies 50 %, so    */

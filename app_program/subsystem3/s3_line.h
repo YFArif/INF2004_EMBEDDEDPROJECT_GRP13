@@ -86,8 +86,12 @@ int32_t  s3_ir_cal_norm(s3_ir_cal_t const * p_cal, uint16_t value);
 #define S3_LN_WHITE         (250)   /* n < 250 = white.                   */
 #define S3_LN_MIN_RANGE     (S3_IR_CAL_MIN_RANGE)
 #define S3_LN_LOST_MM       (40u)   /* Both white this far = LOST.        */
-#define S3_LN_KP_X100       (60)    /* Default gains: steer =             */
-#define S3_LN_KD_X100       (0)     /*   (Kp * e + Kd * de) / 100.        */
+#define S3_LN_KP_X100       (25)    /* Default gains: steer =             */
+#define S3_LN_KD_X100       (25)    /*   (Kp * e + Kd * de) / 100.        */
+                                    /* 25 / 25 / boost 250: best of 5 on  */
+                                    /* the car, 12 Nov (TEST_LOG S3-U02), */
+                                    /* same as S5 sets; was 60 / 0 / 0.   */
+                                    /* Older note, Kp 60 era:             */
                                     /* v29 host sweep (sim_track.c sweep, */
                                     /* 40 mm/s, steer_max 40, lag 80/120  */
                                     /* ms, spot 5/8 mm, noise, 8-bit):    */
@@ -100,7 +104,7 @@ int32_t  s3_ir_cal_norm(s3_ir_cal_t const * p_cal, uint16_t value);
                                     /* UNVERIFIED on the car.             */
 #define S3_LN_KP_MAX_X100   (2000)
 #define S3_LN_KD_MAX_X100   (4000)
-#define S3_LN_BOOST_X100    (0)     /* Curve boost: extra steer per       */
+#define S3_LN_BOOST_X100    (250)   /* Curve boost: extra steer per       */
                                     /* permille of e beyond BOOST_FROM.   */
                                     /* 0 = off. Settable at run time.     */
 #define S3_LN_BOOST_MAX_X100 (600)
