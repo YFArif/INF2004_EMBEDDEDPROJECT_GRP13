@@ -67,6 +67,11 @@ In `app_program/subsystem1/mqtt_config.h` (placeholders shown;
 #define MQTT_LINK_CFG_PASSWORD          ""
 ```
 
+**The topic prefix must be exactly `"robot"`.** The example file sets
+`MQTT_LINK_CFG_TOPIC_PREFIX` to `"robocar/car1"`, but the launcher and
+the dashboard listen on `"robot"`. With any other prefix the car
+connects and the page stays empty.
+
 To find your laptop's address, join the hotspot, then run the launcher
 with `--show-address`. Among its other lines it prints "this laptop's
 address: ..."; copy that into `MQTT_LINK_CFG_BROKER_HOST` and press
@@ -96,7 +101,9 @@ python3 -I -B testing/subsystem1/s1_launch.py --show-address
 
 ## 4. Every session
 
-1. Turn the phone hotspot on and join it with the laptop.
+1. Turn your own phone hotspot on and join it with the laptop before
+   you start. School WiFi (WPA2-Enterprise) is not usable for the car,
+   and the broker has no login.
 2. Start the broker and the dashboard with one command:
 
    ```bash
@@ -108,6 +115,25 @@ python3 -I -B testing/subsystem1/s1_launch.py --show-address
 3. The page opens on http://127.0.0.1:8765/. Switch the car on and wait
    for the green robot light, then carry on with `docs/S1_handover.md`.
 4. Ctrl-C in the launcher's window stops the broker and the dashboard.
+   On Windows the window then asks "Terminate batch job (Y/N)?": answer
+   Y. Lines about the broker or `mosquitto_sub` exiting (an exit code such
+   as 3221225786) may appear around this prompt; they are expected.
+
+With the default config the broker log in the work folder
+(`broker-<time>.log` in `~/s1-broker`) stays empty, because the config
+has no `log_type`. To watch the broker's traffic, run this in a second
+window:
+
+```bash
+mosquitto_sub -h 127.0.0.1 -t "#" -v
+```
+
+On Windows `mosquitto_sub` is in `C:\Program Files\mosquitto` and is not
+on the PATH. In PowerShell, call it by its full path with `&`:
+
+```powershell
+& "C:\Program Files\mosquitto\mosquitto_sub.exe" -h 127.0.0.1 -t "#" -v
+```
 
 If the launcher says port 1883 is already in use, another broker is
 running: on Windows it is usually the service (section 1). No car to
