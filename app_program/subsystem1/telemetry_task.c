@@ -95,7 +95,8 @@ typedef uint8_t telemetry_task_check_map_t[((MSG_FAULT_STALL == S5_FAULT_STALL)
     && (MSG_JUNC_UTURN == S3_JUNC_UTURN)
     && (MSG_BC_LETTER_NONE == S3_C39_IDX_NONE)
     && (S1_TELEM_LINE_UNCAL == (uint32_t)S3_LINE_UNCAL)
-    && (S1_TELEM_CLASS_IMPACT == (uint32_t)S4_CLASS_IMPACT)) ? 1 : -1];
+    && (S1_TELEM_CLASS_LIFTED == (uint32_t)S4_CLASS_LIFTED)
+    && (S1_TELEM_CLASS_OVERTURNED == (uint32_t)S4_CLASS_OVERTURNED)) ? 1 : -1];
 
 #define STACK_WORDS                 (TELEMETRY_TASK_STACK_BYTES / 8U)
 #define STACK_FILL                  (0xDEADBEEFDEADBEEFULL)

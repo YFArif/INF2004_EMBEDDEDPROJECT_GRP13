@@ -333,6 +333,8 @@ const LINE_WORDS = {
   JUNCTION: "At junction", LOST: "Lost", DISABLED: "Off",
   SEARCH: "Searching", UNCAL: "Not ready"
 };
+const STOP_WORDS = {LIFTED: "Lifted: run ended",
+                    OVERTURNED: "Overturned: fault, reset needed"};
 const HUMP_WORDS = {flat: "None", climbing: "Climbing",
                     descending: "Descending"};
 
@@ -376,9 +378,12 @@ function cardsTelemetry(t) {
        : (t.b_cal_done ? "Calibrated" : "Not calibrated"),
        "imu_ok " + (t.b_imu_ok ? 1 : 0) + ", cal_done "
        + (t.b_cal_done ? 1 : 0), !t.b_imu_ok);
-  // Class 6 stays in the frames for as long as the stop is latched (until
-  // the E-stop clears), so the banner follows the class, with no timer.
-  el("view-impact").hidden = t.class_name !== "LIFTED_OVERTURNED";
+  // Class 6 (LIFTED) or 7 (OVERTURNED) stays in the frames for as long as
+  // the stop is latched (until the E-stop clears), so the banner follows
+  // the class, with no timer, and names which of the two it is.
+  const stopWord = STOP_WORDS[t.class_name];
+  el("view-impact").hidden = !stopWord;
+  if (stopWord) { text("view-impact-text", stopWord); }
   const ctrl = CTRL_WORDS[t.ctrl_name] || String(t.ctrl_name);
   text("chip-ctrl-text", ctrl);
   el("chip-ctrl").title = "ctrl_state " + t.ctrl_name;
@@ -435,6 +440,7 @@ const PANELS = [["p-s2", ["live", "tel"], "age-s2"],
                 ["c-line", ["live"], "age-line"],
                 ["c-obs", ["tel"], "age-obs"]];
 let impactAt = null;
+let lastStop = "";      // "LIFTED" or "OVERTURNED", the last stop seen.
 let imu = [];
 let liveSeen = false;
 const msgLost = {tel: 0, live: 0};
@@ -470,7 +476,7 @@ function paintAges() {
   });
   const hot = impactAt !== null && (now - impactAt) / 1000 < IMPACT_HOLD_S;
   el("s4-impact").className = hot ? "impact hot" : "impact";
-  text("s4-impact", hot ? "LIFTED / OVERTURNED" : "OK");
+  text("s4-impact", hot ? (lastStop || "LIFTED / OVERTURNED") : "OK");
   paintRates(now);
 }
 setInterval(paintAges, 200);
@@ -504,7 +510,10 @@ function setTelemetry(t, ageMs) {
   el("s2-stall").hidden = !t.faults.includes("stall");
   el("s4-impacts").textContent = "lift/overturn stops: " + t.impact_count
     + (t.impact_at ? " (last at " + t.impact_at.slice(11, 19) + ")" : "");
-  if (t.b_impact) { impactAt = performance.now() - (ageMs || 0); }
+  if (t.b_impact) {
+    impactAt = performance.now() - (ageMs || 0);
+    lastStop = t.class_name;
+  }
   text("s4-angles", num(t.pitch_deg, "°", 1) + " / "
        + num(t.roll_deg, "°", 1));
   text("s4-turn", num(t.turn_dps, "deg/s"));

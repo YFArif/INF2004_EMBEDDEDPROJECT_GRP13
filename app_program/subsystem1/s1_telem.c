@@ -340,7 +340,7 @@ s1_telem_wifi_update (const s1_telem_wifi_status_t * p_status,
  * state, wheel speeds, counts and distance; S3 the line state and the last
  * barcode's letter and direction (the barcode command is in the live
  * message, so bc_cmd is 0); S4 the terrain fields, with motion_class
- * forced to IMPACT while the impact is latched; S5 the controller state,
+ * LIFTED or OVERTURNED while S4's stop is latched; S5 the controller state,
  * the fault bits, the last ping (closest_mm, angle_idx) and the last
  * profile (width, clearances). Anything a subsystem cannot give is 0.
  *
@@ -394,8 +394,13 @@ s1_telem_fill_frame (const s1_telem_src_t * p_src, uint8_t seq,
         p_tel->hump_state   = p_src->hump_state;
         p_tel->peak_mm      = p_src->peak_mm;
         p_tel->hump_count   = p_src->hump_count;
-        p_tel->motion_class = p_src->b_impact ? S1_TELEM_CLASS_IMPACT
-                                              : p_src->motion_class;
+        p_tel->motion_class = p_src->motion_class;
+        if (p_src->b_impact
+            && (S1_TELEM_CLASS_LIFTED != p_src->motion_class)
+            && (S1_TELEM_CLASS_OVERTURNED != p_src->motion_class))
+        {
+            p_tel->motion_class = S1_TELEM_CLASS_LIFTED;
+        }
         p_tel->turn_dps     = p_src->turn_rate_dps;
         p_tel->b_imu_ok     = p_src->b_imu_ok;
         p_tel->b_cal_done   = p_src->b_cal_done;

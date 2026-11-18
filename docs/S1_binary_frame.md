@@ -117,7 +117,7 @@ one-to-one copy of it.
 | 16 | hump_state | S4 | 0 to 3 | 2 | 122 | guess | Week 6 hump states: FLAT, CLIMBING, DESCENDING, REPORT. |
 | 17 | peak_mm | S4 | 0 to 255 mm | 8 | 124 | from Version B | Run peak hump height. Clamped. |
 | 18 | hump_count | S4 | 0 to 15, saturates | 4 | 132 | guess | Number of humps on the course not given in the brief. |
-| 19 | motion_class | S4 | 0 to 6 used, 0 to 7 | 3 | 136 | guess | 7 classes in FR19: STATIONARY, MOVING, ACCELERATING, TURNING, CLIMBING_HUMP, DESCENDING_HUMP, LIFTED_OVERTURNED (shown as IMPACT before 2026-11-12). |
+| 19 | motion_class | S4 | 0 to 7, all used | 3 | 136 | guess | 8 classes: STATIONARY, MOVING, ACCELERATING, TURNING, CLIMBING_HUMP, DESCENDING_HUMP, LIFTED (6), OVERTURNED (7). 6 was LIFTED_OVERTURNED from 2026-11-12 and IMPACT before that; split on 2026-11-18. |
 | 20 | turn_rate | S4 | -512 to 511 deg/s -> 0 to 1023 | 10 | 139 | from Version B | Width from Version B. Unit 1 deg/s, as FR20 states (IF-08's name `turn_rate_cdps` disagrees; 10 bits in cdeg/s would only reach 5 deg/s, and an in-place turn is about 200 deg/s). Derived from the wheel difference, which this frame already carries; it may be dropped (section 7). |
 | 21 | imu_ok | S4 | 0 or 1 | 1 | 149 | guess | IF-08 flag. |
 | 22 | cal_done | S4 | 0 or 1 | 1 | 150 | guess | IF-08 flag. |
@@ -255,7 +255,7 @@ S1-U14 tests them on the host. The rules:
 | fault_mask | S5's `flg_fault` masked with 0x1F; bits copied as S5 sets them (3.1) |
 | line_state, bc_letter, bc_dir | From S3. If S3 cannot be read: line_state 5 (UNCAL), bc_letter 63 (none), bc_dir 0 |
 | bc_cmd | Always 0 in this message; the barcode command is in LIVE |
-| motion_class | S4's class, but 6 (IMPACT) for as long as the impact is latched (it stays latched until the E-stop clears) |
+| motion_class | S4's class. While S4's stop is latched (until the E-stop clears) it is 6 (LIFTED) or 7 (OVERTURNED) as S4 reports it, or 6 if S4 sent any other class |
 | closest_mm, angle_idx | Last ping's range if the ping had an echo, else 0; angle_idx = servo degrees x 2 / 15 (7.5 degree steps, 0 to 24; the servo angle is limited to 0 to 180 first) |
 | width, clear_l, clear_r | Last profile if a scan has been done, else 0 |
 

@@ -549,9 +549,10 @@ function start() {
     }
     state.width = msg.width_mm || 0;
     estimate.onTelemetry(msg, entry.at);
-    // Class 6 (LIFTED_OVERTURNED) stays for as long as the stop is
+    // Class 6 (LIFTED) or 7 (OVERTURNED) stays for as long as the stop is
     // latched. One short shake marks the moment it appears.
-    const impact = msg.class_name === "LIFTED_OVERTURNED";
+    const impact = msg.class_name === "LIFTED"
+      || msg.class_name === "OVERTURNED";
     if (impact && !state.b_impact && !reduceMotion.matches) {
       state.shakeAt = performance.now();
     }
@@ -727,7 +728,9 @@ function start() {
                  + " degrees.");
       parts.push(tel.closest_mm > 0 ? "Obstacle at " + tel.closest_mm
                  + " millimetres." : "No obstacle echo.");
-      if (state.b_impact) { parts.push("Lifted or overturned."); }
+      if (state.b_impact) {
+        parts.push(tel.class_name === "OVERTURNED" ? "Overturned." : "Lifted.");
+      }
     }
     if (live) {
       parts.push("Heading " + Math.abs(live.heading_deg) + " degrees "

@@ -943,8 +943,23 @@ test_fill_frame (void)
     src          = make_src();
     src.b_impact = true;
     s1_telem_fill_frame(&src, 0U, &tel);
-    check(S1_TELEM_CLASS_IMPACT == tel.motion_class,
-          "frame: latched impact forces class IMPACT", tel.motion_class);
+    check(S1_TELEM_CLASS_LIFTED == tel.motion_class,
+          "frame: latched stop with an ordinary class sends LIFTED",
+          tel.motion_class);
+
+    src              = make_src();
+    src.b_impact     = true;
+    src.motion_class = S1_TELEM_CLASS_OVERTURNED;
+    s1_telem_fill_frame(&src, 0U, &tel);
+    check(S1_TELEM_CLASS_OVERTURNED == tel.motion_class,
+          "frame: latched stop keeps S4's OVERTURNED", tel.motion_class);
+
+    src              = make_src();
+    src.b_impact     = true;
+    src.motion_class = S1_TELEM_CLASS_LIFTED;
+    s1_telem_fill_frame(&src, 0U, &tel);
+    check(S1_TELEM_CLASS_LIFTED == tel.motion_class,
+          "frame: latched stop keeps S4's LIFTED", tel.motion_class);
 
     src                 = make_src();
     src.b_range_valid   = false;

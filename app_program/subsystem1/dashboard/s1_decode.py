@@ -183,8 +183,9 @@ JUNC_NAMES = {0: "straight", 1: "left", 2: "right", 3: "u-turn"}
 HUMP_NAMES = {0: "flat", 1: "climbing", 2: "descending"}
 CLASS_NAMES = {0: "stationary", 1: "moving", 2: "accelerating",
                3: "turning", 4: "climbing hump", 5: "descending hump",
-               6: "LIFTED_OVERTURNED"}
-CLASS_IMPACT = 6
+               6: "LIFTED", 7: "OVERTURNED"}
+CLASS_LIFTED = 6
+CLASS_OVERTURNED = 7
 # S5: subsystem5_ctrl_state_t.
 CTRL_NAMES = {0: "INIT", 1: "CALIBRATING", 2: "READY",
               3: "LINE_FOLLOWING", 4: "APPROACH_JUNCTION",
@@ -310,7 +311,8 @@ def describe(msg):
         shown["bc_char"] = letter_of(msg["bc_letter"])
         shown["hump_name"] = name_of(HUMP_NAMES, msg["hump_state"])
         shown["class_name"] = name_of(CLASS_NAMES, msg["motion_class"])
-        shown["b_impact"] = msg["motion_class"] == CLASS_IMPACT
+        shown["b_impact"] = msg["motion_class"] in (CLASS_LIFTED,
+                                                    CLASS_OVERTURNED)
         shown["pitch_deg"] = msg["pitch_hdeg"] / 2.0
         shown["roll_deg"] = msg["roll_hdeg"] / 2.0
         shown["speed_mms"] = (msg["speed_l_mms"] + msg["speed_r_mms"]) / 2.0

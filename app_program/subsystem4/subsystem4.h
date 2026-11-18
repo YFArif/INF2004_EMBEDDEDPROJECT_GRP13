@@ -75,7 +75,8 @@ typedef enum
     S4_CLASS_TURNING,
     S4_CLASS_CLIMBING_HUMP,
     S4_CLASS_DESCENDING_HUMP,
-    S4_CLASS_IMPACT             /* Stopped: lifted / overturned.  */
+    S4_CLASS_LIFTED,        /* Stopped: picked up (EV_LIFTED, run ends). */
+    S4_CLASS_OVERTURNED     /* Stopped: tipped over (EV_OVERTURNED).     */
 } subsystem4_class_t;
 
 /** Terrain, unpacked for the reader. Resolution is what is stored. */
@@ -90,7 +91,8 @@ typedef struct
     uint8_t hump_count;     /* Humps passed, 0 ... 7 (saturates).        */
     bool    b_imu_ok;       /* false: IMU_DEGRADED, the rest is stale.   */
     bool    b_cal_done;     /* Offsets measured (S5 CALIBRATING).        */
-    bool    b_impact;       /* Lift stop latched until MF_ESTOP clears.  */
+    bool    b_impact;       /* LIFTED or OVERTURNED latched until        */
+                            /* MF_ESTOP clears; motion_class says which. */
 } subsystem4_terrain_t;
 
 /** imu_task's health and timing, for the tests and telemetry. */

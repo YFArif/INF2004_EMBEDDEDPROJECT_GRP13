@@ -28,7 +28,7 @@
 #define MASK_3              (0x7u)
 
 #define STATE_MAX           (2)
-#define CLASS_MAX           (6)
+#define CLASS_MAX           (7)     /* S4_CLASS_OVERTURNED.          */
 
 static uint32_t to_offset(int32_t value, int32_t lo, int32_t hi);
 

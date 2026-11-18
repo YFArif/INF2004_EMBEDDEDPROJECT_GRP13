@@ -3219,7 +3219,7 @@ def check_a14(ctx):
     _, text = http_call(ctx.port, "GET", "/api/state")
     after = json.loads(text)["telemetry"]["impact_count"]
     b_impact = (hit is not None) and (after == count + 1) and (
-        hit[2]["class_name"] == "LIFTED_OVERTURNED")
+        hit[2]["class_name"] == "LIFTED")
     mark = ctx.stream.mark()
     for action in ("s3_barcode", "s3_reject", "s3_junction", "s3_lost"):
         post_json(ctx, "/api/sim", {"action": action})

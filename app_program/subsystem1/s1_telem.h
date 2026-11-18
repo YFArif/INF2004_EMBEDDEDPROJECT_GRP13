@@ -91,13 +91,16 @@
 #define S1_TELEM_LIVE_QUEUED_MAX    1U
 #define S1_TELEM_HB_QUEUED_MAX      3U
 
-/* S3's UNCAL line state and S4's IMPACT motion class, the values sent when
- * S3 cannot be read and while an impact is latched. s1_telem.c does not
+/* S3's UNCAL line state and S4's LIFTED and OVERTURNED motion classes. UNCAL
+ * is sent when S3 cannot be read; while S4's stop is latched the class is
+ * LIFTED or OVERTURNED, as S4 reports it (LIFTED if S4 sent any other
+ * class, so a latched stop always shows). s1_telem.c does not
  * include the subsystem headers (so it builds on the host); the values are
  * checked at compile time by telemetry_task_check_map_t in telemetry_task.c.
  */
 #define S1_TELEM_LINE_UNCAL         5U
-#define S1_TELEM_CLASS_IMPACT       6U
+#define S1_TELEM_CLASS_LIFTED       6U
+#define S1_TELEM_CLASS_OVERTURNED   7U
 
 /** Posts one decoded command to S5. Returns 0 when it was queued, or a
  *  negative kernel error code when it was not.

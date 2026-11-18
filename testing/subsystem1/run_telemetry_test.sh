@@ -203,8 +203,8 @@ mutate M8 run s1_telem.c \
     's/p_live->cmd_speed_mms = (p_src->target_l_mms + p_src->target_r_mms)/p_live->cmd_speed_mms = (p_src->target_l_mms - p_src->target_r_mms)/' \
     "commanded speed uses the difference of the set-points"
 mutate M9 run s1_telem.c \
-    's/p_tel->motion_class = p_src->b_impact ? S1_TELEM_CLASS_IMPACT/p_tel->motion_class = p_src->b_impact ? p_src->motion_class/' \
-    "latched impact not shown as class IMPACT"
+    's/p_tel->motion_class = S1_TELEM_CLASS_LIFTED;/p_tel->motion_class = p_src->motion_class;/' \
+    "latched stop with an ordinary class not shown as LIFTED"
 mutate M10 run s1_telem.c \
     's/p_live->line_state    = S1_TELEM_LINE_UNCAL;/p_live->line_state    = 0U;/' \
     "line state FOLLOW when S3 is unreadable"

@@ -371,9 +371,10 @@ class Describe(unittest.TestCase):
         self.assertEqual(shown["hump_name"], "descending")
         self.assertEqual(shown["class_name"], "climbing hump")
         self.assertFalse(shown["b_impact"])
-        # TEL-3 is all ones: class 7 is not in the table and stays a number.
+        # TEL-3 is all ones: class 7 is OVERTURNED (S4, 2026-11-18).
         shown = dec.describe(dec.decode(vector("TEL-3")[2]))
-        self.assertEqual(shown["class_name"], "7")
+        self.assertEqual(shown["class_name"], "OVERTURNED")
+        self.assertTrue(shown["b_impact"])
         self.assertEqual(shown["bc_char"], "")
 
     def test_live(self):

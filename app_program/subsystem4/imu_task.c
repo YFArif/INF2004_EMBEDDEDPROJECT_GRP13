@@ -163,7 +163,9 @@ typedef struct
     int32_t  lp_fwd;
     int32_t  lp_left;
     bool     b_lp_ready;
-    bool     b_impact;
+    bool     b_impact;              /* Motors stopped by lift/overturn. */
+    uint8_t  stop_cls;              /* S4_CLASS_LIFTED / _OVERTURNED once*/
+                                    /* known; 0 while the tilt wait runs.*/
     int32_t  dxy2_max;              /* Largest |d|^2 since the last log.  */
     uint32_t impact_us;
     uint32_t latency_wait;
@@ -700,6 +702,7 @@ imu_lift_stop (void)
     subsystem2_estop_set();
 
     g_imu.b_impact     = true;      // Latched until MF_ESTOP clears.
+    g_imu.stop_cls     = 0u;        // Kind not known yet (tilt wait).
     g_imu.impact_us    = now_us();
     g_imu.latency_wait = LATENCY_CYCLES;
     g_imu.status.impacts++;
@@ -711,6 +714,11 @@ imu_lift_stop (void)
 static void
 imu_lift_signal (uint32_t ev)
 {
+    // Shown on the dashboard from now on (motion class), until MF_ESTOP
+    // clears. Set before S5 is told, so telemetry never lags the event.
+    // NOTE: The casts are safe: both classes are 6 or 7.
+    g_imu.stop_cls = (EV_LIFTED == ev) ? (uint8_t) S4_CLASS_LIFTED
+                                       : (uint8_t) S4_CLASS_OVERTURNED;
     subsystem5_mission_signal(ev);
 
     tm_printf((UB *) "S4 %s: up=%d mg (rest %d) p=%d r=%d cdeg"
@@ -1146,7 +1154,8 @@ imu_side_hump (subsystem2_odom_t const * p_odom)
 
 /*!
  * @brief Motion class; a new class must hold for 5 cycles (100 ms)
- *        before it is reported, except IMPACT (lift stop), reported at once.
+ *        before it is reported, except LIFTED / OVERTURNED, reported at
+ *        once.
  *
  * @param[in] p_odom This cycle's odometry.
  */
@@ -1158,12 +1167,14 @@ imu_class (subsystem2_odom_t const * p_odom)
     if (g_imu.b_impact && !subsystem2_estop_is_set())
     {
         g_imu.b_impact = false;
+        g_imu.stop_cls = 0u;
         tm_printf((UB *) "S4 LIFT/OVERTURN STOP cleared (MF_ESTOP cleared)\n");
     }
 
-    if (g_imu.b_impact)
+    if (g_imu.b_impact && (0u != g_imu.stop_cls))
     {
-        cand = S4_CLASS_IMPACT;
+        // NOTE: The cast is safe: stop_cls holds LIFTED or OVERTURNED.
+        cand = (subsystem4_class_t) g_imu.stop_cls;
     }
     else if (S4_HUMP_CLIMBING == g_imu.hump)
     {
@@ -1201,7 +1212,8 @@ imu_class (subsystem2_odom_t const * p_odom)
         g_imu.cls_count   = 1u;
     }
 
-    if ((cand != g_imu.cls) && ((S4_CLASS_IMPACT == cand)
+    if ((cand != g_imu.cls) && ((S4_CLASS_LIFTED == cand)
+                                || (S4_CLASS_OVERTURNED == cand)
                                 || (g_imu.cls_count >= CLASS_HOLD_CYCLES)))
     {
         g_imu.cls = cand;
@@ -1283,7 +1295,10 @@ imu_publish (void)
                                               S4_HUMP_COUNT_MAX);
     t.b_imu_ok      = g_imu.b_imu_ok;
     t.b_cal_done    = g_imu.b_cal_done;
-    t.b_impact      = g_imu.b_impact;
+    // Reported once the kind is known: during the 500 ms tilt wait the
+    // motors are already stopped (MF_ESTOP) but LIFTED vs OVERTURNED is
+    // not decided, so the dashboard shows neither yet.
+    t.b_impact      = g_imu.b_impact && (0u != g_imu.stop_cls);
 
     subsystem4_terrain_put(&t);
 }
@@ -1396,7 +1411,7 @@ class_name (subsystem4_class_t cls)
     static char const * const names[] =
     {
         "STATIONARY", "MOVING", "ACCELERATING", "TURNING",
-        "CLIMBING_HUMP", "DESCENDING_HUMP", "LIFTED_OVERTURNED"
+        "CLIMBING_HUMP", "DESCENDING_HUMP", "LIFTED", "OVERTURNED"
     };
     uint32_t idx = (uint32_t) cls;
 
