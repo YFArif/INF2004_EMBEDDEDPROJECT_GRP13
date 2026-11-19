@@ -115,6 +115,7 @@ static uint32_t     g_group_failed;
 static const char * gp_group = "";
 
 static void check(bool b_ok, const char * p_what, uint32_t detail);
+static uint32_t state_detail(s1_wifi_rejoin_state_t state);
 static void group_begin(const char * p_name);
 static void group_end(void);
 static void start(harness_t * p_harness, uint32_t start_msec,
@@ -163,9 +164,6 @@ static void test_names(void);
 
 /*!
  * @brief Count one check; print it if it failed.
- *
- * NOTE: Callers pass a state as the detail with a (uint32_t) cast. It is
- * safe: every enumerator is small and not negative.
  */
 static void
 check (bool b_ok, const char * p_what, uint32_t detail)
@@ -179,6 +177,18 @@ check (bool b_ok, const char * p_what, uint32_t detail)
         g_group_failed++;
         printf("FAIL %s: %s (got %" PRIu32 ")\n", gp_group, p_what, detail);
     }
+}
+
+/*!
+ * @brief A state as the detail number check() prints.
+ */
+static uint32_t
+state_detail (s1_wifi_rejoin_state_t state)
+{
+    /* The cast is safe: every state is small and not negative, and so is
+     * the invalid value 99 that one group stores on purpose.
+     */
+    return ((uint32_t)state);
 }
 
 /*!
@@ -428,7 +438,8 @@ test_boot_join_ok (void)
     group_begin("boot join succeeds");
     start(p_harness, START_MSEC, false);
     check(S1_WIFI_REJOIN_JOINING == p_harness->rejoin.state,
-          "the policy starts in JOINING", (uint32_t)p_harness->rejoin.state);
+          "the policy starts in JOINING",
+          state_detail(p_harness->rejoin.state));
     drive(p_harness, STATUS_JOIN, 3300U);
     drive(p_harness, STATUS_UP, 20000U);
     expect_change(p_harness, 0U, S1_WIFI_REJOIN_JOINING, S1_WIFI_REJOIN_UP,
@@ -547,7 +558,7 @@ test_drop_past_grace (void)
     drive(p_harness, STATUS_JOIN, 3500U);
     drive(p_harness, STATUS_UP, PASS_MSEC);
     check(S1_WIFI_REJOIN_UP == p_harness->rejoin.state, "UP again",
-          (uint32_t)p_harness->rejoin.state);
+          state_detail(p_harness->rejoin.state));
     check(2U == p_harness->action_count, "two joins, no leave",
           p_harness->action_count);
     group_end();
@@ -925,7 +936,7 @@ test_leave_left (void)
     drive(p_harness, STATUS_JOIN, 3500U);
     drive(p_harness, STATUS_UP, PASS_MSEC);
     check(S1_WIFI_REJOIN_UP == p_harness->rejoin.state, "UP after the join",
-          (uint32_t)p_harness->rejoin.state);
+          state_detail(p_harness->rejoin.state));
 
     /* Boot join stuck, leave setting 1: leave at 12 s, join at 13 s. */
     start(p_harness, START_MSEC, true);
@@ -996,7 +1007,7 @@ test_leave_up_is_not_up (void)
     drive(p_harness, STATUS_JOIN, 4000U + PASS_MSEC);
     drive(p_harness, STATUS_UP, 1000U - PASS_MSEC);
     check(S1_WIFI_REJOIN_LEAVING == p_harness->rejoin.state,
-          "still LEAVING with status 3", (uint32_t)p_harness->rejoin.state);
+          "still LEAVING with status 3", state_detail(p_harness->rejoin.state));
     check((first + 3U) == p_harness->change_count, "no change on status 3",
           p_harness->change_count);
     drive(p_harness, STATUS_UP, 2U * PASS_MSEC);
@@ -1061,9 +1072,9 @@ test_refused (void)
     start(p_harness, START_MSEC, false);
     go_up_stable(p_harness);
     s1_wifi_rejoin_refused(&p_harness->rejoin, p_harness->now_msec, &change);
-    check(!change.b_changed, "in UP: no change", (uint32_t)change.to);
+    check(!change.b_changed, "in UP: no change", state_detail(change.to));
     check(S1_WIFI_REJOIN_UP == p_harness->rejoin.state, "still UP",
-          (uint32_t)p_harness->rejoin.state);
+          state_detail(p_harness->rejoin.state));
     check(0U == p_harness->rejoin.attempt, "attempt still 0",
           p_harness->rejoin.attempt);
 
@@ -1072,7 +1083,7 @@ test_refused (void)
     s1_wifi_rejoin_refused(&p_harness->rejoin, START_MSEC, &change);
     check(change.b_changed && (S1_WIFI_REJOIN_BACKOFF == change.to)
           && (1U == change.attempt) && (2000U == change.wait_msec),
-          "boot: BACKOFF, attempt 1, wait 2 s", (uint32_t)change.to);
+          "boot: BACKOFF, attempt 1, wait 2 s", state_detail(change.to));
     group_end();
 }
 
@@ -1138,13 +1149,14 @@ test_null_and_names (void)
           "step with no change record: nothing", 0U);
     check((before.state == p_harness->rejoin.state)
           && (before.since_msec == p_harness->rejoin.since_msec),
-          "and the context is untouched", (uint32_t)p_harness->rejoin.state);
+          "and the context is untouched",
+          state_detail(p_harness->rejoin.state));
     s1_wifi_rejoin_init(NULL, START_MSEC, false);
     s1_wifi_rejoin_refused(NULL, START_MSEC, &change);
     s1_wifi_rejoin_refused(&p_harness->rejoin, START_MSEC, NULL);
     check(S1_WIFI_REJOIN_JOINING == p_harness->rejoin.state,
           "refused with no change record: nothing",
-          (uint32_t)p_harness->rejoin.state);
+          state_detail(p_harness->rejoin.state));
 
     /* An invalid stored state (corrupted memory) starts the ladder. The
      * cast makes a value no enumerator has, on purpose.
