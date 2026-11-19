@@ -18,6 +18,14 @@
 #include "wifi_secrets.h"
 #if TM_MQTT
 #include "mqtt_utk.h"
+/* sys_now(), the rejoin policy's clock. lwip/timeouts.h includes lwip/sys.h
+ * only when NO_SYS is 0, and this port is NO_SYS=1. */
+#include "lwip/sys.h"
+/* S1's WiFi rejoin policy (FR17). app_program/ is not on the include path
+ * of lib/ objects (INCPATH in build_make/makefile), so the header is named
+ * relative to this file, as mqtt_utk.c does for mqtt_link.h.
+ */
+#include "../../../../app_program/subsystem1/s1_wifi_rejoin.h"
 #endif
 #endif
 
@@ -35,7 +43,9 @@
 /* An association can fail transiently -- a busy channel, a weak beacon, an AP
  * that drops the handshake under load. Without a retry the radio would sit in
  * CYW43_LINK_FAIL until the next power cycle, so re-issue the join on a fixed
- * backoff for as long as the link is down. */
+ * backoff for as long as the link is down.
+ * NOTE: MQTT=1 builds compile this retry out and use S1's rejoin policy
+ * instead (app_program/subsystem1/s1_wifi_rejoin.h, FR17). */
 #define WIFI_REJOIN_DELAY_US (5 * 1000 * 1000ull)
 
 /* Overridable from the makefile if an AP needs something else. MIXED accepts
@@ -186,6 +196,159 @@ static int32_t wifi_try_join(void)
 }
 #endif
 
+#if TM_NET_LWIP && TM_MQTT
+/* S1's rejoin policy names two link status values (s1_wifi_rejoin.h); they
+ * must be the driver's.
+ */
+typedef uint8_t s1_wifi_check_link_t[
+    ((S1_WIFI_REJOIN_LINK_DOWN == CYW43_LINK_DOWN)
+     && (S1_WIFI_REJOIN_LINK_UP == CYW43_LINK_UP)) ? 1 : -1];
+
+/* One console line per change of the policy's state. tm_sprintf() does not
+ * limit its output, so the buffer is sized for the widest line with room
+ * to spare. The widest line, in characters:
+ *   "S1: wifi rejoin " 16 + state 7 + " -> " 4 + state 7 + " attempt=" 9
+ *   + "4294967295" 10 + " status=" 8 + "-2147483648" 11 + " wait=" 6
+ *   + "4294967295" 10 + " ms (" 5 + "join request refused" 20 + ")" 1
+ *   + a newline 1 = 115,
+ * plus the NUL tm_sprintf() writes = 116 bytes. 128 leaves 12 spare. The
+ * lines of wifi_rejoin_say() are "S1: wifi rejoin " 16 + its text + 11
+ * digits + a newline 1 + the NUL 1, so its text may be up to 99 bytes;
+ * the longest is 38.
+ */
+#define S1_REJOIN_LINE_BYTES 128U
+
+/*!
+ * @brief Print one console line for a change of the rejoin policy's state.
+ *
+ * @param[in] p_change What the policy reported; nothing is printed if
+ *                     b_changed is false.
+ */
+static void
+wifi_rejoin_report (const s1_wifi_rejoin_change_t * p_change)
+{
+    UB line[S1_REJOIN_LINE_BYTES];
+
+    if (p_change->b_changed)
+    {
+        /* The casts are safe: the format and the names are ASCII; an
+         * unsigned int and an int are 32 bits on this port, so they hold
+         * the counter, the wait and the status. The (void) drops the
+         * length tm_sprintf() returns, which is not needed.
+         */
+        (void)tm_sprintf(line,
+                         (const UB *)"S1: wifi rejoin %s -> %s attempt=%u "
+                                     "status=%d wait=%u ms (%s)\n",
+                         s1_wifi_rejoin_state_name(p_change->from),
+                         s1_wifi_rejoin_state_name(p_change->to),
+                         (unsigned int)p_change->attempt,
+                         (int)p_change->link_status,
+                         (unsigned int)p_change->wait_msec,
+                         s1_wifi_rejoin_why_text(p_change->why));
+        tm_printf(line);
+    }
+}
+
+/*!
+ * @brief Print one console line "S1: wifi rejoin <p_text><value>".
+ *
+ * Used for the start line and a refused leave.
+ *
+ * NOTE: GCC inlines this and wifi_rejoin_poll() into cyw43_utk_task(), so
+ * this buffer is part of the task's own frame: 240 B with MQTT=1, against
+ * 64 B before (-fstack-usage), on its 8192 B stack.
+ *
+ * @param[in] p_text ASCII text, at most 99 bytes (see S1_REJOIN_LINE_BYTES).
+ * @param[in] value  The number printed after it.
+ */
+static void
+wifi_rejoin_say (const char * p_text, int32_t value)
+{
+    UB line[S1_REJOIN_LINE_BYTES];
+
+    /* The casts are safe: the format and the text are ASCII, and an int is
+     * 32 bits on this port. The (void) drops the length tm_sprintf()
+     * returns, which is not needed.
+     */
+    (void)tm_sprintf(line, (const UB *)"S1: wifi rejoin %s%d\n", p_text,
+                     (int)value);
+    tm_printf(line);
+}
+
+/*!
+ * @brief Start the rejoin policy, just after the boot join request.
+ *
+ * @param[out] p_rejoin The policy's state.
+ */
+static void
+wifi_rejoin_start (s1_wifi_rejoin_t * p_rejoin)
+{
+    /* sys_now() is lwIP's millisecond clock, from the kernel's operating
+     * time (sys_arch.c); unlike time_us_64() it does not depend on the
+     * WATCHDOG TICK. u32_t is uint32_t.
+     */
+    s1_wifi_rejoin_init(p_rejoin, sys_now(),
+                        (0 != S1_WIFI_LEAVE_BEFORE_JOIN));
+    wifi_rejoin_say("start JOINING (boot join) leave_first=",
+                    S1_WIFI_LEAVE_BEFORE_JOIN);
+}
+
+/*!
+ * @brief One pass of the rejoin policy: step it with the status just read,
+ *        print a change, and carry out its action.
+ *
+ * Caller must hold cyw43_thread_enter(), as for wifi_try_join(). The join
+ * goes through wifi_try_join(), so the credentials stay where they are.
+ *
+ * @param[in,out] p_rejoin      The policy's state.
+ * @param[out]    p_prev_status The last reported link status. After a
+ *                              join it is set so that the next pass
+ *                              reports the status, as the template does.
+ */
+static void
+wifi_rejoin_poll (s1_wifi_rejoin_t * p_rejoin, int32_t * p_prev_status)
+{
+    s1_wifi_rejoin_change_t change;
+    s1_wifi_rejoin_action_t action;
+    int32_t                 err;
+    /* sys_now(): see wifi_rejoin_start(). */
+    const uint32_t          now_msec = sys_now();
+
+    action = s1_wifi_rejoin_step(p_rejoin, now_msec,
+                                 radio_status.link_status, &change);
+    wifi_rejoin_report(&change);
+
+    if (S1_WIFI_REJOIN_DO_JOIN == action)
+    {
+        if (0 != wifi_try_join())
+        {
+            /* A refused request is a failed attempt at once. */
+            s1_wifi_rejoin_refused(p_rejoin, now_msec, &change);
+            wifi_rejoin_report(&change);
+        }
+
+        /* cyw43_tcpip_link_status() yields -3 to 3, never INT32_MAX, so
+         * the next status always counts as a change and is printed.
+         */
+        *p_prev_status = INT32_MAX;
+    }
+    else if (S1_WIFI_REJOIN_DO_LEAVE == action)
+    {
+        err = cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
+
+        if (0 != err)
+        {
+            /* LEAVING then joins at its limit. */
+            wifi_rejoin_say("leave request refused, err=", err);
+        }
+    }
+    else
+    {
+        /* S1_WIFI_REJOIN_DO_NONE: nothing to do on this pass. */
+    }
+}
+#endif
+
 #if !TM_NET_LWIP
 static int scan_result(void *env, const cyw43_ev_scan_result_t *result)
 {
@@ -275,7 +438,13 @@ void cyw43_utk_task(int32_t stacd, void *exinf)
 
 #if TM_NET_LWIP
     int32_t  prev_link_status = radio_status.link_status;
+#if TM_MQTT
+    s1_wifi_rejoin_t rejoin;
+
+    wifi_rejoin_start(&rejoin);
+#else
     uint64_t rejoin_at = 0;
+#endif
 #endif
 
     for(;;) {
@@ -300,13 +469,20 @@ void cyw43_utk_task(int32_t stacd, void *exinf)
                           (int)radio_status.link_status);
             }
 
+#if !TM_MQTT
             /* Negative == the association attempt is over and lost. Arm a
              * retry; a positive-but-not-UP status (JOIN/NOIP) is still making
              * progress, so leave it alone and let DHCP finish. */
             rejoin_at = (radio_status.link_status < 0)?
                         time_us_64() + WIFI_REJOIN_DELAY_US: 0;
+#endif
         }
 
+#if TM_MQTT
+        /* FR17: S1's rejoin policy sees every status, not only negative
+         * ones, and owns every retry, the boot join's included. */
+        wifi_rejoin_poll(&rejoin, &prev_link_status);
+#else
         if(rejoin_at != 0 && time_us_64() >= rejoin_at) {
             rejoin_at = 0;
             if(radio_status.link_status < 0) {
@@ -318,6 +494,7 @@ void cyw43_utk_task(int32_t stacd, void *exinf)
                 prev_link_status = 0x7fffffff;
             }
         }
+#endif
 #else
         was_scanning = radio_status.scan_active != 0;
         cyw43_thread_enter();

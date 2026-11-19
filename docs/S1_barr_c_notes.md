@@ -69,6 +69,16 @@ Three rules leave room for interpretation. The reading chosen for each:
   and commented casts; the template lines around them keep their tabs
   and same-line braces. Reason: template lines are left exactly as they
   are.
+- **Mixed style in `lib/libwifi/sysdepend/pico_rp2040/cyw43_utk.c`.** S1's
+  lines there, which call the WiFi rejoin policy in MQTT=1 builds (branch
+  `s1-fr17`, from `244bef8`), use Barr-C style: spaces, braces on their
+  own lines, Doxygen blocks and commented casts. The template's lines
+  around them keep their own style. Reason: template lines are left
+  exactly as they are, as in `subsystem1.c`.
+- **4.1.b, first 8 characters of a test's name.** `s1_wifi_rejoin_test`
+  shares its first 8 characters (`s1_wifi_`) with `s1_wifi_rejoin`, as
+  `s1_telem_test` does with `s1_telem`. Reason: each host test is named
+  after the module it tests, and no test is built into the image.
 - **`tid_led` and `cyc_led`.** These globals lack the `g` and `h`
   prefixes. Reason: they are template names, and `tid_led` is interface
   IF-05 (TEAM.md section 5), so a rename needs team agreement.

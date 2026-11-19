@@ -49,7 +49,11 @@ LOOPBACK = "127.0.0.1"
 BROKER_PORT = 1883
 HTTP_PORT = 8765
 TOOLS = ("mosquitto", "mosquitto_sub", "mosquitto_pub")
-WINDOWS_DIRS = [r"C:\Program Files\mosquitto"]
+# A portable copy of mosquitto 2.1.2 for Windows ships in the repository
+# (tools/mosquitto-win, see its README.md), so a teammate needs only Python.
+# It is tried before an installed copy.
+BUNDLED_DIR = os.path.join(REPO, "tools", "mosquitto-win")
+WINDOWS_DIRS = [BUNDLED_DIR, r"C:\Program Files\mosquitto"]
 MAC_DIRS = ["/opt/homebrew/sbin", "/opt/homebrew/bin", "/usr/local/sbin",
             "/usr/local/bin"]
 CONFIG_NAME = "mosquitto.conf"
@@ -107,8 +111,9 @@ def find_tools(path=None, fallback=None, windows=IS_WINDOWS):
 
 def install_hint(windows=IS_WINDOWS):
     if windows:
-        return ("install mosquitto from mosquitto.org/download (it goes to "
-                "C:\\Program Files\\mosquitto)")
+        return ("tools\\mosquitto-win is missing from this checkout: pull "
+                "again, or install mosquitto from mosquitto.org/download (it "
+                "goes to C:\\Program Files\\mosquitto)")
     return "install it with: brew install mosquitto"
 
 
@@ -399,6 +404,11 @@ def on_signal(signum, frame):
 def main(argv=None):
     args, extra = parse(sys.argv[1:] if argv is None else argv)
     found, dirs, workdir, conf = preflight(args)
+    if BUNDLED_DIR in dirs:
+        # The bundled programs need VCRUNTIME140.dll. A python.org Python
+        # keeps one next to python.exe, which covers a PC without the
+        # Visual C++ runtime installed.
+        dirs = dirs + [os.path.dirname(sys.executable)]
     env = child_env(dirs)
     when = stamp()
     log_path = unique_path(workdir, "run", when, ".jsonl")

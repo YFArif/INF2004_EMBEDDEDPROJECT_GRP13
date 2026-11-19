@@ -15,11 +15,13 @@ password only you know), never on shared, school or public WiFi.
 - **Python 3** (3.9 or later). macOS: from python.org or Homebrew.
   Windows: the python.org installer; check it with `py -3 --version`.
 - **mosquitto** (2.0 or later). macOS: `brew install mosquitto`.
-  Windows: the installer from mosquitto.org/download (it needs
-  administrator rights).
-- **Windows only: stop the mosquitto service.** The installer also
-  starts a background broker that holds port 1883. In an administrator
-  PowerShell:
+  **Windows: nothing to install.** A portable mosquitto 2.1.2 ships in
+  `tools\mosquitto-win` and the launcher uses it. Install Python from
+  python.org (not the Microsoft Store), because the bundled programs
+  borrow its `vcruntime140.dll`.
+- **Windows, only if you ran the mosquitto installer before: stop its
+  service.** The installer starts a background broker that holds port
+  1883. In an administrator PowerShell:
 
   ```powershell
   Stop-Service mosquitto
@@ -128,11 +130,11 @@ window:
 mosquitto_sub -h 127.0.0.1 -t "#" -v
 ```
 
-On Windows `mosquitto_sub` is in `C:\Program Files\mosquitto` and is not
-on the PATH. In PowerShell, call it by its full path with `&`:
+On Windows `mosquitto_sub` is in `tools\mosquitto-win` and is not on the
+PATH. In PowerShell, from the repository root:
 
 ```powershell
-& "C:\Program Files\mosquitto\mosquitto_sub.exe" -h 127.0.0.1 -t "#" -v
+.\tools\mosquitto-win\mosquitto_sub.exe -h 127.0.0.1 -t "#" -v
 ```
 
 If the launcher says port 1883 is already in use, another broker is
@@ -148,8 +150,18 @@ session. If anything changed: edit the two files, rebuild and reflash
 (sections 2 and 3). The usual sign of a stale address is a robot light
 that never turns green.
 
-## 6. Windows: not yet verified
+## 6. Windows: what has been checked
 
-The launcher has not yet been run on Windows (S1-U23 part C is NOT
-RUN). If it fails there, `docs/S1_dashboard.md` section 15 has the
-manual steps, which are the fallback.
+On 19 Nov 2026 the launcher ran on Windows 10 with Python 3.14 and the
+bundled mosquitto. It started the broker on port 1883 on every
+interface. A message published to the laptop's own network address
+came back through the broker, the dashboard said "broker: connected",
+and the page answered. Not yet checked: the double-click, Ctrl-C in the
+window, and a real car connecting through the Windows firewall. That
+full run is S1-U23 part C. If the launcher fails, `docs/S1_dashboard.md`
+section 15 has the manual steps, which are the fallback.
+
+If the car never connects (the robot light never turns green) while the
+page works, the usual cause is the firewall: the hotspot is set as a
+Public network, or mosquitto was allowed on Public only. Fix it as in
+section 1.
