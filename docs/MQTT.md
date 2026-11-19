@@ -306,7 +306,7 @@ flag, and the driver's join state stays ACTIVE (cyw43-driver v1.1.1,
 `cyw43_ctrl.c` lines 403 to 414 and 613 to 626); nothing in the driver
 has a timer. So when the chip did not recover, nothing did: on 8 Nov 2026
 the status read 1 from 17:53:26 and still read 1 at the power cut at
-18:01:28, 7 min 25 s after the hotspot came back on at 17:54:04, with no
+18:01:28.3, 7 min 25 s after the hotspot came back on at 17:54:03.6, with no
 `joining` line (`2026-11-08_s1u15_console.txt`,
 `2026-11-08_s1u15_markers.txt`), and on the cold boot of 10 Nov 2026 each
 join held status 1 for 14 to
@@ -384,7 +384,7 @@ status line in the logs).
 | 1. Detection | access point gone, to status 1 | the chip's (10 s in S1-U10 drop 3) |
 | 2. Grace | status 1, to BACKOFF | 3 s |
 | 3. Wait | BACKOFF, to the join request | 1 s, 2 s, then 4 s |
-| 4. Join | request, to status 3 | 3.2 to 3.9 s for a good join; at most 10 s, then back to 3 |
+| 4. Join | request, to status 3 | 3.2 to 3.9 s for a good join; at most 10 s, then the attempt is abandoned and the cycle returns to layer 3 |
 | 5. Address | status 3, to an address | none after a drop: the old address is kept while the link is down, and lwIP restarts DHCP on link-up in the background (`dhcp_network_changed_link_up()`). At a cold boot DHCP is part of layer 4 |
 | 6. MQTT | status 3, to `online` | measured 2.6 to 4.6 s (S1-U13, with the Mac's own rejoin). From the code: any retry delay still running (at most 8 s), a connect of at most 5 s, then CONNACK, SUBSCRIBE and `online` |
 | 7. Telemetry | `online`, to the first frame | at most 0.5 s (the 2 Hz schedule) |
