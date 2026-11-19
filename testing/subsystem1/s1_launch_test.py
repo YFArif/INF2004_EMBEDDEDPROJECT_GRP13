@@ -104,7 +104,8 @@ def test_tools(c, launch, tmp):
             and (os.environ.get("PATH") == before),
             "children's PATH gets the folder; the launcher's does not")
     c.check("L5", (launch.fallback_dirs(True)
-                   == [r"C:\Program Files\mosquitto"])
+                   == [os.path.join(launch.REPO, "tools", "mosquitto-win"),
+                       r"C:\Program Files\mosquitto"])
             and ("/opt/homebrew/sbin" in launch.fallback_dirs(False)),
             "fallback folders for Windows and macOS")
 
