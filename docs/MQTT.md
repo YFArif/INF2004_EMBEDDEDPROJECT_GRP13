@@ -295,6 +295,134 @@ hotspot's return to link up is known for drop 3 alone. While the hotspot
 was off the link status read 1 (JOIN), never 0; it went negative once,
 -3 in drop 1.
 
+**WiFi rejoin in MQTT=1 builds (FR17).** On branch `s1-fr17`, code commit
+`244bef8`: host-tested (S1-U28, PASS), not yet run on hardware (S1-U29).
+Two of the three S1-U10 recoveries above were the chip's own (no
+`joining` line), so S1-U10 never showed the host retrying a lost link.
+The template's retry in `cyw43_utk_task()` is armed only by a negative
+status and has no time limit on any other. After an access point loss the
+status reads 1 (JOIN): the link-down event clears only the netif's link
+flag, and the driver's join state stays ACTIVE (cyw43-driver v1.1.1,
+`cyw43_ctrl.c` lines 403 to 414 and 613 to 626); nothing in the driver
+has a timer. So when the chip did not recover, nothing did: on 8 Nov 2026
+the status read 1 from 17:53:26 and still read 1 at the power cut at
+18:01:28, 7 min 25 s after the hotspot came back on at 17:54:04, with no
+`joining` line (`2026-11-08_s1u15_console.txt`,
+`2026-11-08_s1u15_markers.txt`), and on the cold boot of 10 Nov 2026 each
+join held status 1 for 14 to
+201 s before a -3, eight times, about 624 s in all
+(`2026-11-10_s1u21_console.txt.gz`).
+
+The link status values, from the same driver:
+
+| Status | Name | Meaning |
+|---|---|---|
+| 3 | UP | the netif has its link and an address |
+| 2 | NOIP | associated, no address yet |
+| 1 | JOIN | a join is active: just requested, or the link was lost and the driver still waits |
+| 0 | DOWN | after a disassociation event (a leave, or a de-authentication with reason 2) |
+| -1 | FAIL | setting the SSID failed |
+| -2 | NONET | no network with that SSID was found |
+| -3 | BADAUTH | authentication or the key exchange failed |
+
+A -3 is not always a wrong password. When the key exchange times out
+(`CYW43_EV_PSK_SUP` with status 4, 8 or 10 and reason 15, `cyw43_ctrl.c`
+line 419), the driver joins again by itself and the status stays 1; only
+a failure outside that list gives -3. The driver also sets the join
+ACTIVE again when a good authentication follows a bad one (lines 385 to
+388), so a -3 can be followed by a 1 within one attempt, and the
+template's pending retry was cancelled by that 1.
+
+In MQTT=1 builds the template's retry is compiled out, and
+`cyw43_utk_task()` passes every status, on every pass, to S1's policy
+(`app_program/subsystem1/s1_wifi_rejoin.c`, a pure state machine) and
+carries out the join or leave it returns. The timings are starting
+values; S1-U29 tunes them.
+
+| State | Entered | Left |
+|---|---|---|
+| JOINING | at the boot join, or when a wait ends | status 3: UP. A negative status, a join request the driver refuses, or 10 s at status 0, 1 or 2: BACKOFF, attempt + 1 |
+| UP | status 3 | any other status: LOST. After 10 s of continuous UP the attempt counter goes back to 0 (status 3 after a rejoin means "associated, with the old address", not "lease confirmed") |
+| LOST | a status other than 3 after UP | status 3: UP. A negative status, or 3 s (the chip's grace): BACKOFF |
+| BACKOFF | a lost link or a failed attempt | status 3: UP. The wait over (1 s, 2 s, then 4 s for every later attempt): JOINING, or LEAVING |
+| LEAVING | only with `S1_WIFI_LEAVE_BEFORE_JOIN` 1, when a wait ends | status 0, or 1 s: JOINING. A status of 3 here is not UP: a leave is in flight |
+
+- Console: one line per state change, `S1: wifi rejoin <from> -> <to>
+  attempt=<n> status=<s> wait=<ms> ms (<reason>)`, and once at start,
+  `S1: wifi rejoin start JOINING (boot join) leave_first=<0 or 1>`. These
+  lines hold no SSID or address, but the template's `wifi: joining` and
+  `wifi: link up` lines still print them, so console logs still need
+  masking.
+- The leave switch, `S1_WIFI_LEAVE_BEFORE_JOIN`, is 0 by default: a plain
+  join, which `cyw43_wifi_join()` accepts while a join is active. A leave
+  only sends a request; the driver clears its join state later, when the
+  disassociation event arrives, and an event that arrives after the new
+  join would clear its ACTIVE bit, so the driver could never report
+  link-up (the 10 s limit then recovers). S1-U29 decides the default.
+- MQTT=0 builds are unchanged: with the default, NET=lwip and TEST=1
+  profiles, the image of `244bef8` is byte-identical to main's
+  (`ec4839a`); `cyw43_utk.o` differs from main's only in debug
+  information (identical with it stripped, identical disassembly).
+- Limits: a boot join request the driver refuses (`cyw43_wifi_join()`
+  returns an error) still stops the radio task, as in the template
+  (`init_result`); a link that reads 3 while the Mac or the broker is
+  away starts no WiFi action, by design; no retry can join a hotspot that
+  refuses the client.
+
+**Recovery time, end to end, by layer.** Reasoned from the code, not
+measured; S1-U29 measures it. The radio task asks for a 2 ms delay per
+pass (`CYW43_POLL_MS`), but the kernel tick is 10 ms (`CNF_TIMER_PERIOD`
+in `config/config.h`) and a delay ends on the first tick at least the
+delay plus one tick after the last tick (`knl_timer_insert()` in
+`kernel/tkernel/timer.c`), so a pass starts about every 20 ms, and
+`sys_now()` moves in 10 ms steps. A join request blocks its pass for
+about a quarter of a second (240 to 260 ms from `joining` to the next
+status line in the logs).
+
+| Layer | From, to | Time |
+|---|---|---|
+| 1. Detection | access point gone, to status 1 | the chip's (10 s in S1-U10 drop 3) |
+| 2. Grace | status 1, to BACKOFF | 3 s |
+| 3. Wait | BACKOFF, to the join request | 1 s, 2 s, then 4 s |
+| 4. Join | request, to status 3 | 3.2 to 3.9 s for a good join; at most 10 s, then back to 3 |
+| 5. Address | status 3, to an address | none after a drop: the old address is kept while the link is down, and lwIP restarts DHCP on link-up in the background (`dhcp_network_changed_link_up()`). At a cold boot DHCP is part of layer 4 |
+| 6. MQTT | status 3, to `online` | measured 2.6 to 4.6 s (S1-U13, with the Mac's own rejoin). From the code: any retry delay still running (at most 8 s), a connect of at most 5 s, then CONNACK, SUBSCRIBE and `online` |
+| 7. Telemetry | `online`, to the first frame | at most 0.5 s (the 2 Hz schedule) |
+
+From the moment the access point is back:
+
+- Best case: the chip recovers by itself (8 s after the hotspot came back
+  in S1-U10 drop 3), or a join is requested just as it returns: about
+  3.2 + 2.6 + 0.5 = 6.3 s.
+- The policy is in BACKOFF when it returns: at most 4 + 3.9 + 4.6 + 0.5,
+  about 13 s.
+- Worst case: it returns just after a join that cannot see it was
+  requested, and that join runs to its limit: 10 + 4 + 3.9 + 4.6 + 0.5,
+  about 23 s, more if MQTT still has a retry delay to wait out. NFR14's
+  15 s is therefore not guaranteed in the worst case.
+
+While the access point stays away, one cycle is a join (at most 10 s,
+less if the chip reports a negative status first) and a 4 s wait: at
+most one join request every 14 s, each blocking the radio task for about
+a quarter of a second.
+
+**Does `mqtt_utk.c` need a change for this? No.** It calls
+`mqtt_link_poll()` only while the status is 3, but lwIP's timers keep
+running during the outage, because `cyw43_utk_task()` calls
+`sys_check_timeouts()` on every pass whatever the status. lwIP's
+keep-alive ends a session the broker no longer answers 5 to 10 s after
+its last byte, and `connection_cb()` then starts the driver's retry delay
+(1 s after a session of 10 s or more, else doubled, at most 8 s). After
+an outage longer than about 18 s (10 s plus the longest delay) that delay
+is over when the link returns, so the first poll goes straight to a
+connect; after a shorter one the session may still be open, or up to 8 s
+of delay may be left. One cost stays: during the outage the driver's
+state shown to other tasks is frozen, which the WiFi fault rule covers
+with the stale flag (section 1.1). Polling the driver during the outage
+would let it close the session at once, but that changes the gate in
+`cyw43_utk.c` and the behaviour of `mqtt_link.c`, which this change
+leaves alone.
+
 **MQTT.** From the code:
 
 - `cyw43_utk.c` calls the adapter only while the link is

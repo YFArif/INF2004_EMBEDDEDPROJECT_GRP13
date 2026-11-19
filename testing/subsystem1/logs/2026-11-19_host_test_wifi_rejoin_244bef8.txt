@@ -1,0 +1,72 @@
+S1-U28 run_wifi_rejoin_test.sh, 2026-11-19 01:52:34 +08
+commit: 244bef8
+cc: Apple clang version 17.0.0 (clang-1700.6.4.2)
+== stage 1: build, both leave settings (strict warnings as errors, UBSan/ASan)
+stage 1: ok, no warnings
+== stage 2: run
+S1-U28 s1_wifi_rejoin host test, S1_WIFI_LEAVE_BEFORE_JOIN 0
+group boot join succeeds: 5 checks, 0 failed
+group boot join gives -3, then succeeds: 7 checks, 0 failed
+group boot join stuck at status 1 for ever: 9 checks, 0 failed
+group drop: status 1 past the grace: 9 checks, 0 failed
+group the chip recovers inside the grace: 4 checks, 0 failed
+group a negative status inside the grace: 2 checks, 0 failed
+group -3 then 1 inside one attempt: 5 checks, 0 failed
+group status 0 for ever, past 32 attempts: 7 checks, 0 failed
+group status 2 stuck: 5 checks, 0 failed
+group the 1, 2, 4, 4 ladder and the saturating counter: 12 checks, 0 failed
+group counter reset only after 10 s of UP: 4 checks, 0 failed
+group no action while UP; Mac-only outage: 3 checks, 0 failed
+group leave setting 0: plain joins only: 2 checks, 0 failed
+group leave setting 1: leave, status 0, join: 7 checks, 0 failed
+group leave setting 1: no status 0 within 1 s: 6 checks, 0 failed
+group leave setting 1: status 3 in LEAVING is not UP: 4 checks, 0 failed
+group the configured setting (S1_WIFI_LEAVE_BEFORE_JOIN): 1 checks, 0 failed
+group a join request the driver refuses: 8 checks, 0 failed
+group 32-bit clock wrap: 5 checks, 0 failed
+group NULL arguments, an invalid state: 6 checks, 0 failed
+group console names: 18 checks, 0 failed
+RESULT: all passed (129 checks)
+S1-U28 s1_wifi_rejoin host test, S1_WIFI_LEAVE_BEFORE_JOIN 1
+group boot join succeeds: 5 checks, 0 failed
+group boot join gives -3, then succeeds: 7 checks, 0 failed
+group boot join stuck at status 1 for ever: 9 checks, 0 failed
+group drop: status 1 past the grace: 9 checks, 0 failed
+group the chip recovers inside the grace: 4 checks, 0 failed
+group a negative status inside the grace: 2 checks, 0 failed
+group -3 then 1 inside one attempt: 5 checks, 0 failed
+group status 0 for ever, past 32 attempts: 7 checks, 0 failed
+group status 2 stuck: 5 checks, 0 failed
+group the 1, 2, 4, 4 ladder and the saturating counter: 12 checks, 0 failed
+group counter reset only after 10 s of UP: 4 checks, 0 failed
+group no action while UP; Mac-only outage: 3 checks, 0 failed
+group leave setting 0: plain joins only: 2 checks, 0 failed
+group leave setting 1: leave, status 0, join: 7 checks, 0 failed
+group leave setting 1: no status 0 within 1 s: 6 checks, 0 failed
+group leave setting 1: status 3 in LEAVING is not UP: 4 checks, 0 failed
+group the configured setting (S1_WIFI_LEAVE_BEFORE_JOIN): 1 checks, 0 failed
+group a join request the driver refuses: 8 checks, 0 failed
+group 32-bit clock wrap: 5 checks, 0 failed
+group NULL arguments, an invalid state: 6 checks, 0 failed
+group console names: 18 checks, 0 failed
+RESULT: all passed (129 checks)
+stage 2: ok
+== stage 3: mutations
+C1 a fourth ladder step without S1_WIFI_REJOIN_WAIT_STEPS: caught by a compile-time check
+W1 no time limit on a join: caught by the test (RESULT: 36 FAILED)
+W2 status 1 treated as progress (the join limit restarts on it): caught by the test (RESULT: 31 FAILED)
+W3 counter reset on first sight of status 3: caught by the test (RESULT: 1 FAILED)
+W4 no cap on the ladder: caught by the test (runtime error)
+W5 grace ignored: caught by the test (RESULT: 30 FAILED)
+W6 LEAVING counts status 3 as UP: caught by the test (RESULT: 4 FAILED)
+W7 LEAVING with no 1 s limit: caught by the test (RESULT: 8 FAILED)
+W8 now >= deadline in place of the subtraction (clock wrap): caught by the test (RESULT: 5 FAILED)
+W9 a refused join request waits for the join limit: caught by the test (RESULT: 6 FAILED)
+W10 a negative status in JOINING waits for the join limit: caught by the test (RESULT: 10 FAILED)
+stage 3: 11/11 mutations caught (C1, W1 to W10)
+== stage 4: target compile
+arm-none-eabi-gcc (Arm GNU Toolchain 15.3.Rel1 (Build arm-15.149)) 15.3.1 20260627
+   text	   data	    bss	    dec	    hex	filename
+    922	      0	      0	    922	    39a	s1_wifi_rejoin.o
+stage 4: ok, no warnings
+S1-U28: PASS (129 and 129 checks with S1_WIFI_LEAVE_BEFORE_JOIN 0 and 1, 11/11 mutations caught, target compile ok)
