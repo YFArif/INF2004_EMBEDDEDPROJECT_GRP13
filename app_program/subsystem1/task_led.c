@@ -18,18 +18,18 @@
  * be short and must never wait (no tk_slp_tsk, tk_wai_sem, tm_printf...).
  * Signalling a task is the normal thing to do here.
  */
-EXPORT void led_cyclic_handler(void *exinf)
+EXPORT void led_cyclic_handler(void *p_exinf)
 {
-	(void)exinf;
+	(void)p_exinf;
 	tk_wup_tsk(tid_led);	/* wake the LED task (the request queues
 				   up if the task is not asleep yet) */
 }
 
-EXPORT void led_task(INT stacd, void *exinf)
+EXPORT void led_task(INT stacd, void *p_exinf)
 {
 	UINT	level = 0;
 
-	(void)stacd; (void)exinf;
+	(void)stacd; (void)p_exinf;
 
 	gpio_set_pin(S1_LED_PIN, GPIO_MODE_OUT);	/* make the pin an output */
 
