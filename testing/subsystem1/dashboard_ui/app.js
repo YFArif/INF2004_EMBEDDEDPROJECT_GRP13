@@ -371,6 +371,9 @@ function cardsTelemetry(t) {
   el("m-dist").title = "dist_mm " + t.dist_mm;
   text("a-pitch", signed(t.pitch_deg, 1));
   text("a-roll", signed(t.roll_deg, 1));
+  measure("a-peak", num(t.peak_mm));
+  el("a-peak").title = "peak_mm " + t.peak_mm;
+  text("a-humps", num(t.hump_count));
   word("a-hump", HUMP_WORDS[t.hump_name] || capital(String(t.hump_name)),
        "hump_state " + t.hump_name + ", hump_count " + t.hump_count
        + ", peak_mm " + t.peak_mm, false);

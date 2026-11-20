@@ -473,7 +473,10 @@ last 5 s, age of the last frame). Left column: Control (STOP, START,
 RESET), Last commands, Barcode letter map. Centre: Live view and Latest
 events (the three newest lines of the event log). Right column: Motion,
 Attitude, Line and barcode, Obstacle sensor. The Live view holds the 3D
-view (section 8.4).
+view (section 8.4). The Attitude card has pitch, roll and IMU on top and
+the hump below: Hump height in mm (S4's `peak_mm`, the highest hump of
+the run, as S4 asked for it on the front page), the hump state and Humps
+passed.
 
 - At 1700 px wide and 900 px high or more (a 1080p browser window)
   everything fits and the page does not scroll.
