@@ -9,11 +9,11 @@ Stages; the run stops at the first stage that fails:
      127.0.0.1 only, anonymous, no persistence, full log); lsof must show
      that every socket it listens on is 127.0.0.1:PORT.
   2  Stream: mosquitto_sub -q 1 -t s1test/stream -F '%x' (no -C) piped
-     into s1_decode.py --describe --session, while the 21 golden vectors
+     into s1_decode.py --describe --session, while the 25 golden vectors
      from golden.py are published in document order, one
      mosquitto_pub -q 1 -s each; the subscriber is stopped with SIGINT
-     once it has acknowledged all 21. Its output must equal decoding the
-     same 21 hex lines directly with the same options: 21 lines, 0 error
+     once it has acknowledged all 25. Its output must equal decoding the
+     same 25 hex lines directly with the same options: 25 lines, 0 error
      lines, subscriber and decoder exit status 0. A second subscriber with
      the same options records the raw output, to report how messages are
      separated (reported, not checked).
@@ -23,7 +23,10 @@ Stages; the run stops at the first stage that fails:
      Both must decode as STOP, id 5, and the broker log must show each
      one received and sent on to the subscriber at QoS 1.
   4  The broker is stopped; nothing may listen on the port afterwards.
-The full broker log is printed at the end.
+The full broker log is printed at the end, masked: the temporary folder
+becomes <work>, the home folder <home> and the user name <user> (mosquitto
+prints them on its "Config loaded from" and "running mosquitto as user"
+lines), so a saved log can be committed as it is.
 
 Run from the repository root:
 
@@ -73,7 +76,7 @@ PREFIX = "robocar/car1"
 STREAM_TOPIC = "s1test/stream"
 STOP_BYTES = b"\x14\x85"            # golden vector CMD-1: STOP, id 5
 STOP_TOPICS = (PREFIX + "/cmd", PREFIX + "/cmd/ui")
-GOLDEN_COUNT = 21
+GOLDEN_COUNT = 25
 WAIT_SECONDS = 10
 SETTLE_SECONDS = 0.5
 
@@ -161,7 +164,7 @@ def header(tools):
 
 
 def golden_vectors():
-    """The 21 golden vectors from golden.py, as (name, hex) pairs."""
+    """The 25 golden vectors from golden.py, as (name, hex) pairs."""
     r = subprocess.run([sys.executable, "-I", "-B", str(ROOT / GOLDEN_REL),
                         str(ROOT / DOC_REL)], capture_output=True, text=True)
     if 0 != r.returncode:
@@ -177,6 +180,21 @@ def golden_vectors():
 def log_text(work):
     """The broker log so far."""
     return (work / "broker.log").read_text(errors="replace")
+
+
+def masked(text, work):
+    """The text with the temporary folder, the home folder and the user
+    name replaced by <work>, <home> and <user>. Longest first, so the
+    work folder (inside TMPDIR, which may be inside the home folder) is
+    replaced whole. The user name is replaced as a whole word only."""
+    for path, mark in ((str(Path(work).resolve()), "<work>"), (str(work),
+                       "<work>"), (str(Path.home()), "<home>")):
+        if path and (path != "/"):
+            text = text.replace(path, mark)
+    user = os.environ.get("USER") or os.environ.get("USERNAME") or ""
+    if len(user) >= 2:
+        text = re.sub(r"\b%s\b" % re.escape(user), "<user>", text)
+    return text
 
 
 def start_broker(tools, work):
@@ -220,7 +238,7 @@ def stop_subscriber(proc, name):
 
 
 def stage_stream(tools, work, vectors, procs):
-    """Stage 2: the 21 vectors through the broker, against a direct decode."""
+    """Stage 2: the 25 vectors through the broker, against a direct decode."""
     print("== stage 2: stream")
     sub = [tools["mosquitto_sub"], "-h", HOST, "-p", PORT, "-q", "1", "-t",
            STREAM_TOPIC, "-F", "%x"]
@@ -424,8 +442,8 @@ def main():
         if broker is not None:
             if (not stop_broker(broker)) and (0 == code):
                 status, code, detail = "FAIL", 1, "stage 4: port in use"
-            print("== broker log")
-            sys.stdout.write(log_text(work))
+            print("== broker log (masked)")
+            sys.stdout.write(masked(log_text(work), work))
         if work is not None:
             shutil.rmtree(work, ignore_errors=True)
     if 0 == code:

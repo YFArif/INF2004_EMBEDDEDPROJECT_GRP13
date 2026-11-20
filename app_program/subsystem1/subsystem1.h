@@ -32,7 +32,7 @@ IMPORT bool	subsystem1_event_post(uint8_t code, uint8_t arg_a,
 
 /* Private to subsystem 1, shared between its own .c files */
 IMPORT ID	cyc_led;
-IMPORT void	led_task(INT stacd, void *exinf);
-IMPORT void	led_cyclic_handler(void *exinf);
+IMPORT void	led_task(INT stacd, void *p_exinf);
+IMPORT void	led_cyclic_handler(void *p_exinf);
 
 #endif /* SUBSYSTEM1_H */
