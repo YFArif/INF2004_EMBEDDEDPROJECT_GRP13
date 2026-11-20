@@ -23,7 +23,7 @@ and the Stage 3 statements on 30 Oct 2026 against the adapter commit
 | Message codec (`msg_codec`) | Built, host-tested and timed on the Pico | `app_program/subsystem1/`; TEST_LOG S1-U05, S1-U08 |
 | Dashboard decoder (`s1_decode.py`) | Built and host-tested | `app_program/subsystem1/dashboard/`; TEST_LOG S1-U11, S1-U12 |
 | Stage 3: the radio service task calls `mqtt_link_poll()` | Adapter written: `mqtt_utk_start()` calls `mqtt_link_poll(netif_default)`. Instructor approval 27 Oct 2026; team agreement in person 29 Oct 2026. On the robot: S1-U13 PASS at `9a01717`, 31 Oct 2026 | `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c`; TEAM.md section 3 ("WiFi and MQTT are special"); TEST_LOG S1-U13 |
-| `telemetry_task`, Stage 4a: START, STOP and RESET forwarded to S5 with an ack, and the 1 Hz heartbeat | On `main` and host-tested (S1-U14). Not run on the robot yet (S1-U06). The 2 Hz telemetry frame and the 5 Hz live message are written in the same task (7 Nov 2026) and host-tested (S1-U05, S1-U11, S1-U14, S1-U16 part A), not run on the robot yet; each goes only under the queue rule of section 1.1. Fault bit 4 is implemented (8 Nov 2026, PR #5, section 1.1) and host-tested (S1-U14), not run on the robot yet. Events are Stage 4b | `app_program/subsystem1/telemetry_task.c`, `s1_telem.c`; section 1.1; TEST_LOG S1-U14, S1-U06 |
+| `telemetry_task`, Stage 4a: START, STOP and RESET forwarded to S5 with an ack, and the 1 Hz heartbeat | On `main` and host-tested (S1-U14). Not run on the robot yet (S1-U06). The 2 Hz telemetry frame and the 5 Hz live message are written in the same task (7 Nov 2026) and host-tested (S1-U05, S1-U11, S1-U14, S1-U16 part A), not run on the robot yet; each goes only under the queue rule of section 1.1. Fault bit 4 is implemented (8 Nov 2026, PR #5, section 1.1) and host-tested (S1-U14), not run on the robot yet. Events (Stage 4b, section 1.2) and the heartbeat RSSI are written (21 Nov 2026, branch `s1-demo-ready`) and host-tested (S1-U14, S1-U09, S1-U11), not run on the robot yet (S1-U30) | `app_program/subsystem1/telemetry_task.c`, `s1_telem.c`; section 1.1; TEST_LOG S1-U14, S1-U06 |
 | Laptop dashboard (`s1_dashboard.py`) | On `main`: START, STOP and RESET with each ack matched by cmd_id, the online light and heartbeat, the retained-command banner, and `--simulate` (a fake car). Test S1-U16: part A automated in simulate mode, part B on the robot after S1-U06 | `testing/subsystem1/s1_dashboard.py`; [S1_dashboard.md](S1_dashboard.md); TEST_LOG S1-U16 |
 
 Stage 3 replaced the template's demo client in `mqtt_utk.c` (a text
@@ -38,6 +38,45 @@ hotspot drops and a power cut (section 9). It also logged five
 unexpected disconnects, not explained yet: four after the second boot,
 each followed by `online` with no reboot, and one in the first boot,
 followed by a power cycle (TEST_LOG S1-U13).
+
+### 1.2 Stage 4b: events and RSSI
+
+- **Events (FR16).** Any task reports an event with
+  `subsystem1_event_post(code, arg_a, arg_b)` (`subsystem1.h`, defined in
+  `s1_event.c`). It never waits: it puts one 3-byte record into
+  `mbf_event` (30 records, 240 B) or, if the buffer is full, drops it and
+  counts the drop atomically (either core may post). Without MQTT the call
+  does nothing and returns false. On each pass `telemetry_task` takes up
+  to 2 records, but only while the publish queue holds at most 2 messages
+  (`S1_TELEM_EVT_QUEUED_MAX`), so events wait in `mbf_event`, not in front
+  of an ack. Each is stamped with the uptime in ms and published as a 7 B
+  EVENT on `<prefix>/event` at QoS 1, whether or not the session is up (as
+  the acks are). evt_drop in the heartbeat is the `mbf_event` drops plus
+  the events the driver refused.
+- **Codes.** S5's table (`s5_event.h`, 0x50 to 0x65) is the only one so
+  far; 0x10 to 0x4F are kept for S1 to S4. The dashboard names each code
+  (`s1_decode.event_text()`), for example `OBST_STOP 12 cm at 90 deg` or
+  `CTRL_STATE READY -> LINE_FOLLOWING`.
+- **S5's verdict.** S5 reports what it did with each command as event
+  `COMMAND` (0x65, `{opcode, 1 accepted / 0 refused}`), so the ack keeps
+  its meaning, "queued for S5", and no second ack is needed. The event
+  carries no cmd_id; the dashboard shows it next to the opcode.
+- **S5's side** is a two-file change in S5's folder (`s5_event.c` calls
+  `subsystem1_event_post()`; `s5_links.c` drops its ack TODO). It is for
+  S5's owner to apply and review; until it is merged S5's events go to the
+  console only and evt_drop stays 0.
+- **RSSI (assumption A15).** `mqtt_link_poll()` reads the signal strength
+  while a session is up, at most every 2 s (`RSSI_PERIOD_MSEC`), through
+  `s1_radio_rssi_read()` (`cyw43_wifi_get_rssi()`, one request to the
+  radio chip on the radio service task, the only task that may make one).
+  It is clamped to -127 to 0 dBm and kept in `mqtt_link_status_t`
+  `rssi_dbm`; a failed read keeps the last value. The heartbeat sends it;
+  0 means not read yet.
+- **Cost** (`NET=lwip MQTT=1` against `main` at `27ad563`, measured with
+  `arm-none-eabi-size`): text +928 B, data +0, bss +264 B (240 B of it
+  `mbf_event`), for both `SMP=1` and `SMP=0`. The default image's `.bin`
+  is identical to `main`'s. `mbf_event` makes 7 of the kernel's 12
+  message buffers.
 
 ### 1.1 Stage 4a: commands, ack and heartbeat
 
@@ -83,9 +122,9 @@ adds nothing to a STOP's round trip (NFR15).
 - **Heartbeat.** 9 bytes on the telemetry topic at QoS 0, once a second
   on absolute deadlines, and only while the session is up and the driver
   snapshot is fresh, so an outage does not fill the publish queue that
-  the acks need. rssi and evt_drop are always 0 for now: rssi because no
-  RSSI can be read outside the radio service task yet ("not measured"),
-  evt_drop because there is no `mbf_event` yet. tel_drop is the periodic
+  the acks need. rssi is the driver's last reading (section 1.2; 0 means
+  "not measured" yet), evt_drop the events lost (section 1.2). tel_drop is
+  the periodic
   messages skipped or refused (next point), and cmd_reject is the codec
   rejections plus the post failures plus the refused or malformed MAPs
   (`map_reject`) plus the driver's `command_dropped`.
@@ -191,10 +230,9 @@ will topic as `<prefix>/status` (`build_topics()`,
 | `cmd/#` (subscription) | 1 | - | `COMMAND_QOS` |
 | `telemetry` (TELEMETRY, LIVE, HEARTBEAT) | 0 | no | `telemetry_task` |
 | `ack` | 1 | no | `telemetry_task` (`s1_telem_on_command()`) |
-| `event` | 1 | no | **planned** (Stage 4b) |
+| `event` | 1 | no | `telemetry_task` (`s1_telem_event()`), section 1.2 |
 
-The driver takes QoS and retain from each `mqtt_link_publish()` call, so
-the `event` row becomes real only when `telemetry_task` publishes events. A
+The driver takes QoS and retain from each `mqtt_link_publish()` call. A
 command can arrive twice under QoS 1, so the command handler must accept a
 repeat
 (the "Command delivery" note in `mqtt_link.h`).
@@ -250,10 +288,10 @@ bytes (`MQTT_LINK_PAYLOAD_MAX`).
 | TELEMETRY | 2 Hz | `telemetry_task.c`, `S1_TELEM_TEL_PERIOD_MSEC` (written, not run on the robot): S1_binary_frame.md section 3 |
 | LIVE | 5 Hz | `telemetry_task.c`, `S1_TELEM_LIVE_PERIOD_MSEC` (written, not run on the robot): S1_binary_frame.md section 3A |
 | HEARTBEAT | 1 Hz while the session is up | Stage 4a: `telemetry_task.c`, `S1_TELEM_HB_PERIOD_MSEC` |
-| EVENT | When something happens | **planned** (Stage 4b) |
+| EVENT | When a task posts one; at most 2 per `telemetry_task` pass (40 a second) | Stage 4b: `telemetry_task.c`, `S1_TELEM_EVT_PER_PASS` (written, not run on the robot), section 1.2 |
 | ACK | One per command the driver delivers | Stage 4a: `telemetry_task.c` |
 
-EVENT does not exist in the code yet (Stage 4b). The heartbeat and the ack
+EVENT exists since 21 Nov 2026 (Stage 4b). The heartbeat and the ack
 exist since Stage 4a, and TELEMETRY and LIVE since 7 Nov 2026; none is
 measured on the robot yet (S1-U06). The telemetry topic now carries 8
 publishes a second (2 Hz telemetry, 5 Hz live, 1 Hz heartbeat), so the
@@ -502,8 +540,9 @@ size (`tk_ref_mbf`); it counts the queue only, not the message being sent.
 The heartbeat carries the robot-side drops to the dashboard. `tel_drop` is
 `telemetry_task`'s `periodic_skipped` (the queue rule, section 1.1) plus
 `periodic_failed` and `hb_publish_failed` (refused by the driver).
-`cmd_reject` is section 1.1's sum. `evt_drop` is always 0 for now, until
-`mbf_event` exists.
+`cmd_reject` is section 1.1's sum. `evt_drop` is the posts `mbf_event`
+refused (`s1_event_drop_count()`) plus the events the driver refused
+(`evt_publish_failed`), section 1.2.
 Messages not sent because the session is down are not drops: nothing is
 built for them. A message the driver refuses also shows as a seq gap on the
 dashboard; one the queue rule skips does not.
@@ -641,8 +680,9 @@ STOP round trip under 300 ms) and of the NFR14 test.
 | Only one task may read commands | "Commands" note in `mqtt_link.h` |
 | The robot notices a silent broker 5 to 10 s late | section 3 |
 | The retry-delay reset after a 10 s session has no test yet | `STABLE_SESSION_MSEC` |
-| Heartbeat RSSI is sent as 0 ("not measured") until it can be read inside the radio service task, and the S4 terrain fields will read 0 until S4's data exists | `s1_telem_heartbeat()`; **planned** |
-| An ack's result 0 means queued for S5, not carried out; S5's verdict is not visible to S1 | section 1.1 |
+| Heartbeat RSSI is read at most every 2 s, and reads 0 ("not measured") until the first read of a session | `read_rssi()` in `mqtt_link.c`; section 1.2 |
+| An ack's result 0 means queued for S5, not carried out; S5's verdict arrives as event `COMMAND` (0x65), without the cmd_id, once S5's side of section 1.2 is merged | sections 1.1 and 1.2 |
+| Events from S5 reach the dashboard only once S5 applies its two-file change (section 1.2) | section 1.2 |
 | A retained command runs again after every reconnect: lwIP does not report the retain flag | section 1.1 |
 | Every layout field is still marked "guess" or "from Version B" until its owner confirms it | S1_binary_frame.md section 1 |
 
@@ -653,8 +693,9 @@ STOP round trip under 300 ms) and of the NFR14 test.
   the measured heartbeat rate and STOP round trip.
 - Fault bit 4 implemented (8 Nov 2026, PR #5): sections 1 and 1.1. S1-U06
   checks it on the robot.
-- With Stage 4b (events, S5's verdict in the ack): the planned values in
-  sections 5 and 8 become code, and the measured rates are added.
+- Stage 4b written (21 Nov 2026, section 1.2): events and RSSI. S5's
+  verdict travels as event `COMMAND`, not in the ack. S1-U30 measures it
+  on the robot.
 - After the car measurements: decide whether a QoS 0 publish should count
   as finished before its TCP ACK (section 1.1).
 - Sections 2, 3, 4, 7, 11 and 13 stay as they are, unless the layout

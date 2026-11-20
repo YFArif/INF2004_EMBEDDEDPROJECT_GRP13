@@ -240,6 +240,8 @@ typedef struct
     uint32_t                last_poll_msec;     /* Clock at the last poll.  */
     uint8_t                 broker_addr[4];     /* Resolved address.        */
     uint16_t                broker_port;
+    int16_t                 rssi_dbm;           /* Last RSSI read, dBm; 0   */
+                                                /* until the first read.    */
     bool                    b_initialised;
     bool                    b_connected;
     bool                    b_subscribed;

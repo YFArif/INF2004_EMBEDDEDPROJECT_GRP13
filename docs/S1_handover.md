@@ -3,7 +3,8 @@
 One page for a teammate who has never run S1 (Buddy 1). Details live in
 `docs/S1_dashboard.md` (every dashboard step, Windows in its section 15),
 `docs/MQTT.md` (the link) and `testing/subsystem1/TEST_LOG.md` (what was
-tested). Run every command from the repository root on macOS unless it
+tested). For the live demo, `docs/S1_demo_day.md` maps each rubric item
+to the dashboard and lists the checks for the day before and the day. Run every command from the repository root on macOS unless it
 says otherwise. On Windows: build the firmware in WSL (`README.md`), and
 run the broker and dashboard in PowerShell with `py -3` instead of
 `python3` (`docs/S1_dashboard.md` section 15).

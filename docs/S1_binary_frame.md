@@ -360,10 +360,10 @@ can trigger; the 10-bit field would clamp at -512 and 511 anyway.
 | version, msg_type | see 2.1 | 8 | 0 | see 2.1 | msg_type = 2 |
 | seq | 0 to 255, modulo | 8 | 8 | guess | Own counter, separate from telemetry. |
 | uptime_s | 0 to 65535 s, saturates | 16 | 16 | guess | About 18 h. |
-| rssi_neg | 0 to 127 = -RSSI in dBm, clamped | 7 | 32 | guess | Always 0 for now ("not measured"). A15: must be read inside the service task. |
+| rssi_neg | 0 to 127 = -RSSI in dBm, clamped | 7 | 32 | from code | Read by `mqtt_link_poll()` in the radio service task, at most every 2 s while a session is up (A15; docs/MQTT.md section 1.2). 0 = not read yet. |
 | connect_count | 0 to 255, saturates | 8 | 39 | guess | `mqtt_link` status `connect_count`. |
 | tel_drop | 0 to 255, saturates | 8 | 47 | from code | Telemetry, live and heartbeat messages the robot did not send: skipped because the publish queue was too full (3.4), or refused by the driver. Since power-up. |
-| evt_drop | 0 to 255, saturates | 8 | 55 | guess | Events dropped on a full `mbf_event`. Always 0 for now: there is no `mbf_event` yet. |
+| evt_drop | 0 to 255, saturates | 8 | 55 | from code | Posts refused by a full `mbf_event` (`s1_event_drop_count()`) plus events the driver refused (docs/MQTT.md section 1.2). |
 | cmd_reject | 0 to 255, saturates | 8 | 63 | guess | Codec rejections, post failures and the driver's `command_dropped` (section 5.1). |
 | padding | 0 | 1 | 71 | - | |
 
@@ -462,7 +462,10 @@ fields, which this layout does not include.
 ## 6. EVENT
 
 Two forms. Inside the robot, every task sends a fixed-size record to
-`mbf_event`. On the wire, S1 adds the header and a time stamp.
+`mbf_event` with `subsystem1_event_post()` (`s1_event.c`, 21 Nov 2026).
+On the wire, `telemetry_task` adds the header and a time stamp
+(`s1_telem_event()`). Codes: S5's table in `s5_event.h` (0x50 to 0x65);
+the dashboard names them (`s1_decode.event_text()`).
 
 `mbf_event` record (inside the robot, set in the shared layout header):
 
@@ -649,7 +652,8 @@ Not in these figures:
   flash").
 - **`mbf_event`.** No code creates it yet: it is to be created by
   `telemetry_task` (planned, Stage 4), not by the Stage 3 adapter. Until
-  then its 2048 -> 240 B stays computed (9.2).
+  then its 2048 -> 240 B stays computed (9.2). (Update, 21 Nov 2026: it
+  now exists, created by `s1_event_init()`, and measures 240 B; 9.2.)
 
 **Tag.** The local annotated tag `pre-minbit` on `a25b9f4` (the last
 commit before any minimum-bit change) lets the "before" be rebuilt at
@@ -803,7 +807,7 @@ so the totals below do not change.
 | `mbf_cmd` (8 records) | 960 B | 480 B | 64 B | 8 x (4 + 4) | measured (rooted map, 0x40) |
 | `mqtt_link.o` bss | 648 B | 452 B | 354 B | `g_pending` 214 -> 80 -> 32, `g_command` 116 -> 54 -> 4 | measured (`arm-none-eabi-size`) |
 | `mqtt_queue.o` bss | 2733 B | 1165 B | 365 B | the two buffers + 13 B of IDs and counters | measured (`arm-none-eabi-size`) |
-| `mbf_event` (30 events) | 2048 B | 240 B | 240 B | 30 x (4 + 4), record 3 B rounded to 4 | computed (to be created by `telemetry_task`, planned, Stage 4) |
+| `mbf_event` (30 events) | 2048 B | 240 B | 240 B | 30 x (4 + 4), record 3 B rounded to 4 | measured 21 Nov 2026: `g_event_buf` 0xF0 B in the linked `NET=lwip MQTT=1` image, `SMP=1` and `SMP=0` (`arm-none-eabi-nm -S`); created by `s1_event_init()` |
 | `telemetry_task` stack | 2048 B (Week 6 design) | - | 2048 B at `cb204b3` | `g_stack`, `TELEMETRY_TASK_STACK_BYTES`. Built; high-water mark not yet measured with the telemetry and live code in. The static estimate for the deepest path is 688 B (`telemetry_task` -> `mqtt_link_publish()` -> `tk_snd_mbf()` and the kernel below it; `-fstack-usage` and `-fcallgraph-info=su`; leaves out indirect calls, interrupt frames and library leaves) | measured size; not in the row below |
 | **S1 static RAM, object level** | **5430 B**, with the computed `mbf_event` | **about 1858 B**, with the computed `mbf_event` | **941 B** at `cb204b3`, without the stack and `mbf_event` (the two rows above) | `mqtt_link.o` 1 data + 354 bss and `mqtt_queue.o` 365 bss (as at `df58a14`), `telemetry_task.o` 212 bss without its stack (`g_src` 92, `g_tel` 52, `g_stats` 36, `g_live` 28, four 1-byte variables), `subsystem1.o` 9 bss (the template LED task's 8 B and `gb_mqtt_ok`); `msg_codec.o`, `s1_telem.o` and `s1_radio.o` 0 | measured (`arm-none-eabi-size` and `nm`, `NET=lwip MQTT=1` objects). Not linked-image figures; see 8.3 for those |
 
@@ -827,10 +831,12 @@ At object level it is 2662 B (3382 -> 1618 -> 720 B: `mqtt_link.o`
 648 + 1 data -> 452 + 1 -> 354 + 1, `mqtt_queue.o` 2733 -> 1165 -> 365);
 the 2 B difference is alignment padding in the linked image. The total
 row's `cb204b3` figure is not comparable with its first two columns: it
-adds `telemetry_task`'s statics and leaves out `mbf_event`. The computed
-`mbf_event` saving of 1808 B (2048 -> 240 B) is only confirmed once
-`mbf_event` exists; it is to be created by `telemetry_task` (planned,
-Stage 4).
+adds `telemetry_task`'s statics and leaves out `mbf_event`. The
+`mbf_event` saving of 1808 B (2048 -> 240 B) is confirmed: the buffer
+exists since 21 Nov 2026 and measures 240 B (the row above). The whole
+Stage 4b change (events and RSSI) costs text +928 B, data +0 and bss
++264 B in the `NET=lwip MQTT=1` image against `main` at `27ad563`, for
+both `SMP=1` and `SMP=0`.
 
 **Codec flash (measured, separate):** the `NET=lwip MQTT=1` image with
 the codec in it (the 11 public codec functions linked as roots) is

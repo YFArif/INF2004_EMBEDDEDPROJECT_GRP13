@@ -593,6 +593,43 @@ class MapMessages(unittest.TestCase):
         self.assertEqual(len(dec.CODE39), 44)
 
 
+class EventNames(unittest.TestCase):
+    """S5's event codes shown by name, with their arguments in S5's units
+    (s5_event.h)."""
+
+    def test_obstacle(self):
+        msg = dec.decode(bytes.fromhex("13520c5a234567"))
+        shown = dec.describe(msg)
+        self.assertEqual(shown["event_name"], "OBST_STOP")
+        self.assertEqual(shown["event_text"], "OBST_STOP 12 cm at 90 deg")
+
+    def test_controller(self):
+        self.assertEqual(dec.event_text(0x60, [3, 2]),
+                         "CTRL_STATE READY -> LINE_FOLLOWING")
+        self.assertEqual(dec.event_text(0x63, [2, 0]),
+                         "CTRL_FAULT STALL")
+        self.assertEqual(dec.event_text(0x64, [4, 95]),
+                         "RUN_DONE 4 barcodes in 95 s")
+        self.assertEqual(dec.event_text(0x65, [2, 1]),
+                         "COMMAND STOP accepted by S5")
+        self.assertEqual(dec.event_text(0x65, [1, 0]),
+                         "COMMAND START refused by S5")
+
+    def test_unknown(self):
+        self.assertEqual(dec.event_text(0x21, [7, 8]),
+                         "0x21 args 7 8")
+
+    def test_names_match_s5(self):
+        """Every code in s5_event.h is named, with S5's own name."""
+        path = ROOT / "app_program" / "subsystem5" / "s5_event.h"
+        with open(path) as handle:
+            text = handle.read()
+        found = dict((int(code, 16), name) for name, code in re.findall(
+            r"S5_EVENT_([A-Z_]+)\s*=\s*0x([0-9A-Fa-f]+)", text))
+        self.assertTrue(found)
+        self.assertEqual(found, dec.EVENT_NAMES)
+
+
 class CommandLine(unittest.TestCase):
     """s1_decode.py reads hex lines from stdin and prints JSON lines."""
 

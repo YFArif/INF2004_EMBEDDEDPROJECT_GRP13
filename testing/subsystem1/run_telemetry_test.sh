@@ -270,8 +270,17 @@ mutate N4 run s1_telem.c \
     's/if (MSG_TYPE_MAP == msg_codec_get_type(/if (MSG_TYPE_ACK == msg_codec_get_type(/' \
     "the MAP path never taken"
 
-echo "stage 3: $CAUGHT/29 mutations caught (C1, M1 to M24, N1 to N4)"
-if [ "$CAUGHT" -ne 29 ] || [ "$MISSED" -ne 0 ]
+mutate M25 run s1_telem.c \
+    's/^                                                   p_stats->evt_publish_failed);/                                                   0U);/' \
+    "refused events left out of evt_drop"
+mutate M26 run s1_telem.c \
+    's/hb_fields.rssi_dbm      = p_in->rssi_dbm;/hb_fields.rssi_dbm      = 0;/' \
+    "rssi sent as 0"
+mutate M27 run s1_telem.c \
+    's/p_evt->qos      = MQTT_LINK_QOS_1;/p_evt->qos      = MQTT_LINK_QOS_0;/' \
+    "events sent at QoS 0"
+echo "stage 3: $CAUGHT/32 mutations caught (C1, M1 to M27, N1 to N4)"
+if [ "$CAUGHT" -ne 32 ] || [ "$MISSED" -ne 0 ]
 then
     fail "3: mutations"
 fi

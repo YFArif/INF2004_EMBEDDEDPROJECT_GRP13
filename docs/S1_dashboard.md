@@ -301,7 +301,7 @@ green light.
 | Uptime | The robot's time since power-up, h:mm:ss (16 bits: wraps after 18.2 h) |
 | connect_count | Broker sessions since power-up; it rises by 1 at each reconnect |
 | cmd_reject | Commands S1 refused: codec rejections, post failures (S5's queue full), maps S3 refused or that were malformed, and commands the driver dropped |
-| rssi | "not measured": always 0 for now, because the robot cannot read the signal strength yet |
+| rssi | The WiFi signal strength in dBm, read by the robot every 2 s while connected (docs/MQTT.md section 1.2). "not measured" until the first read of a session, or on an image older than 21 Nov 2026 |
 | tel_drop / evt_drop | tel_drop: telemetry, live and heartbeat messages the robot did not send since power-up, because its publish queue was too full (it keeps room for acks) or the driver refused them. It should stay 0; if it climbs, the link is too slow for 8 messages a second. It stops at 255, shown as "255 or more": from there the page cannot show new drops until the robot restarts. evt_drop: always 0 for now, no events yet |
 | Heartbeats lost | Gaps in the heartbeat sequence since the dashboard started (heartbeats use QoS 0, so a few can go missing). A robot restart does not count |
 | Telemetry / live lost | Gaps in each message's sequence since the dashboard started: messages the robot handed to the driver that never arrived. A gap of more than 25 is read as a restart and not counted |
@@ -318,6 +318,14 @@ and shows the reason underneath, for example "online, waiting for a
 heartbeat". The buttons are decided by the robot light only, not by the S5
 panel: a START sent while the robot calibrates is acked "queued" and
 refused by S5 (section 9).
+
+**Events** (the event log). Each EVENT on `<prefix>/event` is one log
+line with its name and arguments in S5's units, for example `event
+OBST_STOP 12 cm at 90 deg (robot t=83.4 s)`, `CTRL_STATE READY ->
+LINE_FOLLOWING` or `COMMAND STOP accepted by S5` (S5's verdict on a
+command, which the ack's "queued" does not give). The time is the robot's
+uptime when S1 published it. Events appear only once S5 posts them
+(docs/MQTT.md section 1.2).
 
 **Command results** (the "Last commands" table and the event log).
 "queued" is shown in blue, not green: it means the command reached the

@@ -1697,9 +1697,13 @@ class Dashboard:
         except s1_decode.DecodeError as err:
             self.decode_error(suffix, err)
             return
+        shown = s1_decode.describe(msg)
         self.emit("event", {"code": msg.get("code"), "args": msg.get("args"),
                             "t_ms": msg.get("t_ms"),
-                            "log": "event code %s" % msg.get("code")})
+                            "name": shown.get("event_name"),
+                            "log": "event %s (robot t=%.1f s)"
+                                   % (shown.get("event_text"),
+                                      msg.get("t_ms", 0) / 1000.0)})
 
     def decode_error(self, suffix, err):
         self.emit("decode_error", {"topic_suffix": suffix,

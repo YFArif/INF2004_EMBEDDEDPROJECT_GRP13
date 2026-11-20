@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include "mqtt_link.h"       /* empty unless TM_MQTT (MQTT=1 builds) */
 #include "telemetry_task.h"  /* empty unless TM_MQTT */
+#include "s1_event.h"        /* s1_event_init() only if TM_MQTT */
 
 EXPORT ID	tid_led;	/* IF-05, see subsystem1.h */
 EXPORT ID	cyc_led;
@@ -32,6 +33,14 @@ EXPORT ER subsystem1_init(void)
     else
     {
         gb_mqtt_ok = true;
+    }
+
+    /* mbf_event (FR16). Without it posts are dropped and counted; the car
+       runs on. */
+    if (0 != s1_event_init())
+    {
+        /* The cast is safe: the format string is ASCII. */
+        tm_printf((UB *)"S1: mbf_event not created\n");
     }
 #endif
 

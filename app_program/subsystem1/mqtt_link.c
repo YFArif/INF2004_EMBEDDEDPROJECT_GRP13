@@ -44,6 +44,7 @@
 #include "mqtt_config.h"
 #include "mqtt_link.h"
 #include "mqtt_queue.h"
+#include "s1_radio.h"
 
 #if (MQTT_LINK_CFG_BROKER_PORT < 1U) || (MQTT_LINK_CFG_BROKER_PORT > 65535U)
 #error "mqtt_config.h: MQTT_LINK_CFG_BROKER_PORT must be 1 to 65535"
@@ -83,6 +84,14 @@
  * the poll step gives up after this much time.
  */
 #define CONNECT_TIMEOUT_MSEC    5000U
+
+/* While a session is up, the signal strength is read this often for the
+ * heartbeat (assumption A15). Each read is one request to the radio chip on
+ * this task, a few milliseconds, so it is kept rare.
+ */
+#define RSSI_PERIOD_MSEC        2000U
+#define RSSI_MIN_DBM            (-127)
+#define RSSI_MAX_DBM            0
 
 /* MQTT keep-alive in seconds. lwIP checks it on a 5 s timer
  * (MQTT_CYCLIC_TIMER_INTERVAL, mqtt_cyclic_timer() in lwIP's mqtt.c). With
@@ -258,6 +267,8 @@ static uint32_t                    g_pending_attempts = 0U;
 static uint32_t                    g_step_start_msec = 0U;
 static uint32_t                    g_session_start_msec = 0U;
 static uint32_t                    g_backoff_msec = 0U;
+static uint32_t                    g_rssi_read_msec = 0U;
+static bool                        gb_rssi_ever_read = false;
 
 /* Suffix of each topic ID, indexed by the ID. */
 static const char * const       gp_topic_suffix[] =
@@ -285,6 +296,7 @@ static void step_connecting(const struct netif * p_netif,
 static void step_connected(const struct netif * p_netif,
                            uint32_t now_msec);
 static void step_backoff(uint32_t now_msec);
+static void read_rssi(uint32_t now_msec);
 static void step_subscribe(uint32_t now_msec);
 static void step_publish(uint32_t now_msec);
 static void resolve_broker(uint32_t now_msec);
@@ -737,6 +749,50 @@ step_connected (const struct netif * p_netif, uint32_t now_msec)
     {
         step_subscribe(now_msec);
         step_publish(now_msec);
+        read_rssi(now_msec);
+    }
+}
+
+/*!
+ * @brief Read the signal strength into the status, at most every
+ *        RSSI_PERIOD_MSEC.
+ *
+ * Runs on the radio service task (mqtt_link_poll()), the only task that may
+ * ask the radio chip (TEAM.md section 3). A failed read keeps the last
+ * value; the next try is one period later. The value is clamped to the
+ * heartbeat's range, -127 to 0 dBm.
+ *
+ * @param[in] now_msec The clock now.
+ */
+static void
+read_rssi (uint32_t now_msec)
+{
+    int32_t rssi = 0;
+
+    if ((!gb_rssi_ever_read)
+        || ((now_msec - g_rssi_read_msec) >= RSSI_PERIOD_MSEC))
+    {
+        gb_rssi_ever_read = true;
+        g_rssi_read_msec  = now_msec;
+
+        if (s1_radio_rssi_read(&rssi))
+        {
+            if (rssi < RSSI_MIN_DBM)
+            {
+                rssi = RSSI_MIN_DBM;
+            }
+            else if (rssi > RSSI_MAX_DBM)
+            {
+                rssi = RSSI_MAX_DBM;
+            }
+            else
+            {
+                /* Already in range. */
+            }
+
+            /* The cast is safe: rssi was clamped to -127 ... 0. */
+            g_status.rssi_dbm = (int16_t)rssi;
+        }
     }
 }
 

@@ -82,6 +82,7 @@
 #define HDR_MAP                 0x17U
 #define HDR_ACK                 0x15U
 #define HDR_HEARTBEAT           0x12U
+#define HDR_EVENT               0x13U
 
 /* Third ack byte: the 2-bit result at the top, padding below. */
 #define ACK_BYTE2_QUEUED        0x00U
@@ -482,7 +483,7 @@ test_null_arguments (void)
     mqtt_link_command_t cmd = make_cmd(HDR_COMMAND, 0x85U, 2U);
     s1_telem_stats_t    stats;
     s1_telem_pub_t      pub;
-    s1_telem_hb_in_t    hb_in = {0U, 0U, 0U};
+    s1_telem_hb_in_t    hb_in = {0U, 0U, 0U, 0U, 0};
 
     (void)memset(&stats, 0, sizeof(stats));
     stub_reset(E_OK_VALUE);
@@ -513,7 +514,7 @@ test_heartbeat_bytes (void)
      */
     static const uint8_t want[9] = {HDR_HEARTBEAT, 0x01U, 0x00U, 0x02U,
                                     0x00U, 0x06U, 0x00U, 0x00U, 0x08U};
-    s1_telem_hb_in_t     hb_in = {2U, 3U, 1U};
+    s1_telem_hb_in_t     hb_in = {2U, 3U, 1U, 0U, 0};
     s1_telem_stats_t     stats;
     s1_telem_pub_t       hb_msg;
 
@@ -546,7 +547,7 @@ test_heartbeat_bytes (void)
 static void
 test_heartbeat_saturation (void)
 {
-    s1_telem_hb_in_t hb_in = {70000U, 300U, 10U};
+    s1_telem_hb_in_t hb_in = {70000U, 300U, 10U, 0U, 0};
     s1_telem_stats_t stats;
     s1_telem_pub_t   hb_msg;
 
@@ -572,6 +573,72 @@ test_heartbeat_saturation (void)
           0U);
     check(3U == s1_telem_sat_add(1U, 2U), "sat_add 1+2", 0U);
     check(0U == s1_telem_sat_add(0U, 0U), "sat_add 0+0", 0U);
+}
+
+/*!
+ * @brief rssi and evt_drop in the heartbeat (section 4).
+ */
+static void
+test_heartbeat_rssi_evt_drop (void)
+{
+    /* rssi -60 is 60 in bits 32-38: byte 4 is 0111 100(0) = 0x78.
+     * evt_drop 3 + 4 = 7 in bits 55-62: byte 6 bit 0 is 0, byte 7 is
+     * 0000 111(0) = 0x0E. Everything else is 0.
+     */
+    static const uint8_t want[9] = {HDR_HEARTBEAT, 0x00U, 0x00U, 0x00U,
+                                    0x78U, 0x00U, 0x00U, 0x0EU, 0x00U};
+    s1_telem_hb_in_t     hb_in = {0U, 0U, 0U, 3U, -60};
+    s1_telem_stats_t     stats;
+    s1_telem_pub_t       hb_msg;
+
+    /* The cast discards memset()'s return value, which is only its first
+     * argument.
+     */
+    (void)memset(&stats, 0, sizeof(stats));
+    stats.evt_publish_failed = 4U;
+    /* Published events are not drops. */
+    stats.evt_published      = 90U;
+
+    check((s1_telem_heartbeat(0U, &hb_in, &stats, &hb_msg))
+          && (bytes_equal(hb_msg.payload, want, 9U)),
+          "hb: rssi -60, evt_drop = mbf drops + refused events", 0U);
+
+    /* -127 dBm is the field's largest, 127: byte 4 is 1111 111(0). 250 +
+     * 10 saturates evt_drop at 255: byte 6 bit 0 and byte 7 bits 7-1 set.
+     */
+    hb_in.rssi_dbm           = -127;
+    hb_in.evt_mbf_dropped    = 250U;
+    stats.evt_publish_failed = 10U;
+    check((s1_telem_heartbeat(0U, &hb_in, &stats, &hb_msg))
+          && (0xFEU == hb_msg.payload[4])
+          && (0x01U == (hb_msg.payload[6] & 0x01U))
+          && (0xFEU == hb_msg.payload[7]),
+          "hb: rssi -127, evt_drop 260 -> 255", 0U);
+}
+
+/*!
+ * @brief One event, byte for byte (section 6), and how it is sent.
+ */
+static void
+test_event_bytes (void)
+{
+    /* code 0x52 (S5 OBST_STOP), args 12 cm and 90 degrees, t_ms
+     * 0x01234567: only the low 24 bits, 0x234567, are sent.
+     */
+    static const uint8_t     want[7] = {HDR_EVENT, 0x52U, 0x0CU, 0x5AU,
+                                        0x23U, 0x45U, 0x67U};
+    const msg_layout_event_t record = {0x52U, {12U, 90U}};
+    s1_telem_pub_t           evt;
+
+    check(s1_telem_event(&record, 0x01234567U, &evt), "event: returns true",
+          0U);
+    check(MSG_EVT_BYTES == evt.len, "event: length", evt.len);
+    check(bytes_equal(evt.payload, want, 7U), "event: bytes", 0U);
+    check(MQTT_LINK_TOPIC_EVENT == evt.topic, "event: event topic", 0U);
+    check(MQTT_LINK_QOS_1 == evt.qos, "event: QoS 1", 0U);
+    check(!evt.b_retain, "event: not retained", 0U);
+    check(!s1_telem_event(NULL, 0U, &evt), "event: null record", 0U);
+    check(!s1_telem_event(&record, 0U, NULL), "event: null out", 0U);
 }
 
 /*!
@@ -698,6 +765,8 @@ main (void)
     test_heartbeat_bytes();
     test_heartbeat_saturation();
     test_heartbeat_tel_drop();
+    test_heartbeat_rssi_evt_drop();
+    test_event_bytes();
     group_end();
 
     group_begin("schedule");
@@ -1049,7 +1118,7 @@ test_heartbeat_tel_drop (void)
      */
     static const uint8_t   want[9] = {HDR_HEARTBEAT, 0x00U, 0x00U, 0x00U,
                                       0x00U, 0x00U, 0x12U, 0x00U, 0x00U};
-    const s1_telem_hb_in_t hb_in = {0U, 0U, 0U};
+    const s1_telem_hb_in_t hb_in = {0U, 0U, 0U, 0U, 0};
     s1_telem_stats_t       stats;
     s1_telem_pub_t         hb_msg;
 
@@ -1719,7 +1788,7 @@ static void
 test_map_null_and_sum (void)
 {
     mqtt_link_command_t cmd = make_map(g_map1, MSG_MAP_BYTES);
-    s1_telem_hb_in_t    hb_in = {2U, 3U, 4U};
+    s1_telem_hb_in_t    hb_in = {2U, 3U, 4U, 0U, 0};
     s1_telem_stats_t    stats;
     s1_telem_pub_t      pub;
 
