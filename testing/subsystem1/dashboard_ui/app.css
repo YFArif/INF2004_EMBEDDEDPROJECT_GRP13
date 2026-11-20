@@ -352,6 +352,9 @@ button.scene-chip { min-height: var(--target); font-weight: 600; }
 
 /* -- The number cards --------------------------------------------------- */
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
+/* Attitude: six values in two rows of three, so the card is no taller than
+ * the other number cards (the page fits 1700 x 900 without scrolling). */
+.stats3 { grid-template-columns: 1fr 1fr 1fr; gap: 12px 12px; }
 .val {
   font-size: var(--fs-title1); line-height: var(--lh-title1);
   letter-spacing: var(--tr-title1); font-weight: 600;

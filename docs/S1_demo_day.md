@@ -18,7 +18,7 @@ happen, so keep the page on screen for the whole run.
 | Send telemetry data via MQTT | S1 | Robot light green, heartbeat age under 3 s, the summary cards and 3D view moving; "Telemetry / live lost" near 0 |
 | Detect a barcode | S3 | S3 panel: a new barcode entry in the timeline; the Latest events line |
 | Decode the barcode and obtain the code | S3 | S3 panel: the last barcode letter and its command (LEFT, RIGHT, STRAIGHT, U-TURN) |
-| Measure hump height | S4 | S4 panel: hump state, peak height in mm, hump count |
+| Measure hump height | S4 | Front page, Attitude card: Hump height in mm (S4's run peak), the hump state and Humps passed |
 | Follow the line | S3, S2 | S3 line state FOLLOW; S2 motion FOLLOWING; the measured speed |
 | Follow the instruction from the barcode | S3, S5, S2 | S3 junction turn; S5 state EXECUTING_COMMAND; the heading changes by the turn |
 | Detect an obstacle | S5 | S5 panel: closest obstacle range; events `OBST_NEAR`, `OBST_STOP` |
