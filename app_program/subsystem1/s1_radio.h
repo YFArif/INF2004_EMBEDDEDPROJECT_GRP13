@@ -4,7 +4,8 @@
 
 /** @file s1_radio.h
  *
- * @brief Reads the radio link state for S1 code that also uses the kernel.
+ * @brief Reads the radio link state for S1 code that also uses the kernel,
+ *        and the signal strength for the MQTT driver.
  *
  * @par Why it is separate
  * CYW43_LINK_UP is defined in cyw43.h, which must not be included next to the
@@ -31,6 +32,12 @@
 #include <stdint.h>
 
 bool s1_radio_link_read(int32_t * p_link_status);
+
+/* WARNING: s1_radio_rssi_read() asks the radio chip (an ioctl, a few ms), so
+ * only the radio service task, cyw43_utk_task, may call it (TEAM.md section
+ * 3). mqtt_link_poll() calls it there; no application task may.
+ */
+bool s1_radio_rssi_read(int32_t * p_rssi_dbm);
 
 #endif /* TM_MQTT */
 

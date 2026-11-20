@@ -28,11 +28,12 @@
 #define MAP_LETTERS                 4U
 #define MAP_TEXT_BYTES              (MAP_LETTERS + 1U)
 
-/* Both messages this module builds must fit one s1_telem_pub_t, and a
+/* The messages this module builds must fit one s1_telem_pub_t, and a
  * length must fit its uint16_t.
  */
 typedef uint8_t s1_telem_check_pub_t[((MSG_ACK_BYTES <= S1_TELEM_PUB_MAX)
     && (MSG_HB_BYTES <= S1_TELEM_PUB_MAX)
+    && (MSG_EVT_BYTES <= S1_TELEM_PUB_MAX)
     && (S1_TELEM_PUB_MAX <= UINT16_MAX)) ? 1 : -1];
 
 /* S3 takes exactly MAP_LETTERS letters (S3_NAV_MAP_LEN). */
@@ -129,16 +130,15 @@ s1_telem_on_command (const mqtt_link_command_t * p_cmd,
 /*!
  * @brief Pack one heartbeat (docs/S1_binary_frame.md section 4).
  *
- * rssi is sent as 0: no RSSI can be read outside the radio service task
- * yet (assumption A15), and 0 dBm never occurs on a real link, so it
- * reads as "not measured". tel_drop is the sum of the periodic messages
- * the queue rule skipped and the ones the driver refused (telemetry, live
- * and heartbeats). cmd_reject is the sum of the codec rejections, the post
- * failures, the refused or malformed MAPs and the driver's command_dropped.
- * The codec saturates every count at its field's largest value.
- *
- * TODO: evt_drop is 0: there is no mbf_event yet. Count its drops when
- * Stage 4b adds it.
+ * rssi is the driver's last reading, taken in the radio service task
+ * (assumption A15); 0 means not measured yet, since 0 dBm never occurs on
+ * a real link. tel_drop is the sum of the periodic messages the queue rule
+ * skipped and the ones the driver refused (telemetry, live and
+ * heartbeats). evt_drop is the sum of the posts mbf_event refused and the
+ * events the driver refused. cmd_reject is the sum of the codec
+ * rejections, the post failures, the refused or malformed MAPs and the
+ * driver's command_dropped. The codec saturates every count at its field's
+ * largest value.
  *
  * @param[in]  seq     Heartbeat counter, modulo 256.
  * @param[in]  p_in    Uptime and driver counts.
@@ -159,13 +159,14 @@ s1_telem_heartbeat (uint8_t seq, const s1_telem_hb_in_t * p_in,
     {
         hb_fields.seq           = seq;
         hb_fields.uptime_s      = p_in->uptime_s;
-        hb_fields.rssi_dbm      = 0;
+        hb_fields.rssi_dbm      = p_in->rssi_dbm;
         hb_fields.connect_count = p_in->connect_count;
         hb_fields.tel_drop      = s1_telem_sat_add(
             s1_telem_sat_add(p_stats->periodic_skipped,
                              p_stats->periodic_failed),
             p_stats->hb_publish_failed);
-        hb_fields.evt_drop      = 0U;
+        hb_fields.evt_drop      = s1_telem_sat_add(p_in->evt_mbf_dropped,
+                                                   p_stats->evt_publish_failed);
         hb_fields.cmd_reject    = s1_telem_sat_add(
             s1_telem_sat_add(
                 s1_telem_sat_add(p_stats->codec_reject,
@@ -182,6 +183,43 @@ s1_telem_heartbeat (uint8_t seq, const s1_telem_hb_in_t * p_in,
         p_hb->len = (uint16_t)msg_codec_put_heartbeat(
             &hb_fields, p_hb->payload, sizeof(p_hb->payload));
         b_ok      = (MSG_HB_BYTES == p_hb->len);
+    }
+
+    return (b_ok);
+}
+
+/*!
+ * @brief Pack one event for the wire (docs/S1_binary_frame.md section 6).
+ *
+ * @param[in]  p_event The record taken from mbf_event.
+ * @param[in]  t_ms    Robot uptime in milliseconds when it was taken; the
+ *                     codec sends the low 24 bits.
+ * @param[out] p_evt   Receives the event and how to publish it: topic
+ *                     MQTT_LINK_TOPIC_EVENT, QoS 1, not retained.
+ *
+ * @return True if p_evt holds an event; false only for a NULL argument.
+ */
+bool
+s1_telem_event (const msg_layout_event_t * p_event, uint32_t t_ms,
+                s1_telem_pub_t * p_evt)
+{
+    msg_codec_event_t evt = {{0U, {0U}}, 0U};
+    bool              b_ok = false;
+
+    if ((NULL != p_event) && (NULL != p_evt))
+    {
+        evt.event = *p_event;
+        evt.t_ms  = t_ms;
+
+        p_evt->topic    = MQTT_LINK_TOPIC_EVENT;
+        p_evt->qos      = MQTT_LINK_QOS_1;
+        p_evt->b_retain = false;
+        /* The event is MSG_EVT_BYTES long, which the compile-time check
+         * above keeps within uint16_t.
+         */
+        p_evt->len = (uint16_t)msg_codec_put_event(&evt, p_evt->payload,
+                                                   sizeof(p_evt->payload));
+        b_ok       = (MSG_EVT_BYTES == p_evt->len);
     }
 
     return (b_ok);

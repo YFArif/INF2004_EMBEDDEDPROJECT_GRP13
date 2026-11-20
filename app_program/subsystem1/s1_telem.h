@@ -61,8 +61,8 @@
  */
 #define S1_TELEM_HB_PERIOD_MSEC     1000U
 
-/* Payload room in one s1_telem_pub_t: the larger of the ack and the
- * heartbeat. s1_telem.c checks both fit at compile time.
+/* Payload room in one s1_telem_pub_t: the largest of the ack, the event
+ * and the heartbeat. s1_telem.c checks all three fit at compile time.
  */
 #define S1_TELEM_PUB_MAX            MSG_HB_BYTES
 
@@ -90,6 +90,15 @@
 #define S1_TELEM_TEL_QUEUED_MAX     1U
 #define S1_TELEM_LIVE_QUEUED_MAX    1U
 #define S1_TELEM_HB_QUEUED_MAX      3U
+
+/* Events (FR16) wait in mbf_event, not in the publish queue: telemetry_task
+ * takes one only while at most this many records are queued, so a burst of
+ * events cannot fill the queue in front of an ack. At most
+ * S1_TELEM_EVT_PER_PASS events are taken in one pass (one pass is at most
+ * TELEMETRY_TASK_RX_WAIT_MSEC, 50 ms).
+ */
+#define S1_TELEM_EVT_QUEUED_MAX     2U
+#define S1_TELEM_EVT_PER_PASS       2U
 
 /* S3's UNCAL line state and S4's LIFTED and OVERTURNED motion classes. UNCAL
  * is sent when S3 cannot be read; while S4's stop is latched the class is
@@ -135,6 +144,9 @@ typedef struct
     uint32_t    periodic_failed;    /* Telemetry and live messages        */
                                     /* mqtt_link_publish() refused.       */
     uint32_t    rx_error;           /* Kernel errors while receiving.     */
+    uint32_t    evt_published;      /* Events queued for publishing.      */
+    uint32_t    evt_publish_failed; /* Events mqtt_link_publish() refused */
+                                    /* or the codec could not pack.       */
 } s1_telem_stats_t;
 
 /** One message for mqtt_link_publish(): its topic, how it is sent and
@@ -214,6 +226,10 @@ typedef struct
     uint32_t    uptime_s;           /* Seconds since boot.                */
     uint32_t    connect_count;      /* mqtt_link status connect_count.    */
     uint32_t    command_dropped;    /* mqtt_link status command_dropped.  */
+    uint32_t    evt_mbf_dropped;    /* s1_event_drop_count(): posts       */
+                                    /* mbf_event refused.                 */
+    int16_t     rssi_dbm;           /* mqtt_link status rssi_dbm; 0 =     */
+                                    /* not measured.                      */
 } s1_telem_hb_in_t;
 
 /** What the WiFi fault rule reads on each pass of telemetry_task. */
@@ -236,6 +252,8 @@ bool     s1_telem_on_command(const mqtt_link_command_t * p_cmd,
 bool     s1_telem_heartbeat(uint8_t seq, const s1_telem_hb_in_t * p_in,
                             const s1_telem_stats_t * p_stats,
                             s1_telem_pub_t * p_hb);
+bool     s1_telem_event(const msg_layout_event_t * p_event, uint32_t t_ms,
+                        s1_telem_pub_t * p_evt);
 bool     s1_telem_hb_due(uint32_t now_msec, uint32_t * p_next_msec);
 bool     s1_telem_hb_should_publish(mqtt_link_state_t state, bool b_stale);
 bool     s1_telem_due(uint32_t now_msec, uint32_t period_msec,

@@ -26,6 +26,16 @@
  * S1_TELEM_HB_QUEUED_MAX. A message held back is counted, not retried. Acks
  * are never held back.
  *
+ * @par Events (FR16)
+ * Other tasks post event records to mbf_event with subsystem1_event_post()
+ * (s1_event.c). On each pass this task takes up to S1_TELEM_EVT_PER_PASS of
+ * them, stamps each with the uptime and publishes it on <prefix>/event at
+ * QoS 1. It takes one only while the publish queue holds at most
+ * S1_TELEM_EVT_QUEUED_MAX records, so events wait in mbf_event rather than
+ * in front of an ack. Events are sent whether or not the session is up, like
+ * acks: while it is down they wait in the publish queue, then in mbf_event,
+ * and are dropped and counted (evt_drop) only once both are full.
+ *
  * @par WiFi fault bit
  * On each pass this task reads the radio link and the driver status and
  * applies s1_telem_wifi_update(). S1 sets and clears S5_FAULT_WIFI itself, as
@@ -55,6 +65,7 @@
 #include "msg_codec.h"
 #include "msg_layout.h"
 #include "mqtt_link.h"
+#include "s1_event.h"
 #include "s1_radio.h"
 #include "s1_telem.h"
 
@@ -146,6 +157,8 @@ static void     telemetry_task(INT stacd, void * p_exinf);
 static int32_t  post_to_s5(uint8_t opcode, uint8_t cmd_id);
 static int32_t  apply_map(const char * p_letters);
 static void     handle_command(const mqtt_link_command_t * p_cmd);
+static void     send_events(void);
+static void     publish_event(const msg_layout_event_t * p_event);
 static void     update_wifi_fault(void);
 static void     print_wifi_change(int32_t link_status,
                                   const mqtt_link_status_t * p_status);
@@ -281,6 +294,7 @@ telemetry_task (INT stacd, void * p_exinf)
             (void)tk_dly_tsk((TMO)TELEMETRY_TASK_RX_WAIT_MSEC);
         }
 
+        send_events();
         update_wifi_fault();
 
         if (s1_telem_hb_due(now_msec(), &next_hb_msec))
@@ -375,6 +389,63 @@ handle_command (const mqtt_link_command_t * p_cmd)
             g_stats.ack_publish_failed =
                 s1_telem_sat_add(g_stats.ack_publish_failed, 1U);
         }
+    }
+}
+
+/*!
+ * @brief Take up to S1_TELEM_EVT_PER_PASS events from mbf_event and publish
+ *        them, while the publish queue is short enough.
+ *
+ * An event is taken only when it can be handed to the driver at once, so
+ * one left waiting stays in mbf_event, in order.
+ */
+static void
+send_events (void)
+{
+    msg_layout_event_t record = {0U, {0U}};
+    uint32_t           taken = 0U;
+    bool               b_more = true;
+
+    while (b_more && (taken < S1_TELEM_EVT_PER_PASS))
+    {
+        if (!s1_telem_queue_allows(mqtt_link_publish_free(),
+                                   S1_TELEM_EVT_QUEUED_MAX))
+        {
+            b_more = false;
+        }
+        else if (!s1_event_take(&record))
+        {
+            b_more = false;
+        }
+        else
+        {
+            taken++;
+            publish_event(&record);
+        }
+    }
+}
+
+/*!
+ * @brief Stamp one event with the uptime, pack it and hand it to the driver.
+ *
+ * @param[in] p_event The record taken from mbf_event.
+ */
+static void
+publish_event (const msg_layout_event_t * p_event)
+{
+    s1_telem_pub_t evt = {MQTT_LINK_TOPIC_EVENT, MQTT_LINK_QOS_1, false, 0U,
+                          {0U}};
+
+    if ((!s1_telem_event(p_event, now_msec(), &evt))
+        || (MQTT_LINK_OK != mqtt_link_publish(evt.topic, evt.payload, evt.len,
+                                              evt.qos, evt.b_retain)))
+    {
+        g_stats.evt_publish_failed =
+            s1_telem_sat_add(g_stats.evt_publish_failed, 1U);
+    }
+    else
+    {
+        g_stats.evt_published = s1_telem_sat_add(g_stats.evt_published, 1U);
     }
 }
 
@@ -484,13 +555,15 @@ send_heartbeat (void)
 static void
 publish_heartbeat (const mqtt_link_status_t * p_status)
 {
-    s1_telem_hb_in_t hb_in = {0U, 0U, 0U};
+    s1_telem_hb_in_t hb_in = {0U, 0U, 0U, 0U, 0};
     s1_telem_pub_t   hb_msg = {MQTT_LINK_TOPIC_TELEMETRY, MQTT_LINK_QOS_0,
                                false, 0U, {0U}};
 
     hb_in.uptime_s        = uptime_s();
     hb_in.connect_count   = p_status->connect_count;
     hb_in.command_dropped = p_status->command_dropped;
+    hb_in.evt_mbf_dropped = s1_event_drop_count();
+    hb_in.rssi_dbm        = p_status->rssi_dbm;
 
     if (!s1_telem_heartbeat(g_hb_seq, &hb_in, &g_stats, &hb_msg))
     {

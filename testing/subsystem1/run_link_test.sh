@@ -118,7 +118,7 @@ echo "== stage 3: compile-time checks"
 BASE="$WORK/base"
 mkdir -p "$BASE"
 cp "$CODEC_DIR/mqtt_link.c" "$CODEC_DIR/mqtt_link.h" "$CODEC_DIR/mqtt_queue.h" \
-   "$CODEC_DIR/msg_layout.h" "$BASE/"
+   "$CODEC_DIR/msg_layout.h" "$CODEC_DIR/s1_radio.h" "$BASE/"
 sed 's/^\(#define MQTT_LINK_CFG_SET  *\)0$/\11/' \
     "$CODEC_DIR/mqtt_config.example.h" >"$BASE/mqtt_config.h"
 if cmp -s "$CODEC_DIR/mqtt_config.example.h" "$BASE/mqtt_config.h"
@@ -151,7 +151,7 @@ copy_to ()
 {
     mkdir -p "$1"
     cp "$BASE/mqtt_link.c" "$BASE/mqtt_link.h" "$BASE/mqtt_queue.h" \
-       "$BASE/msg_layout.h" "$BASE/mqtt_config.h" "$1/"
+       "$BASE/msg_layout.h" "$BASE/s1_radio.h" "$BASE/mqtt_config.h" "$1/"
     sed "$3" "$BASE/$2" >"$1/$2"
 
     if cmp -s "$BASE/$2" "$1/$2"

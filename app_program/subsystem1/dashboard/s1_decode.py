@@ -166,6 +166,26 @@ MAP_SLOTS = (("letter_left", "LEFT"), ("letter_right", "RIGHT"),
 # (S5_FAULT_xxx in subsystem5.h).
 FAULT_NAMES = {0: "stall", 1: "encoder", 2: "imu", 3: "no echo", 4: "wifi"}
 
+# Event codes (S5's s5_event_code_t in app_program/subsystem5/s5_event.h;
+# codes 0x10-0x4F are kept for S1 to S4 and none is defined yet).
+EVENT_NAMES = {0x50: "OBST_NEAR", 0x51: "OBST_CLEAR", 0x52: "OBST_STOP",
+               0x53: "SCAN_START", 0x54: "PROFILE", 0x55: "SCAN_CLEAR",
+               0x56: "SCAN_ABORT", 0x57: "OBST_PASSED", 0x58: "SENSOR_FAULT",
+               0x60: "CTRL_STATE", 0x61: "AVOID_PLAN", 0x62: "AVOID_STEP",
+               0x63: "CTRL_FAULT", 0x64: "RUN_DONE", 0x65: "COMMAND"}
+# S5's obstacle events: args = {distance in cm, servo angle in degrees};
+# the distance is the width for PROFILE and the depth for OBST_PASSED.
+EVENT_OBSTACLE_FIRST = 0x50
+EVENT_OBSTACLE_LAST = 0x58
+EVENT_CTRL_STATE = 0x60
+EVENT_CTRL_FAULT = 0x63
+EVENT_RUN_DONE = 0x64
+EVENT_COMMAND = 0x65
+# S5's s5_mission_fault_t (subsystem5.h), the argument of CTRL_FAULT.
+CTRL_FAULT_NAMES = {0: "NONE", 1: "IMPACT", 2: "STALL", 3: "SENSOR",
+                    4: "NO_PATH", 5: "LINE_NOT_FOUND", 6: "MOTION_TIMEOUT",
+                    7: "SCAN_TIMEOUT", 8: "OTHER", 9: "OVERTURNED"}
+
 # Names the owners' code defines. A value outside a table is shown as its
 # number (see name_of()), so a state that is added later still displays.
 # S2: subsystem2_state_t.
@@ -297,11 +317,36 @@ def ack_is_map(msg):
     return (msg["opcode"] == ACK_OP_MAP) and (msg["cmd_id"] != 0)
 
 
+def event_text(code, args):
+    """One line for an event: its name and its arguments in S5's units.
+
+    An unknown code, or a code whose arguments have no agreed meaning,
+    shows its number and the two raw bytes.
+    """
+    name = EVENT_NAMES.get(code, "0x%02x" % code)
+    a, b = args[0], args[1]
+    if EVENT_OBSTACLE_FIRST <= code <= EVENT_OBSTACLE_LAST:
+        text = "%s %d cm at %d deg" % (name, a, b)
+    elif code == EVENT_CTRL_STATE:
+        text = "%s %s -> %s" % (name, name_of(CTRL_NAMES, b),
+                                name_of(CTRL_NAMES, a))
+    elif code == EVENT_CTRL_FAULT:
+        text = "%s %s" % (name, name_of(CTRL_FAULT_NAMES, a))
+    elif code == EVENT_RUN_DONE:
+        text = "%s %d barcodes in %d s" % (name, a, b)
+    elif code == EVENT_COMMAND:
+        text = "%s %s %s by S5" % (name, name_of(OPCODE_NAMES, a),
+                                   "accepted" if b else "refused")
+    else:
+        text = "%s args %d %d" % (name, a, b)
+    return text
+
+
 def describe(msg):
     """Return a copy of a decoded message with display-only fields added.
 
     Only names and units the owners' code defines are added (the tables
-    above). Event codes stay numbers until S5's table is agreed.
+    above), including S5's event codes (s5_event.h).
     """
     shown = dict(msg)
     if msg["msg_type"] == TELEMETRY:
@@ -335,6 +380,10 @@ def describe(msg):
         if msg["msg_type"] == ACK:
             shown["result_name"] = RESULT_NAMES.get(
                 msg["result"], "reserved %d" % msg["result"])
+    elif msg["msg_type"] == EVENT:
+        shown["event_name"] = EVENT_NAMES.get(msg["code"],
+                                              "0x%02x" % msg["code"])
+        shown["event_text"] = event_text(msg["code"], msg["args"])
     elif msg["msg_type"] == MAP:
         shown["letters"] = map_letters(msg)
         shown["map_text"] = map_text(shown["letters"])

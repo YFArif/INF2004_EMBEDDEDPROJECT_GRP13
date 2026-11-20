@@ -320,6 +320,22 @@ mqtt_queue_barrier (void)
     /* The host test runs on one thread: there is nothing to order. */
 }
 
+/*!
+ * @brief Stub: the host has no radio, so no RSSI is ever read.
+ *
+ * @param[out] p_rssi_dbm Unused.
+ *
+ * @return False.
+ */
+bool
+s1_radio_rssi_read (int32_t * p_rssi_dbm)
+{
+    /* The cast marks the argument as unused. */
+    (void)p_rssi_dbm;
+
+    return (false);
+}
+
 /* The lwIP stubs. Only test_connect_info() and test_topic_mapping() reach
  * any of them. Two record what they are given, for those tests to read:
  * mqtt_client_connect() the keep-alive and mqtt_publish() the topic. The
