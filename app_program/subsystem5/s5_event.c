@@ -7,6 +7,7 @@
 
 #include <tm/tmonitor.h>    /* tm_printf() console output.              */
 
+#include "../subsystem1/subsystem1.h"  /* subsystem1_event_post().   */
 #include "s5_event.h"
 
 #define MM_PER_CM           (10u)
@@ -32,8 +33,11 @@ s5_event_post (s5_event_code_t code, uint32_t dist_mm, int32_t angle_deg)
     uint8_t arg_cm  = to_arg_cm(dist_mm);
     uint8_t arg_deg = to_arg_deg(angle_deg);
 
-    // TODO: Send {code, arg_cm, arg_deg} to S1's mbf_event with TMO_POL
-    // once it exists.
+    // NOTE: subsystem1_event_post() never waits (TMO_POL); a full
+    // mbf_event drops the event and S1 counts it (heartbeat evt_drop). The
+    // cast is safe: every code in s5_event_code_t is 0x50 to 0x65.
+    (void) subsystem1_event_post((uint8_t) code, arg_cm, arg_deg);
+
     // NOTE: The casts are safe: format strings are ASCII, and every value
     // is 0 to 255, which an int (%d, %x) always holds.
     tm_printf((UB *) "[S5] EVT 0x%02x d=%dcm a=%ddeg\n",
@@ -53,9 +57,11 @@ s5_event_post_args (s5_event_code_t code, uint32_t arg_a, uint32_t arg_b)
     uint32_t byte_a = (arg_a > ARG_MAX) ? ARG_MAX : arg_a;
     uint32_t byte_b = (arg_b > ARG_MAX) ? ARG_MAX : arg_b;
 
-    // TODO: Send {code, byte_a, byte_b} to S1's mbf_event, as above.
-    // NOTE: The casts are safe: format strings are ASCII, and every value
-    // is 0 to 255.
+    // NOTE: As above. The casts are safe: the code is 0x60 to 0x65, both
+    // bytes were limited to 255, and format strings are ASCII.
+    (void) subsystem1_event_post((uint8_t) code, (uint8_t) byte_a,
+                                 (uint8_t) byte_b);
+
     tm_printf((UB *) "[S5] EVT 0x%02x a=%d b=%d\n",
               (int) code, (int) byte_a, (int) byte_b);
 }

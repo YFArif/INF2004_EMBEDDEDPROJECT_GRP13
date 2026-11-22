@@ -15,9 +15,9 @@
  * 0x10-0x1F S1, 0x20-0x2F S2, 0x30-0x3F S3, 0x40-0x4F S4, 0x50-0x6F S5.
  * 0x00 is never used.
  *
- * TODO: S1's mbf_event is not built yet (its Stage 3). Until then
- * s5_event_post() prints the event on the console; s5_event.c is the
- * only file to change when mbf_event arrives.
+ * Each event goes to S1's mbf_event (subsystem1_event_post(), which
+ * never waits) and is published on <prefix>/event; it is also printed on
+ * the console. Without MQTT, subsystem1_event_post() does nothing.
  */
 
 #ifndef S5_EVENT_H

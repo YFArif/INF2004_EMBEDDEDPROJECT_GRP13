@@ -13,7 +13,8 @@
  *
  * @par When another subsystem is merged
  * - S4: return S4's "calibration done" in s5_links_imu_cal_done().
- * - S1: call subsystem1_ack_send() in s5_links_ack().
+ * - S1: the verdict reaches the dashboard as event S5_EVENT_COMMAND
+ *   (s5_links_ack()); S1's ack itself means "queued for S5".
  */
 
 #include <stdbool.h>
@@ -583,12 +584,13 @@ s5_links_imu_cal_done (void)
 void
 s5_links_ack (uint8_t opcode, uint8_t cmd_id, bool b_accepted)
 {
-    // TODO: subsystem1_ack_send(opcode, cmd_id, result), once merged.
+    // NOTE: S1 acked the command when it was queued; the verdict goes to
+    // the dashboard as event S5_EVENT_COMMAND {opcode, accepted}.
     s5_event_trace("LINK S1 stand-in: ack opcode accepted", opcode,
                    b_accepted ? 1 : 0);
     s5_event_post_args(S5_EVENT_COMMAND, opcode, b_accepted ? 1u : 0u);
 
-    // The id is only needed by the real link.
+    // The event has no room for the id: the dashboard matches the opcode.
     (void) cmd_id;
 }
 
