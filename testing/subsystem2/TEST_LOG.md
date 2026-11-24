@@ -4,6 +4,24 @@
 
 See `testing/README.md` for how to run tests and record results.
 
+## Tribunal 1 compatibility boundary
+
+The S2 motion-command message-buffer payload is packed into 28 bits in
+4 bytes. The public `subsystem2_cmd_t`, `subsystem2_odom_t`, and
+`subsystem2_status_t` APIs remain unchanged, as do wheel circumference,
+turn-track calibration, PID gains, command timing and peer subsystem
+calibration code. This intentionally avoids narrowing peer-visible S2
+odometry and therefore cannot change S3/S4/S5 line, IMU or mission
+calibration through representation saturation.
+
+The packed wire codec is checked by:
+
+```sh
+gcc -std=c11 -O2 -Wall -Wextra -Wshadow -Werror \
+    testing/subsystem2/wire_host_test.c -o /tmp/s2_wire_host_test
+/tmp/s2_wire_host_test
+```
+
 ## Test cases
 
 ### Rolling reversal logic regression, 2026-11-06

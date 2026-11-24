@@ -23,6 +23,7 @@
 #include "drv_encoder.h"     /* drv_encoder_now_us(): the 1 MHz timer.    */
 #include "drv_motor.h"
 #include "motion_task.h"
+#include "s2_wire.h"
 #include "subsystem2.h"
 
 /* A steering value older than this is ignored (10 x line_task's 10 ms). */
@@ -38,7 +39,7 @@
  * the message up to 4 bytes (kernel/tkernel/messagebuf.h). */
 #define MBF_HEADER_BYTES        (4u)
 #define MBF_SLOT_BYTES          (MBF_HEADER_BYTES + \
-                                 ((sizeof(subsystem2_cmd_t) + 3u) & ~3u))
+                                 ((S2_WIRE_BYTES + 3u) & ~3u))
 
 /* motion_task's own stack, the same size the kernel would allocate
  * (TASK_STACK_SIZE plus DEFAULT_SYS_STKSZ, 128 on the Cortex-M0+). It is
@@ -49,6 +50,10 @@
 
 _Static_assert(6u == sizeof(subsystem2_cmd_t),
                "IF-04 command layout changed: tell S5");
+_Static_assert(S2_WIRE_SPEED_MAX == S2_SPEED_MAX_MMS,
+               "IF-04 packed speed must match the motion speed limit");
+_Static_assert(S2_WIRE_TYPE_MAX == S2_CMD_CLEAR,
+               "IF-04 packed type range must match the command enum");
 _Static_assert(0u == (S2_MOTION_STACK_BYTES % 8u),
                "stack must be 8-byte sized");
 _Static_assert((TASK_STACK_SIZE + 128) == (int) S2_MOTION_STACK_BYTES,
@@ -99,11 +104,11 @@ subsystem2_init (void)
     // Motors first: braked from the earliest possible moment.
     drv_motor_init();
 
-    // NOTE: The casts are safe: a command is 6 bytes and the buffer
-    // 8 x 12 bytes, far below SZ's and INT's limits.
+    // Only S2's compact wire command enters the message buffer. The
+    // public subsystem2_cmd_t stays 6 bytes for peer-source compatibility.
     cmbf.mbfatr  = TA_TFIFO;
     cmbf.bufsz   = (SZ) (S2_CMD_QUEUE_LEN * MBF_SLOT_BYTES);
-    cmbf.maxmsz  = (INT) sizeof(subsystem2_cmd_t);
+    cmbf.maxmsz  = (INT) S2_WIRE_BYTES;
     g_mbf_motion = tk_cre_mbf(&cmbf);
 
     cflg.flgatr = TA_TFIFO | TA_WMUL;
@@ -199,9 +204,10 @@ subsystem2_start (void)
 ER
 subsystem2_motion_send (subsystem2_cmd_t const * p_cmd)
 {
-    // NOTE: The cast is safe: a command is 6 bytes.
-    return (tk_snd_mbf(g_mbf_motion, p_cmd, (INT) sizeof(*p_cmd),
-                       TMO_POL));
+    uint32_t packed = s2_wire_pack(p_cmd->type, p_cmd->value,
+                                   p_cmd->speed_mms);
+
+    return (tk_snd_mbf(g_mbf_motion, &packed, (INT) S2_WIRE_BYTES, TMO_POL));
 }
 
 /*!
@@ -415,10 +421,16 @@ subsystem2_cycle_wait (bool b_estop_wakes)
 bool
 subsystem2_cmd_receive (subsystem2_cmd_t * p_cmd)
 {
-    INT size = tk_rcv_mbf(g_mbf_motion, p_cmd, TMO_POL);
+    uint32_t packed = 0u;
+    INT      size   = tk_rcv_mbf(g_mbf_motion, &packed, TMO_POL);
 
-    // NOTE: The cast is safe: a command is 6 bytes.
-    return ((INT) sizeof(*p_cmd) == size);
+    if ((INT) S2_WIRE_BYTES != size)
+    {
+        return false;
+    }
+
+    s2_wire_unpack(packed, &p_cmd->type, &p_cmd->value, &p_cmd->speed_mms);
+    return true;
 }
 
 /*!

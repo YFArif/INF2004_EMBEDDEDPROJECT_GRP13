@@ -50,8 +50,9 @@
 
 /* ---------------------------------------------------------------------
  *  IF-04 mbf_motion: commands to motion_task, sent by vehicle_ctrl_task
- *  (S5) with subsystem2_motion_send(). The message buffer copies each
- *  command, so the sender may reuse its variable at once.
+ *  (S5) with subsystem2_motion_send(). S2 copies the public command into a
+ *  4-byte packed message-buffer payload, so the sender may reuse its
+ *  subsystem2_cmd_t at once. Peer-visible types and getters are unchanged.
  * --------------------------------------------------------------------- */
 
 /** Command types. */
