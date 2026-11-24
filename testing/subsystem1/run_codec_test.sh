@@ -207,8 +207,8 @@ mutate C5 compile msg_layout.h \
     's/\(MSG_LIV_STEER_POS  *\)43U/\144U/' \
     "MSG_LIV_STEER_POS 43 -> 44"
 mutate C6 compile msg_layout.h \
-    's/\(MSG_LIV_BYTES  *\)14U/\115U/' \
-    "MSG_LIV_BYTES 14 -> 15"
+    's/\(MSG_LIV_BYTES  *\)15U/\116U/' \
+    "MSG_LIV_BYTES 15 -> 16"
 mutate R1 run msg_codec.c \
     's/\(mask  *= \)0x80U >> (bit_pos % 8U);/\10x01U << (bit_pos % 8U);/' \
     "bit order reversed in put_field"

@@ -132,8 +132,10 @@ typedef uint8_t msg_codec_check_liv_b_t[(
     && (MSG_LIV_LOSTS_POS
         == (MSG_LIV_JUNCTIONS_POS + MSG_LIV_JUNCTIONS_BITS))
     && (MSG_LIV_BARCODES_POS == (MSG_LIV_LOSTS_POS + MSG_LIV_LOSTS_BITS))
-    && (MSG_LIV_DATA_BITS
+    && (MSG_LIV_HEIGHT_POS
         == (MSG_LIV_BARCODES_POS + MSG_LIV_BARCODES_BITS))
+    && (MSG_LIV_DATA_BITS
+        == (MSG_LIV_HEIGHT_POS + MSG_LIV_HEIGHT_BITS))
     && (MSG_LIV_BYTES == ((MSG_LIV_DATA_BITS + 7U) / 8U))) ? 1 : -1];
 
 typedef uint8_t msg_codec_check_hb_t[((MSG_HB_SEQ_POS == 8U)
@@ -548,6 +550,8 @@ msg_codec_put_live (const msg_codec_live_t * p_in,
                    p_in->losts);
         put_modulo(p_buf, MSG_LIV_BARCODES_POS, MSG_LIV_BARCODES_BITS,
                    p_in->barcodes);
+        put_unsigned(p_buf, MSG_LIV_HEIGHT_POS, MSG_LIV_HEIGHT_BITS,
+                     p_in->height_mm);
         written = MSG_LIV_BYTES;
     }
 
@@ -604,6 +608,8 @@ msg_codec_get_live (const uint8_t * p_buf, uint32_t len,
                                       MSG_LIV_LOSTS_BITS);
         p_out->barcodes      = get_u8(p_buf, MSG_LIV_BARCODES_POS,
                                       MSG_LIV_BARCODES_BITS);
+        p_out->height_mm     = get_u8(p_buf, MSG_LIV_HEIGHT_POS,
+                                      MSG_LIV_HEIGHT_BITS);
 
         b_ok = true;
     }

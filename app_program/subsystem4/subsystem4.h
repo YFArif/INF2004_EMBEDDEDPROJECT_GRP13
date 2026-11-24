@@ -115,6 +115,7 @@ void subsystem4_terrain_get(subsystem4_terrain_t * p_terrain);
 bool subsystem4_cal_done(void);
 void subsystem4_calibrate(void);    /* Ask for a new calibration.        */
 void subsystem4_status_get(subsystem4_status_t * p_status);
+uint8_t subsystem4_height_get(void); /* Live hump height, 0 ... 255 mm. */
 
 /* ---------------------------------------------------------------------
  *  Template example (IF-03 of the course example), kept only because
@@ -140,6 +141,7 @@ void imu_task(INT stacd, void * exinf);
 uint32_t subsystem4_wait(void);
 void subsystem4_terrain_put(subsystem4_terrain_t const * p_terrain);
 void subsystem4_status_put(subsystem4_status_t const * p_status);
+void subsystem4_height_put(uint8_t height_mm);
 
 #endif /* SUBSYSTEM4_H */
 

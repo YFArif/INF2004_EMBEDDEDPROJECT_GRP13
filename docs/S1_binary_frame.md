@@ -301,7 +301,7 @@ Published by the MQTT code inside `cyw43_utk_task`, from a message that
 nibble of byte 0). It carries the values that change fast or that the
 S2 and S3 owners asked to see live: the S2 motion state and commanded
 speed, the heading, the E-stop latch, and the S3 line state, steering,
-line sensor readings and counters. The 25-byte telemetry frame keeps its
+line sensor readings and counters, and the S4 live hump height. The 25-byte telemetry frame keeps its
 2 Hz rate and its layout; the measured wheel speeds, distance, encoder
 counts and the S4 and S5 fields stay there.
 
@@ -334,9 +334,10 @@ happened.
 | junctions | 0 to 255, modulo | 8 | 86 | from code | Junction count. |
 | losts | 0 to 255, modulo | 8 | 94 | from code | Line-lost count. |
 | barcodes | 0 to 255, modulo | 8 | 102 | from code | Accepted barcode count. |
-| padding | 0 | 2 | 110 | - | |
+| height_mm | 0 to 255 mm | 8 | 110 | from code | S4 live hump height, `subsystem4_height_get()`: the size of imu_task's integrated hump height h, 0 on flat ground. The run's highest hump stays in telemetry (`peak_mm`). |
+| padding | 0 | 2 | 118 | - | |
 
-**Total: 110 data bits + 2 padding bits = 112 bits = 14 bytes.**
+**Total: 118 data bits + 2 padding bits = 120 bits = 15 bytes.**
 
 A value that is not available yet (no letter read) is sent as 0, except
 `bc_letter`, which is 63. When S3 cannot be read, `line_state` is 5
@@ -758,7 +759,7 @@ ID, `df58a14`), and so is the codec's flash (S1-U08 build, `3814f93`);
 | Event, on the wire | up to 64 B | 7 B | -57 B |
 | Event, `mbf_event` record | up to 64 B | 3 B | -61 B |
 | Heartbeat payload | not defined | 9 B | - |
-| Live payload (5 Hz) | not defined | 14 B | - |
+| Live payload (5 Hz) | not defined | 15 B | - |
 | Ack payload | not defined | 3 B | - |
 | Map payload (dashboard to robot) | not defined | 5 B | - |
 
@@ -970,9 +971,9 @@ before the modulo, pitch and roll as both cdeg (input) and hdeg (sent).
 | TEL-F3 | TEL-2 with only fault_mask 0x08 set (flg_fault bit 3, no echo; wire offset 24) | `11 00 00 80 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00` |
 | TEL-F4 | TEL-2 with only fault_mask 0x10 set (flg_fault bit 4, WiFi loss; wire offset 23) | `11 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00` |
 | TEL-INDEP | a second independent calculation from the section 3 table: seq 165, ctrl 9, motion 5, fault 0x01 (stall), line 6, letter 37, bc_cmd 2, bc_dir 1, speed_l -400, speed_r +400, count_l 0x00071234 (sent 0x1234), count_r 0x0009ABCD (sent 0xABCD), dist -1500, pitch +75 cdeg (+2 hdeg), roll -25 cdeg (-1 hdeg), hump_state 2, peak 60, hump_count 3, class 4, turn -90, imu_ok 1, cal_done 0, closest 1500 (clamped to 1023), angle 12, width 250, clear_l 0, clear_r 1023 | `11 A5 9A 1D 2D 1C 39 01 23 4A BC D7 A2 48 4F E3 C3 8D 35 FF B0 FA 00 3F F0` |
-| LIV-1 typical | seq 9, motion 1 (FOLLOWING), estop 0, cmd_speed +300, heading +4575 cdeg (+92 hdeg, rounds up), line_state 1, steer_dv -87, n_outer 12, n_centre 230, overshoot 1, bc_letter 11 ('B'), bc_cmd 2 (RIGHT), bc_rev 1, junc_turn 2, rejects 3, junctions 300 (sent 44), losts 1, barcodes 5 | `16 09 2C B2 5C 2D 48 67 34 B5 8C B0 04 14` |
-| LIV-2 all minimum | every unsigned field 0, flags 0, every signed field at its minimum (cmd_speed -512, heading -512 hdeg, steer_dv -512) | `16 00 00 00 00 00 00 00 00 00 00 00 00 00` |
-| LIV-3 all maximum | every field at its largest stored value (cmd_speed 511, heading 511 hdeg, steer_dv 511, bc_letter 63, bc_cmd 7) | `16 FF FF FF FF FF FF FF FF FF FF FF FF FC` |
+| LIV-1 typical | seq 9, motion 1 (FOLLOWING), estop 0, cmd_speed +300, heading +4575 cdeg (+92 hdeg, rounds up), line_state 1, steer_dv -87, n_outer 12, n_centre 230, overshoot 1, bc_letter 11 ('B'), bc_cmd 2 (RIGHT), bc_rev 1, junc_turn 2, rejects 3, junctions 300 (sent 44), losts 1, barcodes 5, height_mm 37 | `16 09 2C B2 5C 2D 48 67 34 B5 8C B0 04 14 94` |
+| LIV-2 all minimum | every unsigned field 0, flags 0, every signed field at its minimum (cmd_speed -512, heading -512 hdeg, steer_dv -512) | `16 00 00 00 00 00 00 00 00 00 00 00 00 00 00` |
+| LIV-3 all maximum | every field at its largest stored value (cmd_speed 511, heading 511 hdeg, steer_dv 511, bc_letter 63, bc_cmd 7) | `16 FF FF FF FF FF FF FF FF FF FF FF FF FF FC` |
 | HB-1 | seq 42, uptime 1234 s, rssi -67 dBm (sent 67), connect 3, tel_drop 1, evt_drop 0, cmd_reject 2 | `12 2A 04 D2 86 06 02 00 04` |
 | EVT-1 | code 0x21, args 0x25 0x30, t_ms 123456 | `13 21 25 30 01 E2 40` |
 | CMD-1 | STOP, id 5 | `14 85` |

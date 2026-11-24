@@ -128,7 +128,8 @@
 
 /* ---------------------------------------------------------------------
  * LIVE, robot to dashboard, 5 Hz. Section 3A of the document: the fast
- * values from the motion task (S2) and the line task (S3). It is a
+ * values from the motion task (S2), the line task (S3) and the live hump
+ * height (S4). It is a
  * separate message so the 25-byte telemetry frame keeps its 2 Hz rate and
  * its layout.
  * ------------------------------------------------------------------- */
@@ -168,8 +169,10 @@
 #define MSG_LIV_LOSTS_BITS          8U
 #define MSG_LIV_BARCODES_POS        102U    /* Wraps at 256.            */
 #define MSG_LIV_BARCODES_BITS       8U
-#define MSG_LIV_DATA_BITS           110U
-#define MSG_LIV_BYTES               14U
+#define MSG_LIV_HEIGHT_POS          110U    /* S4 live hump height, mm. */
+#define MSG_LIV_HEIGHT_BITS         8U
+#define MSG_LIV_DATA_BITS           118U
+#define MSG_LIV_BYTES               15U
 
 /* Barcode command, as S3 reports it (s3_cmd_t, copied with no remap). */
 #define MSG_BC_CMD_NONE             0U      /* Letter not in today's map. */

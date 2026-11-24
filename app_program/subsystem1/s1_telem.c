@@ -488,6 +488,7 @@ s1_telem_fill_live (const s1_telem_src_t * p_src, uint8_t seq,
                                     p_src->heading_cdeg);
         p_live->line_state    = S1_TELEM_LINE_UNCAL;
         p_live->bc_letter     = MSG_BC_LETTER_NONE;
+        p_live->height_mm     = p_src->height_mm;
 
         if (p_src->b_s3_ok)
         {

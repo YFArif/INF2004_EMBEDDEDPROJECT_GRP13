@@ -216,7 +216,7 @@ class Padding(unittest.TestCase):
     """Padding bits are ignored (rule 5 of section 2)."""
 
     def test_padding_ignored(self):
-        for label, offset, width in (("TEL-1", 196, 4), ("LIV-1", 110, 2),
+        for label, offset, width in (("TEL-1", 196, 4), ("LIV-1", 118, 2),
                                      ("HB-1", 71, 1), ("ACK-1", 18, 6)):
             with self.subTest(label=label):
                 data = vector(label)[2]
@@ -457,6 +457,7 @@ class LayoutHeader(unittest.TestCase):
             "b_bc_rev": "LIV_BC_REV", "junc_turn": "LIV_JUNC_TURN",
             "rejects": "LIV_REJECTS", "junctions": "LIV_JUNCTIONS",
             "losts": "LIV_LOSTS", "barcodes": "LIV_BARCODES",
+            "height_mm": "LIV_HEIGHT",
         },
         dec.EVENT: {"code": "EVT_CODE", "args": "EVT_ARGS",
                     "t_ms": "EVT_TIME"},

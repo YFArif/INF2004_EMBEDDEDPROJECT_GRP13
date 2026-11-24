@@ -1314,6 +1314,11 @@ imu_publish (void)
     t.b_impact      = g_imu.b_impact && (0u != g_imu.stop_cls);
 
     subsystem4_terrain_put(&t);
+
+    // Live hump height (h, integrated in imu_hump); 0 on flat ground.
+    // NOTE: The cast is safe: the value is clamped to 0 ... 255.
+    subsystem4_height_put((uint8_t) s4_math_clamp(
+        s4_math_abs((int32_t) (g_imu.h_mm + ROUND_HALF)), 0, S4_PEAK_MM_MAX));
 }
 
 /*!

@@ -660,6 +660,7 @@ collect_sources (s1_telem_src_t * p_src)
     p_src->roll_hdeg     = terrain.roll_hdeg;
     p_src->turn_rate_dps = terrain.turn_rate_dps;
     p_src->peak_mm       = terrain.peak_mm;
+    p_src->height_mm     = subsystem4_height_get();
     p_src->hump_state    = terrain.hump_state;
     p_src->motion_class  = terrain.motion_class;
     p_src->hump_count    = terrain.hump_count;
