@@ -470,8 +470,9 @@ and size and where it comes from.
 **Layout.** Header: the group, the SIMULATED or LIVE badge, and the link
 status (robot light and text, broker light, messages per second over the
 last 5 s, age of the last frame). Left column: Control (STOP, START,
-RESET), Last commands, Barcode letter map. Centre: Live view and Latest
-events (the three newest lines of the event log). Right column: Motion,
+RESET), Last commands, Barcode letter map. Centre: Live view, Demo
+checklist (below) and Latest events (the three newest lines of the event
+log). Right column: Motion,
 Attitude, Line and barcode, Obstacle sensor. The Live view holds the 3D
 view (section 8.4). The Attitude card has pitch, roll and IMU on top and
 the hump below: Hump height in mm (S4's `peak_mm`, the highest hump of
@@ -520,6 +521,31 @@ panels. The thresholds are constants at the top of the cards' code in
 
 The 10 and 100 mm/s steering limits are our own choice, not S3's. They
 were not checked against the car on the track.
+
+**Demo checklist.** One row per point of the demo rubric, in its order.
+A row ticks the first time the robot's messages show it, with the
+laptop's time, and keeps the tick until START or RESET is sent or Clear
+is pressed. The ticks are kept in the browser's `sessionStorage`, so a
+page reload during a run keeps them. Distances show mm and cm. The rules
+are in `app.js` (`demoTelemetry()`, `demoLive()`, `demoEvent()`):
+
+| Row | Ticks when | Value shown |
+|---|---|---|
+| Barcode detected | S3's `barcodes` counter (live) has gone up since the clear | the number of reads |
+| Barcode decoded | as above, with a letter | the latest letter |
+| Hump height | `hump_count` or `peak_mm` (telemetry) has gone up since the clear, or S5's RUN_HUMP event | S4's run peak |
+| Line following | `line_state` FOLLOW while `motion_state` is FOLLOWING (live) | the line state now |
+| Instruction followed | S5's state goes from EXECUTING_COMMAND back to LINE_FOLLOWING, with no FAULT between | the command of the barcode read before the junction |
+| Obstacle detected | `closest_mm` at most 350 while S5 is running a mission, S5 entering OBSTACLE_AVOIDANCE, or an OBST_NEAR or OBST_STOP event | the distance |
+| Obstacle width | `width_mm` above 0 while S5 is running a mission, or a PROFILE event | the latest width |
+| Bypassed, line rejoined | S5's state goes from OBSTACLE_AVOIDANCE back to LINE_FOLLOWING, with no FAULT between (`resume_following()` in s5_mission.c) | - |
+| Telemetry via MQTT | any telemetry frame | Connected or Not connected; the time of the last frame |
+| Lifted, motors stopped | `motion_class` LIFTED or OVERTURNED with `motion_state` ESTOP or both wheel speeds 0 | which of the two |
+
+S5's state is read from the telemetry (2 Hz) and from its CTRL_STATE
+events. A state shorter than half a second with no event can be missed,
+and then its row does not tick although the car did it. Checked with
+the `--simulate` scenarios only, not yet on the car.
 
 ### 8.4 The 3D view
 

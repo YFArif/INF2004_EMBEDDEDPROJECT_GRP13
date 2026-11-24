@@ -350,6 +350,31 @@ button.scene-chip { min-height: var(--target); font-weight: 600; }
   font-size: var(--fs-footnote);
 }
 
+/* -- Demo checklist ----------------------------------------------------- */
+.demo {
+  list-style: none; margin: 0; padding: 0; display: grid;
+  grid-template-columns: 1fr 1fr; column-gap: 20px;
+  /* Down the first column, then the second: the rubric's order. */
+  grid-template-rows: repeat(5, auto); grid-auto-flow: column;
+}
+.demo li {
+  display: grid; grid-template-columns: 20px minmax(0, 1fr) auto;
+  column-gap: 8px; align-items: baseline; padding: 6px 0;
+  border-top: 1px solid var(--separator);
+}
+.demo .tick { grid-row: 1 / span 2; font-weight: 700; color: var(--label-3); }
+.demo .done .tick { color: var(--green-text); }
+.demo .d-name { font-weight: 600; }
+.demo .d-when, .demo .d-val {
+  font-size: var(--fs-footnote); line-height: var(--lh-footnote);
+  color: var(--label-2); font-variant-numeric: tabular-nums;
+}
+.demo .d-val {
+  grid-column: 2 / span 2; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.demo .done .d-val { color: var(--label); }
+
 /* -- The number cards --------------------------------------------------- */
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
 /* Attitude: six values in two rows of three, so the card is no taller than
@@ -513,8 +538,10 @@ li { margin-bottom: 4px; }
   main { grid-template-rows: minmax(0, 1fr); }
   .grow { flex: 1; }
   .col-right .card { gap: 8px; padding: 16px 20px; }
-  .col-left .note { display: none; }
+  .col-left .note, #c-demo .note { display: none; }
   #c-cmds .note { display: block; }
+  #c-demo { gap: 8px; padding: 16px 20px; }
+  .demo li { padding: 4px 0; }
 }
 @media (max-width: 759px) {
   body {
@@ -523,6 +550,10 @@ li { margin-bottom: 4px; }
     grid-template-rows: auto;
   }
   .tools { justify-content: flex-start; margin-top: var(--space-1); }
+  .demo {
+    grid-template-columns: minmax(0, 1fr); grid-template-rows: none;
+    grid-auto-flow: row;
+  }
   .stop-mini { display: inline-block; }
   .view-head { padding: 16px; }
 }
