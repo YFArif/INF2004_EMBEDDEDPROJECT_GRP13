@@ -11,7 +11,11 @@ barcode letter map, never steering (no remote control).
 
 S1's own point is "Send telemetry data via MQTT". The other nine points
 come from S2 to S5; the dashboard is where the examiner can see each one
-happen, so keep the page on screen for the whole run.
+happen, so keep the page on screen for the whole run. The **Demo
+checklist** card, below the live view, has one row per rubric point and
+ticks each with its time as it happens; START clears it, so it shows the
+current run only (S1_dashboard.md section 8.3). The panels below hold
+the detail.
 
 | Rubric item | Owner | Where it shows on the dashboard |
 |---|---|---|

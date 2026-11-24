@@ -120,6 +120,7 @@ function setBroker(b) {
 function setLink(l) {
   setLight("robot-light", l.light, true);
   el("robot-text").textContent = l.reason;
+  demoLink(l);
 }
 
 function uptime(s) {
@@ -535,6 +536,7 @@ function setTelemetry(t, ageMs) {
   text("s5-clear", (t.width_mm || t.clear_l_mm || t.clear_r_mm)
        ? num(t.clear_l_mm) + " / " + num(t.clear_r_mm) + " mm" : "-");
   cardsTelemetry(t);
+  demoTelemetry(t, ageMs);
   window.s1Last.tel = {msg: t, at: performance.now() - (ageMs || 0)};
   emit("telemetry", window.s1Last.tel);
 }
@@ -564,6 +566,7 @@ function setLive(l, ageMs) {
   text("s3-counts", "barcodes " + l.barcodes + ", rejected " + l.rejects
        + " (wraps at 16), junctions " + l.junctions + ", lost " + l.losts);
   cardsLive(l);
+  demoLive(l, ageMs);
   window.s1Last.live = {msg: l, at: performance.now() - (ageMs || 0)};
   emit("live", window.s1Last.live);
 }
@@ -655,6 +658,207 @@ function applySnapshot(s) {
   setMap(s.map);
 }
 
+// -- Demo checklist: the demo rubric, in its order. Each row ticks the
+// first time the robot's messages show it, with the time, and keeps the
+// tick until START, RESET or Clear. docs/S1_dashboard.md gives each rule.
+// The state is kept in sessionStorage, so a page reload during a run
+// keeps the ticks; every access is wrapped, the card works without it.
+const DEMO_ROWS = [
+  ["barcode", "Barcode detected"], ["decode", "Barcode decoded"],
+  ["hump", "Hump height"], ["line", "Line following"],
+  ["instr", "Instruction followed"], ["obst", "Obstacle detected"],
+  ["width", "Obstacle width"], ["bypass", "Bypassed, line rejoined"],
+  ["mqtt", "Telemetry via MQTT"], ["lift", "Lifted, motors stopped"]];
+const DEMO_KEY = "s1-demo";
+// S5's subsystem5_ctrl_state_t numbers, for the CTRL_STATE event.
+const CTRL_BY_NUM = {3: "LINE_FOLLOWING", 5: "EXECUTING_COMMAND",
+                     8: "OBSTACLE_AVOIDANCE", 9: "FAULT"};
+const CTRL_RUNNING = ["LINE_FOLLOWING", "APPROACH_JUNCTION",
+                      "EXECUTING_COMMAND", "REACQUIRE_LINE",
+                      "LINE_RECOVERY", "OBSTACLE_AVOIDANCE"];
+const EV_OBST_NEAR = 0x50;
+const EV_OBST_STOP = 0x52;
+const EV_PROFILE = 0x54;
+const EV_CTRL_STATE = 0x60;
+const EV_RUN_HUMP = 0x66;
+let demo = demoFresh();
+
+function demoFresh() {
+  return {done: {}, val: {}, bcBase: null, humpBase: null, cmd: "",
+          sawTurn: false, sawAvoid: false, ctrl: "", lastMsg: null};
+}
+
+function clock(ms) { return new Date(ms).toTimeString().slice(0, 8); }
+
+function mmCm(mm) { return mm + " mm (" + (mm / 10).toFixed(1) + " cm)"; }
+
+function demoSave() {
+  try { sessionStorage.setItem(DEMO_KEY, JSON.stringify(demo)); }
+  catch (e) { /* the card works without it */ }
+}
+
+function demoLoad() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(DEMO_KEY) || "null");
+    if (saved && saved.done) { demo = Object.assign(demoFresh(), saved); }
+  } catch (e) { /* start empty */ }
+}
+
+function demoBuild() {
+  const box = el("demo-list");
+  DEMO_ROWS.forEach(([key, name]) => {
+    const li = document.createElement("li");
+    li.id = "demo-" + key;
+    ["tick", "d-name", "d-when", "d-val"].forEach((c) => {
+      const span = document.createElement("span");
+      span.className = c;
+      li.appendChild(span);
+    });
+    li.children[1].textContent = name;
+    box.appendChild(li);
+  });
+}
+
+function demoPaint() {
+  DEMO_ROWS.forEach(([key]) => {
+    const li = el("demo-" + key);
+    const at = demo.done[key];
+    li.classList.toggle("done", Boolean(at));
+    li.children[0].textContent = at ? "✓" : "○";
+    li.children[2].textContent = (key === "mqtt" && demo.lastMsg)
+      ? "last " + clock(demo.lastMsg) : (at ? clock(at) : "");
+    li.children[3].textContent = demo.val[key] || (at ? "" : "not yet");
+  });
+  demoSave();
+}
+
+// Tick a row once; a value given with it is kept (frozen) unless `keep`
+// is false, when it follows the latest message.
+function demoTick(key, value, keep) {
+  if (!demo.done[key]) {
+    demo.done[key] = Date.now();
+    if (value !== undefined) { demo.val[key] = value; }
+  } else if ((keep === false) && (value !== undefined)) {
+    demo.val[key] = value;
+  }
+}
+
+function demoClear() {
+  const lastMsg = demo.lastMsg;
+  demo = demoFresh();
+  demo.lastMsg = lastMsg;
+  demoPaint();
+}
+
+// A turn is followed when S5 goes from EXECUTING_COMMAND back to
+// LINE_FOLLOWING; a bypass when it goes from OBSTACLE_AVOIDANCE back to
+// LINE_FOLLOWING (s5_mission.c: resume_following()). FAULT cancels both.
+function demoCtrl(name) {
+  if (name === demo.ctrl) { return; }
+  demo.ctrl = name;
+  if (name === "EXECUTING_COMMAND") {
+    // The command being carried out: the barcode read before the
+    // junction, not one read after it.
+    demo.sawTurn = demo.cmd || true;
+  } else if (name === "OBSTACLE_AVOIDANCE") {
+    demo.sawAvoid = true;
+    demoTick("obst");
+  } else if (name === "FAULT") {
+    demo.sawTurn = false;
+    demo.sawAvoid = false;
+  } else if (name === "LINE_FOLLOWING") {
+    if (demo.sawTurn) {
+      demoTick("instr", (demo.sawTurn === true) ? undefined
+               : demo.sawTurn + " done");
+    }
+    if (demo.sawAvoid) { demoTick("bypass"); }
+    demo.sawTurn = false;
+    demo.sawAvoid = false;
+  } else {
+    // Other states change nothing here.
+  }
+}
+
+function demoTelemetry(t, ageMs) {
+  demo.lastMsg = Date.now() - (ageMs || 0);
+  demoTick("mqtt");
+  demo.val.mqtt = "Connected";
+  demoCtrl(t.ctrl_name);
+  if (demo.humpBase === null) {
+    demo.humpBase = {count: t.hump_count, peak: t.peak_mm};
+  }
+  if ((t.hump_count !== demo.humpBase.count)
+      || (t.peak_mm > demo.humpBase.peak)) {
+    demoTick("hump", "peak " + mmCm(t.peak_mm), false);
+  }
+  const running = CTRL_RUNNING.includes(t.ctrl_name);
+  if (running && (t.closest_mm > 0) && (t.closest_mm <= OBSTACLE_NEAR_MM)) {
+    demoTick("obst");
+  }
+  if (demo.done.obst && !demo.val.obst && (t.closest_mm > 0)) {
+    demo.val.obst = "at " + mmCm(t.closest_mm);
+  }
+  if (running && (t.width_mm > 0)) {
+    demoTick("width", mmCm(t.width_mm), false);
+  }
+  if (STOP_WORDS[t.class_name]
+      && ((t.motion_name === "ESTOP")
+          || ((t.speed_l_mms === 0) && (t.speed_r_mms === 0)))) {
+    demoTick("lift", capital(t.class_name.toLowerCase())
+             + ", wheels at 0 mm/s");
+  }
+  demoPaint();
+}
+
+function demoLive(l, ageMs) {
+  demo.lastMsg = Math.max(demo.lastMsg || 0, Date.now() - (ageMs || 0));
+  if (demo.bcBase === null) { demo.bcBase = l.barcodes; }
+  const reads = (l.barcodes - demo.bcBase + 256) % 256;
+  if (reads > 0) {
+    demoTick("barcode", reads + (reads === 1 ? " read" : " reads"), false);
+    if (l.bc_char) {
+      demoTick("decode", "\"" + l.bc_char + "\"", false);
+    }
+  }
+  if ((reads > 0) && l.bc_char && (l.bc_cmd_name !== "none")) {
+    demo.cmd = capital(l.bc_cmd_name);
+    if (!demo.done.instr) { demo.val.instr = "barcode says " + demo.cmd; }
+  }
+  const lineWord = (l.line_name === "FOLLOW") ? "On line"
+    : (LINE_WORDS[l.line_name] || String(l.line_name));
+  if ((l.line_name === "FOLLOW") && (l.motion_name === "FOLLOWING")) {
+    demoTick("line");
+  }
+  demo.val.line = "now " + lineWord.toLowerCase();
+  demoPaint();
+}
+
+function demoEvent(d) {
+  const a = (d.args && d.args.length) ? d.args[0] : 0;
+  if ((d.code === EV_OBST_NEAR) || (d.code === EV_OBST_STOP)) {
+    demoTick("obst", "at " + mmCm(a * 10));
+  } else if (d.code === EV_PROFILE) {
+    demoTick("width", mmCm(a * 10), false);
+  } else if (d.code === EV_RUN_HUMP && a > 0) {
+    demoTick("hump", "peak " + mmCm(a), false);
+  } else if (d.code === EV_CTRL_STATE) {
+    demoCtrl(CTRL_BY_NUM[a] || String(a));
+  } else {
+    return;
+  }
+  demoPaint();
+}
+
+function demoLink(l) {
+  if (l.light !== "green") { demo.val.mqtt = "Not connected"; }
+  demoPaint();
+}
+
+demoBuild();
+demoLoad();
+demoPaint();
+el("demo-clear").addEventListener("click", demoClear);
+
 const es = new EventSource("/events");
 es.onopen = () => { el("stream").textContent = ""; };
 es.onerror = () => {
@@ -673,7 +877,11 @@ on("heartbeat", (d) => {
   emit("heartbeat", d);
 });
 on("controls", setControls);
-on("cmd", (d) => { upsertRow(d); addLog("cmd", d); });
+on("cmd", (d) => {
+  upsertRow(d);
+  addLog("cmd", d);
+  if ((d.op === "START") || (d.op === "RESET")) { demoClear(); }
+});
 on("ack", (d) => {
   if (d.n !== undefined) { upsertRow(d); }
   addLog(d.result === 0 ? "ack_queued" : "ack_other", d);
@@ -700,7 +908,7 @@ on("s3_events", (d) => {
   d.entries.forEach(addTimeline);
   setTally(d.tally, d.rejected);
 });
-on("event", (d) => addLog("event", d));
+on("event", (d) => { addLog("event", d); demoEvent(d); });
 on("note", (d) => addLog("note", d));
 on("retained_cmd", (d) => {
   banner.entries.set(d.topic_suffix, d);
