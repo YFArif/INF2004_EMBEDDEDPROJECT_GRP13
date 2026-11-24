@@ -362,7 +362,7 @@ static const codec_vectors_liv_t g_liv[] =
             .steer_dv_mms = -87, .outer_ir = 12U, .centre_ir = 230U,
             .b_overshoot = true, .bc_letter = 11U, .bc_cmd = 2U,
             .b_bc_rev = true, .junc_turn = 2U, .rejects = 3U,
-            .junctions = 44U, .losts = 1U, .barcodes = 5U,
+            .junctions = 44U, .losts = 1U, .barcodes = 5U, .height_mm = 37U,
         },
         .heading_cdeg = 4575,
         .b_uses_cdeg = true,
@@ -373,12 +373,12 @@ static const codec_vectors_liv_t g_liv[] =
             .steer_dv_mms = -87, .outer_ir = 12U, .centre_ir = 230U,
             .b_overshoot = true, .bc_letter = 11U, .bc_cmd = 2U,
             .b_bc_rev = true, .junc_turn = 2U, .rejects = 3U,
-            .junctions = 44U, .losts = 1U, .barcodes = 5U,
+            .junctions = 44U, .losts = 1U, .barcodes = 5U, .height_mm = 37U,
         },
         .bytes =
         {
             0x16U, 0x09U, 0x2CU, 0xB2U, 0x5CU, 0x2DU, 0x48U, 0x67U,
-            0x34U, 0xB5U, 0x8CU, 0xB0U, 0x04U, 0x14U,
+            0x34U, 0xB5U, 0x8CU, 0xB0U, 0x04U, 0x14U, 0x94U,
         },
     },
     {
@@ -390,7 +390,7 @@ static const codec_vectors_liv_t g_liv[] =
             .steer_dv_mms = -512, .outer_ir = 0U, .centre_ir = 0U,
             .b_overshoot = false, .bc_letter = 0U, .bc_cmd = 0U,
             .b_bc_rev = false, .junc_turn = 0U, .rejects = 0U,
-            .junctions = 0U, .losts = 0U, .barcodes = 0U,
+            .junctions = 0U, .losts = 0U, .barcodes = 0U, .height_mm = 0U,
         },
         .heading_cdeg = 0,
         .b_uses_cdeg = false,
@@ -401,12 +401,12 @@ static const codec_vectors_liv_t g_liv[] =
             .steer_dv_mms = -512, .outer_ir = 0U, .centre_ir = 0U,
             .b_overshoot = false, .bc_letter = 0U, .bc_cmd = 0U,
             .b_bc_rev = false, .junc_turn = 0U, .rejects = 0U,
-            .junctions = 0U, .losts = 0U, .barcodes = 0U,
+            .junctions = 0U, .losts = 0U, .barcodes = 0U, .height_mm = 0U,
         },
         .bytes =
         {
             0x16U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U,
-            0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U,
+            0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0x00U,
         },
     },
     {
@@ -418,7 +418,7 @@ static const codec_vectors_liv_t g_liv[] =
             .steer_dv_mms = 511, .outer_ir = 255U, .centre_ir = 255U,
             .b_overshoot = true, .bc_letter = 63U, .bc_cmd = 7U,
             .b_bc_rev = true, .junc_turn = 3U, .rejects = 15U,
-            .junctions = 255U, .losts = 255U, .barcodes = 255U,
+            .junctions = 255U, .losts = 255U, .barcodes = 255U, .height_mm = 255U,
         },
         .heading_cdeg = 0,
         .b_uses_cdeg = false,
@@ -429,12 +429,12 @@ static const codec_vectors_liv_t g_liv[] =
             .steer_dv_mms = 511, .outer_ir = 255U, .centre_ir = 255U,
             .b_overshoot = true, .bc_letter = 63U, .bc_cmd = 7U,
             .b_bc_rev = true, .junc_turn = 3U, .rejects = 15U,
-            .junctions = 255U, .losts = 255U, .barcodes = 255U,
+            .junctions = 255U, .losts = 255U, .barcodes = 255U, .height_mm = 255U,
         },
         .bytes =
         {
             0x16U, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU,
-            0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFCU,
+            0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFFU, 0xFCU,
         },
     },
 };

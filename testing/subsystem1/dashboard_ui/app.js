@@ -372,8 +372,6 @@ function cardsTelemetry(t) {
   el("m-dist").title = "dist_mm " + t.dist_mm;
   text("a-pitch", signed(t.pitch_deg, 1));
   text("a-roll", signed(t.roll_deg, 1));
-  measure("a-peak", num(t.peak_mm));
-  el("a-peak").title = "peak_mm " + t.peak_mm;
   text("a-humps", num(t.hump_count));
   word("a-hump", HUMP_WORDS[t.hump_name] || capital(String(t.hump_name)),
        "hump_state " + t.hump_name + ", hump_count " + t.hump_count
@@ -408,6 +406,10 @@ function cardsTelemetry(t) {
 }
 
 function cardsLive(l) {
+  // Live hump height: 0 on flat ground (the run's highest is peak_mm).
+  measure("a-height", num(l.height_mm));
+  el("a-height").title = "height_mm " + l.height_mm;
+  text("s4-height", num(l.height_mm, "mm"));
   text("m-head", num(l.heading_deg, "", 1));
   el("m-head").title = "Positive is left of the heading at power-up";
   word("chip-motion", MOTION_WORDS[l.motion_name] || String(l.motion_name),

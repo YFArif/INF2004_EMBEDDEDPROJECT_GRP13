@@ -168,7 +168,7 @@ def heading_hdeg(cdeg):
 
 def live_values(seq, motion, estop, cmd_speed, heading_h, line, steer,
                 outer, centre, overshoot, letter, bccmd, rev, junc, rejects,
-                junctions, losts, barcodes):
+                junctions, losts, barcodes, height=0):
     return {
         "seq": seq % 256, "motion_state": motion, "estop": estop,
         "cmd_speed_mms": off(cmd_speed, 10),
@@ -178,7 +178,7 @@ def live_values(seq, motion, estop, cmd_speed, heading_h, line, steer,
         "bc_letter": letter, "bc_cmd": bccmd, "bc_rev": rev,
         "junc_turn": junc, "rejects": rejects % 16,
         "junctions": junctions % 256, "losts": losts % 256,
-        "barcodes": barcodes % 256,
+        "barcodes": barcodes % 256, "height_mm": height,
     }
 
 
@@ -187,21 +187,22 @@ out.append(("LIV-1 typical",
             "+4575 cdeg (+92 hdeg, rounds up), line_state 1, steer_dv -87, "
             "n_outer 12, n_centre 230, overshoot 1, bc_letter 11 ('B'), "
             "bc_cmd 2 (RIGHT), bc_rev 1, junc_turn 2, rejects 3, junctions "
-            "300 (sent 44), losts 1, barcodes 5",
+            "300 (sent 44), losts 1, barcodes 5, height_mm 37",
             pack(live, live_values(9, 1, 0, 300, heading_hdeg(4575), 1, -87,
-                                   12, 230, 1, 11, 2, 1, 2, 3, 300, 1, 5),
-                 6, 14)))
+                                   12, 230, 1, 11, 2, 1, 2, 3, 300, 1, 5,
+                                   37),
+                 6, 15)))
 out.append(("LIV-2 all minimum",
             "every unsigned field 0, flags 0, every signed field at its "
             "minimum (cmd_speed -512, heading -512 hdeg, steer_dv -512)",
             pack(live, live_values(0, 0, 0, -512, -512, 0, -512, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0), 6, 14)))
+                                   0, 0, 0, 0, 0, 0, 0, 0), 6, 15)))
 out.append(("LIV-3 all maximum",
             "every field at its largest stored value (cmd_speed 511, "
             "heading 511 hdeg, steer_dv 511, bc_letter 63, bc_cmd 7)",
             pack(live, live_values(255, 7, 1, 511, 511, 7, 511, 255, 255,
-                                   1, 63, 7, 1, 3, 15, 255, 255, 255), 6,
-                 14)))
+                                   1, 63, 7, 1, 3, 15, 255, 255, 255, 255),
+                 6, 15)))
 out.append(("HB-1",
             "seq 42, uptime 1234 s, rssi -67 dBm (sent 67), connect 3, "
             "tel_drop 1, evt_drop 0, cmd_reject 2",

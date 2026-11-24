@@ -53,7 +53,7 @@ TYPE_NAMES = {
 
 # Exact payload length of each message type, in bytes.
 LENGTHS = {TELEMETRY: 25, HEARTBEAT: 9, EVENT: 7, COMMAND: 2, ACK: 3,
-           LIVE: 14, MAP: 5}
+           LIVE: 15, MAP: 5}
 
 # How a stored field becomes a value.
 UNSIGNED = "unsigned"      # as stored
@@ -114,6 +114,7 @@ FIELDS = {
         ("junctions", 86, 8, UNSIGNED),
         ("losts", 94, 8, UNSIGNED),
         ("barcodes", 102, 8, UNSIGNED),
+        ("height_mm", 110, 8, UNSIGNED),
     ),
     HEARTBEAT: (
         ("seq", 8, 8, UNSIGNED),

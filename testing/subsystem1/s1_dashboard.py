@@ -578,13 +578,13 @@ class FakeCar:
         "hump": (
             (0.5, {"l": 150, "r": 150, "cmd": 150}),
             (0.75, {"l": 150, "r": 150, "cmd": 150, "pitch": (0, 12),
-                    "hump_state": 1, "klass": 4}),
+                    "height": (0, 12), "hump_state": 1, "klass": 4}),
             (0.75, {"l": 150, "r": 150, "cmd": 150, "pitch": (12, 0),
-                    "hump_state": 1, "klass": 4}),
+                    "height": (12, 25), "hump_state": 1, "klass": 4}),
             (0.75, {"l": 150, "r": 150, "cmd": 150, "pitch": (0, -12),
-                    "hump_state": 2, "klass": 5}),
+                    "height": (25, 12), "hump_state": 2, "klass": 5}),
             (0.75, {"l": 150, "r": 150, "cmd": 150, "pitch": (-12, 0),
-                    "hump_state": 2, "klass": 5}),
+                    "height": (12, 0), "hump_state": 2, "klass": 5}),
             (1.0, {"l": 150, "r": 150, "cmd": 150, "fire": "hump_done"}),
         ),
         # Picked up: S4 reports class 6 and the E-stop latches. In this
@@ -811,9 +811,11 @@ class FakeCar:
         roll = 2.0 * math.sin(0.7 * run) if b_run else 0.0
         if scn is not None:
             pitch, roll = scn.get("pitch", 0.0), scn.get("roll", 0.0)
+        height = scn.get("height", 0.0) if scn is not None else 0.0
         hump_state = 0
         if self._hump_left > 0.0:
             phase = self.HUMP_S - self._hump_left
+            height = 25.0 * math.sin(math.pi * phase / self.HUMP_S)
             half = self.HUMP_S / 2.0
             if phase < half:
                 hump_state = 1
@@ -866,6 +868,7 @@ class FakeCar:
             "pitch_hdeg": max(-64, min(63, int(round(pitch * 2.0)))),
             "roll_hdeg": max(-64, min(63, int(round(roll * 2.0)))),
             "hump_state": hump_state, "klass": klass, "line": line,
+            "height_mm": max(0, min(255, int(round(height)))),
             "outer": min(outer, 255), "centre": min(centre, 255),
             "b_overshoot": outer > 22,
             "ctrl": self.CTRL_INDEX.get(self._state, 0),
@@ -967,7 +970,8 @@ class FakeCar:
             "rejects": counts["rejects"] & 0xF,
             "junctions": counts["junctions"] & 0xFF,
             "losts": counts["losts"] & 0xFF,
-            "barcodes": counts["barcodes"] & 0xFF}
+            "barcodes": counts["barcodes"] & 0xFF,
+            "height_mm": view["height_mm"]}
         self.on_line(sub_line(False, self._topic["telemetry"],
                               pack(s1_decode.LIVE, values)))
 

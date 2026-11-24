@@ -201,6 +201,7 @@ typedef struct
     int16_t     roll_hdeg;
     int16_t     turn_rate_dps;
     uint8_t     peak_mm;
+    uint8_t     height_mm;          /* subsystem4_height_get(): live.     */
     uint8_t     hump_state;
     uint8_t     motion_class;       /* subsystem4_class_t.                */
     uint8_t     hump_count;

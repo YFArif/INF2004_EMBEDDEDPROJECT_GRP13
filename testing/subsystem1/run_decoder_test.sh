@@ -160,7 +160,7 @@ mutate M6 's/self\._last_seq\.clear()/pass/' \
     "rebase_robot() keeps the seq baselines"
 
 # S1-U24 part B: the MAP message.
-mutate N1 's/LIVE: 14, MAP: 5}/LIVE: 14, MAP: 6}/' \
+mutate N1 's/LIVE: 15, MAP: 5}/LIVE: 15, MAP: 6}/' \
     "MAP length 6"
 mutate N2 's/("letter_left", 14, 6, UNSIGNED),/("letter_left", 20, 6, UNSIGNED),/' \
     "LEFT read at RIGHT's offset"

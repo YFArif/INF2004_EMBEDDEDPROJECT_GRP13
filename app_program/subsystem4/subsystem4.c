@@ -24,6 +24,8 @@ static ID g_mtx_terrain = E_NOEXS;
 
 static s4_terrain_packed_t g_terrain;   /* Written by imu_task only.     */
 static subsystem4_status_t g_status;    /* Written by imu_task only.     */
+static volatile uint8_t g_height_mm;    /* Written by imu_task only;     */
+                                        /* one byte, so no lock needed.  */
 
 static void imu_tick(void * p_exinf);
 
@@ -202,6 +204,29 @@ subsystem4_terrain_put (subsystem4_terrain_t const * p_terrain)
     CHECK(tk_loc_mtx(g_mtx_terrain, TMO_FEVR), "mtx_terrain");
     g_terrain = packed;
     CHECK(tk_unl_mtx(g_mtx_terrain), "mtx_terrain");
+}
+
+/*!
+ * @brief Live hump height: how far the robot is above the floor it
+ *        started the hump from, now. 0 on flat ground.
+ *
+ * @return Height in mm, 0 ... 255.
+ */
+uint8_t
+subsystem4_height_get (void)
+{
+    return (g_height_mm);
+}
+
+/*!
+ * @brief imu_task only: store the live hump height.
+ *
+ * @param[in] height_mm Height in mm.
+ */
+void
+subsystem4_height_put (uint8_t height_mm)
+{
+    g_height_mm = height_mm;
 }
 
 /*!

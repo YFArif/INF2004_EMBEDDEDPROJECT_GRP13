@@ -79,7 +79,8 @@ typedef struct
     uint16_t    clear_r_mm;     /* 0-1023 mm.                           */
 } msg_codec_telemetry_t;
 
-/** Live message fields (S2 motion and S3 line), in wire units. */
+/** Live message fields (S2 motion, S3 line, S4 hump height), in wire
+ *  units. */
 typedef struct
 {
     uint8_t     seq;            /* Message counter, modulo 256.         */
@@ -101,6 +102,7 @@ typedef struct
     uint8_t     junctions;      /* Junction count, modulo 256.          */
     uint8_t     losts;          /* Line-lost count, modulo 256.         */
     uint8_t     barcodes;       /* Barcode count, modulo 256.           */
+    uint8_t     height_mm;      /* S4 live hump height, 0-255 mm.       */
 } msg_codec_live_t;
 
 /** Heartbeat fields. */
