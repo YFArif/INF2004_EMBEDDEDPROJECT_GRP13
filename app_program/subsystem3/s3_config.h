@@ -74,7 +74,9 @@
 #define S3_STATUS_PRINT_MS      (200u)  /* "S3 LINE" console period.     */
 #define S3_BC_HOLD_MS           (3500u) /* Max soft steer over a code    */
                                         /* (130 mm code at 40 mm/s).     */
-#define S3_BC_HOLD_DIV          (2)     /* Steering / 2 over a barcode.  */
+#define S3_BC_HOLD_DIV          (4)     /* Steering / 4 over a barcode   */
+                                        /* (was 2: still adjusted along  */
+                                        /* the code, 19 Nov). Car test.  */
 
 /* ---------------------------------------------------------------------
  *  Barcode
