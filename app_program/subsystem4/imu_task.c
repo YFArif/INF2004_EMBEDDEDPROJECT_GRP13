@@ -1292,6 +1292,8 @@ static void
 imu_publish (void)
 {
     subsystem4_terrain_t t = {0};
+    int32_t live_mm = 0;
+    int32_t side_mm = 0;
 
     // NOTE: The casts are safe: s4_terrain_pack clamps every field.
     t.pitch_hdeg    = (int16_t) s4_math_clamp(g_imu.pitch_cdeg / CDEG_PER_HDEG,
@@ -1315,10 +1317,27 @@ imu_publish (void)
 
     subsystem4_terrain_put(&t);
 
-    // Live hump height (h, integrated in imu_hump); 0 on flat ground.
+    // Live hump height from the tilt alone (no odometry, so a hand push
+    // works too): the raised end over the wheelbase (pitch) or the raised
+    // side over the track (one-wheel hump, roll), whichever is higher.
+    // 0 while both tilts are within the flat band.
+    if ((s4_math_abs(g_imu.pitch_cdeg) >= HUMP_FLAT_CDEG)
+        || (s4_math_abs(g_imu.roll_cdeg) >= SIDE_FLAT_CDEG))
+    {
+        live_mm = (int32_t) (((float) WHEELBASE_MM
+                  * s4_math_sin_cdeg(s4_math_abs(g_imu.pitch_cdeg)))
+                  + ROUND_HALF);
+        side_mm = (int32_t) (((float) S2_TRACK_MM
+                  * s4_math_sin_cdeg(s4_math_abs(g_imu.roll_cdeg)))
+                  + ROUND_HALF);
+        if (side_mm > live_mm)
+        {
+            live_mm = side_mm;
+        }
+    }
     // NOTE: The cast is safe: the value is clamped to 0 ... 255.
-    subsystem4_height_put((uint8_t) s4_math_clamp(
-        s4_math_abs((int32_t) (g_imu.h_mm + ROUND_HALF)), 0, S4_PEAK_MM_MAX));
+    subsystem4_height_put((uint8_t) s4_math_clamp(live_mm, 0,
+                                                  S4_PEAK_MM_MAX));
 }
 
 /*!

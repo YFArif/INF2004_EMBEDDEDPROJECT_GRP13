@@ -334,7 +334,7 @@ happened.
 | junctions | 0 to 255, modulo | 8 | 86 | from code | Junction count. |
 | losts | 0 to 255, modulo | 8 | 94 | from code | Line-lost count. |
 | barcodes | 0 to 255, modulo | 8 | 102 | from code | Accepted barcode count. |
-| height_mm | 0 to 255 mm | 8 | 110 | from code | S4 live hump height, `subsystem4_height_get()`: the size of imu_task's integrated hump height h, 0 on flat ground. The run's highest hump stays in telemetry (`peak_mm`). |
+| height_mm | 0 to 255 mm | 8 | 110 | from code | S4 live hump height, `subsystem4_height_get()`: from the tilt now, the larger of 78 mm x sin(pitch) (wheelbase) and 112 mm x sin(roll) (track, one-wheel hump); 0 while pitch < 2 deg and roll < 1.5 deg. Needs no odometry, so a hand push reads too. The run's highest hump stays in telemetry (`peak_mm`). |
 | padding | 0 | 2 | 118 | - | |
 
 **Total: 118 data bits + 2 padding bits = 120 bits = 15 bytes.**

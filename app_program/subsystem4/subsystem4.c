@@ -207,8 +207,9 @@ subsystem4_terrain_put (subsystem4_terrain_t const * p_terrain)
 }
 
 /*!
- * @brief Live hump height: how far the robot is above the floor it
- *        started the hump from, now. 0 on flat ground.
+ * @brief Live hump height from the tilt now: the larger of
+ *        WHEELBASE_MM x sin(|pitch|) and S2_TRACK_MM x sin(|roll|),
+ *        0 while both tilts are within the flat band.
  *
  * @return Height in mm, 0 ... 255.
  */
