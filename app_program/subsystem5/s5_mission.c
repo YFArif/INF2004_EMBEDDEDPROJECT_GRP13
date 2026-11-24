@@ -99,7 +99,8 @@
 #include "subsystem5.h"
 
 #define SLOW_NEAR_MMS       (60u)       /* Under 35 cm (FR9).            */
-#define CAL_TIMEOUT_MS      (3000u)     /* Then go on without the IMU.   */
+#define CAL_TIMEOUT_MS      (6000u)     /* S4 needs 2 s still after boot;*/
+                                        /* then go on without the IMU.   */
 #define S5_JUNCTION_MM      (150)       /* TODO: measure (A11, INT-01).  */
 #define JUNC_FWD_MM         (125)       /* Junction seen by the line     */
                                         /* sensors: drive this far so the*/
@@ -538,7 +539,7 @@ step_calibrating (uint32_t events, uint32_t now_ms)
     {
         if (b_timeout)
         {
-            // NOTE: The cast is safe: the limit is 3000 ms.
+            // NOTE: The cast is safe: the limit is 6000 ms.
             s5_event_trace("CAL IMU not calibrated after ms, carrying on",
                            (int32_t) CAL_TIMEOUT_MS, 0);
         }

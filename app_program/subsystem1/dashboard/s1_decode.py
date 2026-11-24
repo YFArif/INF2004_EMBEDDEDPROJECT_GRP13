@@ -172,7 +172,8 @@ EVENT_NAMES = {0x50: "OBST_NEAR", 0x51: "OBST_CLEAR", 0x52: "OBST_STOP",
                0x53: "SCAN_START", 0x54: "PROFILE", 0x55: "SCAN_CLEAR",
                0x56: "SCAN_ABORT", 0x57: "OBST_PASSED", 0x58: "SENSOR_FAULT",
                0x60: "CTRL_STATE", 0x61: "AVOID_PLAN", 0x62: "AVOID_STEP",
-               0x63: "CTRL_FAULT", 0x64: "RUN_DONE", 0x65: "COMMAND"}
+               0x63: "CTRL_FAULT", 0x64: "RUN_DONE", 0x65: "COMMAND",
+               0x66: "RUN_HUMP"}
 # S5's obstacle events: args = {distance in cm, servo angle in degrees};
 # the distance is the width for PROFILE and the depth for OBST_PASSED.
 EVENT_OBSTACLE_FIRST = 0x50
@@ -181,6 +182,7 @@ EVENT_CTRL_STATE = 0x60
 EVENT_CTRL_FAULT = 0x63
 EVENT_RUN_DONE = 0x64
 EVENT_COMMAND = 0x65
+EVENT_RUN_HUMP = 0x66     # args = {highest hump of the run in mm, 0}
 # S5's s5_mission_fault_t (subsystem5.h), the argument of CTRL_FAULT.
 CTRL_FAULT_NAMES = {0: "NONE", 1: "IMPACT", 2: "STALL", 3: "SENSOR",
                     4: "NO_PATH", 5: "LINE_NOT_FOUND", 6: "MOTION_TIMEOUT",
@@ -334,6 +336,8 @@ def event_text(code, args):
         text = "%s %s" % (name, name_of(CTRL_FAULT_NAMES, a))
     elif code == EVENT_RUN_DONE:
         text = "%s %d barcodes in %d s" % (name, a, b)
+    elif code == EVENT_RUN_HUMP:
+        text = "%s peak %d mm" % (name, a)
     elif code == EVENT_COMMAND:
         text = "%s %s %s by S5" % (name, name_of(OPCODE_NAMES, a),
                                    "accepted" if b else "refused")

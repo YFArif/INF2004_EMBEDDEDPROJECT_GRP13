@@ -610,6 +610,8 @@ class EventNames(unittest.TestCase):
                          "CTRL_FAULT STALL")
         self.assertEqual(dec.event_text(0x64, [4, 95]),
                          "RUN_DONE 4 barcodes in 95 s")
+        self.assertEqual(dec.event_text(0x66, [24, 0]),
+                         "RUN_HUMP peak 24 mm")
         self.assertEqual(dec.event_text(0x65, [2, 1]),
                          "COMMAND STOP accepted by S5")
         self.assertEqual(dec.event_text(0x65, [1, 0]),
