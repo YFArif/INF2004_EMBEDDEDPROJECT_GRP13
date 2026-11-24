@@ -44,7 +44,8 @@ typedef enum
     S5_EVENT_AVOID_STEP   = 0x62,   /* {s5_avoid_state_t, 0}.            */
     S5_EVENT_CTRL_FAULT   = 0x63,   /* {s5_mission_fault_t, 0}.          */
     S5_EVENT_RUN_DONE     = 0x64,   /* {barcodes, run time in s, max 255}*/
-    S5_EVENT_COMMAND      = 0x65    /* {opcode, 1 accepted / 0 refused}. */
+    S5_EVENT_COMMAND      = 0x65,   /* {opcode, 1 accepted / 0 refused}. */
+    S5_EVENT_RUN_HUMP     = 0x66    /* {hump peak mm, max 255, 0}.       */
 } s5_event_code_t;
 
 void s5_event_post(s5_event_code_t code, uint32_t dist_mm, int32_t angle_deg);

@@ -57,7 +57,7 @@ s5_event_post_args (s5_event_code_t code, uint32_t arg_a, uint32_t arg_b)
     uint32_t byte_a = (arg_a > ARG_MAX) ? ARG_MAX : arg_a;
     uint32_t byte_b = (arg_b > ARG_MAX) ? ARG_MAX : arg_b;
 
-    // NOTE: As above. The casts are safe: the code is 0x60 to 0x65, both
+    // NOTE: As above. The casts are safe: the code is 0x60 to 0x66, both
     // bytes were limited to 255, and format strings are ASCII.
     (void) subsystem1_event_post((uint8_t) code, (uint8_t) byte_a,
                                  (uint8_t) byte_b);

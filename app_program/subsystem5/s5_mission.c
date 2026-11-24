@@ -116,7 +116,10 @@
                                         /* after a barcode: cancel it.   */
 #define JUNC_COUNT_MASK     (0xFFu)     /* S3's 8-bit junction counter.  */
 #define REACQUIRE_MM        (300)       /* NFR10.                        */
-#define TURN_MS_PER_DEG     (20u)
+#define JUNC_TURN_MMS       (60u)       /* Junction turn: the speed Sean */
+                                        /* tuned JUNC_FWD_MM with (S2's  */
+                                        /* default is 150 mm/s).         */
+#define TURN_MS_PER_DEG     (40u)       /* About 2 x the time at 60 mm/s.*/
 #define MOTION_SLACK_MS     (2000u)
 #define SEARCH_STEPS        (7u)        /* g_search below (FR15).        */
 #define SEARCH_MOVE_MM      (100)       /* On between the two sweeps.    */
@@ -138,8 +141,11 @@
                                         /* tries with the turn itself.   */
 #define CDEG_PER_DEG        (100)
 #define CDEG_HALF_TURN      (18000)
-#define SLOW_MMS            (40u)       /* Calibration and recovery: S3  */
-                                        /* car test 29 Oct, 150 abrupt.  */
+#define SLOW_MMS            (40u)       /* Calibration sweep: S3 car test*/
+                                        /* 29 Oct, 150 abrupt.           */
+#define RECOVERY_MMS        (60u)       /* Line recovery moves and turns:*/
+                                        /* 40 tripped S2's stall E-stop  */
+                                        /* (Sean's drive test, 5 Nov).   */
 #define SLOW_MS_PER_DEG     (80u)       /* About 3 x the time at 40 mm/s.*/
 #define SLOW_MS_PER_MM      (75u)       /* About 3 x the time at 40 mm/s.*/
 #define TURN_LEFT_DEG       (90)        /* Barcode turns (FR6).          */
@@ -273,7 +279,8 @@ static bool line_is_lost(uint32_t events);
 static void step_recovery(uint32_t events, uint32_t now_ms);
 static void step_avoidance(uint32_t events, uint32_t now_ms);
 static void start_turn(int32_t angle_deg, uint32_t now_ms);
-static void start_slow_turn(int32_t angle_deg, uint32_t now_ms);
+static void start_slow_turn(int32_t angle_deg, uint16_t speed_mms,
+                            uint32_t now_ms);
 static void start_recovery_step(uint32_t now_ms);
 static void start_slow_move(int32_t move_mm, uint32_t now_ms);
 static void update_line_mark(void);
@@ -440,7 +447,7 @@ start_cal_sweep (uint32_t now_ms)
     g_mission.cal_start_cdeg = s5_links_odom_heading_cdeg();
     g_mission.cal_tries      = 0u;
     g_mission.cal_step       = 1u;
-    start_slow_turn(cal_error_deg(g_cal_target_deg[0]), now_ms);
+    start_slow_turn(cal_error_deg(g_cal_target_deg[0]), SLOW_MMS, now_ms);
 }
 
 /*!
@@ -583,14 +590,15 @@ step_cal_sweep (uint32_t events, uint32_t now_ms)
             g_mission.cal_tries++;
             s5_event_trace("CAL correcting: target_deg error_deg", target,
                            error);
-            start_slow_turn(error, now_ms);
+            start_slow_turn(error, SLOW_MMS, now_ms);
         }
         else if (g_mission.cal_step < CAL_TARGETS)
         {
             g_mission.cal_tries = 0u;
             g_mission.cal_step++;
             start_slow_turn(cal_error_deg(g_cal_target_deg[
-                                g_mission.cal_step - 1u]), now_ms);
+                                g_mission.cal_step - 1u]), SLOW_MMS,
+                            now_ms);
         }
         else
         {
@@ -1391,7 +1399,8 @@ start_recovery_step (uint32_t now_ms)
         }
         else
         {
-            start_slow_turn(g_mission.recovery_dir * p_step->value, now_ms);
+            start_slow_turn(g_mission.recovery_dir * p_step->value,
+                            RECOVERY_MMS, now_ms);
         }
     }
     else
@@ -1435,7 +1444,8 @@ step_recovery (uint32_t events, uint32_t now_ms)
 }
 
 /*!
- * @brief Send one slow MOVE (line search) and start its time limit.
+ * @brief Send one slow MOVE (line search, at RECOVERY_MMS) and start its
+ *        time limit.
  *
  * @param[in] move_mm Distance; negative = backwards.
  * @param[in] now_ms  Current time.
@@ -1446,7 +1456,7 @@ start_slow_move (int32_t move_mm, uint32_t now_ms)
     // NOTE: The cast is safe: |move_mm| is at most a few hundred mm.
     uint32_t dist = (uint32_t) s5_math_abs(move_mm);
 
-    s5_links_motion_move(move_mm, SLOW_MMS);
+    s5_links_motion_move(move_mm, RECOVERY_MMS);
     g_mission.wait_start_ms = now_ms;
     g_mission.wait_limit_ms = (dist * SLOW_MS_PER_MM) + MOTION_SLACK_MS;
 }
@@ -1502,7 +1512,8 @@ start_turn (int32_t angle_deg, uint32_t now_ms)
     uint32_t angle = (angle_deg < 0) ? (uint32_t) -angle_deg
                                      : (uint32_t) angle_deg;
 
-    s5_links_motion_turn(angle_deg, 0u);
+    // NOTE: The cast is safe: JUNC_TURN_MMS fits uint16_t.
+    s5_links_motion_turn(angle_deg, (uint16_t) JUNC_TURN_MMS);
     g_mission.wait_start_ms = now_ms;
     g_mission.wait_limit_ms = (angle * TURN_MS_PER_DEG) + MOTION_SLACK_MS;
 }
@@ -1515,16 +1526,17 @@ start_turn (int32_t angle_deg, uint32_t now_ms)
  *        needed), and S3's car test found 150 mm/s too abrupt.
  *
  * @param[in] angle_deg Angle; positive = left.
+ * @param[in] speed_mms SLOW_MMS (calibration) or RECOVERY_MMS.
  * @param[in] now_ms    Current time.
  */
 static void
-start_slow_turn (int32_t angle_deg, uint32_t now_ms)
+start_slow_turn (int32_t angle_deg, uint16_t speed_mms, uint32_t now_ms)
 {
     // NOTE: The casts are safe: |angle_deg| is at most 180.
     uint32_t angle = (angle_deg < 0) ? (uint32_t) -angle_deg
                                      : (uint32_t) angle_deg;
 
-    s5_links_motion_turn(angle_deg, SLOW_MMS);
+    s5_links_motion_turn(angle_deg, speed_mms);
     g_mission.wait_start_ms = now_ms;
     g_mission.wait_limit_ms = (angle * SLOW_MS_PER_DEG) + MOTION_SLACK_MS;
 }
@@ -1633,11 +1645,17 @@ finish_run (uint32_t now_ms)
     s5_links_line_search(S5_LINKS_SIDE_NONE);
     subsystem5_obst_request(OB_HOLD);
 
-    // TODO: Add S4's peak hump height once its getter is merged (FR8).
-    // NOTE: The casts are safe: both counts are far below 2^31.
+    // The run summary also reports S4's highest hump of the run (brief:
+    // "in telemetry and in the run summary").
+    uint32_t hump_mm = s5_links_hump_peak_mm();
+
+    // NOTE: The casts are safe: both counts are far below 2^31, and the
+    // hump is at most 255 mm.
     s5_event_post_args(S5_EVENT_RUN_DONE, g_mission.barcodes, run_s);
+    s5_event_post_args(S5_EVENT_RUN_HUMP, hump_mm, 0u);
     s5_event_trace("RUN summary: barcodes run_s",
                    (int32_t) g_mission.barcodes, (int32_t) run_s);
+    s5_event_trace("RUN summary: hump_peak_mm 0", (int32_t) hump_mm, 0);
     set_state(S5_CTRL_FINISHED);
 }
 

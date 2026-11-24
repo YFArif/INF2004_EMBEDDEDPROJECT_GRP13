@@ -65,6 +65,7 @@ bool            s5_links_nav_take(subsystem5_nav_msg_t * p_msg);
 
 /* S4: IMU. */
 bool    s5_links_imu_cal_done(void);
+uint32_t s5_links_hump_peak_mm(void);
 
 /* S1: commands. */
 void    s5_links_ack(uint8_t opcode, uint8_t cmd_id, bool b_accepted);

@@ -11,10 +11,10 @@
  * - mbf_nav (owned by S3) is read only by vehicle_ctrl_task, through
  *   s5_links_nav_take().
  *
- * @par When another subsystem is merged
- * - S4: return S4's "calibration done" in s5_links_imu_cal_done().
- * - S1: the verdict reaches the dashboard as event S5_EVENT_COMMAND
- *   (s5_links_ack()); S1's ack itself means "queued for S5".
+ * @par S1
+ * The verdict on a command reaches the dashboard as event
+ * S5_EVENT_COMMAND (s5_links_ack()); S1's ack itself means "queued for
+ * S5".
  */
 
 #include <stdbool.h>
@@ -23,6 +23,7 @@
 #include "../subsystem2/subsystem2.h"
 #include "../subsystem3/s3_config.h"    /* S3_EXPERIMENT_MODE, DRIVE_TEST. */
 #include "../subsystem3/subsystem3.h"   /* s3_api.h.                       */
+#include "../subsystem4/subsystem4.h"   /* IF-08: calibration, hump peak.  */
 #include "s5_event.h"
 #include "s5_links.h"
 #include "subsystem5.h"
@@ -563,15 +564,34 @@ s5_links_nav_take (subsystem5_nav_msg_t * p_msg)
 }
 
 /*!
- * @brief Tell whether S4 has finished its IMU calibration.
+ * @brief Tell whether S4 has finished its IMU calibration (IF-08,
+ *        subsystem4_cal_done()). S4 needs the robot standing still for
+ *        it, so S5 waits for this before its power-up line-sensor sweep
+ *        (the sweep moving the robot made S4 start again, log
+ *        2026-11-13_1539).
  *
- * @return true; the stand-in never waits.
+ * @return true once S4's offsets are measured.
  */
 bool
 s5_links_imu_cal_done (void)
 {
-    // TODO: S4's "cal_done" (IF-08 terrain.cal_done), once merged.
-    return (true);
+    return (subsystem4_cal_done());
+}
+
+/*!
+ * @brief The highest hump of the run so far, as S4 measured it (IF-08,
+ *        terrain.peak_mm).
+ *
+ * @return mm, 0 ... 255.
+ */
+uint32_t
+s5_links_hump_peak_mm (void)
+{
+    subsystem4_terrain_t terrain = {0};
+
+    subsystem4_terrain_get(&terrain);
+
+    return (terrain.peak_mm);
 }
 
 /*!
