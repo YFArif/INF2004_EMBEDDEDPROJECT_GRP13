@@ -162,6 +162,11 @@ MAP_RESULT_NAMES = {0: "applied", 1: "refused"}
 # The four letters of a MAP, in wire order, and the command each one is.
 MAP_SLOTS = (("letter_left", "LEFT"), ("letter_right", "RIGHT"),
              ("letter_straight", "STRAIGHT"), ("letter_uturn", "U-TURN"))
+# The dashboard's filler for a turn the track does not use, one per slot
+# in MAP_SLOTS order. S3 takes only four different letters, so an empty
+# box on the page is sent as this slot's symbol, which no track barcode
+# carries (testing/subsystem1/dashboard_ui/app.js, MAP_UNUSED).
+MAP_UNUSED = "%+/$"
 
 # Section 3.1: bit n of fault_mask is fault n, as S5 numbers them
 # (S5_FAULT_xxx in subsystem5.h).
@@ -310,9 +315,12 @@ def map_letters(msg):
 
 def map_text(letters):
     """'LEFT=D RIGHT=C STRAIGHT=B U-TURN=A' for the letters "DCBA", the
-    order of S3's own console line."""
-    return " ".join("%s=%s" % (slot, letter)
-                    for (_, slot), letter in zip(MAP_SLOTS, letters))
+    order of S3's own console line; a slot holding its MAP_UNUSED filler
+    shows as unused ('LEFT=Z RIGHT=unused ...' for "Z+/$")."""
+    return " ".join("%s=%s" % (slot, "unused" if letter == unused
+                               else letter)
+                    for (_, slot), letter, unused
+                    in zip(MAP_SLOTS, letters, MAP_UNUSED))
 
 
 def ack_is_map(msg):

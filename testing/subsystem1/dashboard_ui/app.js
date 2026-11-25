@@ -65,15 +65,34 @@ document.addEventListener("keydown", (e) => {
     send("stop");
   }
 });
-function mapCheck(letters) {
-  if (letters.length !== 4) { return "Fill in all four boxes."; }
-  for (const ch of letters) {
-    if ((CODE39.indexOf(ch) < 0) || (ch === "*")) {
+// A box left empty is a turn the track does not use. S3 takes only a
+// map of four different letters (s3_nav_set_map()), so an empty box is
+// sent as its own Code 39 symbol, one per slot, that no track barcode
+// carries: % for LEFT, + for RIGHT, / for STRAIGHT, $ for U-TURN. The
+// status line shows those slots as "unused" (s1_decode.map_text()).
+// A barcode whose letter is not in the map gives no command: S5 goes
+// straight on at its junction.
+const MAP_UNUSED = "%+/$";
+
+function mapCheck(boxes) {
+  const used = boxes.filter((ch) => ch !== "");
+  if (used.length === 0) { return "Type a letter for at least one turn."; }
+  for (const ch of used) {
+    if (MAP_UNUSED.indexOf(ch) >= 0) {
+      return "% + / $ are kept for unused turns: leave the box empty.";
+    }
+    if ((CODE39.indexOf(ch) < 0) || (ch === "*") || (ch === " ")) {
       return "\"" + ch + "\" is not a Code 39 letter S3 takes.";
     }
   }
-  if (new Set(letters).size !== 4) { return "Each letter may be used once."; }
+  if (new Set(used).size !== used.length) {
+    return "Each letter may be used once.";
+  }
   return "";
+}
+
+function mapLetters(boxes) {
+  return boxes.map((ch, i) => ch || MAP_UNUSED[i]).join("");
 }
 
 function setMap(m) {
@@ -87,11 +106,11 @@ MAP_IDS.forEach((id) => {
   });
 });
 el("map-set").addEventListener("click", () => {
-  const letters = MAP_IDS.map((id) => el(id).value).join("");
-  const why = mapCheck(letters);
+  const boxes = MAP_IDS.map((id) => el(id).value.trim());
+  const why = mapCheck(boxes);
   el("map-why").textContent = why;
   if (why) { return; }
-  post("/api/map", {letters: letters}).then((r) => {
+  post("/api/map", {letters: mapLetters(boxes)}).then((r) => {
     if (r.status !== 200) {
       el("map-why").textContent = (r.body && r.body.error) ? r.body.error
         : "not sent (HTTP " + r.status + ")";
@@ -429,8 +448,102 @@ function cardsLive(l) {
   word("l-bc", l.bc_char || "None", l.bc_char
        ? "bc_cmd " + l.bc_cmd_name + ", read "
          + (l.b_bc_rev ? "backwards" : "forwards") : "bc_letter 63", false);
-  word("l-junc", l.junctions ? capital(l.junc_name) : "None yet",
-       "junc_turn " + l.junc_name + ", junctions " + l.junctions, false);
+  paintJunc();
+}
+
+// -- Junction turn. S3's junc_turn is written only by S3's drive test
+// (task_drive_test.c, off in main), so on the mission it stays 0,
+// "straight". S5 makes the turn: it takes the command of each barcode S3
+// reads (the letter map), approaches the next junction and carries the
+// command out there in EXECUTING_COMMAND; a junction with no command
+// waiting is crossed straight on (s5_mission.c: take_barcodes(),
+// execute_command(), step_following()). The page follows the same steps
+// from the live barcode counter and S5's state (telemetry and the
+// CTRL_STATE event).
+const nav = {bcBase: null, juncBase: null, ctrl: "", pending: "",
+             last: "", why: "", b_late: false};
+
+function navTurn(cmd, why) {
+  nav.last = cmd;
+  nav.why = why;
+  nav.pending = "";
+}
+
+function navLive(l) {
+  if (nav.bcBase === null) {
+    nav.bcBase = l.barcodes;
+    nav.juncBase = l.junctions;
+  }
+  const reads = (l.barcodes - nav.bcBase + 256) % 256;
+  const juncs = (l.junctions - nav.juncBase + 256) % 256;
+  nav.bcBase = l.barcodes;
+  nav.juncBase = l.junctions;
+  const cmd = (l.bc_cmd_name && (l.bc_cmd_name !== "none"))
+    ? l.bc_cmd_name : "";
+  if ((reads > 0) && cmd && CTRL_RUNNING.includes(nav.ctrl)) {
+    if (nav.b_late) {
+      // S5 went into EXECUTING_COMMAND before this frame showed the
+      // barcode (it waits at a junction for a letter being read).
+      navTurn(cmd, "barcode " + l.bc_char);
+    } else {
+      nav.pending = cmd;
+      nav.why = "barcode " + l.bc_char;
+    }
+  }
+  nav.b_late = false;
+  if ((juncs > 0) && !nav.pending
+      && !["APPROACH_JUNCTION", "EXECUTING_COMMAND"].includes(nav.ctrl)
+      && CTRL_RUNNING.includes(nav.ctrl)) {
+    navTurn("straight", "no command waiting");
+  }
+}
+
+function navCtrl(name) {
+  if (name === nav.ctrl) { return; }
+  const prev = nav.ctrl;
+  nav.ctrl = name;
+  if ((name === "EXECUTING_COMMAND")
+      || ((name === "REACQUIRE_LINE") && (prev === "APPROACH_JUNCTION"))) {
+    // The second case: a STRAIGHT command passes EXECUTING_COMMAND at
+    // once, so a 2 Hz telemetry frame can miss it.
+    nav.b_late = !nav.pending;
+    navTurn(nav.pending || "straight", nav.pending ? nav.why
+            : "no command waiting");
+  } else if ((name === "LINE_FOLLOWING") && (prev === "APPROACH_JUNCTION")) {
+    // S5 gave up: no junction within NAV_GIVE_UP_MM.
+    nav.pending = "";
+  } else if (!CTRL_RUNNING.includes(name)) {
+    nav.pending = "";
+  } else {
+    // Other running states keep the command.
+  }
+  paintJunc();
+}
+
+function navClear() {
+  nav.pending = "";
+  nav.last = "";
+  nav.why = "";
+  paintJunc();
+}
+
+function paintJunc() {
+  let shown = "None yet";
+  if (nav.pending) {
+    shown = capital(nav.pending) + " next";
+  } else if (nav.last) {
+    shown = capital(nav.last);
+  } else {
+    // Nothing since the page opened or the last START or RESET.
+  }
+  const raw = (nav.pending ? "next junction: " + nav.pending
+               + " (" + nav.why + ")" : "")
+    + (nav.last ? (nav.pending ? "; " : "") + "last junction: "
+       + nav.last + " (" + nav.why + ")" : "")
+    + "; S5 " + (nav.ctrl || "state not seen yet");
+  word("l-junc", shown, raw, false);
+  text("s3-junc", nav.pending ? nav.pending + " at the next junction"
+       : (nav.last ? "turned " + nav.last : "none yet"));
 }
 
 const STALE_S = 2;
@@ -539,6 +652,7 @@ function setTelemetry(t, ageMs) {
   text("s5-clear", (t.width_mm || t.clear_l_mm || t.clear_r_mm)
        ? num(t.clear_l_mm) + " / " + num(t.clear_r_mm) + " mm" : "-");
   cardsTelemetry(t);
+  navCtrl(t.ctrl_name);
   demoTelemetry(t, ageMs);
   window.s1Last.tel = {msg: t, at: performance.now() - (ageMs || 0)};
   emit("telemetry", window.s1Last.tel);
@@ -565,9 +679,9 @@ function setLive(l, ageMs) {
   text("s3-over", l.b_overshoot ? "on" : "off");
   text("s3-bc", l.bc_char ? l.bc_char + ": " + l.bc_cmd_name + ", read "
        + (l.b_bc_rev ? "backwards" : "forwards") : "none yet");
-  text("s3-junc", l.junctions ? "turn " + l.junc_name : "none yet");
   text("s3-counts", "barcodes " + l.barcodes + ", rejected " + l.rejects
        + " (wraps at 16), junctions " + l.junctions + ", lost " + l.losts);
+  navLive(l);
   cardsLive(l);
   demoLive(l, ageMs);
   window.s1Last.live = {msg: l, at: performance.now() - (ageMs || 0)};
@@ -674,8 +788,11 @@ const DEMO_ROWS = [
   ["mqtt", "Telemetry via MQTT"], ["lift", "Lifted, motors stopped"]];
 const DEMO_KEY = "s1-demo";
 // S5's subsystem5_ctrl_state_t numbers, for the CTRL_STATE event.
-const CTRL_BY_NUM = {3: "LINE_FOLLOWING", 5: "EXECUTING_COMMAND",
-                     8: "OBSTACLE_AVOIDANCE", 9: "FAULT"};
+const CTRL_BY_NUM = {0: "INIT", 1: "CALIBRATING", 2: "READY",
+                     3: "LINE_FOLLOWING", 4: "APPROACH_JUNCTION",
+                     5: "EXECUTING_COMMAND", 6: "REACQUIRE_LINE",
+                     7: "LINE_RECOVERY", 8: "OBSTACLE_AVOIDANCE",
+                     9: "FAULT", 10: "FINISHED"};
 const CTRL_RUNNING = ["LINE_FOLLOWING", "APPROACH_JUNCTION",
                       "EXECUTING_COMMAND", "REACQUIRE_LINE",
                       "LINE_RECOVERY", "OBSTACLE_AVOIDANCE"];
@@ -902,6 +1019,7 @@ function demoEvent(d) {
       return;
     }
   } else if (d.code === EV_CTRL_STATE) {
+    navCtrl(CTRL_BY_NUM[a] || String(a));
     demoCtrl(CTRL_BY_NUM[a] || String(a));
   } else {
     return;
@@ -940,7 +1058,10 @@ on("controls", setControls);
 on("cmd", (d) => {
   upsertRow(d);
   addLog("cmd", d);
-  if ((d.op === "START") || (d.op === "RESET")) { demoClear(); }
+  if ((d.op === "START") || (d.op === "RESET")) {
+    demoClear();
+    navClear();
+  }
 });
 on("ack", (d) => {
   if (d.n !== undefined) { upsertRow(d); }

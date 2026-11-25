@@ -399,19 +399,27 @@ so it grows by roughly 20 MB an hour while the robot runs.
 
 The demo day gives the letter for each turn, and the code may not be
 recompiled, so the robot takes the letters over MQTT: a 5-byte MAP
-message (`docs/S1_binary_frame.md` section 5). Type one letter in each
-box, LEFT, RIGHT, STRAIGHT and U-TURN, and press **Set map**; lower case
-becomes upper case. The page checks S3's rules, and the server checks
-them again: four different Code 39 characters (`0` to `9`, `A` to `Z`,
-`-`, `.`, space, `$`, `/`, `+`, `%`; not `*`). The robot hands the
-letters to S3 (`s3_set_nav_map()`), and the ack says what S3 did. A map is
-taken in any state, running or not.
+message (`docs/S1_binary_frame.md` section 5). Type a letter in the box
+of each turn the track uses, LEFT, RIGHT, STRAIGHT and U-TURN, leave the
+others empty, and press **Set map**; lower case becomes upper case. At
+least one box must hold a letter, and no letter may be used twice. S3
+takes only a map of four different Code 39 characters (`0` to `9`, `A`
+to `Z`, `-`, `.`, space, `$`, `/`, `+`, `%`; not `*`), so the page sends
+an empty box as that slot's own symbol: `%` for LEFT, `+` for RIGHT, `/`
+for STRAIGHT, `$` for U-TURN (`MAP_UNUSED` in `app.js` and
+`s1_decode.py`). No track barcode carries those, so the page does not
+let you type them. The status line shows such a slot as "unused". A
+barcode whose letter is not in the map gives S5 no command, and the car
+goes straight on at its junction. The server checks S3's rules again on
+the four characters it receives. The robot hands the letters to S3
+(`s3_set_nav_map()`), and the ack says what S3 did. A map is taken in
+any state, running or not.
 
 | Status line | Meaning |
 |---|---|
 | No map set (robot uses its default) | Nothing set since the dashboard started. S3 uses ABCD after every reset |
 | Sending DCBA (try n of 3) | Published; waiting for the ack |
-| Applied on the robot: LEFT=D RIGHT=C STRAIGHT=B U-TURN=A (acked hh:mm:ss) | Ack result 0: S3 took the map. The console prints `S3 NAV MAP set: LEFT=D RIGHT=C STRAIGHT=B U-TURN=A` |
+| Applied on the robot: LEFT=D RIGHT=C STRAIGHT=B U-TURN=A (acked hh:mm:ss) | Ack result 0: S3 took the map. The console prints `S3 NAV MAP set: LEFT=D RIGHT=C STRAIGHT=B U-TURN=A`. With only LEFT set to Z the line reads `LEFT=Z RIGHT=unused STRAIGHT=unused U-TURN=unused`; S3's console shows the symbols (`RIGHT=+` and so on) |
 | NOT CONFIRMED: ... | No ack after 3 sends, 2 s apart. The map may or may not be on the robot; it is sent again when the robot's status next turns online |
 | REFUSED: ... | Ack result 1: S3 refused the map and kept the one it had (console `S3 NAV MAP REJECTED (kept)`). The line still shows the last map applied. Not retried |
 | Robot offline: DCBA is kept and sent when it comes online | Set while the robot's status was not online; nothing is published until it is |
@@ -517,7 +525,8 @@ panels. The thresholds are constants at the top of the cards' code in
 | Straight, Slight left or right, Hard left or right | Steering | `steer_dv` (live, positive is a turn right): at most 10 mm/s in size is Straight; at most 100 is Slight; above is Hard. S3's full lock is 200 mm/s (`S3_STEER_MAX_MMS`), so the limits are 5 % and 50 % of it |
 | None, Climbing, Descending | Hump | `hump_state` 0, 1, 2 (telemetry) |
 | Calibrated, Not calibrated, Fault | IMU | Fault: `imu_ok` 0. Otherwise by `cal_done` |
-| None, None yet, No echo | Last barcode, Junction turn, Closest | `bc_letter` 63; `junctions` 0; `closest_mm` 0 |
+| Left, Right, Straight, U-turn; Left next and so on; None yet | Junction turn, and the S3 panel's last junction turn | Worked out on the page, not read from `junc_turn`: S3 sets that field only in its drive test (`task_drive_test.c`, off in main), so on the mission it always reads straight. S5 makes the turn (`s5_mission.c`): a new barcode read while the car runs (`barcodes` counter, live) with a command from the map shows "<command> next"; when S5 enters EXECUTING_COMMAND (telemetry `ctrl_state` or the CTRL_STATE event), or goes straight from APPROACH_JUNCTION to REACQUIRE_LINE, that command shows as the turn taken. A junction (`junctions` counter) with no command waiting shows Straight. S5 going back to LINE_FOLLOWING from APPROACH_JUNCTION (no junction found) or leaving the running states drops the waiting command. START and RESET clear it; a page reload starts from None yet. The tooltip says which barcode gave the turn |
+| None, None yet, No echo | Last barcode, Junction turn, Closest | `bc_letter` 63; nothing since the page opened, START or RESET; `closest_mm` 0 |
 
 The 10 and 100 mm/s steering limits are our own choice, not S3's. They
 were not checked against the car on the track.
