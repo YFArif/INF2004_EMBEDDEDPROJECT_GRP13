@@ -770,7 +770,8 @@ class FakeCar:
                         "turn": self._bc["turn"]}
             self._s3["barcodes"] += 1
         elif event in ("junc_left", "junc_right"):
-            self._bc["turn"] = 1 if event == "junc_left" else 2
+            # junc_turn stays 0, as on the car: only S3's drive test sets
+            # it, and that is off in main.
             self._s3["junctions"] += 1
         elif event == "hump_done":
             self._hump_count += 1
@@ -903,7 +904,6 @@ class FakeCar:
         elif name == "reject":
             self._s3["rejects"] += 1
         elif name == "junction":
-            self._bc["turn"] = (self._s3["junctions"] + 1) % 4
             self._s3["junctions"] += 1
             self._hold["junction"] = 0.6
         elif name == "lost":
@@ -1559,11 +1559,13 @@ class Dashboard:
             entries.append(self.add_timeline(
                 "reject", "barcode rejected (%d)" % deltas["rejects"]))
         if deltas["junctions"] > 0:
+            # No turn here: junc_turn is set only by S3's drive test (off
+            # in main); S5 makes the turn, and the page works it out
+            # (app.js, navLive() and navCtrl()).
             entries.append(self.add_timeline(
-                "junction", "junction: turn %s%s" % (
-                    shown["junc_name"],
+                "junction", "junction%s" % (
                     "" if deltas["junctions"] == 1
-                    else " (%d junctions, last turn)" % deltas["junctions"])))
+                    else " (%d junctions)" % deltas["junctions"])))
         if deltas["losts"] > 0:
             entries.append(self.add_timeline(
                 "lost", "line lost%s" % (
@@ -3146,7 +3148,7 @@ def telemetry_probe():
                               "lost"]
         b_texts = (("barcode C accepted" in texts[0])
                    and ("and 1 more" in texts[1])
-                   and ("turn right" in texts[3])
+                   and (texts[3] == "junction")
                    and ("2 times" in texts[4]) and (dash.s3_rejected == 1))
         before = len(dash.s3_timeline)
         live(barcodes=106)
