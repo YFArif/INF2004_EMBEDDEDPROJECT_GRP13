@@ -336,7 +336,7 @@ const LINE_WORDS = {
 };
 const STOP_WORDS = {LIFTED: "Lifted: run ended",
                     OVERTURNED: "Overturned: fault, reset needed"};
-const HUMP_WORDS = {flat: "None", climbing: "Climbing",
+const HUMP_WORDS = {flat: "Flat", climbing: "Climbing",
                     descending: "Descending"};
 
 function word(id, value, raw, bad) {
@@ -406,7 +406,8 @@ function cardsTelemetry(t) {
 }
 
 function cardsLive(l) {
-  // Live hump height: 0 on flat ground (the run's highest is peak_mm).
+  // Live hump height: 0 on flat ground (its highest since START is
+  // "Peak hump height", demoHumpLive()).
   measure("a-height", num(l.height_mm));
   el("a-height").title = "height_mm " + l.height_mm;
   text("s4-height", num(l.height_mm, "mm"));
@@ -687,7 +688,51 @@ let demo = demoFresh();
 
 function demoFresh() {
   return {done: {}, val: {}, bcBase: null, humpBase: null, cmd: "",
-          sawTurn: false, sawAvoid: false, ctrl: "", lastMsg: null};
+          sawTurn: false, sawAvoid: false, ctrl: "", lastMsg: null,
+          peak: 0, hump: 0, humpWait: null, lifted: false};
+}
+
+// Peak hump height: the highest live hump height (S4's tilt height_mm)
+// since the clear (START, RESET or Clear). One hump is the time the
+// height is above 0; its highest value counts once the height has been
+// back at 0 for PEAK_SETTLE_MS with no lift seen, so lifting the car at
+// the end of the demo is not taken for a hump. A lift (LIFTED or
+// OVERTURNED) stops the tracking until the next clear.
+const PEAK_SETTLE_MS = 1500;
+
+function demoHumpLive(h) {
+  if (demo.lifted) { return; }
+  const now = Date.now();
+  const w = demo.humpWait;
+  if (w && ((now - w.at) >= PEAK_SETTLE_MS)) {
+    demo.humpWait = null;
+    if (w.mm > demo.peak) {
+      demo.peak = w.mm;
+      demoTick("hump", "peak " + mmCm(demo.peak), false);
+    }
+  }
+  if (h > 0) {
+    demo.hump = Math.max(demo.hump, h);
+  } else if (demo.hump > 0) {
+    demo.humpWait = {mm: Math.max(demo.hump, w ? w.mm : 0), at: now};
+    demo.hump = 0;
+  }
+}
+
+function demoLifted() {
+  demo.lifted = true;
+  demo.hump = 0;
+  demo.humpWait = null;
+}
+
+// The hump row's value: the live peak when there is one, else S4's
+// peak_mm if it rose since the clear (peak_mm runs from power-on).
+function demoHumpText(s4mm) {
+  if (demo.peak > 0) { return "peak " + mmCm(demo.peak); }
+  if (demo.humpBase && (s4mm > demo.humpBase.peak)) {
+    return "S4 peak " + mmCm(s4mm);
+  }
+  return "counted by S4";
 }
 
 function clock(ms) { return new Date(ms).toTimeString().slice(0, 8); }
@@ -731,6 +776,9 @@ function demoPaint() {
       ? "last " + clock(demo.lastMsg) : (at ? clock(at) : "");
     li.children[3].textContent = demo.val[key] || (at ? "" : "not yet");
   });
+  measure("a-peak", demo.peak ? num(demo.peak) : "");
+  el("a-peak").title = "Highest live height_mm since "
+    + "the clear: " + demo.peak + " mm";
   demoSave();
 }
 
@@ -789,9 +837,10 @@ function demoTelemetry(t, ageMs) {
   if (demo.humpBase === null) {
     demo.humpBase = {count: t.hump_count, peak: t.peak_mm};
   }
+  if (STOP_WORDS[t.class_name]) { demoLifted(); }
   if ((t.hump_count !== demo.humpBase.count)
       || (t.peak_mm > demo.humpBase.peak)) {
-    demoTick("hump", "peak " + mmCm(t.peak_mm), false);
+    demoTick("hump", demoHumpText(t.peak_mm), false);
   }
   const running = CTRL_RUNNING.includes(t.ctrl_name);
   if (running && (t.closest_mm > 0) && (t.closest_mm <= OBSTACLE_NEAR_MM)) {
@@ -815,6 +864,7 @@ function demoTelemetry(t, ageMs) {
 function demoLive(l, ageMs) {
   demo.lastMsg = Math.max(demo.lastMsg || 0, Date.now() - (ageMs || 0));
   if (demo.bcBase === null) { demo.bcBase = l.barcodes; }
+  demoHumpLive(l.height_mm || 0);
   const reads = (l.barcodes - demo.bcBase + 256) % 256;
   if (reads > 0) {
     demoTick("barcode", reads + (reads === 1 ? " read" : " reads"), false);
@@ -841,8 +891,16 @@ function demoEvent(d) {
     demoTick("obst", "at " + mmCm(a * 10));
   } else if (d.code === EV_PROFILE) {
     demoTick("width", mmCm(a * 10), false);
-  } else if (d.code === EV_RUN_HUMP && a > 0) {
-    demoTick("hump", "peak " + mmCm(a), false);
+  } else if ((d.code === EV_RUN_HUMP) && (a > 0)) {
+    // a is S4's peak_mm, which runs from power-on: it ticks the row only
+    // if it rose since the clear.
+    if (demo.humpBase && (a > demo.humpBase.peak)) {
+      demoTick("hump", demoHumpText(a), false);
+    } else if (demo.peak > 0) {
+      demoTick("hump", demoHumpText(0), false);
+    } else {
+      return;
+    }
   } else if (d.code === EV_CTRL_STATE) {
     demoCtrl(CTRL_BY_NUM[a] || String(a));
   } else {

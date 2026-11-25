@@ -379,7 +379,8 @@ button.scene-chip { min-height: var(--target); font-weight: 600; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
 /* Attitude: six values in two rows of three, so the card is no taller than
  * the other number cards (the page fits 1700 x 900 without scrolling). */
-.stats3 { grid-template-columns: 1fr 1fr 1fr; gap: 12px 12px; }
+.stats3 { grid-template-columns: 1fr 1fr 1fr; gap: 12px 12px;
+  align-items: end; }
 .val {
   font-size: var(--fs-title1); line-height: var(--lh-title1);
   letter-spacing: var(--tr-title1); font-weight: 600;
@@ -537,6 +538,9 @@ li { margin-bottom: 4px; }
   body { height: 100vh; overflow: hidden; }
   main { grid-template-rows: minmax(0, 1fr); }
   .grow { flex: 1; }
+  /* Attitude has seven values in three rows: it takes the room the
+   * two-row number cards leave. */
+  #c-att { flex: 1.6; }
   .col-right .card { gap: 8px; padding: 16px 20px; }
   .col-left .note, #c-demo .note { display: none; }
   #c-cmds .note { display: block; }
