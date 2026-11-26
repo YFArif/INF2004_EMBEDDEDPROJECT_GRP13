@@ -97,8 +97,8 @@ static uint32_t g_reg_ints  = IO_PROC0_INTS2_REG;
 static uint32_t g_all_edges = 0u;
 static uint32_t g_core      = UINT32_MAX;   /* Not set up yet.          */
 static uint32_t g_tick_was  = 0u;           /* TICK before the fix.     */
-static volatile drv_encoder_hook_t g_hook = NULL;  /* Other GPIO users. */
-static volatile bool g_b_isr_ready = false;
+static volatile drv_encoder_hook_t gp_hook = NULL; /* Other GPIO users. */
+static volatile bool gb_isr_ready = false;
 
 static void     timer_tick_setup(void);
 static void     encoder_isr(UINT intno);
@@ -182,7 +182,7 @@ drv_encoder_init (void)
         out_w(reg_inte + ALIAS_SET, g_all_edges);
         EnableInt(INTNO_IO_BANK0, ENCODER_INT_LEVEL);  /* This core.     */
         g_core        = core;
-        g_b_isr_ready = true;
+        gb_isr_ready  = true;
 
         // NOTE: The cast is safe: format strings are ASCII, and every
         // value is below 32, which an int always holds.
@@ -206,7 +206,7 @@ drv_encoder_init (void)
 void
 drv_encoder_hook_set (drv_encoder_hook_t p_hook)
 {
-    g_hook = p_hook;
+    gp_hook = p_hook;
 }
 
 /*!
@@ -217,7 +217,7 @@ drv_encoder_hook_set (drv_encoder_hook_t p_hook)
 bool
 drv_encoder_isr_ready (void)
 {
-    return (g_b_isr_ready);
+    return (gb_isr_ready);
 }
 
 /*!
@@ -335,9 +335,9 @@ encoder_isr (UINT intno)
     // Other users of IO_IRQ_BANK0 (S3's barcode edge on GP6) run here: only
     // one handler can own an interrupt number, so they share this one. The
     // hook clears its own pins, as every handler of this interrupt must.
-    if (NULL != g_hook)
+    if (NULL != gp_hook)
     {
-        g_hook(intno);
+        gp_hook(intno);
     }
 }
 
@@ -369,7 +369,7 @@ encoder_event (volatile encoder_state_t * p_state, uint32_t events,
             p_state->count.raw_fall++;
         }
 
-        if (p_state->b_any_edge &&
+        if ((p_state->b_any_edge) &&
             ((now_us - p_state->last_edge_us) < p_state->count.min_gap_us))
         {
             p_state->count.min_gap_us = now_us - p_state->last_edge_us;
@@ -426,3 +426,4 @@ pad_reg (uint32_t pin)
 }
 
 /*** end of file ***/
+

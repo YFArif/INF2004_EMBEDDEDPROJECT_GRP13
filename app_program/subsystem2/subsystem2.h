@@ -13,10 +13,10 @@
  * correction both turn the robot left (the right wheel runs faster).
  *
  * @par Kernel objects (created in subsystem2_init)
- * mbf_motion (IF-04 commands), flg_motion (IF-05 MF_ESTOP latch, plus a
- * private 20 ms tick bit), mtx_odom (IF-06 odometry and status),
- * mtx_steer (IF-02 steering) and cyc_motion (20 ms period). Except for
- * the legacy flg_motion below, their IDs stay inside subsystem2.c;
+ * gh_mbf_motion (IF-04 commands), flg_motion (IF-05 MF_ESTOP latch, plus
+ * a private 20 ms tick bit), gh_mtx_odom (IF-06 odometry and status),
+ * gh_mtx_steer (IF-02 steering) and gh_cyc_motion (20 ms period). Except
+ * for the legacy flg_motion below, their IDs stay inside subsystem2.c;
  * other subsystems use the functions below (BARR-C 4.2c).
  *
  * @par Deviations from BARR-C:2018 (same as S5; approval: project
@@ -29,9 +29,8 @@
  * - Legacy section: flg_motion is declared extern (rule 4.2c) and ODOM
  *   is not a lower-case _t name (rule 5.1a). Both stay only until S5's
  *   obstacle_task uses subsystem2_estop_set() and subsystem2_odom_get().
- * - task_producer.c / .h are the course template's example, unchanged
- *   apart from moving its objects there; they are deleted with the S3 /
- *   S4 examples.
+ * - task_producer.c / .h are the course template's example, moved here
+ *   and reformatted; they are deleted with the S3 / S4 examples.
  *
  * @par Abbreviations used in S2 (BARR-C 1.5b)
  * cmd: command; cyc: cyclic handler; dist: distance; enc: encoder;
@@ -49,7 +48,7 @@
 #include "task_producer.h"  /* Template example; see the note above.    */
 
 /* ---------------------------------------------------------------------
- *  IF-04 mbf_motion: commands to motion_task, sent by vehicle_ctrl_task
+ *  IF-04 gh_mbf_motion: commands to motion_task, sent by vehicle_ctrl_task
  *  (S5) with subsystem2_motion_send(). S2 copies the public command into a
  *  4-byte packed message-buffer payload, so the sender may reuse its
  *  subsystem2_cmd_t at once. Peer-visible types and getters are unchanged.
@@ -234,3 +233,4 @@ int16_t  subsystem2_steer_get(void);
 #endif /* SUBSYSTEM2_H */
 
 /*** end of file ***/
+

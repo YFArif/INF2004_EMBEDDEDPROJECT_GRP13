@@ -93,6 +93,7 @@ drv_servo_move (int32_t angle_deg)
                         (uint32_t) pulse_us);
     g_angle_deg = target;
 
+    // NOTE: The cast is safe: travel is 0 ... 180, so it is not negative.
     return (SETTLE_BASE_MS + (SETTLE_MS_PER_DEG * (uint32_t) travel));
 }
 
@@ -138,3 +139,4 @@ clamp_angle (int32_t angle_deg, int32_t low_deg, int32_t high_deg)
 }
 
 /*** end of file ***/
+

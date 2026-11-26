@@ -97,6 +97,7 @@ drv_adc_to8 (uint16_t adc)
 {
     uint32_t value = ((uint32_t) adc + 8u) >> 4;
 
+    /* The cast is safe: value is limited to 255 first, which fits uint8_t. */
     return (uint8_t) ((value > 255u) ? 255u : value);
 }
 
@@ -111,3 +112,4 @@ uint32_t drv_adc_isr_max_us_take(void);     /* Only with S3_TIMING 1.   */
 #endif /* DRV_ADC_H */
 
 /*** end of file ***/
+

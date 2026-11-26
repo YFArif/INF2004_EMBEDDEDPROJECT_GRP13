@@ -5,9 +5,9 @@
  *
  * @par
  * This file owns everything that is shared between S3's tasks or with
- * other subsystems: mbf_nav, mtx_s3, flg_s3, flg_line, the packed status
- * (always under mtx_s3), the steering word (one writer, one 32-bit store)
- * and the tuning requests (handed over under mtx_s3).
+ * other subsystems: gh_mbf_nav, gh_mtx_s3, gh_flg_s3, gh_flg_line, the
+ * packed status (always under gh_mtx_s3), the steering word (one writer,
+ * one 32-bit store) and the tuning requests (handed over under gh_mtx_s3).
  */
 
 #include <stdbool.h>
@@ -43,31 +43,32 @@ typedef char s3_chk_nav_t[(sizeof(s3_nav_msg_t) == 4u) ? 1 : -1];
 typedef char s3_chk_status_t[(sizeof(s3_line_status_t) == 16u) ? 1 : -1];
 typedef char s3_chk_line_t[(sizeof(s3_line_t) <= 48u) ? 1 : -1];
 
-ID mbf_nav;
-ID mtx_s3;
-ID flg_s3;
-ID flg_line;
+ID gh_mbf_nav;
+ID gh_mtx_s3;
+ID gh_flg_s3;
+ID gh_flg_line;
 
-static s3_line_status_t      g_status;      /* Always under mtx_s3.     */
-static s3_cal_levels_t       g_cal;         /* Always under mtx_s3.     */
-static volatile s3_odom_fn_t g_odom_fn;     /* Set once by S2.          */
+static s3_line_status_t      g_status;      /* Always under gh_mtx_s3.  */
+static s3_cal_levels_t       g_cal;         /* Always under gh_mtx_s3.  */
+static volatile s3_odom_fn_t gp_odom_fn;    /* Set once by S2.          */
 static volatile uint32_t     g_steer_word;  /* IF-02, see above.        */
 
 /* Tuning requests: written by any task, taken by task_line. */
 static int32_t       g_req_kp;
 static int32_t       g_req_kd;
-static volatile bool g_b_req_gains;         /* Set and cleared under    */
-                                            /* mtx_s3; peeked without.  */
-static volatile bool g_b_req_recal;         /* One flag, one byte.      */
+static volatile bool gb_req_gains;          /* Set and cleared under    */
+                                            /* gh_mtx_s3; read without. */
+static volatile bool gb_req_recal;          /* One flag, one byte.      */
 static int32_t       g_req_boost;
-static volatile bool g_b_req_shape;         /* Like g_b_req_gains.      */
+static volatile bool gb_req_shape;          /* Like gb_req_gains.       */
 static volatile int32_t g_steer_max_mms = S3_STEER_MAX_MMS; /* One     */
                                             /* aligned 32-bit store.    */
 
 static void status_map_update(void);
 
 /*!
- * @brief Create mbf_nav, mtx_s3, flg_s3 and flg_line; reset the map.
+ * @brief Create gh_mbf_nav, gh_mtx_s3, gh_flg_s3 and gh_flg_line; reset
+ *        the map.
  *
  * @return E_OK or the first kernel error.
  */
@@ -79,34 +80,35 @@ s3_init (void)
     T_CFLG cflg = {0};
 
     cmbf.mbfatr = TA_TFIFO;
+    /* The casts are safe: the buffer is a few tens of bytes, which fits INT. */
     cmbf.bufsz  = (INT) (S3_NAV_MBF_DEPTH *
                          (sizeof(s3_nav_msg_t) + S3_NAV_MBF_HEADER));
     cmbf.maxmsz = (INT) sizeof(s3_nav_msg_t);
-    mbf_nav = tk_cre_mbf(&cmbf);
-    if (mbf_nav < E_OK)
+    gh_mbf_nav  = tk_cre_mbf(&cmbf);
+    if (gh_mbf_nav < E_OK)
     {
-        return mbf_nav;
+        return gh_mbf_nav;
     }
 
     cmtx.mtxatr = TA_INHERIT;
-    mtx_s3 = tk_cre_mtx(&cmtx);
-    if (mtx_s3 < E_OK)
+    gh_mtx_s3   = tk_cre_mtx(&cmtx);
+    if (gh_mtx_s3 < E_OK)
     {
-        return mtx_s3;
+        return gh_mtx_s3;
     }
 
     cflg.flgatr  = TA_TFIFO | TA_WMUL;
     cflg.iflgptn = 0u;
-    flg_s3 = tk_cre_flg(&cflg);
-    if (flg_s3 < E_OK)
+    gh_flg_s3    = tk_cre_flg(&cflg);
+    if (gh_flg_s3 < E_OK)
     {
-        return flg_s3;
+        return gh_flg_s3;
     }
-    cflg.iflgptn = LF_ENABLE;       /* Steer from power-up until the VC  */
-    flg_line = tk_cre_flg(&cflg);   /* says otherwise.                   */
-    if (flg_line < E_OK)
+    cflg.iflgptn = LF_ENABLE;           /* Steer from power-up until the VC  */
+    gh_flg_line  = tk_cre_flg(&cflg);   /* says otherwise.                   */
+    if (gh_flg_line < E_OK)
     {
-        return flg_line;
+        return gh_flg_line;
     }
 
     s3_nav_reset();
@@ -134,14 +136,14 @@ s3_start (void)
 ER
 s3_get_line_status (s3_line_status_t * p_status)
 {
-    ER er = tk_loc_mtx(mtx_s3, TMO_FEVR);
+    ER err = tk_loc_mtx(gh_mtx_s3, TMO_FEVR);
 
-    if (E_OK != er)
+    if (E_OK != err)
     {
-        return er;
+        return err;
     }
     *p_status = g_status;
-    (void) tk_unl_mtx(mtx_s3);
+    (void) tk_unl_mtx(gh_mtx_s3);
     return E_OK;
 }
 
@@ -153,14 +155,14 @@ s3_get_line_status (s3_line_status_t * p_status)
 BOOL
 s3_get_steer_sp (H * p_dv_mms, UB * p_seq)
 {
-    uint32_t word = g_steer_word;   /* ONE load: dv, seq and valid match. */
-    int32_t  dv   = (int32_t) (word & SP_DV_MASK);
+    uint32_t word   = g_steer_word;   /* ONE load: dv, seq and valid match. */
+    int32_t  dv_mms = (int32_t) (word & SP_DV_MASK);
 
-    if (0 != (dv & SP_DV_SIGN))
+    if (0 != (dv_mms & SP_DV_SIGN))
     {
-        dv -= SP_DV_WRAP;           /* Sign-extend 10 bits.              */
+        dv_mms -= SP_DV_WRAP;           /* Sign-extend 10 bits.              */
     }
-    *p_dv_mms = (H) dv;
+    *p_dv_mms = (H) dv_mms;
     *p_seq    = (UB) ((word >> SP_SEQ_POS) & SP_SEQ_MASK);
     return (0u != (word & SP_VALID_BIT)) ? TRUE : FALSE;
 }
@@ -197,12 +199,12 @@ s3_set_line_gains (INT kp_x100, INT kd_x100)
     {
         return;
     }
-    if (E_OK == tk_loc_mtx(mtx_s3, TMO_FEVR))
+    if (E_OK == tk_loc_mtx(gh_mtx_s3, TMO_FEVR))
     {
         g_req_kp      = kp_x100;
         g_req_kd      = kd_x100;
-        g_b_req_gains = true;
-        (void) tk_unl_mtx(mtx_s3);
+        gb_req_gains  = true;
+        (void) tk_unl_mtx(gh_mtx_s3);
     }
 }
 
@@ -217,11 +219,11 @@ s3_set_line_shape (INT boost_x100)
     {
         return;
     }
-    if (E_OK == tk_loc_mtx(mtx_s3, TMO_FEVR))
+    if (E_OK == tk_loc_mtx(gh_mtx_s3, TMO_FEVR))
     {
         g_req_boost   = boost_x100;
-        g_b_req_shape = true;
-        (void) tk_unl_mtx(mtx_s3);
+        gb_req_shape  = true;
+        (void) tk_unl_mtx(gh_mtx_s3);
     }
 }
 
@@ -235,10 +237,12 @@ s3_set_line_shape (INT boost_x100)
 void
 s3_set_steer_max (INT dv_mms)
 {
-    int32_t v = (int32_t) dv_mms;
+    int32_t limit_mms = (int32_t) dv_mms;
 
-    v = (v < 1) ? 1 : ((v > S3_STEER_LIMIT_MMS) ? S3_STEER_LIMIT_MMS : v);
-    g_steer_max_mms = v;
+    limit_mms = (limit_mms < 1) ? 1 :
+                ((limit_mms > S3_STEER_LIMIT_MMS) ? S3_STEER_LIMIT_MMS :
+                                                    limit_mms);
+    g_steer_max_mms = limit_mms;
 }
 
 /*!
@@ -250,22 +254,29 @@ s3_set_steer_max (INT dv_mms)
 ER
 s3_set_nav_map (char const * p_map)
 {
-    int  rc;
+    int  result;
     char map[S3_NAV_MAP_LEN + 1u];
-    ER   er = tk_loc_mtx(mtx_s3, TMO_FEVR);
+    ER   err = tk_loc_mtx(gh_mtx_s3, TMO_FEVR);
 
-    if (E_OK != er)
+    if (E_OK != err)
     {
-        return er;
+        return err;
     }
-    rc = s3_nav_set_map(p_map);
+    result = s3_nav_set_map(p_map);
     status_map_update();
     s3_nav_get_map(map);
-    (void) tk_unl_mtx(mtx_s3);
+    /* The cast discards the result: the mutex was locked just above, so
+     * unlocking it cannot fail.
+     */
+    (void) tk_unl_mtx(gh_mtx_s3);
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 NAV MAP %s: LEFT=%c RIGHT=%c STRAIGHT=%c U-TURN=%c\n",
-              (0 == rc) ? "set" : "REJECTED (kept)",
+              (0 == result) ? "set" : "REJECTED (kept)",
               map[0], map[1], map[2], map[3]);
-    return (0 == rc) ? E_OK : E_PAR;
+    return (0 == result) ? E_OK : E_PAR;
 }
 
 /*!
@@ -274,16 +285,16 @@ s3_set_nav_map (char const * p_map)
 void
 s3_request_recalibrate (void)
 {
-    g_b_req_recal = true;
+    gb_req_recal = true;
 }
 
 /*!
  * @brief IF-S3d: S2 hands over its odometry (total mm since power-up).
  */
 void
-s3_set_odometry (s3_odom_fn_t fn)
+s3_set_odometry (s3_odom_fn_t p_fn)
 {
-    g_odom_fn = fn;
+    gp_odom_fn = p_fn;
 }
 
 /* ------------------------------------------------- s3_private.h helpers */
@@ -296,6 +307,10 @@ s3_now_ms (void)
 {
     SYSTIM now;
 
+    /* The casts are safe: tk_get_tim() cannot fail with a valid pointer, and
+     * the low 32 bits are the millisecond count, which wraps after about 49
+     * days.
+     */
     (void) tk_get_tim(&now);
     return (uint32_t) now.lo;
 }
@@ -308,13 +323,13 @@ s3_now_ms (void)
 bool
 s3_odom_read (uint32_t * p_mm)
 {
-    s3_odom_fn_t fn = g_odom_fn;
+    s3_odom_fn_t p_odom_fn = gp_odom_fn;
 
-    if (NULL == fn)
+    if (NULL == p_odom_fn)
     {
         return false;
     }
-    *p_mm = fn();
+    *p_mm = p_odom_fn();
     return true;
 }
 
@@ -324,10 +339,13 @@ s3_odom_read (uint32_t * p_mm)
 uint32_t
 s3_odom_mm (void)
 {
-    uint32_t mm = 0u;
+    uint32_t dist_mm = 0u;
 
-    (void) s3_odom_read(&mm);
-    return mm;
+    /* The cast discards the result: dist_mm stays 0 if S2 has not handed over
+     * its odometry.
+     */
+    (void) s3_odom_read(&dist_mm);
+    return dist_mm;
 }
 
 /*!
@@ -342,12 +360,12 @@ s3_steer_publish (int32_t dv_mms, uint32_t seq, bool b_valid)
 }
 
 /*!
- * @brief task_line only: its part of the status, under mtx_s3.
+ * @brief task_line only: its part of the status, under gh_mtx_s3.
  */
 void
 s3_status_set_line (s3_line_report_t const * p_rep)
 {
-    (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
+    (void) tk_loc_mtx(gh_mtx_s3, TMO_FEVR);
     g_status.steer_dv   = p_rep->steer_dv;
     g_status.pos        = p_rep->pos;
     g_status.state      = p_rep->state;
@@ -360,7 +378,7 @@ s3_status_set_line (s3_line_report_t const * p_rep)
     g_status.losts      = (g_status.losts + p_rep->lost_event) & U8_MASK;
     g_status.updated_ms = s3_now_ms() & U16_MASK;
     g_cal               = p_rep->cal;
-    (void) tk_unl_mtx(mtx_s3);
+    (void) tk_unl_mtx(gh_mtx_s3);
 }
 
 /*!
@@ -369,9 +387,9 @@ s3_status_set_line (s3_line_report_t const * p_rep)
 void
 s3_cal_levels_get (s3_cal_levels_t * p_cal)
 {
-    (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
+    (void) tk_loc_mtx(gh_mtx_s3, TMO_FEVR);
     *p_cal = g_cal;
-    (void) tk_unl_mtx(mtx_s3);
+    (void) tk_unl_mtx(gh_mtx_s3);
 }
 
 /*!
@@ -387,19 +405,19 @@ s3_gains_request_take (int32_t * p_kp_x100, int32_t * p_kd_x100)
     /* Called every 10 ms but a request comes perhaps once a run: peek at
      * the flag first and take the mutex only when it is set. A request
      * set just after the peek is taken at the next step. */
-    if (!g_b_req_gains)
+    if (!gb_req_gains)
     {
         return false;
     }
-    (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
-    if (g_b_req_gains)
+    (void) tk_loc_mtx(gh_mtx_s3, TMO_FEVR);
+    if (gb_req_gains)
     {
         b_take        = true;
         *p_kp_x100    = g_req_kp;
         *p_kd_x100    = g_req_kd;
-        g_b_req_gains = false;
+        gb_req_gains  = false;
     }
-    (void) tk_unl_mtx(mtx_s3);
+    (void) tk_unl_mtx(gh_mtx_s3);
     return b_take;
 }
 
@@ -413,18 +431,21 @@ s3_shape_request_take (int32_t * p_boost_x100)
 {
     bool b_take = false;
 
-    if (!g_b_req_shape)
+    if (!gb_req_shape)
     {
         return false;
     }
-    (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
-    if (g_b_req_shape)
+    /* The cast discards the result: TMO_FEVR waits until the mutex is free, so
+     * the call cannot time out.
+     */
+    (void) tk_loc_mtx(gh_mtx_s3, TMO_FEVR);
+    if (gb_req_shape)
     {
         b_take        = true;
         *p_boost_x100 = g_req_boost;
-        g_b_req_shape = false;
+        gb_req_shape  = false;
     }
-    (void) tk_unl_mtx(mtx_s3);
+    (void) tk_unl_mtx(gh_mtx_s3);
     return b_take;
 }
 
@@ -443,41 +464,44 @@ s3_steer_max_get (void)
 bool
 s3_recal_request_take (void)
 {
-    if (!g_b_req_recal)
+    if (!gb_req_recal)
     {
         return false;
     }
-    g_b_req_recal = false;
+    gb_req_recal = false;
     return true;
 }
 
 /*!
- * @brief task_barcode: today's command for a letter (under mtx_s3, as
+ * @brief task_barcode: today's command for a letter (under gh_mtx_s3, as
  *        s3_set_nav_map() may change the map at any time).
  */
 s3_nav_cmd_t
-s3_nav_lookup (char ch)
+s3_nav_lookup (char letter)
 {
     s3_nav_cmd_t cmd;
 
-    (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
-    cmd = s3_nav_from_char(ch);
-    (void) tk_unl_mtx(mtx_s3);
+    /* The casts discard the results: TMO_FEVR waits until the mutex is free,
+     * and unlocking a mutex this task holds cannot fail.
+     */
+    (void) tk_loc_mtx(gh_mtx_s3, TMO_FEVR);
+    cmd = s3_nav_from_char(letter);
+    (void) tk_unl_mtx(gh_mtx_s3);
     return cmd;
 }
 
 /*!
- * @brief task_barcode only: its part of the status, under mtx_s3.
+ * @brief task_barcode only: its part of the status, under gh_mtx_s3.
  */
 void
 s3_status_set_barcode (uint8_t ch_idx, uint8_t cmd, uint8_t rev)
 {
-    (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
+    (void) tk_loc_mtx(gh_mtx_s3, TMO_FEVR);
     g_status.last_ch  = ch_idx;
     g_status.last_cmd = cmd;
     g_status.last_rev = rev;
     g_status.barcodes = (g_status.barcodes + 1u) & U8_MASK;
-    (void) tk_unl_mtx(mtx_s3);
+    (void) tk_unl_mtx(gh_mtx_s3);
 }
 
 /*!
@@ -486,9 +510,9 @@ s3_status_set_barcode (uint8_t ch_idx, uint8_t cmd, uint8_t rev)
 void
 s3_status_barcode_reject (void)
 {
-    (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
+    (void) tk_loc_mtx(gh_mtx_s3, TMO_FEVR);
     g_status.rejects = (g_status.rejects + 1u) & REJECTS_MASK;
-    (void) tk_unl_mtx(mtx_s3);
+    (void) tk_unl_mtx(gh_mtx_s3);
 }
 
 /*!
@@ -498,9 +522,9 @@ s3_status_barcode_reject (void)
 void
 s3_status_set_junction (uint32_t turn)
 {
-    (void) tk_loc_mtx(mtx_s3, TMO_FEVR);
+    (void) tk_loc_mtx(gh_mtx_s3, TMO_FEVR);
     g_status.junc_turn = turn & JUNC_TURN_MASK;
-    (void) tk_unl_mtx(mtx_s3);
+    (void) tk_unl_mtx(gh_mtx_s3);
 }
 
 /*!
@@ -514,7 +538,8 @@ s3_state_txt (uint32_t state, uint8_t overshoot)
     switch (state)
     {
         case S3_LINE_FOLLOW:
-            p_txt = (0u != overshoot) ? "FOLLOW (one sensor off line)" : "FOLLOW";
+            p_txt = (0u != overshoot) ? "FOLLOW (one sensor off line)" :
+                                        "FOLLOW";
             break;
         case S3_LINE_JUNCTION:
             p_txt = "JUNCTION";
@@ -535,8 +560,10 @@ s3_state_txt (uint32_t state, uint8_t overshoot)
     return p_txt;
 }
 
-/* Copy the current letter map into the status. Caller holds mtx_s3, or
- * runs before any task exists (s3_init). */
+/*!
+ * @brief Copy the current letter map into the status. Caller holds
+ *        gh_mtx_s3, or runs before any task exists (s3_init()).
+ */
 static void
 status_map_update (void)
 {
@@ -550,3 +577,4 @@ status_map_update (void)
 }
 
 /*** end of file ***/
+

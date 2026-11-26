@@ -27,7 +27,7 @@
 typedef char s3_line_chk_mm_t[((S3_LN_LOST_MM * UM_PER_MM) < SAT16) ?
                               1 : -1];
 
-static int32_t  clamp_i32(int32_t value, int32_t lo, int32_t hi);
+static int32_t  clamp_i32(int32_t value, int32_t low, int32_t high);
 static uint16_t add_sat16(uint16_t acc, uint32_t add);
 static void     reset_tracking(s3_line_t * p_ln);
 static int32_t  off_line_steer(uint16_t white_um);
@@ -248,6 +248,7 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
         else if (n_e >= S3_LN_WHITE)
         {
             p_ln->edge_grey_um = add_sat16(p_ln->edge_grey_um, moved_um);
+            /* The cast is safe: a uint16_t value always fits uint32_t. */
             if ((uint32_t) p_ln->edge_grey_um >=
                 MM_TO_UM(S3_LN_EDGE_SETTLE_MM))
             {
@@ -467,21 +468,30 @@ pd_steer (s3_line_t * p_ln, int32_t err, uint32_t dt_us,
         /* |de| <= 2000 and REF_DT = 10 000, so de * REF_DT <= 2e7 fits.
          * d_err is clamped BEFORE the multiply: after a late wake-up dt
          * can be a few us, and Kd * d_err would overflow 32 bits. */
-        int32_t dt = (dt_us > (uint32_t) INT32_MAX) ? INT32_MAX :
-                                                      (int32_t) dt_us;
+        int32_t dt_capped = (dt_us > (uint32_t) INT32_MAX) ? INT32_MAX :
+                                                             (int32_t) dt_us;
 
-        d_err  = ((err - p_ln->e_prev) * (int32_t) S3_LN_REF_DT_US) / dt;
+        /* The casts are safe: |err - e_prev| <= 2000 and the reference period
+         * is 10000, so the product is at most 2e7; kd_x100 <= 4000 and d_err is
+         * clamped first, so their product fits int32_t.
+         */
+        d_err  = ((err - p_ln->e_prev) * (int32_t) S3_LN_REF_DT_US) / dt_capped;
         d_err  = clamp_i32(d_err, -S3_LN_D_LIMIT * X100,
                            S3_LN_D_LIMIT * X100);
         d_term = clamp_i32((int32_t) p_ln->kd_x100 * d_err,
                            -S3_LN_D_LIMIT * X100, S3_LN_D_LIMIT * X100);
     }
+    /* The cast is safe: err is -1000 ... +1000 permille, which fits int16_t. */
     p_ln->e_prev       = (int16_t) err;
     p_ln->e_prev_valid = 1u;
     return clamp_i32((p_term + d_term) / X100, -S3_LN_STEER_MAX,
                      S3_LN_STEER_MAX);
 }
 
+/*!
+ * @brief Clear the tracking history: error, distances, steering and edge
+ *        flags.
+ */
 static void
 reset_tracking (s3_line_t * p_ln)
 {
@@ -521,24 +531,32 @@ off_line_steer (uint16_t white_um)
             (lost_um - hold_um));
 }
 
+/*!
+ * @brief Limit a value to low ... high.
+ */
 static int32_t
-clamp_i32 (int32_t value, int32_t lo, int32_t hi)
+clamp_i32 (int32_t value, int32_t low, int32_t high)
 {
-    if (value < lo)
+    if (value < low)
     {
-        return lo;
+        return low;
     }
-    if (value > hi)
+    if (value > high)
     {
-        return hi;
+        return high;
     }
     return value;
 }
 
-/* Saturating 16-bit distance accumulator. */
+/*!
+ * @brief Saturating 16-bit distance accumulator.
+ */
 static uint16_t
 add_sat16 (uint16_t acc, uint32_t add)
 {
+    /* The casts are safe: the sum of a uint16_t and a distance is
+     * limited to 0xFFFF before it is narrowed back to uint16_t.
+     */
     uint32_t sum = (uint32_t) acc + add;
 
     return (uint16_t) ((sum > SAT16) ? SAT16 : sum);
@@ -627,22 +645,24 @@ s3_ir_cal_relax (s3_ir_cal_t * p_cal)
 {
     uint32_t black     = p_cal->black;
     uint32_t white     = p_cal->white;
-    uint32_t hi        = ((uint32_t) p_cal->win_hi << WIN_SHIFT) +
+    uint32_t win_high  = ((uint32_t) p_cal->win_hi << WIN_SHIFT) +
                          WIN_HALF_STEP;
-    uint32_t lo        = ((uint32_t) p_cal->win_lo << WIN_SHIFT) +
+    uint32_t win_low   = ((uint32_t) p_cal->win_lo << WIN_SHIFT) +
                          WIN_HALF_STEP;
     uint32_t new_black = black;
     uint32_t new_white = white;
 
     if ((0u != p_cal->valid) && (p_cal->win_hi >= p_cal->win_lo))
     {
-        if ((hi >= (white + S3_IR_CAL_MIN_RANGE)) && (hi < black))
+        if ((win_high >= (white + S3_IR_CAL_MIN_RANGE)) && (win_high < black))
         {
-            new_black = black - ((black - hi + (RELAX_DIV - 1u)) / RELAX_DIV);
+            new_black = black -
+                        ((black - win_high + (RELAX_DIV - 1u)) / RELAX_DIV);
         }
-        if (((lo + S3_IR_CAL_MIN_RANGE) <= black) && (lo > white))
+        if (((win_low + S3_IR_CAL_MIN_RANGE) <= black) && (win_low > white))
         {
-            new_white = white + ((lo - white + (RELAX_DIV - 1u)) / RELAX_DIV);
+            new_white = white +
+                        ((win_low - white + (RELAX_DIV - 1u)) / RELAX_DIV);
         }
         if ((new_black > new_white) &&
             ((new_black - new_white) >= S3_IR_CAL_MIN_RANGE))
@@ -670,6 +690,9 @@ s3_ir_cal_norm (s3_ir_cal_t const * p_cal, uint16_t value)
     {
         return 0;
     }
+    /* The casts are safe: the levels are 12-bit values, so (value - white) x
+     * 1000 fits int32_t.
+     */
     norm = (((int32_t) value - (int32_t) p_cal->white) * PERMILLE) / range;
     if (norm < 0)
     {
@@ -679,15 +702,27 @@ s3_ir_cal_norm (s3_ir_cal_t const * p_cal, uint16_t value)
     {
         norm = PERMILLE;
     }
+    else
+    {
+        ;   /* Already 0 ... PERMILLE. */
+    }
     return norm;
 }
 
+/*!
+ * @brief Mark a calibration valid once black - white is at least
+ *        S3_IR_CAL_MIN_RANGE.
+ */
 static void
 update_valid (s3_ir_cal_t * p_cal)
 {
+    /* The cast is safe: black > white is checked first, so the difference is
+     * positive.
+     */
     p_cal->valid = ((p_cal->black > p_cal->white) &&
                     ((uint32_t) (p_cal->black - p_cal->white) >=
                      S3_IR_CAL_MIN_RANGE)) ? 1u : 0u;
 }
 
 /*** end of file ***/
+

@@ -25,3 +25,4 @@ int32_t  s5_math_abs(int32_t value);
 #endif /* S5_MATH_H */
 
 /*** end of file ***/
+

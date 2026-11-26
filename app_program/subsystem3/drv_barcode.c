@@ -90,17 +90,19 @@ static void dout_edge(uint32_t now_us, uint32_t idx);
 ER
 drv_barcode_init (void)
 {
-    ER er;
+    ER err;
 
     drv_adc_pin_analog(DRV_ADC_FIRST_PIN + DRV_BARCODE_ADC_CH);
+    /* The cast discards gpio_set_pin()'s result: the pin is a valid constant.
+     */
     (void) gpio_set_pin(DRV_BARCODE_DOUT_PIN, GPIO_MODE_IN);
     clr_w(GPIO(DRV_BARCODE_DOUT_PIN), GPIO_PUE | GPIO_PDE);
     set_w(GPIO(DRV_BARCODE_DOUT_PIN), GPIO_SHEMITT);
 
-    er = subsystem2_gpio_isr_register(gpio_isr);
-    if (er < E_OK)
+    err = subsystem2_gpio_isr_register(gpio_isr);
+    if (err < E_OK)
     {
-        return er;
+        return err;
     }
     out_w(BC_IO_INTR_REG, BC_EDGE_BITS);
     set_w(BC_PROC1_INTE_REG, BC_EDGE_BITS);
@@ -124,6 +126,9 @@ drv_barcode_sample_isr (uint32_t idx)
     {
         g_act_ref = value;
     }
+    /* The casts are safe: both are 8-bit samples, which int32_t holds, so the
+     * difference cannot overflow.
+     */
     diff = (int32_t) value - (int32_t) g_act_ref;
     if ((diff > DRV_BARCODE_ACT_STEP) || (diff < -DRV_BARCODE_ACT_STEP))
     {
@@ -196,27 +201,28 @@ drv_barcode_take_pass (drv_barcode_pass_t * p_pass)
 {
     static uint8_t glitch_seen;     /* Counter values at the last pass. */
     static uint8_t lost_seen;
-    uint8_t        rd    = g_gap_rd;
-    uint8_t        wr    = g_gap_wr;
-    uint32_t       first = 1u;
-    uint32_t       last  = 0u;
-    uint32_t       n_win = 0u;
+    uint8_t        read_idx  = g_gap_rd;
+    uint8_t        write_idx = g_gap_wr;
+    uint32_t       first     = 1u;
+    uint32_t       last      = 0u;
+    uint32_t       n_win     = 0u;
     uint32_t       now_idx;
     uint32_t       idx;
     UINT           imask;
 
     /* Digital: drain the gap ring. Gap 0 is the idle time before the
      * first edge, so element k is gap k + 1. */
-    p_pass->n_edges = (uint32_t) ((uint8_t) (wr - rd) & DIG_MASK);
+    p_pass->n_edges = (uint32_t) ((uint8_t) (write_idx - read_idx) & DIG_MASK);
     for (idx = 1u; idx < p_pass->n_edges; idx++)
     {
-        g_dur[idx - 1u] = (uint32_t) g_gap[(rd + idx) & DIG_MASK] << GAP_SHIFT;
+        g_dur[idx - 1u] = (uint32_t) g_gap[(read_idx + idx) & DIG_MASK]
+                          << GAP_SHIFT;
     }
-    g_gap_rd          = wr;             /* Hand the slots back.         */
+    g_gap_rd           = write_idx;      /* Hand the slots back.         */
     p_pass->glitches  = (uint8_t) (g_glitches - glitch_seen);
-    glitch_seen       = g_glitches;
+    glitch_seen        = g_glitches;
     p_pass->lost      = (uint8_t) (g_gap_lost - lost_seen);
-    lost_seen         = g_gap_lost;
+    lost_seen          = g_gap_lost;
     p_pass->p_dur     = g_dur;
     p_pass->b_clipped = false;
     p_pass->src       = 0u;
@@ -268,6 +274,7 @@ gpio_isr (UINT intno)
 {
     uint32_t status = in_w(BC_PROC1_INTS_REG) & BC_EDGE_BITS;
 
+    /* The cast marks the argument as unused. */
     (void) intno;
     if (0u == status)
     {
@@ -286,8 +293,8 @@ gpio_isr (UINT intno)
 S3_RAM_FUNC(dout_edge) static void
 dout_edge (uint32_t now_us, uint32_t idx)
 {
-    uint8_t  wr   = g_gap_wr;
-    uint8_t  next = (uint8_t) ((wr + 1u) & DIG_MASK);
+    uint8_t  write_idx = g_gap_wr;
+    uint8_t  next = (uint8_t) ((write_idx + 1u) & DIG_MASK);
     uint32_t gap  = (now_us - g_last_us) >> GAP_SHIFT;
 
     mark_active(idx, ACT_DOUT_BIT);
@@ -299,7 +306,7 @@ dout_edge (uint32_t now_us, uint32_t idx)
     }
     else
     {
-        g_gap[wr] = (uint16_t) ((gap > GAP_MAX) ? GAP_MAX : gap);
+        g_gap[write_idx] = (uint16_t) ((gap > GAP_MAX) ? GAP_MAX : gap);
         g_gap_wr  = next;               /* Publish AFTER the data.      */
     }
     g_last_us = now_us;
@@ -323,8 +330,13 @@ mark_active (uint32_t idx, uint8_t src_bit)
     {
         g_act_gap = idx - g_act_last;
     }
+    else
+    {
+        ;   /* The gap is no wider than the widest so far. */
+    }
     g_act_last = idx;
     g_act      = (uint8_t) (g_act | src_bit);
 }
 
 /*** end of file ***/
+

@@ -188,3 +188,4 @@ sin_quarter (int32_t angle_deg)
 }
 
 /*** end of file ***/
+

@@ -48,3 +48,4 @@ ER drv_lsm303_fifo_read(drv_lsm303_accel_t * p_sample);
 #endif /* DRV_LSM303_H */
 
 /*** end of file ***/
+

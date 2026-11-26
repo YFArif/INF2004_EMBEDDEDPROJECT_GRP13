@@ -34,8 +34,8 @@
 #define PERMILLE        (1000)
 #define SEQ_MASK        (0xFFu)
 
-static ID g_tid_line;
-static ID g_cyc_line;
+static ID gh_tid_line;
+static ID gh_cyc_line;
 
 static void         line_task(INT stacd, void * p_exinf);
 static void         line_cyclic(void * p_exinf);
@@ -45,7 +45,7 @@ static s3_ln_mode_t mode_from_flags(UINT pattern);
 static void         events_publish(s3_line_out_t const * p_out);
 static void         status_print(s3_line_t const * p_ln,
                                  s3_line_out_t const * p_out,
-                                 int32_t dv, uint32_t state);
+                                 int32_t steer_dv, uint32_t state);
 static void         timing_report(uint32_t t_start_us, uint32_t dt_us);
 #if (1 == S3_LINE_VERBOSE)
 static char const * zone_txt(int32_t n_permille);
@@ -63,31 +63,52 @@ task_line_start (void)
 {
     T_CCYC ccyc = {0};
 
-    g_tid_line = app_start_task((FP) line_task, S3_PRI_LINE, TP_PRC2,
+    /* The cast is safe: line_task has the kernel's task entry signature, which
+     * FP stands for.
+     */
+    gh_tid_line = app_start_task((FP) line_task, S3_PRI_LINE, TP_PRC2,
                                 "s3_line_task");
-    if (g_tid_line < E_OK)
+    if (gh_tid_line < E_OK)
     {
-        return g_tid_line;
+        return gh_tid_line;
     }
     ccyc.cycatr = TA_HLNG | TA_STA;
+    /* The cast is safe: line_cyclic has the kernel's cyclic handler signature,
+     * which FP stands for.
+     */
     ccyc.cychdr = (FP) line_cyclic;
     ccyc.cyctim = S3_LINE_PERIOD_MS;
     ccyc.cycphs = S3_LINE_PERIOD_MS;
-    g_cyc_line  = tk_cre_cyc(&ccyc);
-    return (g_cyc_line < E_OK) ? g_cyc_line : E_OK;
+    gh_cyc_line = tk_cre_cyc(&ccyc);
+    return (gh_cyc_line < E_OK) ? gh_cyc_line : E_OK;
 }
 
+/*!
+ * @brief Cyclic handler: wake line_task every S3_LINE_PERIOD_MS.
+ *
+ * @param[in] p_exinf Extended information; not used.
+ */
 static void
 line_cyclic (void * p_exinf)
 {
+    /* The casts mark the argument as unused and discard tk_wup_tsk()'s result:
+     * a wake-up that cannot be queued is simply dropped until the next period.
+     */
     (void) p_exinf;
-    (void) tk_wup_tsk(g_tid_line);
+    (void) tk_wup_tsk(gh_tid_line);
 }
 
+/*!
+ * @brief The line task: read the IR sensors, steer and publish IF-02
+ *        every period.
+ *
+ * @param[in] stacd   Start code; not used.
+ * @param[in] p_exinf Extended information; not used.
+ */
 static void
 line_task (INT stacd, void * p_exinf)
 {
-    static s3_line_t ln;            /* Static: keeps the stack small.   */
+    static s3_line_t line;              /* Static: keeps the stack small.   */
     s3_line_out_t    out;
     s3_line_report_t rep = {0};
     T_RFLG           rflg;
@@ -100,11 +121,12 @@ line_task (INT stacd, void * p_exinf)
     uint32_t         state;
     uint16_t         raw_l;
     uint16_t         raw_c;
-    int32_t          dv;
+    int32_t          steer_dv;
 
+    /* The casts mark the arguments as unused. */
     (void) stacd;
     (void) p_exinf;
-    s3_line_init(&ln, S3_IR_L_SIDE);
+    s3_line_init(&line, S3_IR_L_SIDE);
 
     for (;;)
     {
@@ -117,14 +139,14 @@ line_task (INT stacd, void * p_exinf)
         /* IF-07: what the Vehicle Controller wants. Acts only when the
          * REQUESTED mode changes, so a found line is not re-searched
          * while LF_SEARCH_x is still set. */
-        if (E_OK == tk_ref_flg(flg_line, &rflg))
+        if (E_OK == tk_ref_flg(gh_flg_line, &rflg))
         {
-            s3_line_request_mode(&ln, mode_from_flags(rflg.flgptn));
+            s3_line_request_mode(&line, mode_from_flags(rflg.flgptn));
         }
-        requests_apply(&ln);
+        requests_apply(&line);
 
         drv_adc_ir_read(&raw_l, &raw_c);
-        s3_line_step(&ln, raw_l, raw_c, moved_um_get(dt_us), dt_us, &out);
+        s3_line_step(&line, raw_l, raw_c, moved_um_get(dt_us), dt_us, &out);
         timing_report(t_now, dt_us);
 
         relax_ms += dt_us / US_PER_MS;
@@ -133,14 +155,15 @@ line_task (INT stacd, void * p_exinf)
             relax_ms = 0u;
             if ((S3_LN_DISABLED == out.state) || (S3_LN_SEARCH == out.state))
             {
-                s3_ir_cal_relax(&ln.cal_l);
-                s3_ir_cal_relax(&ln.cal_c);
+                s3_ir_cal_relax(&line.cal_l);
+                s3_ir_cal_relax(&line.cal_c);
             }
         }
 
         /* IF-02 steer_sp: permille -> mm/s, 10-bit signed, one store. */
-        state = (0u == out.calibrated) ? S3_LINE_UNCAL : (uint32_t) out.state;
-        dv    = s3_line_dv(&out, s3_steer_max_get());   /* 10-bit clamp. */
+        state    = (0u == out.calibrated) ? S3_LINE_UNCAL :
+                                            (uint32_t) out.state;
+        steer_dv = s3_line_dv(&out, s3_steer_max_get()); /* 10-bit clamp. */
 
         /* Barcode passing: half steering so its speed and path stay
          * steadier (car 30 Oct: weave lost 2 of 29 stripes). Not while
@@ -149,31 +172,34 @@ line_task (INT stacd, void * p_exinf)
         if ((0u != hold_ms) && (hold_ms <= S3_BC_HOLD_MS) &&
             (0u == out.off_line))
         {
-            dv = dv / S3_BC_HOLD_DIV;   /* Softer, not off: 0 drifted   */
-                                        /* along the left edge (15:56). */
+            /* Softer, not off: 0 drifted along the left edge (15:56). */
+            steer_dv = steer_dv / S3_BC_HOLD_DIV;
         }
         seq = (seq + 1u) & SEQ_MASK;
-        s3_steer_publish(dv, seq, (S3_LINE_FOLLOW == state) ||
-                                  (S3_LINE_JUNCTION == state) ||
-                                  (S3_LINE_LOST == state));
+        s3_steer_publish(steer_dv, seq, (S3_LINE_FOLLOW == state) ||
+                                        (S3_LINE_JUNCTION == state) ||
+                                        (S3_LINE_LOST == state));
 
-        rep.steer_dv       = dv;
+        rep.steer_dv       = steer_dv;
         rep.pos            = out.pos;
         rep.state          = state;
         rep.seq            = seq;
         rep.n_left         = out.n_l;
         rep.n_centre       = out.n_c;
-        rep.cal.white_o    = (uint16_t) ln.cal_l.white;
-        rep.cal.black_o    = (uint16_t) ln.cal_l.black;
-        rep.cal.white_c    = (uint16_t) ln.cal_c.white;
-        rep.cal.black_c    = (uint16_t) ln.cal_c.black;
+        /* The casts are safe: the calibration levels are 12-bit fields, which
+         * fit uint16_t.
+         */
+        rep.cal.white_o    = (uint16_t) line.cal_l.white;
+        rep.cal.black_o    = (uint16_t) line.cal_l.black;
+        rep.cal.white_c    = (uint16_t) line.cal_c.white;
+        rep.cal.black_c    = (uint16_t) line.cal_c.black;
         rep.overshoot      = out.overshoot;
         rep.junction_event = out.junction_event;
         rep.lost_event     = out.lost_event;
         s3_status_set_line(&rep);
 
         events_publish(&out);
-        status_print(&ln, &out, dv, state);
+        status_print(&line, &out, steer_dv, state);
     }
 }
 
@@ -211,30 +237,45 @@ moved_um_get (uint32_t dt_us)
 static void
 requests_apply (s3_line_t * p_ln)
 {
-    int32_t kp    = 0;
-    int32_t kd    = 0;
-    int32_t boost = 0;
+    int32_t gain_kp = 0;
+    int32_t gain_kd = 0;
+    int32_t boost   = 0;
 
-    if (s3_gains_request_take(&kp, &kd))
+    if (s3_gains_request_take(&gain_kp, &gain_kd))
     {
-        s3_line_set_gains(p_ln, kp, kd);
+        s3_line_set_gains(p_ln, gain_kp, gain_kd);
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "S3 TUNE kp=%d kd=%d (x100)\n",
                   (INT) p_ln->kp_x100, (INT) p_ln->kd_x100);
     }
     if (s3_shape_request_take(&boost))
     {
         s3_line_set_shape(p_ln, boost);
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "S3 TUNE curve boost=%d (x100)\n",
                   (INT) p_ln->boost_x100);
     }
     if (s3_recal_request_take())
     {
         s3_line_recalibrate(p_ln);
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "S3 RECALIBRATE: sweep both sensors over white "
                          "and black\n");
     }
 }
 
+/*!
+ * @brief The line mode the Vehicle Controller requests in gh_flg_line.
+ */
 static s3_ln_mode_t
 mode_from_flags (UINT pattern)
 {
@@ -258,15 +299,15 @@ events_publish (s3_line_out_t const * p_out)
 {
     if (0u != p_out->junction_event)
     {
-        (void) tk_set_flg(flg_s3, FLG_S3_JUNCTION);
+        (void) tk_set_flg(gh_flg_s3, FLG_S3_JUNCTION);
     }
     if (0u != p_out->lost_event)
     {
-        (void) tk_set_flg(flg_s3, FLG_S3_LOST);
+        (void) tk_set_flg(gh_flg_s3, FLG_S3_LOST);
     }
     if (0u != p_out->line_found_event)
     {
-        (void) tk_set_flg(flg_s3, FLG_S3_LINE_FOUND);
+        (void) tk_set_flg(gh_flg_s3, FLG_S3_LINE_FOUND);
     }
 #if (1 == S3_LINE_VERBOSE)
     if (0u != p_out->junction_event)
@@ -291,7 +332,7 @@ events_publish (s3_line_out_t const * p_out)
  */
 static void
 status_print (s3_line_t const * p_ln, s3_line_out_t const * p_out,
-              int32_t dv, uint32_t state)
+              int32_t steer_dv, uint32_t state)
 {
 #if (1 == S3_LINE_VERBOSE)
     static uint32_t last_ms;
@@ -303,11 +344,11 @@ status_print (s3_line_t const * p_ln, s3_line_out_t const * p_out,
         return;
     }
     last_ms = now_ms;
-    if (dv > 0)
+    if (steer_dv > 0)
     {
         p_turn = "RIGHT   ";
     }
-    else if (dv < 0)
+    else if (steer_dv < 0)
     {
         p_turn = "LEFT    ";
     }
@@ -319,7 +360,7 @@ status_print (s3_line_t const * p_ln, s3_line_out_t const * p_out,
                      "  %s   cal GP27 %d-%d  GP26 %d-%d\n",
               zone_txt(p_out->n_c), (INT) p_out->n_c,
               zone_txt(p_out->n_l), (INT) p_out->n_l,
-              p_turn, (INT) ((dv < 0) ? -dv : dv),
+              p_turn, (INT) ((steer_dv < 0) ? -steer_dv : steer_dv),
               ((0u != p_out->off_line) && (S3_LINE_FOLLOW == state)) ?
               ((p_out->steer > 0) ? "OFF LINE -> searching RIGHT" :
                                     "OFF LINE -> searching LEFT") :
@@ -329,7 +370,7 @@ status_print (s3_line_t const * p_ln, s3_line_out_t const * p_out,
 #else
     (void) p_ln;
     (void) p_out;
-    (void) dv;
+    (void) steer_dv;
     (void) state;
 #endif
 }
@@ -402,3 +443,4 @@ zone_txt (int32_t n_permille)
 #endif
 
 /*** end of file ***/
+

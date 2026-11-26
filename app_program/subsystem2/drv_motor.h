@@ -46,3 +46,4 @@ void drv_motor_coast(void);
 #endif /* DRV_MOTOR_H */
 
 /*** end of file ***/
+

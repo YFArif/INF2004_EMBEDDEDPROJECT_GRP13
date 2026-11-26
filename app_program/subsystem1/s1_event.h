@@ -76,3 +76,4 @@ uint32_t s1_event_drop_count(void);
 #endif /* S1_EVENT_H */
 
 /*** end of file ***/
+

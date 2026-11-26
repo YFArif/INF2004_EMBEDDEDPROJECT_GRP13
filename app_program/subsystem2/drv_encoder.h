@@ -60,3 +60,4 @@ uint32_t drv_encoder_tick_was(void);
 #endif /* DRV_ENCODER_H */
 
 /*** end of file ***/
+

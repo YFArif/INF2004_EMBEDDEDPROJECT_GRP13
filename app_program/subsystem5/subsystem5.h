@@ -14,11 +14,11 @@
  * avoidance, buttons, and the commands from the dashboard.
  *
  * @par Kernel objects (created in subsystem5_init)
- * flg_mission (IF-03), flg_fault (S1 fault_mask), flg_obst (requests to
- * obstacle_task), mtx_obst (IF-09 and the controller state) and mbf_cmd
- * (commands from S1). Their IDs stay inside subsystem5.c; other
+ * gh_flg_mission (IF-03), gh_flg_fault (S1 fault_mask), gh_flg_obst
+ * (requests to obstacle_task), gh_mtx_obst (IF-09 and the controller state)
+ * and gh_mbf_cmd (commands from S1). Their IDs stay inside subsystem5.c; other
  * subsystems use the functions below instead, so no variable is declared
- * extern here (BARR-C 4.2c). S3's objects (flg_line, flg_s3, mbf_nav)
+ * extern here (BARR-C 4.2c). S3's objects (gh_flg_line, gh_flg_s3, gh_mbf_nav)
  * are used only in s5_links.c.
  *
  * @par Deviations from BARR-C:2018 (approval: project manager, TBD)
@@ -53,15 +53,15 @@
 #define S5_PRI_OBSTACLE     (11)    /* obstacle_task, core 0.            */
 
 /* ---------------------------------------------------------------------
- *  IF-03 flg_mission: events for vehicle_ctrl_task. Any subsystem sets
+ *  IF-03 gh_flg_mission: events for vehicle_ctrl_task. Any subsystem sets
  *  them with subsystem5_mission_signal(). S3's events arrive on its own
- *  flg_s3 and are turned into EV_xxx bits by s5_links_line_events().
+ *  gh_flg_s3 and are turned into EV_xxx bits by s5_links_line_events().
  * --------------------------------------------------------------------- */
 #define EV_START            (0x00000001u)   /* S1 or GP20: start a run.  */
 #define EV_STOP             (0x00000002u)   /* S1: stop the run.         */
 #define EV_RESET            (0x00000004u)   /* S1: leave FAULT.          */
 #define EV_CAL              (0x00000008u)   /* GP21: calibrate.          */
-#define EV_BARCODE          (0x00000010u)   /* S3: barcode in mbf_nav.   */
+#define EV_BARCODE          (0x00000010u)   /* S3: barcode (gh_mbf_nav). */
 #define EV_JUNCTION         (0x00000020u)   /* S3: junction under robot. */
 #define EV_LINE_LOST        (0x00000040u)   /* S3: no line for 40 mm.    */
 #define EV_LINE_FOUND       (0x00000080u)   /* S3: a search found it.    */
@@ -69,7 +69,7 @@
 /* 0x00000200u unused: was EV_IMPACT (S4 collision), dropped from the
  * brief on 2026-11-11 in favour of EV_LIFTED and EV_OVERTURNED below.
  */
-#define EV_FAULT            (0x00000400u)   /* Any: see flg_fault.       */
+#define EV_FAULT            (0x00000400u)   /* Any: see gh_flg_fault.    */
 #define EV_OBSTACLE_NEAR    (0x00000800u)   /* S5: under 35 cm, slow.    */
 #define EV_OBSTACLE_CLEAR   (0x00001000u)   /* S5: path clear again.     */
 #define EV_OBSTACLE         (0x00002000u)   /* S5: stopped, MF_ESTOP.    */
@@ -85,7 +85,7 @@
 #define EV_ALL              (0x000FFFFFu)
 
 /* ---------------------------------------------------------------------
- *  flg_fault: fault causes. Bit n is fault n, the numbering of S1's
+ *  gh_flg_fault: fault causes. Bit n is fault n, the numbering of S1's
  *  telemetry fault_mask (msg_layout.h MSG_FAULT_xxx), so S1 copies it
  *  with no remapping. Kernel event flag: tk_set_flg and tk_clr_flg are
  *  atomic on both cores, so no bit is lost (Tribunal 1). Nobody waits on
@@ -108,7 +108,7 @@
 #define S5_FAULT_WIFI       (0x10u)     /* S1: link down, level.         */
 
 /* ---------------------------------------------------------------------
- *  Requests to obstacle_task (flg_obst), sent with
+ *  Requests to obstacle_task (gh_flg_obst), sent with
  *  subsystem5_obst_request(). If several are pending, OB_HOLD (or else
  *  OB_RESUME) is carried out first, then the first of the others.
  * --------------------------------------------------------------------- */
@@ -161,7 +161,7 @@ typedef enum
 #define S5_CTRL_FAULT_MASK  (0xFu)
 
 /* ---------------------------------------------------------------------
- *  IF-01: barcode commands, converted from S3's mbf_nav messages by
+ *  IF-01: barcode commands, converted from S3's gh_mbf_nav messages by
  *  s5_links_nav_take().
  * --------------------------------------------------------------------- */
 typedef enum
@@ -259,3 +259,4 @@ void     subsystem5_ctrl_state_put(subsystem5_ctrl_state_t state);
 #endif /* SUBSYSTEM5_H */
 
 /*** end of file ***/
+

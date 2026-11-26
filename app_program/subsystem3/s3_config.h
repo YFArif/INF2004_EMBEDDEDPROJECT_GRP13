@@ -37,9 +37,11 @@
 #ifndef S3_IR_L_SIDE
 #define S3_IR_L_SIDE            (S3_LN_L_ON_RIGHT)
 #endif
-#define S3_LAYOUT_TXT           ((S3_LN_L_ON_LEFT == S3_IR_L_SIDE) ? \
-                                 "single edge, GP27 on the RIGHT edge, GP26 guard LEFT" : \
-                                 "single edge, GP27 on the LEFT edge, GP26 guard RIGHT")
+#define S3_LAYOUT_TXT           ((S3_LN_L_ON_LEFT == S3_IR_L_SIDE) ?     \
+                                 "single edge, GP27 on the RIGHT edge, " \
+                                 "GP26 guard LEFT" :                     \
+                                 "single edge, GP27 on the LEFT edge, "  \
+                                 "GP26 guard RIGHT")
 
 /* ---------------------------------------------------------------------
  *  Tasks (Week 6 report section 3, TEAM.md section 4). Both run on core 1
@@ -87,7 +89,7 @@
                                         /* long after publishing one.    */
 #define S3_BC_BEEP_MS           (80u)   /* GP22 buzzer per decoded code; */
                                         /* 0 = no beep.                  */
-#define S3_NAV_MBF_DEPTH        (4u)    /* mbf_nav holds 4 messages.     */
+#define S3_NAV_MBF_DEPTH        (4u)    /* gh_mbf_nav holds 4 messages.  */
 #define S3_NAV_MBF_HEADER       (4u)    /* Kernel header per message.    */
 
 /* ---------------------------------------------------------------------
@@ -155,3 +157,4 @@
 #endif /* S3_CONFIG_H */
 
 /*** end of file ***/
+

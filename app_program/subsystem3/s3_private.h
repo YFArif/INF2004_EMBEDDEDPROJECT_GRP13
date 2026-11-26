@@ -7,7 +7,7 @@
  * @par Who writes what
  * s3_api.c owns the kernel objects, the packed status, the steering word
  * and the tuning requests. The tasks change them only through the
- * functions below, which take mtx_s3 where the data is shared.
+ * functions below, which take gh_mtx_s3 where the data is shared.
  *
  * @par Task start-up order
  * s3_start() starts task_barcode, which sets up S3's hardware on core 1
@@ -71,7 +71,7 @@ bool         s3_recal_request_take(void);
 void         s3_cal_levels_get(s3_cal_levels_t * p_cal);
 
 /* task_barcode. */
-s3_nav_cmd_t s3_nav_lookup(char ch);
+s3_nav_cmd_t s3_nav_lookup(char letter);
 void         s3_status_set_barcode(uint8_t ch_idx, uint8_t cmd, uint8_t rev);
 void         s3_status_barcode_reject(void);
 void         s3_status_set_junction(uint32_t turn);
@@ -82,3 +82,4 @@ char const * s3_state_txt(uint32_t state, uint8_t overshoot);
 #endif /* S3_PRIVATE_H */
 
 /*** end of file ***/
+

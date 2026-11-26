@@ -49,3 +49,4 @@ void s4_terrain_unpack(s4_terrain_packed_t const * p_in,
 #endif /* S4_TERRAIN_H */
 
 /*** end of file ***/
+

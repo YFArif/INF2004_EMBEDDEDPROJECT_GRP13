@@ -34,9 +34,9 @@
  *   where a kernel call, a task entry, a kernel object ID or the interface
  *   to subsystem 2 requires them. s3_get_steer_sp() keeps BOOL / H / UB
  *   because subsystem2.c declares it with those types.
- * - The kernel object IDs mbf_nav, flg_line, flg_s3, mtx_s3 are declared
- *   extern in s3_api.h (rule 4.2c): the Vehicle Controller and Buddy 1
- *   must pass them to tk_rcv_mbf(), tk_set_flg() and tk_wai_flg().
+ * - The kernel object IDs gh_mbf_nav, gh_flg_line, gh_flg_s3, gh_mtx_s3 are
+ *   declared extern in s3_api.h (rule 4.2c): the Vehicle Controller and
+ *   Buddy 1 must pass them to tk_rcv_mbf(), tk_set_flg() and tk_wai_flg().
  * - The packed bit-fields of s3_nav_msg_t and s3_line_status_t use UW /
  *   signed int (Change Requirement 1); their sizes are checked at compile
  *   time in s3_api.c.
@@ -66,3 +66,4 @@
 #endif /* SUBSYSTEM3_H */
 
 /*** end of file ***/
+

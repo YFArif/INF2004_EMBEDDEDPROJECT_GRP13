@@ -21,3 +21,4 @@ void obstacle_task(INT stacd, void * p_exinf);
 #endif /* OBSTACLE_TASK_H */
 
 /*** end of file ***/
+

@@ -219,7 +219,7 @@ motion_setup (void)
     drv_encoder_count_t count  = {0};
     ER                  result = drv_encoder_init();
     uint32_t            idx    = 0u;
-    int                 core   = 0;
+    INT                 core   = 0;
 
     if (E_OK != result)
     {
@@ -237,7 +237,7 @@ motion_setup (void)
 
 #if TK_SUPPORT_SMP
     // NOTE: The cast is safe: tk_get_prc() returns 1 or 2 here.
-    core = (int) tk_get_prc() - 1;
+    core = (INT) tk_get_prc() - 1;
 #endif
 
     // NOTE: The casts are safe: the format string is ASCII, and the
@@ -255,7 +255,7 @@ motion_cycle (void)
     uint32_t start_us = drv_encoder_now_us();
 
     // 1. Emergency stop before anything else (NFR6).
-    if ((S2_STATE_ESTOP != g_motion.state) && subsystem2_estop_is_set())
+    if ((S2_STATE_ESTOP != g_motion.state) && (subsystem2_estop_is_set()))
     {
         enter_estop();
     }
@@ -282,7 +282,7 @@ commands_process (void)
     {
         if (S2_STATE_ESTOP == g_motion.state)
         {
-            if ((S2_CMD_CLEAR == cmd.type) && !subsystem2_estop_is_set())
+            if ((S2_CMD_CLEAR == cmd.type) && (!subsystem2_estop_is_set()))
             {
                 enter_idle();
             }
@@ -423,7 +423,7 @@ control_run (void)
         break;
     }
 
-    if (b_drive && direction_ready(want_left, want_right))
+    if (b_drive && (direction_ready(want_left, want_right)))
     {
         wheel_drive(&g_motion.wheel[WHEEL_LEFT], want_left);
         wheel_drive(&g_motion.wheel[WHEEL_RIGHT], want_right);
@@ -439,6 +439,14 @@ control_run (void)
     }
 }
 
+/*!
+ * @brief Whether a wheel has stopped: no new tick this cycle and none for
+ *        SPEED_STOPPED_US.
+ *
+ * @param[in] p_wheel The wheel.
+ *
+ * @return true if the wheel has stopped.
+ */
 static bool
 wheel_stopped (wheel_t const * p_wheel)
 {
@@ -461,8 +469,8 @@ direction_ready (int32_t want_left, int32_t want_right)
     bool b_left_reverse = (want_left * p_left->direction) < 0;
     bool b_right_reverse = (want_right * p_right->direction) < 0;
 
-    if ((b_left_reverse && !b_left_stopped) ||
-        (b_right_reverse && !b_right_stopped))
+    if ((b_left_reverse && (!b_left_stopped)) ||
+        (b_right_reverse && (!b_right_stopped)))
     {
         g_motion.b_reverse_wait = true;
     }
@@ -960,6 +968,7 @@ speed_pick (uint16_t requested_mms, int32_t default_mms)
 
     if (0u != requested_mms)
     {
+        // The cast is safe: every uint16_t value fits int32_t.
         speed = clamp((int32_t) requested_mms, 1, S2_SPEED_MAX_MMS);
     }
 
@@ -1010,3 +1019,4 @@ magnitude (int32_t value)
 }
 
 /*** end of file ***/
+

@@ -2,7 +2,7 @@
  *
  * @brief Subsystem 5 event reporting (FR16) and console trace.
  *
- * @par Event record (S1 msg_layout.h, msg_event_t)
+ * @par Event record (S1 msg_layout.h, msg_layout_event_t)
  * One code byte plus two argument bytes.
  * - Obstacle events 0x50-0x58 (s5_event_post): args[0] = distance in cm
  *   (0 to 255, clamped), args[1] = servo angle in degrees (0 to 180). The
@@ -57,3 +57,4 @@ void s5_event_log_ping(int32_t servo_deg, int32_t range_mm, uint32_t echo_us,
 #endif /* S5_EVENT_H */
 
 /*** end of file ***/
+

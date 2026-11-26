@@ -16,13 +16,13 @@
 ER
 subsystem3_init (void)
 {
-    ER er = consumer_init();    /* Template example (S2 / S4 use it).    */
+    ER err = task_consumer_init();  /* Template example (S2 / S4 use it). */
 
-    if (er < E_OK)
+    if (err < E_OK)
     {
-        return er;
+        return err;
     }
-    return s3_init();           /* mbf_nav, mtx_s3, flg_s3, flg_line.    */
+    return s3_init();   /* gh_mbf_nav, gh_mtx_s3, gh_flg_s3, gh_flg_line. */
 }
 
 /*!
@@ -33,14 +33,15 @@ subsystem3_init (void)
 ER
 subsystem3_start (void)
 {
-    ID tid = app_start_task((FP) consumer_task, S3_PRI_CONSUMER, TP_PRC1,
-                            "consumer_task");   /* Template example.     */
+    ID h_tid = app_start_task((FP) task_consumer_task, S3_PRI_CONSUMER, TP_PRC1,
+                              "consumer_task");   /* Template example.     */
 
-    if (tid < E_OK)
+    if (h_tid < E_OK)
     {
-        return tid;
+        return h_tid;
     }
     return s3_start();          /* task_barcode, then task_line.         */
 }
 
 /*** end of file ***/
+

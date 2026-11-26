@@ -168,7 +168,7 @@ static void straight_run(void);
 #endif
 static int32_t sensor_permille(s3_line_status_t const * p_st, bool b_left);
 static char    zone_char(int32_t n_permille);
-static void    run_log(uint32_t ms, uint32_t moved_mm,
+static void    run_log(uint32_t elapsed_ms, uint32_t moved_mm,
                        s3_line_status_t const * p_st);
 static void    stats_add(drive_stats_t * p_s, s3_line_status_t const * p_st,
                          uint32_t moved_mm);
@@ -180,17 +180,25 @@ static void    run_summary(drive_stats_t const * p_s, uint32_t moved_mm);
 ER
 task_drive_test_start (void)
 {
-    ID tid = app_start_task((FP) drive_task, S3_PRI_DRIVE_TEST, TP_PRC1,
-                            "s3_drive_task");
+    ID h_tid = app_start_task((FP) drive_task, S3_PRI_DRIVE_TEST, TP_PRC1,
+                              "s3_drive_task");
 
-    return (tid < E_OK) ? tid : E_OK;
+    return (h_tid < E_OK) ? h_tid : E_OK;
 }
 
+/*!
+ * @brief The drive test task: calibrate, then run the line-following
+ *        test each time button 1 is pressed.
+ *
+ * @param[in] stacd   Start code; not used.
+ * @param[in] p_exinf Extended information; not used.
+ */
 static void
 drive_task (INT stacd, void * p_exinf)
 {
-    uint32_t i;
+    uint32_t idx;
 
+    /* The casts mark the arguments as unused. */
     (void) stacd;
     (void) p_exinf;
     button_input(S3_DRIVE_BTN1_PIN);
@@ -205,7 +213,8 @@ drive_task (INT stacd, void * p_exinf)
         {
             tk_dly_tsk(POLL_MS);
         }
-        for (i = 0u; i < PRESS_MS; i = button1_down() ? (i + POLL_MS) : 0u)
+        for (idx = 0u; idx < PRESS_MS;
+             idx = button1_down() ? (idx + POLL_MS) : 0u)
         {
             tk_dly_tsk(POLL_MS);    /* Held PRESS_MS = a real press.     */
         }
@@ -229,13 +238,13 @@ drive_task (INT stacd, void * p_exinf)
             cal_countdown();        /* START before READY: calibrate.    */
             continue;
         }
-        for (i = S3_DRIVE_GO_COUNT_S; i > 0u; i--)
+        for (idx = S3_DRIVE_GO_COUNT_S; idx > 0u; idx--)
         {
             tm_printf((UB *) ">>> STARTING IN %d ... release GP20 now\n",
-                      (INT) i);
+                      (INT) idx);
             tk_dly_tsk(COUNTDOWN_STEP_MS);
         }
-        if (start_allowed() && estop_clear_ok())
+        if ((start_allowed()) && (estop_clear_ok()))
         {
             drive_run();
         }
@@ -250,8 +259,12 @@ static void
 cal_countdown (void)
 {
     s3_cal_levels_t cal = {0};
-    uint32_t        i;
+    uint32_t        idx;
 
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "\n================================================\n"
                      "  STEP 1: GET READY TO CALIBRATE - NOT DRIVING\n"
                      "================================================\n"
@@ -259,13 +272,21 @@ cal_countdown (void)
                      "It will turn left and right by itself to calibrate.\n"
                      "Calibration starts in %d s.\n",
               (INT) S3_DRIVE_CAL_COUNT_S);
-    for (i = S3_DRIVE_CAL_COUNT_S; i > 0u; i--)
+    for (idx = S3_DRIVE_CAL_COUNT_S; idx > 0u; idx--)
     {
-        tm_printf((UB *) "S3 CAL %d\n", (INT) i);
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
+        tm_printf((UB *) "S3 CAL %d\n", (INT) idx);
         tk_dly_tsk(COUNTDOWN_STEP_MS);
     }
     s3_request_recalibrate();
     tk_dly_tsk(SETTLE_MS);
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "\n================================================\n"
                      "  STEP 2: AUTO SWEEP - CAR TURNS ON THE SPOT\n"
                      "================================================\n"
@@ -274,6 +295,10 @@ cal_countdown (void)
     s3_cal_levels_get(&cal);
     if (!cal_ready(&cal))
     {
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "AUTO SWEEP not enough: slide the car sideways "
                          "across WHITE and BLACK by hand.\n"
                          "Wait for CALIBRATION READY below.\n");
@@ -293,7 +318,7 @@ auto_sweep (void)
     subsystem2_odom_t odom  = {0};
     int32_t           start;
     int32_t           target[4];
-    uint32_t          i;
+    uint32_t          idx;
 
     wheels_stop();
     subsystem2_odom_get(&odom);
@@ -302,9 +327,9 @@ auto_sweep (void)
     target[1] = start;                                      /* back  */
     target[2] = start - (AUTO_SWEEP_DEG * CDEG_PER_DEG);    /* right */
     target[3] = start;                                      /* back  */
-    for (i = 0u; i < 4u; i++)
+    for (idx = 0u; idx < 4u; idx++)
     {
-        if (subsystem2_estop_is_set() || !sweep_turn_to(target[i]))
+        if ((subsystem2_estop_is_set()) || (!sweep_turn_to(target[idx])))
         {
             break;
         }
@@ -327,9 +352,9 @@ sweep_turn_to (int32_t target_cdeg)
 {
     subsystem2_odom_t odom = {0};
     int32_t           err;
-    uint32_t          k;
+    uint32_t          attempt;
 
-    for (k = 0u; k < SWEEP_TRIES; k++)
+    for (attempt = 0u; attempt < SWEEP_TRIES; attempt++)
     {
         wheels_stop();          /* Coasting done: the heading is final. */
         subsystem2_odom_get(&odom);
@@ -356,23 +381,33 @@ sweep_turn_to (int32_t target_cdeg)
 static bool
 start_allowed (void)
 {
-    s3_line_status_t st = {0};
+    s3_line_status_t line_status = {0};
 
-    if ((E_OK != s3_get_line_status(&st)) || (S3_LINE_FOLLOW != st.state))
+    if ((E_OK != s3_get_line_status(&line_status)) ||
+        (S3_LINE_FOLLOW != line_status.state))
     {
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "S3 DRIVE NOT STARTED: line state is %s. Sweep the "
                          "car sideways across the line until it is "
                          "calibrated, then centre it on the line.\n",
-                  s3_state_txt((uint32_t) st.state, 0u));
+                  s3_state_txt((uint32_t) line_status.state, 0u));
         return false;
     }
-    if ((st.n_centre < U8_WHITE_BELOW) && (st.n_outer < U8_WHITE_BELOW))
+    if ((line_status.n_centre < U8_WHITE_BELOW) &&
+        (line_status.n_outer < U8_WHITE_BELOW))
     {
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "S3 DRIVE NOT STARTED: neither sensor is on the line "
                          "(GP27=%d, GP26=%d of 1000). Centre the car on "
                          "the line, GP27 on its LEFT edge (grey).\n",
-                  (INT) ((st.n_centre * PERMILLE) / U8_FULL),
-                  (INT) ((st.n_outer * PERMILLE) / U8_FULL));
+                  (INT) ((line_status.n_centre * PERMILLE) / U8_FULL),
+                  (INT) ((line_status.n_outer * PERMILLE) / U8_FULL));
         return false;
     }
     return true;
@@ -393,6 +428,10 @@ cal_ok (void)
     {
         return true;
     }
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 DRIVE NOT STARTED: need black >= %d and contrast "
                      ">= %d on BOTH sensors. Sweep white and black, or "
                      "hold GP21 for 2 s to recalibrate.\n",
@@ -400,11 +439,18 @@ cal_ok (void)
     return false;
 }
 
+/*!
+ * @brief Print the calibration levels and whether they are ready.
+ */
 static void
 cal_print (s3_cal_levels_t const * p_cal)
 {
     bool b_ready = cal_ready(p_cal);
 
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 DRIVE CAL: GP26 white %d black %d, GP27 white %d "
                      "black %d (raw) -> %s\n",
               (INT) p_cal->white_o, (INT) p_cal->black_o,
@@ -426,6 +472,9 @@ cal_ready (s3_cal_levels_t const * p_cal)
             (int32_t) S3_IR_CAL_MIN_RANGE);
 }
 
+/*!
+ * @brief Print the calibration state when it changes.
+ */
 static void
 cal_watch (bool * p_ready, bool * p_reported)
 {
@@ -439,17 +488,26 @@ cal_watch (bool * p_ready, bool * p_reported)
         cal_print(&cal);
         if (b_ready)
         {
-            tm_printf((UB *) "\n================================================\n"
-                             "  STEP 3: CALIBRATION READY - WAITING FOR YOU\n"
-                             "================================================\n"
-                             "Stop sweeping. Centre the car on the line:\n"
-                             "GP27 on the LEFT edge (grey), GP26 on white.\n"
-                             "Tap and RELEASE GP20 to start (3 s countdown).\n"
-                             "GP21: tap = preset; hold 2 s = recalibrate.\n"
-                             "No driving until you press GP20.\n");
+            /* The casts are for tm_printf only: the format is an ASCII literal,
+             * and each value is printed with %d, so a value outside INT's range
+             * would only print wrong.
+             */
+            tm_printf((UB *)
+                      "\n================================================\n"
+                      "  STEP 3: CALIBRATION READY - WAITING FOR YOU\n"
+                      "================================================\n"
+                      "Stop sweeping. Centre the car on the line:\n"
+                      "GP27 on the LEFT edge (grey), GP26 on white.\n"
+                      "Tap and RELEASE GP20 to start (3 s countdown).\n"
+                      "GP21: tap = preset; hold 2 s = recalibrate.\n"
+                      "No driving until you press GP20.\n");
         }
         else
         {
+            /* The casts are for tm_printf only: the format is an ASCII literal,
+             * and each value is printed with %d, so a value outside INT's range
+             * would only print wrong.
+             */
             tm_printf((UB *) "CALIBRATION NOT READY: keep sweeping BOTH "
                              "sensors across white and black.\n");
         }
@@ -465,17 +523,21 @@ cal_watch (bool * p_ready, bool * p_reported)
 static bool
 estop_clear_ok (void)
 {
-    subsystem2_status_t s2 = {0};
+    subsystem2_status_t s2_status = {0};
 
     if (!subsystem2_estop_is_set())
     {
         return true;
     }
-    subsystem2_status_get(&s2);
+    subsystem2_status_get(&s2_status);
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 DRIVE NOT STARTED: S2 E-STOP is latched (stalls=%d, "
                      "e-stops=%d). S3 may not clear it: power-cycle the car "
-                     "(Buddy 2 rule).\n", (INT) s2.stall_count,
-              (INT) s2.estop_count);
+                     "(Buddy 2 rule).\n", (INT) s2_status.stall_count,
+              (INT) s2_status.estop_count);
     return false;
 }
 
@@ -497,17 +559,26 @@ straight_run (void)
     uint32_t last_mm  = start_mm;
     uint32_t still_ms = 0u;
     uint32_t now_mm;
-    ER       er;
+    ER       err;
 
-    er = subsystem2_move((int16_t) S3_DRIVE_STRAIGHT_MM,
+    /* The casts are safe: 600 mm fits int16_t and 50 mm/s fits uint16_t. */
+    err = subsystem2_move((int16_t) S3_DRIVE_STRAIGHT_MM,
                          (uint16_t) S3_DRIVE_SPEED_MMS);
-    if (E_OK != er)
+    if (E_OK != err)
     {
         subsystem2_estop_set();
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "S3 STRAIGHT command failed (%d); E-stop set.\n",
-                  (INT) er);
+                  (INT) err);
         return;
     }
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 STRAIGHT TEST GO: %d mm at %d mm/s, line following "
                      "OFF. GP20 stops.\n",
               (INT) S3_DRIVE_STRAIGHT_MM, (INT) S3_DRIVE_SPEED_MMS);
@@ -515,7 +586,7 @@ straight_run (void)
     {
         tk_dly_tsk(POLL_MS);
         now_mm = s3_odom_mm();
-        if (button1_down() || subsystem2_estop_is_set())
+        if ((button1_down()) || (subsystem2_estop_is_set()))
         {
             break;
         }
@@ -524,9 +595,13 @@ straight_run (void)
             last_mm  = now_mm;
             still_ms = 0u;
         }
-        else if ((still_ms += POLL_MS) >= S3_DRIVE_STILL_MS)
+        else
         {
-            break;                      /* MOVE finished (or stalled).   */
+            still_ms += POLL_MS;
+            if (still_ms >= S3_DRIVE_STILL_MS)
+            {
+                break;                  /* MOVE finished (or stalled).   */
+            }
         }
     }
     wheels_stop();
@@ -539,64 +614,96 @@ straight_run (void)
 }
 #endif
 
+/*!
+ * @brief One test run: follow the line until stopped, then print a
+ *        summary.
+ */
 static void
 drive_run (void)
 {
-    drive_preset_t const * p_set   = &g_presets[g_preset];
-    s3_line_status_t       st      = {0};
-    subsystem2_status_t    s2      = {0};
-    drive_stats_t          stats   = {0};
-    uint32_t               start_mm  = s3_odom_mm();
-    uint32_t               moved_mm  = 0u;
-    uint32_t               ms        = 0u;
-    uint32_t               log_ms    = 0u;
-    uint32_t               still_ms  = 0u;  /* Time without odometry.    */
-    uint32_t               last_mm   = 0u;
-    uint32_t               junc_seen;       /* st.junctions last printed. */
-    uint32_t               bc_seen;         /* st.barcodes last taken.    */
-    uint32_t               nav       = S3_CMD_NONE; /* Next junction.  */
-    char const *           p_why     = "?";
-    ER                     er;
+    drive_preset_t const * p_set       = &g_presets[g_preset];
+    s3_line_status_t       line_status = {0};
+    subsystem2_status_t    s2_status   = {0};
+    drive_stats_t          stats       = {0};
+    uint32_t               start_mm    = s3_odom_mm();
+    uint32_t               moved_mm    = 0u;
+    uint32_t               elapsed_ms  = 0u;
+    uint32_t               log_ms      = 0u;
+    uint32_t               still_ms    = 0u;  /* Time without odometry.    */
+    uint32_t               last_mm     = 0u;
+    uint32_t               junc_seen;         /* Junctions last printed.   */
+    uint32_t               bc_seen;           /* Barcodes last taken.      */
+    uint32_t               nav         = S3_CMD_NONE; /* Next junction.  */
+    char const *           p_why       = "?";
+    ER                     err;
 
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "\n================================================\n"
                      "  STEP 4: RUNNING - PRESS GP20 TO STOP\n"
                      "================================================\n");
-    er = subsystem2_follow(p_set->speed_mms);
-    if (E_OK != er)
+    err = subsystem2_follow(p_set->speed_mms);
+    if (E_OK != err)
     {
         subsystem2_estop_set();
-        tm_printf((UB *) "S3 DRIVE command failed (%d); E-stop set.\n", (INT) er);
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
+        tm_printf((UB *) "S3 DRIVE command failed (%d); E-stop set.\n",
+                  (INT) err);
         return;
     }
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 DRIVE GO preset %d: %d mm/s, kp=%d kd=%d boost=%d, "
                      "steer max %d mm/s, %s (er=%d). Press BUTTON 1 to stop.\n",
               (INT) g_preset, (INT) p_set->speed_mms, (INT) p_set->kp_x100,
               (INT) p_set->kd_x100, (INT) p_set->boost_x100,
               (INT) p_set->steer_max_mms, S3_LAYOUT_TXT,
-              (INT) er);
+              (INT) err);
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 DRIVE ISOLATED: S5 disabled, no ultrasonic guard. "
                      "GP20 stops.\n");
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 LOG legend: t ms | mm | sensors L R (0 white .. "
                      "1000 black) zone (B black, G grey, W white) | dv "
                      "(+ = right) | S2 wheel target, measured, duty L/R | "
                      "encoder ticks L/R | heading 0.01 deg\n");
-    (void) s3_get_line_status(&st);
-    junc_seen = st.junctions;
-    bc_seen   = st.barcodes;
+    /* The cast discards the result: on an error the status keeps its last
+     * values, which only affects the test's log.
+     */
+    (void) s3_get_line_status(&line_status);
+    junc_seen = line_status.junctions;
+    bc_seen   = line_status.barcodes;
     for (;;)
     {
         tk_dly_tsk(POLL_MS);
-        ms      += POLL_MS;
-        log_ms  += POLL_MS;
-        moved_mm = s3_odom_mm() - start_mm;    /* Reversing wraps huge.  */
-        (void) s3_get_line_status(&st);
-        stats_add(&stats, &st, moved_mm);
-        nav_take(&st, &bc_seen, &nav);
-        if (st.junctions != junc_seen)
+        elapsed_ms += POLL_MS;
+        log_ms     += POLL_MS;
+        moved_mm   = s3_odom_mm() - start_mm;    /* Reversing wraps huge.  */
+        (void) s3_get_line_status(&line_status);
+        stats_add(&stats, &line_status, moved_mm);
+        nav_take(&line_status, &bc_seen, &nav);
+        if (line_status.junctions != junc_seen)
         {
             uint32_t waited;
 
-            junc_seen = st.junctions;
+            junc_seen = line_status.junctions;
+            /* The casts are for tm_printf only: the format is an ASCII literal,
+             * and each value is printed with %d, so a value outside INT's range
+             * would only print wrong.
+             */
             tm_printf((UB *) "S3 DRIVE JUNCTION detected at %d mm (both "
                              "sensors black)\n", (INT) moved_mm);
             /* Stop and decide at every junction. */
@@ -608,13 +715,14 @@ drive_run (void)
                 tm_printf((UB *) "S3 DRIVE JUNCTION: barcode still being "
                                  "read, waiting for it\n");
                 for (waited = 0u; (waited < DRIVE_JUNC_WAIT_MS) &&
-                                  (st.barcodes == bc_seen) && !button1_down();
+                                  (line_status.barcodes == bc_seen) &&
+                                  (!button1_down());
                      waited += POLL_MS)
                 {
                     tk_dly_tsk(POLL_MS);
-                    (void) s3_get_line_status(&st);
+                    (void) s3_get_line_status(&line_status);
                 }
-                nav_take(&st, &bc_seen, &nav);
+                nav_take(&line_status, &bc_seen, &nav);
             }
             if (S3_CMD_NONE == nav)
             {
@@ -644,9 +752,9 @@ drive_run (void)
                     break;
                 }
                 nav = S3_CMD_NONE;
-                (void) s3_get_line_status(&st);
-                junc_seen = st.junctions;   /* Black seen while turning.  */
-                bc_seen   = st.barcodes;
+                (void) s3_get_line_status(&line_status);
+                junc_seen = line_status.junctions; /* Black seen turning. */
+                bc_seen   = line_status.barcodes;
                 start_mm  = s3_odom_mm() - moved_mm;  /* A spot turn can */
                 last_mm   = moved_mm;   /* run odometry back: re-base so */
                 still_ms  = 0u;         /* moved_mm cannot wrap (car 5   */
@@ -656,7 +764,7 @@ drive_run (void)
         if (log_ms >= S3_DRIVE_LOG_MS)
         {
             log_ms = 0u;
-            run_log(ms, moved_mm, &st);
+            run_log(elapsed_ms, moved_mm, &line_status);
         }
         if (button1_down())
         {
@@ -677,9 +785,9 @@ drive_run (void)
         }
         /* LINE_RECOVERY (design 6.1 SEARCHING, FR15): stop and sweep;
          * not found after 3 sweeps = LINE_NOT_FOUND fault. */
-        if (S3_LINE_LOST == st.state)
+        if (S3_LINE_LOST == line_status.state)
         {
-            if (!line_recover(st.steer_dv, p_set->speed_mms))
+            if (!line_recover(line_status.steer_dv, p_set->speed_mms))
             {
                 p_why = "LINE NOT FOUND after 3 sweeps (FAULT)";
                 break;
@@ -694,19 +802,20 @@ drive_run (void)
             break;
         }
     }
-    er = subsystem2_stop();
-    if (E_OK != er)
+    err = subsystem2_stop();
+    if (E_OK != err)
     {
         subsystem2_estop_set();
-        tm_printf((UB *) "S3 DRIVE STOP failed (%d); E-stop set.\n", (INT) er);
+        tm_printf((UB *) "S3 DRIVE STOP failed (%d); E-stop set.\n", (INT) err);
     }
     s3_set_steer_max(p_set->steer_max_mms);
-    subsystem2_status_get(&s2);
+    subsystem2_status_get(&s2_status);
     tm_printf((UB *) "\n================ RUN STOPPED ================\n"
                      "S3 DRIVE STOP (%s) after %d mm, %d ms. S2: stalls=%d "
                      "e-stops=%d discarded=%d\n",
-              p_why, (INT) moved_mm, (INT) ms, (INT) s2.stall_count,
-              (INT) s2.estop_count, (INT) s2.discarded_count);
+              p_why, (INT) moved_mm, (INT) elapsed_ms,
+              (INT) s2_status.stall_count,
+              (INT) s2_status.estop_count, (INT) s2_status.discarded_count);
     run_summary(&stats, moved_mm);
     while (button1_down())          /* The stop press must not restart.  */
     {
@@ -725,9 +834,15 @@ sensor_permille (s3_line_status_t const * p_st, bool b_left)
     bool     b_gp26 = (S3_LN_L_ON_LEFT == S3_IR_L_SIDE) ? b_left : (!b_left);
     uint32_t n_u8   = b_gp26 ? p_st->n_outer : p_st->n_centre;
 
+    /* The cast is safe: n_u8 is at most 255, so the permille result is at most
+     * 1000.
+     */
     return (int32_t) ((n_u8 * PERMILLE) / U8_FULL);
 }
 
+/*!
+ * @brief Zone letter for a sensor reading: B black, G grey, W white.
+ */
 static char
 zone_char (int32_t n_permille)
 {
@@ -743,25 +858,29 @@ zone_char (int32_t n_permille)
  *        what S2's wheels and encoders did.
  */
 static void
-run_log (uint32_t ms, uint32_t moved_mm, s3_line_status_t const * p_st)
+run_log (uint32_t elapsed_ms, uint32_t moved_mm, s3_line_status_t const * p_st)
 {
-    subsystem2_status_t s2   = {0};
+    subsystem2_status_t s2_status = {0};
     subsystem2_odom_t   odom = {0};
     int32_t             n_l  = sensor_permille(p_st, true);
     int32_t             n_r  = sensor_permille(p_st, false);
 
-    subsystem2_status_get(&s2);
+    subsystem2_status_get(&s2_status);
     subsystem2_odom_get(&odom);
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 LOG %6d | %4d mm | L %4d R %4d %c%c %s | dv %+4d | "
                      "tgt %+4d %+4d spd %+4d %+4d duty %+4d %+4d | "
                      "enc %6d %6d | hdg %+6d\n",
-              (INT) ms, (INT) moved_mm, (INT) n_l, (INT) n_r,
+              (INT) elapsed_ms, (INT) moved_mm, (INT) n_l, (INT) n_r,
               zone_char(n_l), zone_char(n_r),
               s3_state_txt((uint32_t) p_st->state, 0u),
               (INT) p_st->steer_dv,
-              (INT) s2.target_l_mms, (INT) s2.target_r_mms,
+              (INT) s2_status.target_l_mms, (INT) s2_status.target_r_mms,
               (INT) odom.speed_l_mms, (INT) odom.speed_r_mms,
-              (INT) s2.duty_l, (INT) s2.duty_r,
+              (INT) s2_status.duty_l, (INT) s2_status.duty_r,
               (INT) odom.count_l, (INT) odom.count_r,
               (INT) odom.heading_cdeg);
 }
@@ -773,13 +892,13 @@ static void
 stats_add (drive_stats_t * p_s, s3_line_status_t const * p_st,
            uint32_t moved_mm)
 {
-    subsystem2_status_t s2   = {0};
+    subsystem2_status_t s2_status = {0};
     subsystem2_odom_t   odom = {0};
     int32_t             n_l  = sensor_permille(p_st, true);
     int32_t             n_r  = sensor_permille(p_st, false);
     bool                b_lw = (n_l < S3_LN_WHITE);
     bool                b_rw = (n_r < S3_LN_WHITE);
-    int32_t             dv   = p_st->steer_dv;
+    int32_t             steer_dv = p_st->steer_dv;
     int32_t             err_l;
     int32_t             err_r;
 
@@ -809,19 +928,23 @@ stats_add (drive_stats_t * p_s, s3_line_status_t const * p_st,
             p_s->one_white++;
         }
     }
-    if (((dv > 0) && (p_s->dv_prev < 0)) || ((dv < 0) && (p_s->dv_prev > 0)))
+    if (((steer_dv > 0) && (p_s->dv_prev < 0)) ||
+        ((steer_dv < 0) && (p_s->dv_prev > 0)))
     {
         p_s->flips++;
     }
-    if (0 != dv)
+    if (0 != steer_dv)
     {
-        p_s->dv_prev = dv;
+        p_s->dv_prev = steer_dv;
     }
 
-    subsystem2_status_get(&s2);
+    subsystem2_status_get(&s2_status);
     subsystem2_odom_get(&odom);
-    err_l = s2.target_l_mms - odom.speed_l_mms;
-    err_r = s2.target_r_mms - odom.speed_r_mms;
+    err_l = s2_status.target_l_mms - odom.speed_l_mms;
+    err_r = s2_status.target_r_mms - odom.speed_r_mms;
+    /* The casts are safe: each absolute speed error is non-negative and far
+     * below 2^31 mm/s.
+     */
     p_s->wheel_err_sum += (uint32_t) ((err_l < 0) ? -err_l : err_l) +
                           (uint32_t) ((err_r < 0) ? -err_r : err_r);
 }
@@ -832,14 +955,18 @@ stats_add (drive_stats_t * p_s, s3_line_status_t const * p_st,
 static void
 run_summary (drive_stats_t const * p_s, uint32_t moved_mm)
 {
-    uint32_t n         = (0u == p_s->polls) ? 1u : p_s->polls;
-    uint32_t pct_gg    = (100u * p_s->both_grey) / n;
-    uint32_t pct_one   = (100u * p_s->one_white) / n;
-    uint32_t pct_ww    = (100u * p_s->both_white) / n;
+    uint32_t polls     = (0u == p_s->polls) ? 1u : p_s->polls;
+    uint32_t pct_gg    = (100u * p_s->both_grey) / polls;
+    uint32_t pct_one   = (100u * p_s->one_white) / polls;
+    uint32_t pct_ww    = (100u * p_s->both_white) / polls;
     uint32_t flips_m   = (moved_mm < 100u) ? 0u :
                          (p_s->flips * 1000u) / moved_mm;
-    uint32_t wheel_err = p_s->wheel_err_sum / (2u * n);
+    uint32_t wheel_err = p_s->wheel_err_sum / (2u * polls);
 
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 SUMMARY: both sensors grey (centred) %d %%, one "
                      "sensor white %d %%, both white %d %% (longest %d mm). "
                      "Steering flips %d (%d per m). Wheel speed error mean "
@@ -849,6 +976,10 @@ run_summary (drive_stats_t const * p_s, uint32_t moved_mm)
               (INT) wheel_err);
     if (pct_gg < DIAG_BOTH_GREY_MIN_PCT)
     {
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "S3 DIAG: SENSORS: both were grey together only "
                          "%d %% of the time. The car weaves, or the sensors "
                          "are not on the edges: park centred on the line, "
@@ -857,6 +988,10 @@ run_summary (drive_stats_t const * p_s, uint32_t moved_mm)
     }
     if (pct_ww > DIAG_BOTH_WHITE_MAX_PCT)
     {
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "S3 DIAG: OFF LINE: both white %d %% of the time "
                          "while driving: the car leaves the line (too late "
                          "on curves: try a stronger preset), or the sensors "
@@ -865,12 +1000,20 @@ run_summary (drive_stats_t const * p_s, uint32_t moved_mm)
     }
     if (flips_m > DIAG_FLIPS_PER_M_MAX)
     {
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "S3 DIAG: OVERSTEER / WEAVE: steering changed side "
                          "%d times per metre. Try a softer preset (lower "
                          "Kp) or one with D.\n", (INT) flips_m);
     }
     if (wheel_err > DIAG_WHEEL_ERR_MAX_MMS)
     {
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "S3 DIAG: MOTORS: wheels were %d mm/s off their "
                          "set-points on average: check the motor power, the "
                          "encoders (enc L/R in S3 LOG must both rise) and "
@@ -881,6 +1024,10 @@ run_summary (drive_stats_t const * p_s, uint32_t moved_mm)
         (flips_m <= DIAG_FLIPS_PER_M_MAX) &&
         (wheel_err <= DIAG_WHEEL_ERR_MAX_MMS))
     {
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "S3 DIAG: no problem found in this run.\n");
     }
 }
@@ -968,9 +1115,16 @@ line_recover (int32_t last_dv, uint16_t speed_mms)
     {
         for (step = 0u; (step < RECOVERY_STEPS) && (0 == res); step++)
         {
+            /* The casts are for tm_printf only: the format is an ASCII literal,
+             * and each value is printed with %d, so a value outside INT's range
+             * would only print wrong.
+             */
             tm_printf((UB *) "S3 DRIVE LINE LOST: round %d sweep %d, turn "
                              "%d deg\n", (INT) (round + 1u), (INT) (step + 1u),
                       (INT) (sweep_deg[step] * side));
+            /* The cast is safe: the sweep angles are at most 90 degrees and
+             * side is +1 or -1, so the product fits int16_t.
+             */
             res = recovery_move(true, (int16_t) (sweep_deg[step] * side),
                                 true);
         }
@@ -1074,17 +1228,17 @@ junction_turn (uint32_t cmd, uint16_t speed_mms)
 static int
 recovery_move (bool b_turn, int16_t value, bool b_until_line)
 {
-    s3_line_status_t    st       = {0};
-    subsystem2_status_t s2       = {0};
-    uint32_t            waited   = 0u;
-    subsystem2_state_t  busy     = b_turn ? S2_STATE_TURNING :
+    s3_line_status_t    line_status = {0};
+    subsystem2_status_t s2_status   = {0};
+    uint32_t            waited      = 0u;
+    subsystem2_state_t  busy        = b_turn ? S2_STATE_TURNING :
                                             S2_STATE_MOVING;
-    ER                  er;
+    ER                  err;
 
     wheels_stop();
-    er = b_turn ? subsystem2_turn(value, RECOVERY_SPEED_MMS) :
-                  subsystem2_move(value, RECOVERY_SPEED_MMS);
-    if (E_OK != er)
+    err = b_turn ? subsystem2_turn(value, RECOVERY_SPEED_MMS) :
+                   subsystem2_move(value, RECOVERY_SPEED_MMS);
+    if (E_OK != err)
     {
         return -1;
     }
@@ -1092,20 +1246,24 @@ recovery_move (bool b_turn, int16_t value, bool b_until_line)
     {
         tk_dly_tsk(POLL_MS);
         waited += POLL_MS;
-        (void) s3_get_line_status(&st);
+        /* The cast discards the result: on an error the status keeps its last
+         * values, which only affects the test's log.
+         */
+        (void) s3_get_line_status(&line_status);
         if (b_until_line &&
-            ((st.n_centre > U8_FOUND) || (st.n_outer > U8_FOUND)))
+            ((line_status.n_centre > U8_FOUND) ||
+             (line_status.n_outer > U8_FOUND)))
         {
             wheels_stop();
             return 1;
         }
-        if (button1_down() || subsystem2_estop_is_set())
+        if ((button1_down()) || (subsystem2_estop_is_set()))
         {
             return -1;
         }
-        subsystem2_status_get(&s2);
+        subsystem2_status_get(&s2_status);
         /* The first SETTLE_MS: S2 may not have taken the command yet. */
-    } while (((waited < (uint32_t) SETTLE_MS) || (busy == s2.state)) &&
+    } while (((waited < (uint32_t) SETTLE_MS) || (busy == s2_status.state)) &&
              (waited < RECOVERY_MOVE_MS));
     return (waited < RECOVERY_MOVE_MS) ? 0 : -1;
 }
@@ -1122,6 +1280,9 @@ wheels_stop (void)
     subsystem2_odom_t odom   = {0};
     uint32_t          waited = 0u;
 
+    /* The cast discards the result: the wait below ends when both wheels have
+     * stopped or after STOPPED_WAIT_MS, either way.
+     */
     (void) subsystem2_stop();
     do
     {
@@ -1132,6 +1293,9 @@ wheels_stop (void)
              (waited < STOPPED_WAIT_MS));
 }
 
+/*!
+ * @brief Select the next tuning preset and apply it.
+ */
 static void
 preset_next (void)
 {
@@ -1139,6 +1303,9 @@ preset_next (void)
     preset_apply();
 }
 
+/*!
+ * @brief Apply the selected preset to S3's line follower and print it.
+ */
 static void
 preset_apply (void)
 {
@@ -1147,6 +1314,10 @@ preset_apply (void)
     s3_set_line_gains(p_set->kp_x100, p_set->kd_x100);
     s3_set_line_shape(p_set->boost_x100);
     s3_set_steer_max(p_set->steer_max_mms);
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 DRIVE PRESET %d of %d: %d mm/s, kp=%d kd=%d "
                      "boost=%d, steer max %d mm/s\n",
               (INT) g_preset, (INT) (N_PRESETS - 1u), (INT) p_set->speed_mms,
@@ -1154,20 +1325,32 @@ preset_apply (void)
               (INT) p_set->boost_x100, (INT) p_set->steer_max_mms);
 }
 
+/*!
+ * @brief Make a button pin an input with its pull-up on.
+ */
 static void
 button_input (uint32_t pin)
 {
+    /* The cast discards gpio_set_pin()'s result: the button pins are valid
+     * constants.
+     */
     (void) gpio_set_pin(pin, GPIO_MODE_IN);
     clr_w(GPIO(pin), GPIO_PDE);
     set_w(GPIO(pin), GPIO_PUE);
 }
 
+/*!
+ * @brief Whether button 1 (GP20) is pressed.
+ */
 static bool
 button1_down (void)
 {
     return (0u == gpio_get_val(S3_DRIVE_BTN1_PIN));
 }
 
+/*!
+ * @brief Whether button 2 (GP21) is pressed.
+ */
 static bool
 button2_down (void)
 {
@@ -1188,3 +1371,4 @@ task_drive_test_start (void)
 #endif /* S3_DRIVE_TEST */
 
 /*** end of file ***/
+

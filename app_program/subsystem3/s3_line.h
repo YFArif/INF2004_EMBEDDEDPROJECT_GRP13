@@ -227,3 +227,4 @@ void s3_line_step(s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
 #endif /* S3_LINE_H */
 
 /*** end of file ***/
+

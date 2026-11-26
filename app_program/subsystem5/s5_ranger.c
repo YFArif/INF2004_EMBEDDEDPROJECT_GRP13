@@ -40,9 +40,9 @@
 
 static uint32_t g_last_ping_us = 0u;
 static uint32_t g_busy_since   = 0u;
-static bool     g_b_busy       = false;
+static bool     gb_busy        = false;
 static uint32_t g_unanswered   = 0u;
-static bool     g_b_fault      = false;
+static bool     gb_fault       = false;
 
 static void               wait_for_slot(void);
 static s5_ranger_status_t ping_and_read(uint32_t * p_echo_us);
@@ -57,9 +57,9 @@ s5_ranger_init (void)
 {
     // Pretend the last ping was a full period ago so the first is at once.
     g_last_ping_us = drv_s5_hw_now_us() - PING_PERIOD_US;
-    g_b_busy       = false;
+    gb_busy        = false;
     g_unanswered   = 0u;
-    g_b_fault      = false;
+    gb_fault       = false;
 }
 
 /*!
@@ -79,7 +79,7 @@ s5_ranger_measure (s5_ranger_reading_t * p_reading)
 
     wait_for_slot();
 
-    if (g_b_fault)
+    if (gb_fault)
     {
         status = S5_RANGER_FAULT;
     }
@@ -89,8 +89,8 @@ s5_ranger_measure (s5_ranger_reading_t * p_reading)
     }
     else
     {
-        g_b_busy = false;
-        status   = ping_and_read(&echo_us);
+        gb_busy = false;
+        status  = ping_and_read(&echo_us);
     }
 
     // Count unanswered pings; any real answer resets the count.
@@ -100,8 +100,8 @@ s5_ranger_measure (s5_ranger_reading_t * p_reading)
 
         if (g_unanswered >= FAULT_PINGS)
         {
-            g_b_fault = true;
-            status    = S5_RANGER_FAULT;
+            gb_fault = true;
+            status   = S5_RANGER_FAULT;
         }
     }
     else if ((S5_RANGER_OK == status) || (S5_RANGER_CLEAR == status))
@@ -156,8 +156,8 @@ s5_ranger_is_conclusive (s5_ranger_reading_t const * p_reading)
 void
 s5_ranger_reset_fault (void)
 {
-    g_b_fault    = false;
-    g_b_busy     = false;
+    gb_fault     = false;
+    gb_busy      = false;
     g_unanswered = 0u;
 }
 
@@ -233,14 +233,14 @@ note_busy (void)
     s5_ranger_status_t status = S5_RANGER_BUSY;
     uint32_t           now_us = drv_s5_hw_now_us();
 
-    if (!g_b_busy)
+    if (!gb_busy)
     {
-        g_b_busy     = true;
+        gb_busy      = true;
         g_busy_since = now_us;
     }
     else if ((now_us - g_busy_since) >= STUCK_US)
     {
-        g_b_fault = true;
+        gb_fault  = true;
         status    = S5_RANGER_FAULT;
     }
     else
@@ -274,3 +274,4 @@ echo_to_mm (uint32_t echo_us)
 }
 
 /*** end of file ***/
+

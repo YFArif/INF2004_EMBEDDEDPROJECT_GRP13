@@ -76,7 +76,7 @@
 /* S5-U11, the fault flag stress test (Tribunal 1, Version C): one task
  * on each core sets and clears its own bit STRESS_ROUNDS times, first in
  * a plain shared word with a slow read-modify-write, then in an event
- * flag made like flg_fault and changed only by tk_set_flg / tk_clr_flg.
+ * flag made like gh_flg_fault and changed only by tk_set_flg / tk_clr_flg.
  * The plain word must lose bits (else the test could not see a race at
  * all); the event flag must lose none.
  */
@@ -112,7 +112,7 @@ static volatile uint32_t g_stress_word                       = 0u;
 static volatile uint32_t g_stress_done[STRESS_WORKERS]       = {0u, 0u};
 static volatile uint32_t g_stress_lost_plain[STRESS_WORKERS] = {0u, 0u};
 static volatile uint32_t g_stress_lost_flag[STRESS_WORKERS]  = {0u, 0u};
-static ID                g_stress_flg                        = 0;
+static ID                gh_stress_flg                       = 0;
 
 static bool                    math_is_right(void);
 static bool                    fixture_scan_is_right(void);
@@ -133,7 +133,7 @@ static void                    stress_core1_task(INT stacd,
 static void                    stress_worker(uint32_t idx);
 static uint32_t                stress_plain(uint32_t bit);
 static uint32_t                stress_flag(uint32_t bit);
-static void                    stress_spin(uint32_t us);
+static void                    stress_spin(uint32_t delay_us);
 #if WITH_BENCH
 static bool                    range_is_steady(void);
 static bool                    scan_publishes_profile(void);
@@ -428,7 +428,7 @@ range_is_steady (void)
  *        prints it; compare the width with a ruler.
  *
  * NOTE: The test polls the profile instead of waiting for
- * EV_PROFILE_READY: flg_mission has one waiter, vehicle_ctrl_task.
+ * EV_PROFILE_READY: gh_flg_mission has one waiter, vehicle_ctrl_task.
  *
  * @return true if a new valid profile arrived in time.
  */
@@ -499,6 +499,7 @@ stop_run (uint32_t run)
 
     subsystem5_ctrl_state_t end = wait_state(STOP_RUN_MS, false);
 
+    // NOTE: The cast is safe: end is a small enum value.
     s5_event_trace("RESULT U08 state driven_mm", (int32_t) end,
                    s5_links_odom_dist_mm() - start_mm);
     back_to_ready();
@@ -538,6 +539,7 @@ avoid_run (uint32_t run)
         subsystem5_delay_ms(STATE_WAIT_MS);
     }
 
+    // NOTE: The cast is safe: end is a small enum value.
     s5_event_trace("RESULT U05 state ok", (int32_t) end, b_ok ? 1 : 0);
     back_to_ready();
 
@@ -658,10 +660,13 @@ step_ready (char const * p_next)
 
     for (uint32_t sec = COUNTDOWN_S; sec > 0u; sec--)
     {
+        // NOTE: The casts are safe: the string is ASCII, and sec is at most
+        // COUNTDOWN_S.
         tm_printf((UB *) "[S5-STEP] %d\n", (int) sec);
         subsystem5_delay_ms(MS_PER_S);
     }
 
+    // NOTE: The cast is safe: the string is ASCII.
     tm_printf((UB *) "[S5-STEP] GO\n");
 }
 #endif /* WITH_FLOOR */
@@ -719,7 +724,7 @@ stress_run (uint32_t * p_lost_plain, uint32_t * p_lost_flag)
     T_CFLG cflg   = {0};
     bool   b_done = false;
 
-    // Made like flg_fault (subsystem5.c, create_flag()), so the kernel
+    // Made like gh_flg_fault (subsystem5.c, create_flag()), so the kernel
     // object and its calls are the same as the real fault bits use.
     cflg.flgatr  = TA_TFIFO | TA_WSGL;
     cflg.iflgptn = 0u;
@@ -734,16 +739,16 @@ stress_run (uint32_t * p_lost_plain, uint32_t * p_lost_flag)
         g_stress_lost_flag[idx]  = 0u;
     }
 
-    g_stress_flg = tk_cre_flg(&cflg);
+    gh_stress_flg = tk_cre_flg(&cflg);
 
-    if (g_stress_flg >= E_OK)
+    if (gh_stress_flg >= E_OK)
     {
-        ID tid_0 = app_start_task(stress_core0_task, STRESS_PRI, TP_PRC1,
-                                  "s5_stress_core0");
-        ID tid_1 = app_start_task(stress_core1_task, STRESS_PRI, TP_PRC2,
-                                  "s5_stress_core1");
+        ID h_tid_0 = app_start_task(stress_core0_task, STRESS_PRI, TP_PRC1,
+                                    "s5_stress_core0");
+        ID h_tid_1 = app_start_task(stress_core1_task, STRESS_PRI, TP_PRC2,
+                                    "s5_stress_core1");
 
-        if ((tid_0 >= E_OK) && (tid_1 >= E_OK))
+        if ((h_tid_0 >= E_OK) && (h_tid_1 >= E_OK))
         {
             // Both workers are spinning on g_stress_go: start them
             // together, one round at a time.
@@ -761,7 +766,7 @@ stress_run (uint32_t * p_lost_plain, uint32_t * p_lost_flag)
 
     if (b_done)
     {
-        CHECK(tk_del_flg(g_stress_flg), "s5 stress flag");
+        CHECK(tk_del_flg(gh_stress_flg), "s5 stress flag");
     }
     else
     {
@@ -918,7 +923,7 @@ stress_plain (uint32_t bit)
 }
 
 /*!
- * @brief The flg_fault way: set and clear one bit with tk_set_flg and
+ * @brief The gh_flg_fault way: set and clear one bit with tk_set_flg and
  *        tk_clr_flg, STRESS_ROUNDS times.
  *
  * @param[in] bit This worker's bit.
@@ -935,8 +940,8 @@ stress_flag (uint32_t bit)
     {
         T_RFLG rflg = {0};
 
-        if ((E_OK != tk_set_flg(g_stress_flg, bit))
-            || (E_OK != tk_ref_flg(g_stress_flg, &rflg))
+        if ((E_OK != tk_set_flg(gh_stress_flg, bit))
+            || (E_OK != tk_ref_flg(gh_stress_flg, &rflg))
             || (0u == (rflg.flgptn & bit)))
         {
             lost++;
@@ -944,8 +949,8 @@ stress_flag (uint32_t bit)
 
         stress_spin(STRESS_WINDOW_US);
 
-        if ((E_OK != tk_clr_flg(g_stress_flg, ~bit))
-            || (E_OK != tk_ref_flg(g_stress_flg, &rflg))
+        if ((E_OK != tk_clr_flg(gh_stress_flg, ~bit))
+            || (E_OK != tk_ref_flg(gh_stress_flg, &rflg))
             || (0u != (rflg.flgptn & bit)))
         {
             lost++;
@@ -963,11 +968,11 @@ stress_flag (uint32_t bit)
  * @param[in] us How long.
  */
 static void
-stress_spin (uint32_t us)
+stress_spin (uint32_t delay_us)
 {
     uint32_t start_us = drv_s5_hw_now_us();
 
-    while ((drv_s5_hw_now_us() - start_us) < us)
+    while ((drv_s5_hw_now_us() - start_us) < delay_us)
     {
         // Busy wait: keeps the read-modify-write window open.
     }
@@ -976,3 +981,4 @@ stress_spin (uint32_t us)
 #endif /* APP_TEST */
 
 /*** end of file ***/
+

@@ -114,10 +114,10 @@
 #define MSG_TEL_DATA_BITS           196U
 #define MSG_TEL_BYTES               25U
 
-/* fault_mask bits. The field is flg_fault & 0x1F, copied with no remap:
+/* fault_mask bits. The field is gh_flg_fault & 0x1F, copied with no remap:
  * integer bit n is fault n. Like every field it is written MSB first, so
  * bit n lands at wire offset 27 - n (section 3.1 of the document).
- * NOTE: flg_fault (Buddy 5) must use this same numbering.
+ * NOTE: gh_flg_fault (Buddy 5) must use this same numbering.
  */
 #define MSG_FAULT_STALL             0x01U   /* Bit 0: S2, latched.      */
 #define MSG_FAULT_ENCODER           0x02U   /* Bit 1: S2, reserved.     */

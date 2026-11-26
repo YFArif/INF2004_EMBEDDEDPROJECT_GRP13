@@ -37,15 +37,15 @@
 #define ALIAS_SET           (0x2000u)
 #define ALIAS_CLR           (0x3000u)
 #define PADS_BANK0_ADDR     (0x4001C000u)
-#define PAD_ADDR(pin)       (PADS_BANK0_ADDR + 4u + (4u * (pin)))
+#define BUTTON_PAD_ADDR     (PADS_BANK0_ADDR + 4u + (4u * BUTTON_PIN))
 #define PAD_PUE_BIT         (0x08u)
 #define PAD_PDE_BIT         (0x04u)
 #define SIO_GPIO_IN_REG     (0xD0000004u)
 
-static bool g_b_ready = false;          /* GP20 set up.                  */
+static bool gb_ready = false;          /* GP20 set up.                  */
 
 static bool button_down(void);
-static void sleep_ms(uint32_t ms);
+static void sleep_ms(uint32_t msec);
 
 /*!
  * @brief Announce the next step, wait for Button 1, count down, return.
@@ -63,12 +63,14 @@ subsystem2_step_ready (char const * p_next)
     uint32_t waited = 0u;
     uint32_t sec    = 0u;
 
-    if (!g_b_ready)
+    if (!gb_ready)
     {
+        // The cast discards gpio_set_pin()'s result: BUTTON_PIN is a valid
+        // constant pin.
         (void) gpio_set_pin(BUTTON_PIN, GPIO_MODE_IN);
-        out_w(PAD_ADDR(BUTTON_PIN) + ALIAS_CLR, PAD_PDE_BIT);
-        out_w(PAD_ADDR(BUTTON_PIN) + ALIAS_SET, PAD_PUE_BIT);
-        g_b_ready = true;
+        out_w(BUTTON_PAD_ADDR + ALIAS_CLR, PAD_PDE_BIT);
+        out_w(BUTTON_PAD_ADDR + ALIAS_SET, PAD_PUE_BIT);
+        gb_ready = true;
         sleep_ms(POLL_MS);
     }
 
@@ -101,6 +103,7 @@ subsystem2_step_ready (char const * p_next)
         if (waited >= REMIND_MS)
         {
             waited = 0u;
+            // The cast is safe: the format string is ASCII.
             tm_printf((UB *) "[S2-STEP] still waiting for BUTTON 1\n");
         }
     }
@@ -112,10 +115,13 @@ subsystem2_step_ready (char const * p_next)
 
     for (sec = STEP_COUNTDOWN_S; sec > 0u; sec--)
     {
+        // The casts are safe: the format string is ASCII, and sec counts down
+        // from STEP_COUNTDOWN_S, which fits int.
         tm_printf((UB *) "[S2-STEP] %d\n", (int) sec);
         sleep_ms(1000u);
     }
 
+    // The cast is safe: the format string is ASCII.
     tm_printf((UB *) "[S2-STEP] GO\n");
 }
 
@@ -133,15 +139,16 @@ button_down (void)
 /*!
  * @brief Sleep, letting the other tasks run.
  *
- * @param[in] ms Milliseconds.
+ * @param[in] msec Milliseconds.
  */
 static void
-sleep_ms (uint32_t ms)
+sleep_ms (uint32_t msec)
 {
     // NOTE: The cast is safe: delays here are at most 1 s.
-    CHECK(tk_dly_tsk((RELTIM) ms), "tk_dly_tsk");
+    CHECK(tk_dly_tsk((RELTIM) msec), "tk_dly_tsk");
 }
 
 #endif /* APP_TEST */
 
 /*** end of file ***/
+

@@ -229,8 +229,8 @@ typedef struct
 } mission_t;
 
 /* The state enum must fit its field; a misfit stops the build here. */
-typedef char mission_state_check[(S5_CTRL_FINISHED <= S5_CTRL_STATE_MASK)
-                                 ? 1 : -1];
+typedef char mission_state_check_t[(S5_CTRL_FINISHED <= S5_CTRL_STATE_MASK)
+                                   ? 1 : -1];
 
 static mission_t g_mission = {0u, 0u, 0u, 0u, 0, 0u, 1, 0,
                               S5_LINKS_SIDE_NONE, 0, 0u, 0, 0, 0, 0u, 0u,
@@ -241,9 +241,9 @@ static mission_t g_mission = {0u, 0u, 0u, 0u, 0, 0u, 1, 0,
  * the S2 tests that run first are never disturbed.
  */
 #if APP_TEST
-static volatile bool g_b_armed = false;
+static volatile bool gb_armed = false;
 #else
-static volatile bool g_b_armed = true;
+static volatile bool gb_armed = true;
 #endif
 
 static void set_state(subsystem5_ctrl_state_t state);
@@ -317,14 +317,14 @@ s5_mission_init (uint32_t now_ms)
 void
 s5_mission_arm (bool b_armed)
 {
-    g_b_armed = b_armed;
+    gb_armed = b_armed;
 }
 
 /*!
  * @brief Advance the mission with a batch of events. Call it at least
  *        every 50 ms, also with no events, so time limits are checked.
  *
- * @param[in] events EV_xxx bits taken from flg_mission (may be 0).
+ * @param[in] events EV_xxx bits taken from gh_flg_mission (may be 0).
  * @param[in] now_ms Current time.
  */
 void
@@ -334,7 +334,7 @@ s5_mission_step (uint32_t events, uint32_t now_ms)
     {
         step_calibrating(events, now_ms);
     }
-    else if (g_b_armed && is_running())
+    else if (gb_armed && (is_running()))
     {
         step_running(events, now_ms);
     }
@@ -359,13 +359,13 @@ s5_mission_command (uint8_t opcode, uint32_t now_ms)
     // NOTE: The cast is safe: the field only ever holds a state value.
     subsystem5_ctrl_state_t state = (subsystem5_ctrl_state_t) g_mission.state;
 
-    if (!g_b_armed)
+    if (!gb_armed)
     {
         b_ok = false;
     }
     else if (S5_CMD_START == opcode)
     {
-        if ((S5_CTRL_READY == state) && cal_needed())
+        if ((S5_CTRL_READY == state) && (cal_needed()))
         {
             // Without calibrated line sensors the robot would drive
             // straight with no line to follow or find (log
@@ -427,7 +427,7 @@ s5_mission_command (uint8_t opcode, uint32_t now_ms)
 void
 s5_mission_calibrate (uint32_t now_ms)
 {
-    if (g_b_armed && (S5_CTRL_READY == g_mission.state))
+    if (gb_armed && (S5_CTRL_READY == g_mission.state))
     {
         start_cal_sweep(now_ms);
     }
@@ -460,7 +460,7 @@ start_cal_sweep (uint32_t now_ms)
 static bool
 cal_needed (void)
 {
-    return (s5_links_line_is_used() && (!s5_links_line_is_ready()));
+    return ((s5_links_line_is_used()) && (!s5_links_line_is_ready()));
 }
 
 /*!
@@ -489,6 +489,8 @@ set_state (subsystem5_ctrl_state_t state)
                            (uint32_t) g_mission.state);
     }
 
+    // NOTE: The cast is safe: state is a subsystem5_ctrl_state_t value, and
+    // mission_state_check_t proves the largest one fits the mask.
     g_mission.state = (uint32_t) state & S5_CTRL_STATE_MASK;
     subsystem5_ctrl_state_put(state);
 }
@@ -535,7 +537,7 @@ step_calibrating (uint32_t events, uint32_t now_ms)
     {
         step_cal_sweep(events, now_ms);
     }
-    else if (s5_links_imu_cal_done() || b_timeout)
+    else if ((s5_links_imu_cal_done()) || b_timeout)
     {
         if (b_timeout)
         {
@@ -544,7 +546,7 @@ step_calibrating (uint32_t events, uint32_t now_ms)
                            (int32_t) CAL_TIMEOUT_MS, 0);
         }
 
-        if (g_b_armed && cal_needed())
+        if (gb_armed && (cal_needed()))
         {
             // As Sean's drive test: calibrate by itself at power-up.
             s5_event_trace("CAL auto: robot centred on the line, it turns "
@@ -682,6 +684,8 @@ step_route (uint32_t events, uint32_t now_ms)
 {
     int32_t travelled = s5_links_odom_dist_mm() - g_mission.mark_mm;
 
+    // NOTE: The cast is safe: the field is only ever set from
+    // subsystem5_ctrl_state_t values.
     switch ((subsystem5_ctrl_state_t) g_mission.state)
     {
         case S5_CTRL_LINE_FOLLOWING:
@@ -708,13 +712,13 @@ step_route (uint32_t events, uint32_t now_ms)
                 take_barcodes();
             }
 
-            if (junction_reached(events)
+            if ((junction_reached(events))
                 || ((!s5_links_line_is_ready())
                     && (travelled >= S5_JUNCTION_MM)))
             {
                 execute_command(now_ms);
             }
-            else if (s5_links_line_is_ready()
+            else if ((s5_links_line_is_ready())
                      && (travelled >= NAV_GIVE_UP_MM))
             {
                 // NOTE: The cast is safe: the command is 0 ... 3.
@@ -880,7 +884,7 @@ junction_reached (uint32_t events)
     {
         // Nothing to do at a junction.
     }
-    else if (g_mission.b_confirming
+    else if ((g_mission.b_confirming)
              && ((s5_links_odom_dist_mm() - g_mission.confirm_mm)
                  < CROSS_MM))
     {
@@ -966,7 +970,7 @@ step_following (uint32_t events, uint32_t now_ms)
 static bool
 junction_now (uint32_t events)
 {
-    bool b_crossing = g_mission.b_confirming
+    bool b_crossing = (g_mission.b_confirming)
                       && ((s5_links_odom_dist_mm() - g_mission.confirm_mm)
                           < CROSS_MM);
 
@@ -1056,6 +1060,7 @@ execute_command (uint32_t now_ms)
         uint32_t dist = (uint32_t) JUNC_FWD_MM;
 
         g_mission.b_junc_fwd    = true;
+        // NOTE: The cast is safe: JUNC_FWD_MMS is 60, which fits uint16_t.
         s5_links_motion_move(JUNC_FWD_MM, (uint16_t) JUNC_FWD_MMS);
         g_mission.wait_start_ms = now_ms;
         g_mission.wait_limit_ms = ((dist * MS_PER_S) / JUNC_FWD_MMS)
@@ -1104,7 +1109,7 @@ command_turn_deg (void)
 static void
 step_turning (uint32_t events, uint32_t now_ms)
 {
-    if ((0u != (events & EV_MOTION_DONE)) && g_mission.b_junc_fwd)
+    if ((0u != (events & EV_MOTION_DONE)) && (g_mission.b_junc_fwd))
     {
         // The rear axle is on the crossing now: turn.
         g_mission.b_junc_fwd = false;
@@ -1220,7 +1225,7 @@ line_lost (uint32_t now_ms)
                    s5_links_odom_dist_mm() - g_mission.line_mark_mm,
                    (int32_t) s5_links_line_is_lost());
 
-    if (g_mission.b_confirming && g_mission.b_bypass_find)
+    if ((g_mission.b_confirming) && (g_mission.b_bypass_find))
     {
         // Crossed it after the bypass: not a bar. Search forward first
         // (S3's last side pointed back at the obstacle, log
@@ -1272,7 +1277,7 @@ line_is_lost (uint32_t events)
 {
     int32_t odom   = s5_links_odom_dist_mm();
     int32_t driven = odom - g_mission.follow_mm;
-    bool    b_over = g_mission.b_confirming && g_mission.b_bypass_find
+    bool    b_over = (g_mission.b_confirming) && (g_mission.b_bypass_find)
                      && (0u != (events & EV_JUNCTION))
                      && (driven < CROSS_MM);
 
@@ -1283,9 +1288,9 @@ line_is_lost (uint32_t events)
     }
 
     return (b_over || (0u != (events & EV_LINE_LOST))
-            || ((driven >= LOST_CHECK_MM) && s5_links_line_is_lost())
-            || (s5_links_line_is_ready() && g_mission.b_confirming
-                && g_mission.b_bypass_find
+            || ((driven >= LOST_CHECK_MM) && (s5_links_line_is_lost()))
+            || ((s5_links_line_is_ready()) && (g_mission.b_confirming)
+                && (g_mission.b_bypass_find)
                 && ((odom - g_mission.line_mark_mm) >= WHITE_LOST_MM)));
 }
 
@@ -1312,7 +1317,7 @@ check_confirm (void)
 {
     int32_t followed = s5_links_odom_dist_mm() - g_mission.confirm_mm;
 
-    if (g_mission.b_confirming && (followed >= CONFIRM_MM))
+    if ((g_mission.b_confirming) && (followed >= CONFIRM_MM))
     {
         g_mission.b_confirming = false;
         g_mission.rejects      = 0u;
@@ -1422,7 +1427,7 @@ step_recovery (uint32_t events, uint32_t now_ms)
 {
     // Found: S3's event, or S3 already following (the event came before
     // the search began, or mid-swing).
-    if ((0u != (events & EV_LINE_FOUND)) || s5_links_line_is_locked())
+    if ((0u != (events & EV_LINE_FOUND)) || (s5_links_line_is_locked()))
     {
         // Stop the sweep; resume_following() lets the wheels settle.
         s5_links_motion_stop();
@@ -1744,7 +1749,7 @@ enter_fault (subsystem5_ctrl_fault_t fault)
 }
 
 /*!
- * @brief Work out which fault EV_FAULT reports, from flg_fault.
+ * @brief Work out which fault EV_FAULT reports, from gh_flg_fault.
  *
  * @return The reason, or NONE if only a warning bit (IMU, WiFi) is set.
  */
@@ -1797,3 +1802,4 @@ slow_mms (void)
 }
 
 /*** end of file ***/
+

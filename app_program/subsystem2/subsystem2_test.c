@@ -92,7 +92,7 @@ static bool     motion_alive(void);
 static bool     state_wait(subsystem2_state_t state, uint32_t timeout_ms);
 static void     cmd_send(subsystem2_cmd_type_t type, int16_t value,
                          uint16_t speed_mms);
-static void     delay_ms(uint32_t ms);
+static void     delay_ms(uint32_t msec);
 static bool     s2_u05_estop_latency(void);
 static bool     s2_u07_estop_latch(void);
 static bool     s2_u08_timer_rate(void);
@@ -340,7 +340,7 @@ s2_u05_estop_latency (void)
 
         subsystem2_estop_clear();
         cmd_send(S2_CMD_CLEAR, 0, 0u);
-        b_ok = b_ok && state_wait(S2_STATE_IDLE, STATE_WAIT_MS);
+        b_ok = b_ok && (state_wait(S2_STATE_IDLE, STATE_WAIT_MS));
     }
 
     // NOTE: The casts are safe: the format string is ASCII, and every
@@ -374,6 +374,7 @@ s2_u07_estop_latch (void)
     }
     else
     {
+        // The cast is safe: the format string is ASCII.
         tm_printf((UB *) "[TEST] S2-U07 INFO did not enter ESTOP\n");
     }
 
@@ -468,6 +469,7 @@ s2_u01_wheel (drv_encoder_t wheel, char const * p_name)
 
     drv_encoder_get(wheel, &start);
     drv_encoder_get(other, &o_from);
+    // The casts are safe: the format string is ASCII and U01_REVS is 10.
     tm_printf((UB *) "[S2-U01] GO: turn the %s wheel %d full revolutions\n",
               p_name, (int) U01_REVS);
 
@@ -475,6 +477,8 @@ s2_u01_wheel (drv_encoder_t wheel, char const * p_name)
     {
         delay_ms(1000u);
         drv_encoder_get(wheel, &now);
+        // The casts are safe: the format string is ASCII, and over 40 s the
+        // counts stay below 100000, which fits int.
         tm_printf((UB *) "[S2-U01] %d s  ticks=%d  raw rise=%d fall=%d\n",
                   (int) sec, (int) (now.ticks - start.ticks),
                   (int) (now.raw_rise - start.raw_rise),
@@ -488,7 +492,7 @@ s2_u01_wheel (drv_encoder_t wheel, char const * p_name)
     // NOTE: The casts are safe: counts over 40 s stay below 100000.
     tm_printf((UB *) "[TEST] S2-U01 INFO %s: ticks=%d -> %d.%d per rev,"
               " rejected=%d, shortest gap=%d us\n", p_name, (int) mine,
-              (int) (mine / U01_REVS), (int) ((mine * 10u / U01_REVS) % 10u),
+              (int) (mine / U01_REVS), (int) (((mine * 10u) / U01_REVS) % 10u),
               (int) (now.rejected - start.rejected), (int) now.min_gap_us);
 
     return ((mine > 0u) && ((theirs * 100u) <= mine));
@@ -513,6 +517,7 @@ s2_u06_motor (drv_motor_t motor, char const * p_name)
     uint32_t fast = 0u;
     bool     b_l  = (DRV_MOTOR_LEFT == motor);
 
+    // The cast marks p_name as unused.
     (void) p_name;
 
     // Each phase waits for Button 1, so the tester answers the PC's
@@ -565,6 +570,7 @@ s2_u06_run (drv_motor_t motor, int32_t duty)
     {
         mine  = DRV_ENCODER_RIGHT;
         other = DRV_ENCODER_LEFT;
+        // The casts are safe: both are positive constants that fit uint32_t.
         tpr   = (uint32_t) S2_TICKS_PER_REV_R;
         circ  = (uint32_t) S2_WHEEL_CIRC_UM_R;
     }
@@ -616,9 +622,11 @@ s2_u02_step (void)
     subsystem2_step_ready("S2-U02 both wheels run 1.5 s at 250 mm/s: WATCH"
                           " that BOTH turn the way that drives the robot"
                           " forward");
+    // The cast is safe: the format string is ASCII.
     tm_printf((UB *) "[S2-U02] t_ms,speed_l,speed_r,duty_l,duty_r\n");
 
     subsystem2_steer_set(0);
+    // The cast is safe: U02_SPEED_MMS is 250, which fits uint16_t.
     cmd_send(S2_CMD_FOLLOW, 0, (uint16_t) U02_SPEED_MMS);
 
     for (elapsed = U02_SAMPLE_MS; elapsed <= U02_RUN_MS;
@@ -700,15 +708,16 @@ cmd_send (subsystem2_cmd_type_t type, int16_t value, uint16_t speed_mms)
 /*!
  * @brief Sleep, letting the other tasks run.
  *
- * @param[in] ms Milliseconds.
+ * @param[in] msec Milliseconds.
  */
 static void
-delay_ms (uint32_t ms)
+delay_ms (uint32_t msec)
 {
     // NOTE: The cast is safe: test delays are at most a few seconds.
-    CHECK(tk_dly_tsk((RELTIM) ms), "tk_dly_tsk");
+    CHECK(tk_dly_tsk((RELTIM) msec), "tk_dly_tsk");
 }
 
 #endif /* APP_TEST */
 
 /*** end of file ***/
+

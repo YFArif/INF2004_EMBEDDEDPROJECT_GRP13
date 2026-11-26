@@ -22,40 +22,40 @@
 #define ATAN_C7             (-0.0851330f)
 #define ATAN_C9             (0.0208351f)
 
-static float atan_unit(float z);
+static float32_t atan_unit(float32_t ratio);
 
 /*!
- * @brief Angle of the vector (x, y) in 1/100 degree.
+ * @brief Angle of the vector (x_val, y_val) in 1/100 degree.
  *
- * @param[in] y Component along the "positive angle" axis.
- * @param[in] x Component along the "zero angle" axis.
+ * @param[in] y_val Component along the "positive angle" axis.
+ * @param[in] x_val Component along the "zero angle" axis.
  *
  * @return -18000 ... 18000; 0 if both are 0.
  */
 int32_t
-s4_math_atan2_cdeg (float y, float x)
+s4_math_atan2_cdeg (float32_t y_val, float32_t x_val)
 {
-    float ax    = (x < 0.0f) ? -x : x;
-    float ay    = (y < 0.0f) ? -y : y;
-    float angle = 0.0f;
+    float32_t abs_x = (x_val < 0.0f) ? -x_val : x_val;
+    float32_t abs_y = (y_val < 0.0f) ? -y_val : y_val;
+    float32_t angle = 0.0f;
 
-    if ((ax > 0.0f) || (ay > 0.0f))
+    if ((abs_x > 0.0f) || (abs_y > 0.0f))
     {
-        if (ay <= ax)
+        if (abs_y <= abs_x)
         {
-            angle = atan_unit(ay / ax);
+            angle = atan_unit(abs_y / abs_x);
         }
         else
         {
-            angle = HALF_PI_F - atan_unit(ax / ay);
+            angle = HALF_PI_F - atan_unit(abs_x / abs_y);
         }
 
-        if (x < 0.0f)
+        if (x_val < 0.0f)
         {
             angle = PI_F - angle;
         }
 
-        if (y < 0.0f)
+        if (y_val < 0.0f)
         {
             angle = -angle;
         }
@@ -72,16 +72,18 @@ s4_math_atan2_cdeg (float y, float x)
  *
  * @return sin(angle), -1 ... 1.
  */
-float
+float32_t
 s4_math_sin_cdeg (int32_t angle_cdeg)
 {
-    float x  = (float) s4_math_clamp(angle_cdeg, -CDEG_90, CDEG_90)
-               * RAD_PER_CDEG;
-    float x2 = x * x;
+    float32_t rad    = (float32_t) s4_math_clamp(angle_cdeg, -CDEG_90,
+                                                 CDEG_90)
+                       * RAD_PER_CDEG;
+    float32_t rad_sq = rad * rad;
 
-    // Taylor series to x^9: error below 4e-6 for |x| <= pi / 2.
-    return (x * (1.0f - (x2 / 6.0f) * (1.0f - (x2 / 20.0f)
-                 * (1.0f - (x2 / 42.0f) * (1.0f - (x2 / 72.0f))))));
+    // Taylor series to rad^9: error below 4e-6 for |rad| <= pi / 2.
+    return (rad * (1.0f - ((rad_sq / 6.0f) * (1.0f - ((rad_sq / 20.0f)
+                   * (1.0f - ((rad_sq / 42.0f)
+                   * (1.0f - (rad_sq / 72.0f)))))))));
 }
 
 /*!
@@ -91,11 +93,11 @@ s4_math_sin_cdeg (int32_t angle_cdeg)
  *
  * @return sqrt(value).
  */
-float
-s4_math_sqrt (float value)
+float32_t
+s4_math_sqrt (float32_t value)
 {
-    float    root = value;
-    uint32_t idx  = 0u;
+    float32_t root = value;
+    uint32_t  idx  = 0u;
 
     if (value <= 0.0f)
     {
@@ -118,20 +120,20 @@ s4_math_sqrt (float value)
 }
 
 /*!
- * @brief Limit a value to [lo, hi].
+ * @brief Limit a value to [low, high].
  */
 int32_t
-s4_math_clamp (int32_t value, int32_t lo, int32_t hi)
+s4_math_clamp (int32_t value, int32_t low, int32_t high)
 {
     int32_t result = value;
 
-    if (result < lo)
+    if (result < low)
     {
-        result = lo;
+        result = low;
     }
-    else if (result > hi)
+    else if (result > high)
     {
-        result = hi;
+        result = high;
     }
     else
     {
@@ -158,15 +160,16 @@ s4_math_abs (int32_t value)
 }
 
 /*!
- * @brief atan(z) for 0 <= z <= 1.
+ * @brief atan(ratio) for 0 <= ratio <= 1.
  */
-static float
-atan_unit (float z)
+static float32_t
+atan_unit (float32_t ratio)
 {
-    float z2 = z * z;
+    float32_t ratio_sq = ratio * ratio;
 
-    return (z * (ATAN_C1 + z2 * (ATAN_C3 + z2 * (ATAN_C5 + z2 * (ATAN_C7
-                 + z2 * ATAN_C9)))));
+    return (ratio * (ATAN_C1 + (ratio_sq * (ATAN_C3 + (ratio_sq * (ATAN_C5
+                     + (ratio_sq * (ATAN_C7 + (ratio_sq * ATAN_C9)))))))));
 }
 
 /*** end of file ***/
+

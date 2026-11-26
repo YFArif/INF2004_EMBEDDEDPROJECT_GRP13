@@ -6,16 +6,16 @@
  * subsystem5_init() creates every S5 kernel object; subsystem5_start()
  * starts the tasks. The object IDs stay in this file: other code reaches
  * them only through the functions here, so the objects cannot be misused
- * (for example, another task waiting on flg_obst).
+ * (for example, another task waiting on gh_flg_obst).
  *
  * @par Objects
- * - flg_mission: events for vehicle_ctrl_task (IF-03), one waiter.
- * - flg_fault:   latched fault causes, read by S1 for telemetry.
- * - flg_obst:    requests to obstacle_task, one waiter.
- * - mtx_obst:    guards the obstacle profile, the live status and the
+ * - gh_flg_mission: events for vehicle_ctrl_task (IF-03), one waiter.
+ * - gh_flg_fault:   latched fault causes, read by S1 for telemetry.
+ * - gh_flg_obst:    requests to obstacle_task, one waiter.
+ * - gh_mtx_obst:    guards the obstacle profile, the live status and the
  *                controller state (IF-09).
- * - mbf_cmd:     dashboard commands from S1.
- * Barcode commands come from S3's own mbf_nav (IF-01), read through
+ * - gh_mbf_cmd:     dashboard commands from S1.
+ * Barcode commands come from S3's own gh_mbf_nav (IF-01), read through
  * s5_links_nav_take().
  */
 
@@ -36,14 +36,14 @@
 #define CMD_QUEUE_LEN       (8u)
 #define CMD_BYTES           (2u)        /* {opcode, cmd_id}.             */
 
-static ID                       g_flg_mission = 0;
-static ID                       g_flg_fault   = 0;
-static ID                       g_flg_obst    = 0;
-static ID                       g_mtx_obst    = 0;
-static ID                       g_mbf_cmd     = 0;
-static s5_profile_t             g_profile     = {0};
-static subsystem5_obst_status_t g_obst_status = {0};
-static subsystem5_ctrl_state_t  g_ctrl_state  = S5_CTRL_INIT;
+static ID                       gh_flg_mission = 0;
+static ID                       gh_flg_fault   = 0;
+static ID                       gh_flg_obst    = 0;
+static ID                       gh_mtx_obst    = 0;
+static ID                       gh_mbf_cmd     = 0;
+static s5_profile_t             g_profile      = {0};
+static subsystem5_obst_status_t g_obst_status  = {0};
+static subsystem5_ctrl_state_t  g_ctrl_state   = S5_CTRL_INIT;
 
 static ID create_flag(void);
 static ID create_buffer(uint32_t msg_bytes, uint32_t count);
@@ -59,36 +59,36 @@ subsystem5_init (void)
     ER     result = E_OK;
     T_CMTX cmtx   = {0};
 
-    g_flg_mission = create_flag();
-    g_flg_fault   = create_flag();
-    g_flg_obst    = create_flag();
+    gh_flg_mission = create_flag();
+    gh_flg_fault   = create_flag();
+    gh_flg_obst    = create_flag();
 
     // Priority inheritance bounds the wait when telemetry reads the
     // profile while obstacle_task writes it (Week 6 report 8.3).
     cmtx.mtxatr = TA_INHERIT;
-    g_mtx_obst  = tk_cre_mtx(&cmtx);
+    gh_mtx_obst = tk_cre_mtx(&cmtx);
 
-    g_mbf_cmd = create_buffer(CMD_BYTES, CMD_QUEUE_LEN);
+    gh_mbf_cmd = create_buffer(CMD_BYTES, CMD_QUEUE_LEN);
 
-    if (g_flg_mission < E_OK)
+    if (gh_flg_mission < E_OK)
     {
-        result = g_flg_mission;
+        result = gh_flg_mission;
     }
-    else if (g_flg_fault < E_OK)
+    else if (gh_flg_fault < E_OK)
     {
-        result = g_flg_fault;
+        result = gh_flg_fault;
     }
-    else if (g_flg_obst < E_OK)
+    else if (gh_flg_obst < E_OK)
     {
-        result = g_flg_obst;
+        result = gh_flg_obst;
     }
-    else if (g_mtx_obst < E_OK)
+    else if (gh_mtx_obst < E_OK)
     {
-        result = g_mtx_obst;
+        result = gh_mtx_obst;
     }
-    else if (g_mbf_cmd < E_OK)
+    else if (gh_mbf_cmd < E_OK)
     {
-        result = g_mbf_cmd;
+        result = gh_mbf_cmd;
     }
     else
     {
@@ -117,23 +117,24 @@ subsystem5_start (void)
 
     if (!s5_links_tasks_allowed())
     {
+        // NOTE: The cast is safe: the string is ASCII.
         tm_printf((UB *) "S5 tasks DISABLED: isolated S3 test owns the "
                          "motors and buttons; no ultrasonic protection.\n");
     }
     else
     {
-        ID tid_obs = app_start_task(obstacle_task, S5_PRI_OBSTACLE,
-                                    TP_PRC1, "obstacle_task");
-        ID tid_veh = app_start_task(vehicle_ctrl_task, S5_PRI_VEHICLE,
-                                    TP_PRC2, "vehicle_ctrl_task");
+        ID h_tid_obs = app_start_task(obstacle_task, S5_PRI_OBSTACLE,
+                                      TP_PRC1, "obstacle_task");
+        ID h_tid_veh = app_start_task(vehicle_ctrl_task, S5_PRI_VEHICLE,
+                                      TP_PRC2, "vehicle_ctrl_task");
 
-        if (tid_obs < E_OK)
+        if (h_tid_obs < E_OK)
         {
-            result = tid_obs;
+            result = h_tid_obs;
         }
-        else if (tid_veh < E_OK)
+        else if (h_tid_veh < E_OK)
         {
-            result = tid_veh;
+            result = h_tid_veh;
         }
         else
         {
@@ -159,7 +160,7 @@ subsystem5_command_post (uint8_t opcode, uint8_t cmd_id)
     uint8_t record[CMD_BYTES] = {opcode, cmd_id};
 
     // NOTE: The cast is safe: the record is 2 bytes.
-    ER result = tk_snd_mbf(g_mbf_cmd, record, (INT) CMD_BYTES, TMO_POL);
+    ER result = tk_snd_mbf(gh_mbf_cmd, record, (INT) CMD_BYTES, TMO_POL);
 
     if (E_OK == result)
     {
@@ -184,7 +185,7 @@ subsystem5_command_take (uint8_t * p_opcode, uint8_t * p_cmd_id)
     uint8_t record[CMD_BYTES] = {0u, 0u};
 
     // NOTE: The cast is safe: the record is 2 bytes.
-    bool b_got = ((INT) CMD_BYTES == tk_rcv_mbf(g_mbf_cmd, record, TMO_POL));
+    bool b_got = ((INT) CMD_BYTES == tk_rcv_mbf(gh_mbf_cmd, record, TMO_POL));
 
     *p_opcode = record[0];
     *p_cmd_id = record[1];
@@ -203,10 +204,10 @@ subsystem5_ctrl_state_get (void)
 {
     subsystem5_ctrl_state_t state = S5_CTRL_INIT;
 
-    if (E_OK == tk_loc_mtx(g_mtx_obst, TMO_FEVR))
+    if (E_OK == tk_loc_mtx(gh_mtx_obst, TMO_FEVR))
     {
         state = g_ctrl_state;
-        CHECK(tk_unl_mtx(g_mtx_obst), "mtx_obst");
+        CHECK(tk_unl_mtx(gh_mtx_obst), "mtx_obst");
     }
 
     return (state);
@@ -220,10 +221,10 @@ subsystem5_ctrl_state_get (void)
 void
 subsystem5_ctrl_state_put (subsystem5_ctrl_state_t state)
 {
-    if (E_OK == tk_loc_mtx(g_mtx_obst, TMO_FEVR))
+    if (E_OK == tk_loc_mtx(gh_mtx_obst, TMO_FEVR))
     {
         g_ctrl_state = state;
-        CHECK(tk_unl_mtx(g_mtx_obst), "mtx_obst");
+        CHECK(tk_unl_mtx(gh_mtx_obst), "mtx_obst");
     }
 }
 
@@ -251,7 +252,7 @@ subsystem5_now_ms (void)
 void
 subsystem5_mission_signal (uint32_t events)
 {
-    CHECK(tk_set_flg(g_flg_mission, events), "flg_mission");
+    CHECK(tk_set_flg(gh_flg_mission, events), "flg_mission");
 }
 
 /*!
@@ -263,7 +264,7 @@ subsystem5_mission_signal (uint32_t events)
  *
  * @return true if an event arrived before the timeout.
  *
- * NOTE: flg_mission allows one waiter: vehicle_ctrl_task, or the S5
+ * NOTE: gh_flg_mission allows one waiter: vehicle_ctrl_task, or the S5
  * tests while vehicle_ctrl_task does not exist yet.
  */
 bool
@@ -274,7 +275,7 @@ subsystem5_mission_wait (uint32_t events, uint32_t timeout_ms,
 
     // NOTE: The cast is safe: timeouts in S5 are a few seconds, far
     // below TMO's maximum.
-    ER result = tk_wai_flg(g_flg_mission, events, TWF_ORW | TWF_BITCLR,
+    ER result = tk_wai_flg(gh_flg_mission, events, TWF_ORW | TWF_BITCLR,
                            &pattern, (TMO) timeout_ms);
 
     *p_events = pattern & events;
@@ -290,7 +291,7 @@ subsystem5_mission_wait (uint32_t events, uint32_t timeout_ms,
 void
 subsystem5_fault_set (uint32_t faults)
 {
-    CHECK(tk_set_flg(g_flg_fault, faults), "flg_fault");
+    CHECK(tk_set_flg(gh_flg_fault, faults), "flg_fault");
 }
 
 /*!
@@ -301,7 +302,7 @@ subsystem5_fault_set (uint32_t faults)
 void
 subsystem5_fault_clear (uint32_t faults)
 {
-    CHECK(tk_clr_flg(g_flg_fault, ~faults), "flg_fault");
+    CHECK(tk_clr_flg(gh_flg_fault, ~faults), "flg_fault");
 }
 
 /*!
@@ -315,7 +316,7 @@ subsystem5_fault_get (void)
     T_RFLG   rflg   = {0};
     uint32_t faults = 0u;
 
-    if (E_OK == tk_ref_flg(g_flg_fault, &rflg))
+    if (E_OK == tk_ref_flg(gh_flg_fault, &rflg))
     {
         faults = rflg.flgptn;
     }
@@ -331,7 +332,7 @@ subsystem5_fault_get (void)
 void
 subsystem5_obst_request (uint32_t requests)
 {
-    CHECK(tk_set_flg(g_flg_obst, requests & OB_ALL_REQUESTS), "flg_obst");
+    CHECK(tk_set_flg(gh_flg_obst, requests & OB_ALL_REQUESTS), "flg_obst");
 }
 
 /*!
@@ -347,7 +348,7 @@ subsystem5_obst_take (bool b_wait)
 {
     UINT     pattern  = 0u;
     uint32_t requests = 0u;
-    ER       result   = tk_wai_flg(g_flg_obst, OB_ALL_REQUESTS,
+    ER       result   = tk_wai_flg(gh_flg_obst, OB_ALL_REQUESTS,
                                    TWF_ORW | TWF_BITCLR, &pattern,
                                    b_wait ? TMO_FEVR : TMO_POL);
 
@@ -372,7 +373,7 @@ subsystem5_obst_pending (uint32_t requests)
     T_RFLG rflg      = {0};
     bool   b_pending = false;
 
-    if (E_OK == tk_ref_flg(g_flg_obst, &rflg))
+    if (E_OK == tk_ref_flg(gh_flg_obst, &rflg))
     {
         b_pending = (0u != (rflg.flgptn & requests));
     }
@@ -389,10 +390,10 @@ subsystem5_obst_pending (uint32_t requests)
 void
 subsystem5_profile_get (s5_profile_t * p_profile)
 {
-    if (E_OK == tk_loc_mtx(g_mtx_obst, TMO_FEVR))
+    if (E_OK == tk_loc_mtx(gh_mtx_obst, TMO_FEVR))
     {
         *p_profile = g_profile;
-        CHECK(tk_unl_mtx(g_mtx_obst), "mtx_obst");
+        CHECK(tk_unl_mtx(gh_mtx_obst), "mtx_obst");
     }
 }
 
@@ -404,10 +405,10 @@ subsystem5_profile_get (s5_profile_t * p_profile)
 void
 subsystem5_profile_put (s5_profile_t const * p_profile)
 {
-    if (E_OK == tk_loc_mtx(g_mtx_obst, TMO_FEVR))
+    if (E_OK == tk_loc_mtx(gh_mtx_obst, TMO_FEVR))
     {
         g_profile = *p_profile;
-        CHECK(tk_unl_mtx(g_mtx_obst), "mtx_obst");
+        CHECK(tk_unl_mtx(gh_mtx_obst), "mtx_obst");
     }
 }
 
@@ -419,10 +420,10 @@ subsystem5_profile_put (s5_profile_t const * p_profile)
 void
 subsystem5_obst_status_get (subsystem5_obst_status_t * p_status)
 {
-    if (E_OK == tk_loc_mtx(g_mtx_obst, TMO_FEVR))
+    if (E_OK == tk_loc_mtx(gh_mtx_obst, TMO_FEVR))
     {
         *p_status = g_obst_status;
-        CHECK(tk_unl_mtx(g_mtx_obst), "mtx_obst");
+        CHECK(tk_unl_mtx(gh_mtx_obst), "mtx_obst");
     }
 }
 
@@ -434,10 +435,10 @@ subsystem5_obst_status_get (subsystem5_obst_status_t * p_status)
 void
 subsystem5_obst_status_put (subsystem5_obst_status_t const * p_status)
 {
-    if (E_OK == tk_loc_mtx(g_mtx_obst, TMO_FEVR))
+    if (E_OK == tk_loc_mtx(gh_mtx_obst, TMO_FEVR))
     {
         g_obst_status = *p_status;
-        CHECK(tk_unl_mtx(g_mtx_obst), "mtx_obst");
+        CHECK(tk_unl_mtx(gh_mtx_obst), "mtx_obst");
     }
 }
 
@@ -498,3 +499,4 @@ create_buffer (uint32_t msg_bytes, uint32_t count)
 }
 
 /*** end of file ***/
+

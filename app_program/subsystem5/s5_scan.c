@@ -373,3 +373,4 @@ add_point (s5_scan_result_t * p_result, s5_profile_point_t point)
 }
 
 /*** end of file ***/
+

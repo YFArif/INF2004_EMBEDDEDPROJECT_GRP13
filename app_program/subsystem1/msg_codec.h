@@ -53,7 +53,7 @@ typedef struct
     uint8_t     seq;            /* Frame counter, modulo 256.           */
     uint8_t     ctrl_state;     /* S5 controller state, 0-15.           */
     uint8_t     motion_state;   /* S2 motion state, 0-7.                */
-    uint8_t     fault_mask;     /* flg_fault & 0x1F (MSG_FAULT_xxx).    */
+    uint8_t     fault_mask;     /* gh_flg_fault & 0x1F (MSG_FAULT_xxx). */
     uint8_t     line_state;     /* S3 line state, 0-7.                  */
     uint8_t     bc_letter;      /* 0 none, 1-43 Code 39 symbol.         */
     uint8_t     bc_cmd;         /* Barcode command, 0-3.                */

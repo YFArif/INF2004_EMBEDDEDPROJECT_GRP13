@@ -161,14 +161,14 @@ Every arrow between two subsystems is listed here. The **provider** creates
 the kernel object and publishes its ID in its own `subsystemN.h`; the **user** only
 sends to it or waits on it. Agree on the data format before coding.
 
-| ID    | From → To | Mechanism                                   | Object ID name              | Data / meaning                                       | Agreed by |
-| ----- | --------- | ------------------------------------------- | --------------------------- | ---------------------------------------------------- | --------- |
-| IF-01 | S2 → S3   | mailbox (owned by S3)                       | `mbx_samples`               | `SAMPLE_MSG` in `subsystem2.h`                       | _example_ |
-| IF-02 | S3 → S2   | semaphore + fixed memory pool (owned by S2) | `sem_slots`, `mpf_samples`  | receiver returns the block, then 1 slot              | _example_ |
-| IF-03 | S3 → S4   | message buffer + event flag (owned by S4)   | `mbf_summary`, `flg_events` | text line ≤ `S4_SUMMARY_MAX` bytes, then `FLG_BATCH` | _example_ |
-| IF-04 | S4 → S3   | shared data under a mutex (owned by S3)     | `app_stats`, `mtx_stats`    | `APP_STATS`, read only while locked                  | _example_ |
-| IF-05 | S4 → S1   | task control                                | `tid_led`                   | `tk_sus_tsk` / `tk_rsm_tsk` / `tk_chg_pri`           | _example_ |
-| IF-06 |           |                                             |                             |                                                      |           |
+| ID    | From → To | Mechanism                                   | Object ID name                    | Data / meaning                                          | Agreed by |
+| ----- | --------- | ------------------------------------------- | --------------------------------- | ------------------------------------------------------- | --------- |
+| IF-01 | S2 → S3   | mailbox (owned by S3)                       | `gh_mbx_samples`                  | `task_producer_sample_t` in `task_producer.h`           | _example_ |
+| IF-02 | S3 → S2   | semaphore + fixed memory pool (owned by S2) | `gh_sem_slots`, `gh_mpf_samples`  | receiver returns the block, then 1 slot                 | _example_ |
+| IF-03 | S3 → S4   | message buffer + event flag (owned by S4)   | `gh_mbf_summary`, `gh_flg_events` | text line ≤ `S4_SUMMARY_MAX` bytes, then `FLG_BATCH`    | _example_ |
+| IF-04 | S4 → S3   | shared data under a mutex (owned by S3)     | `g_app_stats`, `gh_mtx_stats`     | `task_consumer_stats_t`, read only while locked         | _example_ |
+| IF-05 | S4 → S1   | task control                                | `gh_tid_led`                      | `tk_sus_tsk` / `tk_rsm_tsk` / `tk_chg_pri`              | _example_ |
+| IF-06 |           |                                             |                                   |                                                         |           |
 | IF-10 | all tasks → S1 → broker; broker → S1 → one reader task | two message buffers owned by S1 (created by `mqtt_link_init()`, IDs not exported), reached only through functions; the radio service task `cyw43_utk_task` (template code in lib/libwifi) drains them via `mqtt_utk_start()` → `mqtt_link_poll(netif_default)` every 2 ms while the link is up | `mqtt_link_publish()`, `mqtt_link_receive_command()`, `mqtt_link_get_status()` in `app_program/subsystem1/mqtt_link.h` | publish: topic ID (`MQTT_LINK_TOPIC_TELEMETRY` 0, `_EVENT` 1, `_ACK` 2) + packed payload ≤ 25 B (`docs/S1_binary_frame.md`), QoS 0/1, retain; never blocks; `MQTT_LINK_ERR_FULL` when 8 are queued; about 72 B of the caller's stack. Commands: one 2-byte COMMAND or 5-byte MAP per call (the MAP since 14 Nov 2026), one reader task only (planned: S1 `telemetry_task`, which routes to S5). Status: snapshot, any task. `<prefix>/status` online/offline belongs to the driver | the team, in person, 29 Oct 2026; instructor "go ahead", 27 Oct 2026 |
 
 Each interface is tested by at least one integration test
@@ -183,13 +183,13 @@ limit there. The numbers below are the example's usage.
 | -------------------- | ----- | --- | --- | --- | --- | --- |
 | Task                 | 32    | 1   | 1   | 1   | 1 (imu_task) | 2   |
 | Semaphore            | 16    |     | 1   |     |     |     |
-| Event flag           | 16    |     |     |     | 2 (flg_imu, template flg_events) | 3   |
+| Event flag           | 16    |     |     |     | 2 (gh_flg_imu, template gh_flg_events) | 3   |
 | Mailbox              | 12    |     |     | 1   |     |     |
-| Mutex                | 12    |     |     | 1   | 1 (mtx_terrain) | 1   |
-| Message buffer       | 12    |     |     |     | 1 (template mbf_summary) | 2   |
+| Mutex                | 12    |     |     | 1   | 1 (gh_mtx_terrain) | 1   |
+| Message buffer       | 12    |     |     |     | 1 (template gh_mbf_summary) | 2   |
 | Fixed memory pool    | 12    |     | 1   |     |     |     |
 | Variable memory pool | 12    |     |     |     |     |     |
-| Cyclic handler       | 12    | 1   |     |     | 1 (cyc_imu) |     |
+| Cyclic handler       | 12    | 1   |     |     | 1 (gh_cyc_imu) |     |
 | Alarm handler        | 12    |     |     |     |     |     |
 
 (The kernel's USB and WiFi service tasks also use a few of these.)

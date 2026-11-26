@@ -149,6 +149,9 @@ drv_adc_ir_read (uint16_t * p_left, uint16_t * p_centre)
     UINT imask;
 
     DI(imask);
+    /* The casts are safe: an 8-bit reading shifted left 4 is at most 4080,
+     * which fits uint16_t.
+     */
     *p_left   = (uint16_t) ((uint16_t) g_ir_left8 << 4);
     *p_centre = (uint16_t) ((uint16_t) g_ir_centre8 << 4);
     EI(imask);
@@ -163,16 +166,19 @@ ER
 drv_adc_init (void)
 {
     T_DINT dint = {0};
-    ER     er;
+    ER     err;
 
     set_w(ADC_CS_REG, ADC_CS_EN_BIT);   /* Harmless if already enabled. */
 
     dint.intatr = TA_HLNG;
+    /* The cast is safe: sampler_isr has the kernel's interrupt handler
+     * signature, which FP stands for.
+     */
     dint.inthdr = (FP) sampler_isr;
-    er = tk_def_int(INTNO_TIMER1, &dint);
-    if (er < E_OK)
+    err = tk_def_int(INTNO_TIMER1, &dint);
+    if (err < E_OK)
     {
-        return er;
+        return err;
     }
     out_w(TIMER_INTR, TIMER_ALARM1_BIT);
     set_w(TIMER_INTE, TIMER_ALARM1_BIT);
@@ -199,6 +205,7 @@ sampler_isr (UINT intno)
     uint32_t idx    = g_sample_idx;
     uint32_t now_us = in_w(TIMER_TIMERAWL);
 
+    /* The cast marks the argument as unused. */
     (void) intno;
     out_w(TIMER_INTR, TIMER_ALARM1_BIT);        /* Acknowledge.         */
     g_alarm_next += DRV_ADC_SAMPLE_US;
@@ -211,6 +218,10 @@ sampler_isr (UINT intno)
     drv_barcode_sample_isr(idx);
     if (0u == g_ir_countdown)
     {
+        /* The casts are safe: the stride is a small constant, and the sums add
+         * DRV_ADC_IR_SAMPLES (4) 12-bit samples, at most 16380, which fits
+         * uint16_t.
+         */
         g_ir_countdown   = (uint8_t) (DRV_ADC_IR_STRIDE - 1u);
         g_ir_left_sum    = (uint16_t) (g_ir_left_sum +
                                        drv_adc_convert(DRV_IR_LEFT_ADC_CH));
@@ -245,6 +256,9 @@ sampler_isr (UINT intno)
 
         if (run_us > g_isr_max_us)
         {
+            /* The cast is safe: the handler runs for tens of microseconds, far
+             * below 65535.
+             */
             g_isr_max_us = (uint16_t) run_us;
         }
     }
@@ -252,3 +266,4 @@ sampler_isr (UINT intno)
 }
 
 /*** end of file ***/
+

@@ -17,3 +17,4 @@ void vehicle_ctrl_task(INT stacd, void * p_exinf);
 #endif /* VEHICLE_CTRL_TASK_H */
 
 /*** end of file ***/
+

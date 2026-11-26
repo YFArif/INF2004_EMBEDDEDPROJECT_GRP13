@@ -14,11 +14,14 @@
 #define S3_PRI_CONSUMER     (16)    /* Priority band 16-17 (TEAM.md).    */
 #define S3_BATCH_SIZE       (5)     /* Report to subsystem 4 every N.    */
 
-/* IF-01 (template): send SAMPLE_MSG (subsystem2.h) here with tk_snd_mbx. */
-extern ID mbx_samples;
+/* IF-01 (template): send a task_producer_sample_t (task_producer.h) here
+ * with tk_snd_mbx.
+ */
+extern ID gh_mbx_samples;
 
-/* IF-04 (template): statistics. Read them ONLY while holding mtx_stats:
- *   tk_loc_mtx(mtx_stats, TMO_FEVR); copy = app_stats; tk_unl_mtx(mtx_stats);
+/* IF-04 (template): statistics. Read them ONLY while holding gh_mtx_stats:
+ *   tk_loc_mtx(gh_mtx_stats, TMO_FEVR); copy = g_app_stats;
+ *   tk_unl_mtx(gh_mtx_stats);
  */
 typedef struct
 {
@@ -26,14 +29,15 @@ typedef struct
     INT min;
     INT max;
     W   sum;
-} APP_STATS;
+} task_consumer_stats_t;
 
-extern ID        mtx_stats;
-extern APP_STATS app_stats;
+extern ID                    gh_mtx_stats;
+extern task_consumer_stats_t g_app_stats;
 
-ER   consumer_init(void);
-void consumer_task(INT stacd, void * exinf);
+ER   task_consumer_init(void);
+void task_consumer_task(INT stacd, void * p_exinf);
 
 #endif /* TASK_CONSUMER_H */
 
 /*** end of file ***/
+

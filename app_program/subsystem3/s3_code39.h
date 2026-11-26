@@ -61,14 +61,14 @@ s3_c39_result_t s3_code39_decode(uint32_t const * p_dur, uint32_t count,
  * Returns 0 if the character is not in the Code 39 table.  Used by the
  * host test to prove every stored character decodes in both directions.
  */
-int s3_code39_pattern(char ch, uint16_t * p_pattern);
+int s3_code39_pattern(char letter, uint16_t * p_pattern);
 
 /* 6-bit character code for packed messages (Change Requirement 1):
    index 0..43 into the Code 39 table
    ('0'..'9', 'A'..'Z', '-', '.', ' ', '*', '$', '/', '+', '%').
    s3_code39_index returns 63 if the character is not in the table. */
 #define S3_C39_IDX_NONE     (63u)
-uint8_t s3_code39_index(char ch);
+uint8_t s3_code39_index(char letter);
 char    s3_code39_char(uint8_t idx);     /* '?' for an invalid index */
 
 /* ------------------------------------------------------------------ nav */
@@ -85,10 +85,11 @@ typedef enum
 
 void         s3_nav_reset(void);                    /* Back to "ABCD".    */
 int          s3_nav_set_map(char const * p_map);    /* 0 ok, -1 rejected. */
-void         s3_nav_get_map(char * p_out5);         /* "DCBA" + '\0'.     */
-s3_nav_cmd_t s3_nav_from_char(char ch);
+void         s3_nav_get_map(char * p_out5);         /* "DCBA" + NUL.       */
+s3_nav_cmd_t s3_nav_from_char(char letter);
 char const * s3_nav_name(s3_nav_cmd_t cmd);
 
 #endif /* S3_CODE39_H */
 
 /*** end of file ***/
+

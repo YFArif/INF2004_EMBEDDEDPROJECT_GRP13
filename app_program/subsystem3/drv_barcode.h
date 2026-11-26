@@ -80,3 +80,4 @@ void drv_barcode_take_pass(drv_barcode_pass_t * p_pass);
 #endif /* DRV_BARCODE_H */
 
 /*** end of file ***/
+

@@ -7,6 +7,24 @@ You need a **Raspberry Pi Pico W**, a USB cable, and a computer running
 macOS, Linux, or Windows with **WSL (Ubuntu)**. On Windows, run every
 command below inside the WSL Ubuntu terminal.
 
+**Looking for the test videos or the coding standard?** Go to
+[4. Test videos](#4-test-videos) (every test with a timestamped link) or
+[5. Coding standard (BARR-C:2018)](#5-coding-standard-barr-c2018).
+
+### Contents
+
+1. [Set up the Pico C SDK and the compiler](#1-set-up-the-pico-c-sdk-and-the-compiler)
+2. [Clone this repo and build the `.uf2` file](#2-clone-this-repo-and-build-the-uf2-file)
+3. [Build options](#3-build-options-smp-console-wifi-test-crash_report)
+4. [Test videos](#4-test-videos):
+   [S1 Telemetry](#s1-telemetry-over-mqtt) ·
+   [S2 Motion](#s2-motion-control) ·
+   [S3 Line and barcode](#s3-line-following-and-barcode) ·
+   [S4 IMU and terrain](#s4-imu-and-terrain) ·
+   [S5 Obstacle avoidance](#s5-obstacle-avoidance) ·
+   [Final mission](#final-mission)
+5. [Coding standard (BARR-C:2018)](#5-coding-standard-barr-c2018)
+
 ---
 
 ## 1. Set up the Pico C SDK and the compiler
@@ -258,6 +276,223 @@ One command starts the S1 broker and dashboard:
 `python3 -I -B testing/subsystem1/s1_launch.py` (Windows: double-click
 `testing\subsystem1\run_dashboard.bat`). First time? Start with
 `docs/S1_quickstart.md`.
+
+---
+
+## 4. Test videos
+
+All filmed tests are chapters of **one unlisted YouTube video** (1080p, no
+sound, 13:28): <https://www.youtube.com/watch?v=SKQWj1TgEVk>.
+
+- The tests are grouped by subsystem below. Click a test to open its
+  description and a link that starts the video at that test.
+- Each clip starts with a 3-second title card that names the test.
+- [`videos/README.md`](videos/README.md) has the video index in the
+  course's format, with the date and student ID for each test.
+- The automatic test results are in `testing/subsystemN/TEST_LOG.md`.
+
+### S1 Telemetry over MQTT
+
+<details>
+<summary><b>S1-U06</b>: START, STOP and lift force stop via MQTT</summary>
+
+START and STOP are sent from the dashboard over MQTT and the car obeys.
+Lifting the car triggers a force stop, which the dashboard reports. Demo
+test cases #8 and #9.
+
+Watch from [0:00](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=0s)
+
+</details>
+
+<details>
+<summary><b>S1-U17</b>: Telemetry from the other subsystems reaches the dashboard</summary>
+
+Each subsystem's values arrive on the dashboard: S2's wheel speeds in mm/s,
+S3's barcode result, and S4's pitch and roll as numbers and as a graph. Demo
+test case #9.
+
+Watch: S2 wheel speeds from [0:43](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=43s), S3 barcode from [0:51](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=51s), S4 pitch and roll from [1:11](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=71s)
+
+</details>
+
+<details>
+<summary><b>S1-U29</b>: WiFi lost mid-run, then reconnects</summary>
+
+When WiFi is lost, the dashboard indicator goes from Online to Online
+(Heartbeat Lost) for 3 s, then to Offline. When WiFi is back, the car
+reconnects by itself and the indicator returns to Online. Demo test
+case #10.
+
+Watch from [1:38](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=98s)
+
+</details>
+
+### S2 Motion control
+
+<details>
+<summary><b>S2-U02</b>: Speed control, 250 mm/s</summary>
+
+The robot starts from rest, drives forward at a target speed of 250 mm/s,
+and stops. The target is both wheels at 225 to 275 mm/s within 0.5 s,
+without large overshoot.
+
+Watch from [2:05](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=125s)
+
+</details>
+
+<details>
+<summary><b>S2-U03</b>: Turn accuracy</summary>
+
+The robot turns from its starting direction and stops near the target angle:
+90 degrees left, 90 degrees right, and a 180-degree U-turn.
+
+Watch: Left 90 from [2:16](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=136s), Right 90 from [2:25](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=145s), U-turn 180 from [2:34](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=154s)
+
+</details>
+
+<details>
+<summary><b>S2-U05</b>: Emergency brake</summary>
+
+The robot drives forward, then brakes and stops when the emergency stop is
+triggered.
+
+Watch from [2:45](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=165s)
+
+</details>
+
+### S3 Line following and barcode
+
+<details>
+<summary><b>S3-U02</b>: Line following, one full lap</summary>
+
+The car follows the line for a full lap and never leaves it. The dashboard
+shows the line state (centred or correcting) and the steering, which change
+as the car takes the curves. Demo test case #1.
+
+Watch from [2:56](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=176s)
+
+</details>
+
+<details>
+<summary><b>S3-U10, S3-U05, S3-U11</b>: Barcode Z sets the turn at the next junction</summary>
+
+The car reads barcode Z while following the line, looks the letter up in the
+keymap, and turns that way at the next junction. The same barcode is used in
+all three runs; only the keymap was changed live on the dashboard, and the
+car's turn changed with it. Demo test cases #2 and #3.
+
+Watch: Z = LEFT from [5:33](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=333s), Z = RIGHT from [6:30](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=390s), Z = U-TURN from [7:24](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=444s)
+
+</details>
+
+### S4 IMU and terrain
+
+<details>
+<summary><b>S4-U01</b>: Pitch against a protractor</summary>
+
+The car is tilted to about 20 degrees against a protractor, and the
+dashboard shows the same pitch.
+
+Watch from [8:16](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=496s)
+
+</details>
+
+<details>
+<summary><b>S4-U02</b>: Hump height</summary>
+
+The car drives over a 10 mm hump (measured with a ruler), and the dashboard
+reports a height of about 10 mm. Two takes. Demo test case #4.
+
+Watch: Take 1 from [8:38](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=518s), Take 2 from [9:02](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=542s)
+
+</details>
+
+<details>
+<summary><b>S4-U10</b>: Car lifted: wheels stop</summary>
+
+The car is lifted off the ground and the wheels stop. Demo test case #8.
+
+Watch from [9:22](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=562s)
+
+</details>
+
+### S5 Obstacle avoidance
+
+<details>
+<summary><b>Demo</b>: Scan, bypass and rejoin the line</summary>
+
+The car follows the line towards a box. After the servo scan, the dashboard
+shows the box's width and the clear space on each side. The car goes round
+the box, rejoins the line and carries on following it. Demo test
+cases #5, #6 and #7.
+
+Watch from [9:35](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=575s)
+
+</details>
+
+<details>
+<summary><b>Demo</b>: Side choice: left blocked, goes right</summary>
+
+A big box now blocks the left side and the right side is open. The car only
+uses a side it fits through with a 7 cm margin, so it picks the right. Demo
+test case #7.
+
+Watch from [10:13](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=613s)
+
+</details>
+
+<details>
+<summary><b>Demo</b>: Wider obstacle</summary>
+
+A box about 28 cm wide, twice the first. The servo sweeps 40 degrees each
+side and finds each edge in 5-degree steps; the width is the distance
+between the edges. A wider box gets a steeper turn out and a longer move to
+the side. Demo test case #6.
+
+Watch from [10:44](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=644s)
+
+</details>
+
+### Final mission
+
+<details>
+<summary><b>Demo</b>: Full run, start to finish</summary>
+
+The whole course with every subsystem working together.
+
+Watch from [11:23](https://www.youtube.com/watch?v=SKQWj1TgEVk&t=683s)
+
+</details>
+
+---
+
+## 5. Coding standard (BARR-C:2018)
+
+The firmware's C code follows the Barr Group **Embedded C Coding Standard,
+BARR-C:2018**. That covers all 105 files in `app_program/`: the shared
+files and subsystems S1 to S5.
+
+- **Checked rule by rule.** Each subsystem was checked against every rule
+  of the standard, with two scanners run over every build configuration
+  and a review of each finding by hand.
+- **No logic changed.** The changes are names, comments, white space,
+  parentheses and layout. All 24 firmware configurations were built
+  before and after, and every image is byte-for-byte identical. For the
+  11 test builds, which print source line numbers, this holds with the
+  line numbers fixed at 0.
+- **Exceptions.** A few rules could only be met by changing what the code
+  does, so the code stays as it is in those places. The main ones are 7
+  functions longer than 100 lines (6.2.a), early `return`s (6.2.c,
+  preferred practice), 10 places with `if`s nested three deep (8.2.b),
+  four `continue`s (1.7.d), the test and logging macros (6.3.a) and the
+  template's file layout (4.1.b, 4.2.a).
+- **Abbreviations** (rule 1.5.b) are listed in `docs/abbreviations.md`
+  for S1, and at the top of each `subsystemN.h` for S2 to S5.
+
+The full report, with every exception and its reason, the readings
+chosen where the standard leaves room, the byte-comparison table and the
+old-to-new names of renamed kernel objects, is in
+[`docs/barr_c_2018.md`](docs/barr_c_2018.md).
 
 ---
 

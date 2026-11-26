@@ -3,12 +3,12 @@
  * @brief Subsystem 5's links to the other subsystems (see s5_links.h).
  *
  * @par S3 rules followed here (s3_api.h, README_S3.md)
- * - flg_line: LF_SEARCH_x wins over LF_ENABLE. To end a search, keep
+ * - gh_flg_line: LF_SEARCH_x wins over LF_ENABLE. To end a search, keep
  *   LF_ENABLE set and then clear LF_SEARCH_x; clearing both at once
  *   leaves S3 DISABLED for a step.
- * - flg_s3 has one consumer, vehicle_ctrl_task, through
+ * - gh_flg_s3 has one consumer, vehicle_ctrl_task, through
  *   s5_links_line_events(). FLG_S3_LINE_FOUND is only raised by a search.
- * - mbf_nav (owned by S3) is read only by vehicle_ctrl_task, through
+ * - gh_mbf_nav (owned by S3) is read only by vehicle_ctrl_task, through
  *   s5_links_nav_take().
  *
  * @par S1
@@ -59,7 +59,7 @@
                              | FLG_S3_BARCODE | FLG_S3_LINE_FOUND)
 
 /* false: the S5 floor tests drive without S3 (s5_links_line_use()). */
-static volatile bool g_b_line_used = true;
+static volatile bool gb_line_used  = true;
 static uint16_t      g_tuned_mms   = 0u;     /* S3 last tuned for this.  */
 
 static int16_t clamp_to_int16(int32_t value, int32_t limit);
@@ -127,7 +127,7 @@ s5_links_motion_follow (uint16_t speed_mms)
     // Tune S3 only when the speed changes: S3 restarts its steering's D
     // term on every new gain setting, a small steering kick each time
     // (it was re-sent on every near/clear event, Anna 2026-11-18).
-    if (g_b_line_used && (speed_mms != g_tuned_mms))
+    if (gb_line_used && (speed_mms != g_tuned_mms))
     {
         g_tuned_mms = speed_mms;
 
@@ -150,8 +150,8 @@ uint16_t
 s5_links_follow_speed_mms (void)
 {
     // NOTE: The casts are safe: both speeds are a few hundred mm/s.
-    return (g_b_line_used ? (uint16_t) LINE_SPEED_MMS
-                          : (uint16_t) FLOOR_TEST_MMS);
+    return (gb_line_used ? (uint16_t) LINE_SPEED_MMS
+                         : (uint16_t) FLOOR_TEST_MMS);
 }
 
 /*!
@@ -271,11 +271,11 @@ s5_links_bend_deg (int32_t ahead_mm)
 void
 s5_links_line_use (bool b_used)
 {
-    g_b_line_used = b_used;
+    gb_line_used = b_used;
 
     if (!b_used)
     {
-        CHECK(tk_clr_flg(flg_line, ~(LF_ENABLE | LF_SEARCH_BOTH)),
+        CHECK(tk_clr_flg(gh_flg_line, ~(LF_ENABLE | LF_SEARCH_BOTH)),
               "flg_line");
     }
 }
@@ -289,7 +289,7 @@ s5_links_line_use (bool b_used)
 bool
 s5_links_line_is_used (void)
 {
-    return (g_b_line_used);
+    return (gb_line_used);
 }
 
 /*!
@@ -304,7 +304,7 @@ s5_links_line_is_ready (void)
     s3_line_status_t status  = {0};
     bool             b_ready = false;
 
-    if (g_b_line_used && (E_OK == s3_get_line_status(&status)))
+    if (gb_line_used && (E_OK == s3_get_line_status(&status)))
     {
         b_ready = (S3_LINE_UNCAL != status.state);
     }
@@ -319,7 +319,7 @@ s5_links_line_is_ready (void)
 void
 s5_links_line_recalibrate (void)
 {
-    if (g_b_line_used)
+    if (gb_line_used)
     {
         s3_request_recalibrate();
     }
@@ -333,13 +333,13 @@ s5_links_line_recalibrate (void)
 void
 s5_links_line_enable (bool b_enable)
 {
-    if (b_enable && g_b_line_used)
+    if (b_enable && gb_line_used)
     {
-        CHECK(tk_set_flg(flg_line, LF_ENABLE), "flg_line");
+        CHECK(tk_set_flg(gh_flg_line, LF_ENABLE), "flg_line");
     }
     else
     {
-        CHECK(tk_clr_flg(flg_line, ~LF_ENABLE), "flg_line");
+        CHECK(tk_clr_flg(gh_flg_line, ~LF_ENABLE), "flg_line");
     }
 }
 
@@ -355,19 +355,19 @@ s5_links_line_enable (bool b_enable)
 void
 s5_links_line_search (s5_links_side_t side)
 {
-    CHECK(tk_clr_flg(flg_line, ~LF_SEARCH_BOTH), "flg_line");
+    CHECK(tk_clr_flg(gh_flg_line, ~LF_SEARCH_BOTH), "flg_line");
 
-    if (!g_b_line_used)
+    if (!gb_line_used)
     {
         // S3 is not in use: there is nothing to search with.
     }
     else if (S5_LINKS_SIDE_LEFT == side)
     {
-        CHECK(tk_set_flg(flg_line, LF_SEARCH_L), "flg_line");
+        CHECK(tk_set_flg(gh_flg_line, LF_SEARCH_L), "flg_line");
     }
     else if (S5_LINKS_SIDE_RIGHT == side)
     {
-        CHECK(tk_set_flg(flg_line, LF_SEARCH_R), "flg_line");
+        CHECK(tk_set_flg(gh_flg_line, LF_SEARCH_R), "flg_line");
     }
     else
     {
@@ -410,7 +410,7 @@ s5_links_line_side (void)
 bool
 s5_links_barcode_reading (void)
 {
-    return (g_b_line_used && (FALSE != s3_barcode_reading()));
+    return (gb_line_used && (FALSE != s3_barcode_reading()));
 }
 
 /*!
@@ -427,7 +427,7 @@ s5_links_junction_count (void)
     s3_line_status_t status = {0};
     uint32_t         count  = 0u;
 
-    if (g_b_line_used && (E_OK == s3_get_line_status(&status)))
+    if (gb_line_used && (E_OK == s3_get_line_status(&status)))
     {
         count = status.junctions;
     }
@@ -450,7 +450,7 @@ s5_links_line_is_lost (void)
     s3_line_status_t status = {0};
     bool             b_lost = false;
 
-    if (g_b_line_used && (E_OK == s3_get_line_status(&status)))
+    if (gb_line_used && (E_OK == s3_get_line_status(&status)))
     {
         b_lost = (S3_LINE_LOST == status.state);
     }
@@ -473,7 +473,7 @@ s5_links_line_is_locked (void)
     s3_line_status_t status   = {0};
     bool             b_locked = false;
 
-    if (g_b_line_used && (E_OK == s3_get_line_status(&status)))
+    if (gb_line_used && (E_OK == s3_get_line_status(&status)))
     {
         b_locked = (S3_LINE_FOLLOW == status.state);
     }
@@ -493,7 +493,7 @@ s5_links_line_sees_black (void)
     s3_line_status_t status  = {0};
     bool             b_black = false;
 
-    if (g_b_line_used && (E_OK == s3_get_line_status(&status)))
+    if (gb_line_used && (E_OK == s3_get_line_status(&status)))
     {
         b_black = (status.n_outer >= LINE_BLACK_U8)
                   || (status.n_centre >= LINE_BLACK_U8);
@@ -503,7 +503,7 @@ s5_links_line_sees_black (void)
 }
 
 /*!
- * @brief Take S3's events (IF-S3c flg_s3) as mission events. Call it on
+ * @brief Take S3's events (IF-S3c gh_flg_s3) as mission events. Call it on
  *        every vehicle_ctrl_task wake-up; it never blocks.
  *
  * @return EV_JUNCTION, EV_LINE_LOST, EV_LINE_FOUND and EV_BARCODE bits;
@@ -514,14 +514,14 @@ s5_links_line_events (void)
 {
     UINT     pattern = 0u;
     uint32_t events  = 0u;
-    ER       result  = tk_wai_flg(flg_s3, FLG_S3_ALL, TWF_ORW | TWF_BITCLR,
+    ER       result  = tk_wai_flg(gh_flg_s3, FLG_S3_ALL, TWF_ORW | TWF_BITCLR,
                                   &pattern, TMO_POL);
 
     if (E_OK != result)
     {
         // No event since the last call.
     }
-    else if (!g_b_line_used)
+    else if (!gb_line_used)
     {
         // Ignored, but S3's barcode queue is emptied so it never fills.
         nav_drain();
@@ -539,7 +539,7 @@ s5_links_line_events (void)
 }
 
 /*!
- * @brief Take the oldest barcode command from S3's mbf_nav (IF-01).
+ * @brief Take the oldest barcode command from S3's gh_mbf_nav (IF-01).
  *        Letters that are not in today's map are skipped.
  *
  * @param[out] p_msg The command.
@@ -554,7 +554,7 @@ s5_links_nav_take (subsystem5_nav_msg_t * p_msg)
 
     // NOTE: The cast is safe: the message is 4 bytes.
     while ((!b_got)
-           && ((INT) sizeof(s3_msg) == tk_rcv_mbf(mbf_nav, &s3_msg,
+           && ((INT) sizeof(s3_msg) == tk_rcv_mbf(gh_mbf_nav, &s3_msg,
                                                    TMO_POL)))
     {
         b_got = nav_from_s3(&s3_msg, p_msg);
@@ -656,7 +656,7 @@ clamp_to_int16 (int32_t value, int32_t limit)
  * turning left until the time limit).
  *
  * NOTE: Blocks vehicle_ctrl_task for at most 0.5 s while the robot is
- * braked; mission events wait in flg_mission meanwhile, and obstacle
+ * braked; mission events wait in gh_flg_mission meanwhile, and obstacle
  * stops do not depend on this task.
  */
 static void
@@ -679,7 +679,7 @@ wait_wheels_still (void)
 /*!
  * @brief Convert one S3 barcode message to S5's form.
  *
- * @param[in]  p_s3_msg The message from mbf_nav.
+ * @param[in]  p_s3_msg The message from gh_mbf_nav.
  * @param[out] p_msg    The command.
  *
  * @return false for a letter that is not a command today (S3_CMD_NONE).
@@ -730,10 +730,11 @@ nav_drain (void)
     s3_nav_msg_t s3_msg = {0};
 
     // NOTE: The cast is safe: the message is 4 bytes.
-    while ((INT) sizeof(s3_msg) == tk_rcv_mbf(mbf_nav, &s3_msg, TMO_POL))
+    while ((INT) sizeof(s3_msg) == tk_rcv_mbf(gh_mbf_nav, &s3_msg, TMO_POL))
     {
         // Dropped.
     }
 }
 
 /*** end of file ***/
+

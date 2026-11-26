@@ -42,15 +42,15 @@
  * field widths must hold their largest values. A wrong size stops the
  * build here (an array of size -1).
  */
-typedef char s5_profile_size_check[(S5_PROFILE_BYTES
-                                    == sizeof(s5_profile_t)) ? 1 : -1];
-typedef char s5_profile_mm_check[(S5_PROFILE_MM_MASK
-                                  == ((1u << S5_PROFILE_MM_BITS) - 1u))
-                                 && (S5_CLEAR_OPEN_MM <= S5_PROFILE_MM_MAX)
-                                 ? 1 : -1];
-typedef char s5_profile_step_check[((uint32_t) (S5_PROFILE_ANGLE_MAX_DEG
-                                                - S5_PROFILE_ANGLE_MIN_DEG)
-                                    <= S5_PROFILE_STEP_MASK) ? 1 : -1];
+typedef char s5_profile_size_check_t[(S5_PROFILE_BYTES
+                                      == sizeof(s5_profile_t)) ? 1 : -1];
+typedef char s5_profile_mm_check_t[((S5_PROFILE_MM_MASK
+                                     == ((1u << S5_PROFILE_MM_BITS) - 1u))
+                                    && (S5_CLEAR_OPEN_MM <= S5_PROFILE_MM_MAX))
+                                   ? 1 : -1];
+typedef char s5_profile_step_check_t[((uint32_t) (S5_PROFILE_ANGLE_MAX_DEG
+                                                  - S5_PROFILE_ANGLE_MIN_DEG)
+                                      <= S5_PROFILE_STEP_MASK) ? 1 : -1];
 
 static bool     point_has_echo(s5_profile_point_t const * p_point);
 static uint32_t clamp_mm(int32_t value_mm, int32_t max_mm);
@@ -651,3 +651,4 @@ side_clearance (s5_profile_point_t const * p_points, uint32_t count,
 }
 
 /*** end of file ***/
+

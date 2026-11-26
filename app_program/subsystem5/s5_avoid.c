@@ -208,18 +208,18 @@ typedef struct
 /* The enums and counts must fit their fields; a misfit stops the build
  * here (an array of size -1).
  */
-typedef char avoid_state_check[((S5_AVOID_FAILED <= S5_AVOID_STATE_MASK)
-                                && (S5_CTRL_FAULT_OVERTURNED
-                                    <= S5_CTRL_FAULT_MASK)
-                                && ((RETRIES_MAX + 1u) <= 3u)
-                                && (LOOKS_MAX <= 15u)) ? 1 : -1];
+typedef char avoid_state_check_t[((S5_AVOID_FAILED <= S5_AVOID_STATE_MASK)
+                                  && (S5_CTRL_FAULT_OVERTURNED
+                                      <= S5_CTRL_FAULT_MASK)
+                                  && ((RETRIES_MAX + 1u) <= 3u)
+                                  && (LOOKS_MAX <= 15u)) ? 1 : -1];
 
 static avoid_t       g_avoid       = {{S5_PLAN_CONTINUE, 0, 0, 0u, 0u, 0u,
                                        0u, 0u, 0u},
                                       0u, 0u, 0, {0}, S5_AVOID_IDLE,
                                       S5_CTRL_FAULT_NONE, 0u, 0u, 0u, false,
                                       0u, PROBE_NONE, 0u, 0u, false};
-static volatile bool g_b_bypass_on = true;
+static volatile bool gb_bypass_on = true;
 
 static s5_avoid_result_t step_scanning(uint32_t events, uint32_t now_ms);
 static s5_avoid_result_t on_profile(s5_profile_t const * p_profile,
@@ -264,7 +264,7 @@ static void              enter(s5_avoid_state_t state);
 void
 s5_avoid_set_bypass (bool b_enabled)
 {
-    g_b_bypass_on = b_enabled;
+    gb_bypass_on = b_enabled;
 }
 
 /*!
@@ -290,7 +290,7 @@ s5_avoid_start (uint32_t now_ms)
 /*!
  * @brief Advance the avoidance with a batch of mission events.
  *
- * @param[in] events EV_xxx bits taken from flg_mission (may be 0).
+ * @param[in] events EV_xxx bits taken from gh_flg_mission (may be 0).
  * @param[in] now_ms Current time.
  *
  * @return BUSY until finished; then RESUME, PLAN_ONLY, FAILURE or SEARCH.
@@ -300,6 +300,8 @@ s5_avoid_step (uint32_t events, uint32_t now_ms)
 {
     s5_avoid_result_t result = S5_AVOID_BUSY;
 
+    // NOTE: The cast is safe: the field is only ever set from s5_avoid_state_t
+    // values.
     switch ((s5_avoid_state_t) g_avoid.state)
     {
         case S5_AVOID_SCANNING:
@@ -436,7 +438,7 @@ act_on_plan (uint32_t now_ms)
     s5_event_trace("PLAN back_mm reverse_first_mm",
                    (int32_t) p_plan->back_mm, (int32_t) p_plan->room_mm);
 
-    if (!g_b_bypass_on)
+    if (!gb_bypass_on)
     {
         enter(S5_AVOID_DONE);
         result = S5_AVOID_PLAN_ONLY;
@@ -499,7 +501,7 @@ step_bypass (uint32_t events, uint32_t now_ms)
     bool              b_done = (0u != (events & EV_MOTION_DONE));
 
     bool              b_line = (0u != (events & EV_LINE_FOUND))
-                               || s5_links_line_is_locked();
+                               || (s5_links_line_is_locked());
 
     if ((S5_AVOID_ALIGN == g_avoid.state) && b_line)
     {
@@ -607,7 +609,7 @@ next_leg (uint32_t now_ms)
 
         case S5_AVOID_LOOK_BACK:
             // Echo: still beside it. First silence: look once more.
-            if (g_avoid.b_look_near && (g_avoid.looks >= LOOKS_MAX))
+            if ((g_avoid.b_look_near) && (g_avoid.looks >= LOOKS_MAX))
             {
                 // Longer than any obstacle expected: something else is
                 // beside the track. Turning in could hit it.
@@ -680,7 +682,7 @@ step_return (uint32_t events, uint32_t now_ms)
     bool              b_found = (0u != (events & EV_LINE_FOUND));
     bool              b_done  = (0u != (events & EV_MOTION_DONE));
 
-    if (b_found || s5_links_line_is_locked())
+    if (b_found || (s5_links_line_is_locked()))
     {
         result = line_found(now_ms);
     }
@@ -851,7 +853,7 @@ step_look_turn (uint32_t events, uint32_t now_ms)
     subsystem5_obst_status_t status = {0};
     uint32_t                 fresh  = fresh_pings(&status);
 
-    if ((fresh > 0u) && is_too_close(&status))
+    if ((fresh > 0u) && (is_too_close(&status)))
     {
         // NOTE: The cast widens the 10-bit field, so no value is lost.
         s5_event_trace("AVOID look stopped, side too close: range_mm"
@@ -978,7 +980,7 @@ needs_probe (s5_profile_t const * p_profile)
     bool     b_one_of = (p_profile->b_left_edge != p_profile->b_right_edge);
 
     // NOTE: The cast widens the 10-bit field, so no value is lost.
-    return (g_b_bypass_on && p_profile->b_on_path && b_one_of
+    return (gb_bypass_on && (p_profile->b_on_path) && b_one_of
             && (PROBE_NONE == g_avoid.probe)
             && (0u == (g_avoid.blocked & side))
             && ((int32_t) p_profile->closest_mm >= PROBE_MIN_MM));
@@ -1107,7 +1109,7 @@ step_check (uint32_t now_ms)
     int32_t limit_mm = (int32_t) g_avoid.plan.out_mm + S5_SENSOR_SETBACK_MM
                        + CHECK_MARGIN_MM;
 
-    if ((fresh > LOOK_SKIP_PINGS) && status.b_range_valid
+    if ((fresh > LOOK_SKIP_PINGS) && (status.b_range_valid)
         && ((int32_t) status.range_mm < limit_mm))
     {
         g_avoid.b_look_near = true;
@@ -1258,7 +1260,7 @@ step_look (uint32_t now_ms)
 
     uint32_t                 fresh  = fresh_pings(&status);
 
-    if ((fresh > LOOK_SKIP_PINGS) && is_side_echo(&status))
+    if ((fresh > LOOK_SKIP_PINGS) && (is_side_echo(&status)))
     {
         g_avoid.b_look_near = true;
     }
@@ -1269,7 +1271,7 @@ step_look (uint32_t now_ms)
         s5_event_trace("AVOID look: number echo", (int32_t) g_avoid.looks,
                        g_avoid.b_look_near ? 1 : 0);
 
-        if ((!g_avoid.b_look_near) && g_avoid.b_silent)
+        if ((!g_avoid.b_look_near) && (g_avoid.b_silent))
         {
             // Silent twice in a row: past it. Straight on from here.
             start_way_back(now_ms);
@@ -1498,3 +1500,4 @@ enter (s5_avoid_state_t state)
 }
 
 /*** end of file ***/
+

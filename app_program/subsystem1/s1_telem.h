@@ -123,7 +123,7 @@ typedef int32_t (* s1_telem_post_fn_t)(uint8_t opcode, uint8_t cmd_id);
  */
 typedef int32_t (* s1_telem_map_fn_t)(const char * p_letters);
 
-/** Sets or clears fault bits in S5's flg_fault: subsystem5_fault_set() or
+/** Sets or clears fault bits in S5's gh_flg_fault: subsystem5_fault_set() or
  *  subsystem5_fault_clear(), passed in so that s1_telem.c builds on the host.
  */
 typedef void (* s1_telem_fault_function_t)(uint32_t faults);

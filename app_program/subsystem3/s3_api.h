@@ -11,9 +11,9 @@
  *
  * @par Provided by S3 (all objects are created in subsystem3_init)
  *
- * IF-01  S3 -> Vehicle Controller: message buffer mbf_nav.
+ * IF-01  S3 -> Vehicle Controller: message buffer gh_mbf_nav.
  *        One s3_nav_msg_t (4 bytes) per decoded barcode, COPIED, 4 deep.
- *        Receiver: s3_nav_msg_t m; tk_rcv_mbf(mbf_nav, &m, TMO_xxx);
+ *        Receiver: s3_nav_msg_t m; tk_rcv_mbf(gh_mbf_nav, &m, TMO_xxx);
  *                  char letter = s3_nav_msg_char(&m);
  *        Concurrency: kernel copy. Full -> S3 drops the newest (TMO_POL).
  *
@@ -24,7 +24,7 @@
  *        Concurrency: ONE aligned 32-bit word, single writer (task_line),
  *        read with one load -> atomic on the M0+, no lock, any core.
  *
- * IF-07  Vehicle Controller -> S3: event flag flg_line (owned by S3).
+ * IF-07  Vehicle Controller -> S3: event flag gh_flg_line (owned by S3).
  *        LF_ENABLE    set = S3 steers; clear = turning / bypassing
  *                     (steer 0, no junction / lost events). Set at
  *                     power-up.
@@ -37,7 +37,7 @@
  *        (clearing both at once = DISABLED for a step). To search again,
  *        clear LF_SEARCH_x first, then set it.
  *
- * IF-S3c S3 -> Vehicle Controller ONLY: event flag flg_s3.
+ * IF-S3c S3 -> Vehicle Controller ONLY: event flag gh_flg_s3.
  *        FLG_S3_JUNCTION / LOST / BARCODE / LINE_FOUND, set by S3.
  *        ONE consumer: tk_wai_flg(..., TWF_ORW | TWF_BITCLR, ...).
  *        Everyone else reads the counters in s3_line_status_t.
@@ -45,7 +45,7 @@
  * IF-S3b S3 -> anyone (telemetry): s3_line_status_t (16 bytes), getter.
  *        s3_line_status_t st; if (E_OK == s3_get_line_status(&st)) {...}
  *        Concurrency: written by task_line AND task_barcode, both under
- *        mtx_s3; the getter copies under mtx_s3. Never read the packed
+ *        gh_mtx_s3; the getter copies under gh_mtx_s3. Never read the packed
  *        struct directly. Tasks only.
  *
  * IF-S3d Motion (Buddy 2) -> S3: s3_set_odometry(fn), fn() = total mm.
@@ -90,7 +90,7 @@ typedef struct
                         /* distance to the junction = odom_now - odom_mm. */
 } s3_nav_msg_t;
 
-extern ID mbf_nav;
+extern ID gh_mbf_nav;
 char      s3_nav_msg_char(s3_nav_msg_t const * p_msg);
 
 /* ---------------------------------------------------------------- IF-02 */
@@ -102,14 +102,14 @@ BOOL s3_get_steer_sp(H * p_dv_mms, UB * p_seq);  /* FALSE = not steering  */
 #define LF_ENABLE           (0x0001u)
 #define LF_SEARCH_L         (0x0002u)
 #define LF_SEARCH_R         (0x0004u)
-extern ID flg_line;
+extern ID gh_flg_line;
 
 /* --------------------------------------------------------------- IF-S3c */
 #define FLG_S3_JUNCTION     (0x0001u)
 #define FLG_S3_LOST         (0x0002u)
 #define FLG_S3_BARCODE      (0x0004u)
 #define FLG_S3_LINE_FOUND   (0x0008u)
-extern ID flg_s3;
+extern ID gh_flg_s3;
 
 /* --------------------------------------------------------------- IF-S3b */
 /** Line state as reported: 6 values -> 3 bits. */
@@ -161,12 +161,12 @@ typedef struct
     UW         updated_ms: 16;  /* System time, ms, wraps every 65.5 s.  */
 } s3_line_status_t;
 
-extern ID mtx_s3;
+extern ID gh_mtx_s3;
 ER        s3_get_line_status(s3_line_status_t * p_status);  /* Tasks only. */
 
 /* --------------------------------------------------------- IF-S3d/e/f */
 typedef UW (* s3_odom_fn_t)(void);
-void s3_set_odometry(s3_odom_fn_t fn);
+void s3_set_odometry(s3_odom_fn_t p_fn);
 void s3_set_line_gains(INT kp_x100, INT kd_x100);   /* e.g. 150, 400.     */
 void s3_set_line_shape(INT boost_x100);             /* 0 = off (default). */
 void s3_set_steer_max(INT dv_mms);                  /* 1 ... 511 mm/s.    */
@@ -182,3 +182,4 @@ ER   s3_start(void);
 #endif /* S3_API_H */
 
 /*** end of file ***/
+

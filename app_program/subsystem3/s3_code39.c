@@ -19,7 +19,7 @@
    1 = wide.  Verified against Barcode Sample.pdf for '*', 'A' and 'Z'. */
 typedef struct
 {
-    char     ch;
+    char     letter;
     uint16_t pattern;
 } s3_c39_entry_t;
 
@@ -50,36 +50,36 @@ static s3_c39_entry_t const g_c39_table[] =
  *         another). *p_min_wide = shortest wide (UINT32_MAX if none).
  */
 static int
-split_wide (uint32_t const * p_el, uint32_t first, uint32_t n,
+split_wide (uint32_t const * p_el, uint32_t first, uint32_t count,
             uint32_t n_wide, uint8_t * p_is_wide, uint32_t * p_min_wide)
 {
     uint32_t min_wide   = UINT32_MAX;
     uint32_t max_narrow = 0u;
     uint32_t min_narrow = UINT32_MAX;
-    uint32_t k;
-    uint32_t i;
+    uint32_t found;
+    uint32_t idx;
 
-    for (k = 0u; k < n_wide; k++)
+    for (found = 0u; found < n_wide; found++)
     {
         uint32_t best = SYMBOL_LEN;
 
-        for (i = first; i < (first + (2u * n)); i += 2u)
+        for (idx = first; idx < (first + (2u * count)); idx += 2u)
         {
-            if ((0u == p_is_wide[i]) &&
-                ((SYMBOL_LEN == best) || (p_el[i] > p_el[best])))
+            if ((0u == p_is_wide[idx]) &&
+                ((SYMBOL_LEN == best) || (p_el[idx] > p_el[best])))
             {
-                best = i;
+                best = idx;
             }
         }
         p_is_wide[best] = 1u;
         min_wide = (p_el[best] < min_wide) ? p_el[best] : min_wide;
     }
-    for (i = first; i < (first + (2u * n)); i += 2u)
+    for (idx = first; idx < (first + (2u * count)); idx += 2u)
     {
-        if (0u == p_is_wide[i])
+        if (0u == p_is_wide[idx])
         {
-            max_narrow = (p_el[i] > max_narrow) ? p_el[i] : max_narrow;
-            min_narrow = (p_el[i] < min_narrow) ? p_el[i] : min_narrow;
+            max_narrow = (p_el[idx] > max_narrow) ? p_el[idx] : max_narrow;
+            min_narrow = (p_el[idx] < min_narrow) ? p_el[idx] : min_narrow;
         }
     }
     *p_min_wide = min_wide;
@@ -110,11 +110,13 @@ decode_symbol (uint32_t const * p_el, char * p_char, uint32_t * p_min_wide)
     uint32_t min_wide_bar;
     uint32_t min_wide   = UINT32_MAX;
     uint16_t pattern    = 0u;
-    uint32_t i;
+    uint32_t idx;
 
     if ((0 == split_wide(p_el, 0u, 5u, 2u, is_wide, &min_wide_bar)) ||
         (0 == split_wide(p_el, 1u, 4u, 1u, is_wide, &min_wide)))
     {
+        /* The cast discards memset()'s return value, which is the same pointer.
+         */
         (void) memset(is_wide, 0, sizeof(is_wide));
         if ((0 == split_wide(p_el, 0u, 5u, 0u, is_wide, &min_wide_bar)) ||
             (0 == split_wide(p_el, 1u, 4u, 3u, is_wide, &min_wide)))
@@ -123,16 +125,19 @@ decode_symbol (uint32_t const * p_el, char * p_char, uint32_t * p_min_wide)
         }
     }
 
-    for (i = 0u; i < SYMBOL_LEN; i++)
+    for (idx = 0u; idx < SYMBOL_LEN; idx++)
     {
-        pattern = (uint16_t)((pattern << 1) | is_wide[i]);
+        /* The cast is safe: the pattern is SYMBOL_LEN (9) bits, which fits
+         * uint16_t.
+         */
+        pattern = (uint16_t)((pattern << 1) | is_wide[idx]);
     }
 
-    for (i = 0u; i < C39_TABLE_LEN; i++)
+    for (idx = 0u; idx < C39_TABLE_LEN; idx++)
     {
-        if (g_c39_table[i].pattern == pattern)
+        if (g_c39_table[idx].pattern == pattern)
         {
-            *p_char     = g_c39_table[i].ch;
+            *p_char     = g_c39_table[idx].letter;
             *p_min_wide = min_wide;
             return S3_C39_OK;
         }
@@ -141,18 +146,27 @@ decode_symbol (uint32_t const * p_el, char * p_char, uint32_t * p_min_wide)
     return S3_C39_BAD_SYMBOL;
 }
 
+/*!
+ * @brief Decode one frame (start symbol, letter, stop symbol) read in
+ *        one direction.
+ *
+ * @param[in]  p_dur  Element durations of the frame.
+ * @param[out] p_char The letter.
+ *
+ * @return S3_C39_OK, or the first symbol's failure.
+ */
 static s3_c39_result_t
 decode_frame (uint32_t const * p_dur, char * p_char)
 {
     char            sym[SYMBOLS];
     uint32_t        min_wide[SYMBOLS];
-    uint32_t        s;
+    uint32_t        sym_idx;
     s3_c39_result_t res;
 
-    for (s = 0u; s < SYMBOLS; s++)
+    for (sym_idx = 0u; sym_idx < SYMBOLS; sym_idx++)
     {
-        res = decode_symbol(&p_dur[s * (SYMBOL_LEN + 1u)], &sym[s],
-                            &min_wide[s]);
+        res = decode_symbol(&p_dur[sym_idx * (SYMBOL_LEN + 1u)], &sym[sym_idx],
+                            &min_wide[sym_idx]);
         if (S3_C39_OK != res)
         {
             return res;
@@ -175,12 +189,16 @@ decode_frame (uint32_t const * p_dur, char * p_char)
     return S3_C39_OK;
 }
 
+/*!
+ * @brief Decode one barcode pass, forwards and then reversed (see
+ *        s3_code39.h).
+ */
 s3_c39_result_t
 s3_code39_decode (uint32_t const * p_dur, uint32_t count,
                   char * p_char, uint8_t * p_reversed)
 {
     uint32_t        rev[S3_C39_ELEMENTS];
-    uint32_t        i;
+    uint32_t        idx;
     uint32_t        ofs;
     s3_c39_result_t res;
     s3_c39_result_t first_res = S3_C39_BAD_COUNT;
@@ -202,9 +220,9 @@ s3_code39_decode (uint32_t const * p_dur, uint32_t count,
             return res;
         }
 
-        for (i = 0u; i < S3_C39_ELEMENTS; i++)
+        for (idx = 0u; idx < S3_C39_ELEMENTS; idx++)
         {
-            rev[i] = p_dur[ofs + S3_C39_ELEMENTS - 1u - i];
+            rev[idx] = p_dur[ofs + S3_C39_ELEMENTS - 1u - idx];
         }
 
         if (S3_C39_OK == decode_frame(rev, p_char))
@@ -221,51 +239,70 @@ s3_code39_decode (uint32_t const * p_dur, uint32_t count,
     return first_res;   /* report the first forward-read failure reason */
 }
 
-int s3_code39_pattern (char ch, uint16_t * p_pattern)
+/*!
+ * @brief The 9-element pattern of a character (see s3_code39.h).
+ */
+int s3_code39_pattern (char letter, uint16_t * p_pattern)
 {
-    uint32_t i;
+    uint32_t idx;
 
-    for (i = 0u; i < C39_TABLE_LEN; i++)
+    for (idx = 0u; idx < C39_TABLE_LEN; idx++)
     {
-        if (g_c39_table[i].ch == ch)
+        if (g_c39_table[idx].letter == letter)
         {
-            *p_pattern = g_c39_table[i].pattern;
+            *p_pattern = g_c39_table[idx].pattern;
             return 1;
         }
     }
     return 0;
 }
 
-uint8_t s3_code39_index (char ch)
+/*!
+ * @brief The 6-bit table index of a character, or S3_C39_IDX_NONE.
+ */
+uint8_t s3_code39_index (char letter)
 {
-    uint32_t i;
+    uint32_t idx;
 
-    for (i = 0u; i < C39_TABLE_LEN; i++)
+    for (idx = 0u; idx < C39_TABLE_LEN; idx++)
     {
-        if (g_c39_table[i].ch == ch)
+        if (g_c39_table[idx].letter == letter)
         {
-            return (uint8_t)i;
+            /* The cast is safe: idx is below C39_TABLE_LEN (44), which fits
+             * uint8_t.
+             */
+            return (uint8_t)idx;
         }
     }
     return S3_C39_IDX_NONE;
 }
 
+/*!
+ * @brief The character at a table index, or '?' for an invalid index.
+ */
 char s3_code39_char (uint8_t idx)
 {
-    return (idx < C39_TABLE_LEN) ? g_c39_table[idx].ch : '?';
+    return (idx < C39_TABLE_LEN) ? g_c39_table[idx].letter : '?';
 }
 
 /* ------------------------------------------------------------------ nav */
 
 /* g_nav_map[i] = letter for command (i + 1): LEFT, RIGHT, STRAIGHT,
  * U-TURN. Not thread-safe on its own: s3_api.c calls the setter and the
- * lookup under mtx_s3. */
+ * lookup under gh_mtx_s3. */
 static char g_nav_map[S3_NAV_MAP_LEN] = {'A', 'B', 'C', 'D'};
 
+/*!
+ * @brief A lower-case ASCII letter in upper case; anything else as it is.
+ */
 static char
-nav_to_upper (char ch)
+nav_to_upper (char letter)
 {
-    return ((ch >= 'a') && (ch <= 'z')) ? (char) ((ch - 'a') + 'A') : ch;
+    /* The cast is safe: a lower-case ASCII letter minus 'a' plus 'A' is an
+     * upper-case ASCII letter.
+     */
+    return ((letter >= 'a') && (letter <= 'z')) ?
+           (char) ((letter - 'a') + 'A') : letter;
 }
 
 /*!
@@ -290,24 +327,24 @@ s3_nav_set_map (char const * p_map)
 {
     char     tmp[S3_NAV_MAP_LEN];
     uint16_t pat;
-    uint32_t i;
-    uint32_t j;
+    uint32_t idx;
+    uint32_t pos;
 
     if (NULL == p_map)
     {
         return -1;
     }
-    for (i = 0u; i < S3_NAV_MAP_LEN; i++)
+    for (idx = 0u; idx < S3_NAV_MAP_LEN; idx++)
     {
-        tmp[i] = nav_to_upper(p_map[i]);
-        if (('\0' == tmp[i]) || ('*' == tmp[i]) ||
-            (0 == s3_code39_pattern(tmp[i], &pat)))
+        tmp[idx] = nav_to_upper(p_map[idx]);
+        if (('\0' == tmp[idx]) || ('*' == tmp[idx]) ||
+            (0 == s3_code39_pattern(tmp[idx], &pat)))
         {
             return -1;  /* Too short, start/stop char, or not Code 39.  */
         }
-        for (j = 0u; j < i; j++)
+        for (pos = 0u; pos < idx; pos++)
         {
-            if (tmp[j] == tmp[i])
+            if (tmp[pos] == tmp[idx])
             {
                 return -1;  /* Same letter for two commands.            */
             }
@@ -317,24 +354,24 @@ s3_nav_set_map (char const * p_map)
     {
         return -1;      /* Too long.                                     */
     }
-    for (i = 0u; i < S3_NAV_MAP_LEN; i++)
+    for (idx = 0u; idx < S3_NAV_MAP_LEN; idx++)
     {
-        g_nav_map[i] = tmp[i];  /* Commit only a fully valid map.        */
+        g_nav_map[idx] = tmp[idx];  /* Commit only a fully valid map.        */
     }
     return 0;
 }
 
 /*!
- * @brief Copy the current map, e.g. "DCBA" plus '\0'.
+ * @brief Copy the current map, e.g. "DCBA" plus the NUL.
  */
 void
 s3_nav_get_map (char * p_out5)
 {
-    uint32_t i;
+    uint32_t idx;
 
-    for (i = 0u; i < S3_NAV_MAP_LEN; i++)
+    for (idx = 0u; idx < S3_NAV_MAP_LEN; idx++)
     {
-        p_out5[i] = g_nav_map[i];
+        p_out5[idx] = g_nav_map[idx];
     }
     p_out5[S3_NAV_MAP_LEN] = '\0';
 }
@@ -343,16 +380,19 @@ s3_nav_get_map (char * p_out5)
  * @brief The command for a decoded letter; S3_NAV_NONE if not in the map.
  */
 s3_nav_cmd_t
-s3_nav_from_char (char ch)
+s3_nav_from_char (char letter)
 {
     s3_nav_cmd_t cmd = S3_NAV_NONE;
-    uint32_t     i;
+    uint32_t     idx;
 
-    for (i = 0u; i < S3_NAV_MAP_LEN; i++)
+    for (idx = 0u; idx < S3_NAV_MAP_LEN; idx++)
     {
-        if (g_nav_map[i] == ch)
+        if (g_nav_map[idx] == letter)
         {
-            cmd = (s3_nav_cmd_t) (i + 1u);
+            /* The cast is safe: idx + 1 is 1 ... S3_NAV_MAP_LEN, each a valid
+             * s3_nav_cmd_t value.
+             */
+            cmd = (s3_nav_cmd_t) (idx + 1u);
             break;
         }
     }
@@ -393,3 +433,4 @@ s3_nav_name (s3_nav_cmd_t cmd)
 }
 
 /*** end of file ***/
+

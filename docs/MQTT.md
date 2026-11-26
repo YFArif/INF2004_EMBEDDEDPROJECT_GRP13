@@ -97,7 +97,7 @@ adds nothing to a STOP's round trip (NFR15).
   turns each 6-bit index into its character with S3's `s3_code39_char()`
   and calls `s3_set_nav_map()` (IF-S3f). S3 judges the map: a repeated
   letter, `*`, or an index above 43 (`?`) is refused and S3 keeps its old
-  map. `s3_set_nav_map()` takes `mtx_s3` with `TMO_FEVR`, so the task can
+  map. `s3_set_nav_map()` takes `gh_mtx_s3` with `TMO_FEVR`, so the task can
   wait while S3's line or barcode task holds it, and it prints
   `S3 NAV MAP set: LEFT=D RIGHT=C STRAIGHT=B U-TURN=A` (or `REJECTED
   (kept)`) with `tm_printf` on `telemetry_task`'s own stack (S1-U25

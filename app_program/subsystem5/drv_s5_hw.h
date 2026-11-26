@@ -40,3 +40,4 @@ void     drv_s5_hw_wait_us(uint32_t delay_us);
 #endif /* DRV_S5_HW_H */
 
 /*** end of file ***/
+

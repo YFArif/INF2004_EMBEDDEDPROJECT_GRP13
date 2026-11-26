@@ -57,3 +57,4 @@ s5_scan_outcome_t s5_scan_run(s5_scan_measure_fn_t p_measure,
 #endif /* S5_SCAN_H */
 
 /*** end of file ***/
+

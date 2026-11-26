@@ -433,7 +433,7 @@ s1_telem_fill_frame (const s1_telem_src_t * p_src, uint8_t seq,
         p_tel->peak_mm      = p_src->peak_mm;
         p_tel->hump_count   = p_src->hump_count;
         p_tel->motion_class = p_src->motion_class;
-        if (p_src->b_impact
+        if ((p_src->b_impact)
             && (S1_TELEM_CLASS_LIFTED != p_src->motion_class)
             && (S1_TELEM_CLASS_OVERTURNED != p_src->motion_class))
         {

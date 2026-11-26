@@ -325,7 +325,7 @@ no_change (const s1_wifi_rejoin_t * p_rejoin,
 {
     p_change->b_changed   = false;
     p_change->from        = p_rejoin->state;
-    p_change->to          = p_rejoin->state;
+    p_change->to_state    = p_rejoin->state;
     p_change->why         = S1_WIFI_REJOIN_WHY_NONE;
     p_change->attempt     = p_rejoin->attempt;
     p_change->wait_msec   = p_rejoin->wait_msec;
@@ -345,7 +345,7 @@ enter (s1_wifi_rejoin_t * p_rejoin, s1_wifi_rejoin_state_t next,
 {
     p_change->b_changed = true;
     p_change->from      = p_rejoin->state;
-    p_change->to        = next;
+    p_change->to_state  = next;
     p_change->why       = why;
 
     p_rejoin->state      = next;

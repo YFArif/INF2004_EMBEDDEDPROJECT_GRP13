@@ -174,7 +174,7 @@ typedef struct
 {
     bool                   b_changed;    /* false: nothing to print */
     s1_wifi_rejoin_state_t from;
-    s1_wifi_rejoin_state_t to;
+    s1_wifi_rejoin_state_t to_state;
     s1_wifi_rejoin_why_t   why;
     uint32_t               attempt;      /* the counter after the change */
     uint32_t               wait_msec;    /* BACKOFF: the wait; else 0 */

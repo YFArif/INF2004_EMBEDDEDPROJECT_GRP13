@@ -43,3 +43,4 @@ void s5_ranger_reset_fault(void);
 #endif /* S5_RANGER_H */
 
 /*** end of file ***/
+

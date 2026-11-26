@@ -50,15 +50,17 @@
 #define TX_FIFO_DEPTH       (16u)
 #define DATA_MASK           (0xFFu)
 
-#define S4_RESETS_REG        (0x4000C000u)
-#define S4_RESETS_DONE         (0x4000C008u)
+#define S4_RESETS_REG       (0x4000C000u)
+#define S4_RESETS_DONE      (0x4000C008u)
 #define RESET_I2C0          (0x00000008u)
-#define S4_GPIO_CTRL(pin)      (0x40014004u + ((pin) * 8u))
-#define S4_PAD_GPIO(pin)       (0x4001C004u + ((pin) * 4u))
 #define FUNCSEL_I2C         (3u)
 #define PAD_IE_4MA_PU_SMT   (0x5Au)     /* IE, 4 mA, pull-up, Schmitt.     */
 #define PIN_SDA             (4u)
 #define PIN_SCL             (5u)
+#define S4_GPIO_CTRL_SDA    (0x40014004u + (PIN_SDA * 8u))
+#define S4_GPIO_CTRL_SCL    (0x40014004u + (PIN_SCL * 8u))
+#define S4_PAD_SDA          (0x4001C004u + (PIN_SDA * 4u))
+#define S4_PAD_SCL          (0x4001C004u + (PIN_SCL * 4u))
 
 #define TIMER_RAWL          (0x40054028u)
 #define XFER_TIMEOUT_US     (3000u)
@@ -95,7 +97,7 @@ static ER  reg_read(uint8_t addr, uint8_t reg, uint8_t * p_buf, uint32_t len);
 static ER  reg_write(uint8_t addr, uint8_t reg, uint8_t value);
 static ER  xfer_finish(uint32_t start_us);
 static void i2c_select(uint8_t addr);
-static int16_t to_mg(uint8_t lo, uint8_t hi);
+static int16_t to_mg(uint8_t low, uint8_t high);
 
 /*!
  * @brief Take I2C0 out of reset, route GP4/GP5 to it, 400 kHz master.
@@ -113,10 +115,10 @@ drv_lsm303_open (void)
         // Wait for the block to leave reset (a few cycles).
     }
 
-    out_w(S4_PAD_GPIO(PIN_SDA), PAD_IE_4MA_PU_SMT);
-    out_w(S4_PAD_GPIO(PIN_SCL), PAD_IE_4MA_PU_SMT);
-    out_w(S4_GPIO_CTRL(PIN_SDA), FUNCSEL_I2C);
-    out_w(S4_GPIO_CTRL(PIN_SCL), FUNCSEL_I2C);
+    out_w(S4_PAD_SDA, PAD_IE_4MA_PU_SMT);
+    out_w(S4_PAD_SCL, PAD_IE_4MA_PU_SMT);
+    out_w(S4_GPIO_CTRL_SDA, FUNCSEL_I2C);
+    out_w(S4_GPIO_CTRL_SCL, FUNCSEL_I2C);
 
     out_w(IC_ENABLE, 0u);
     out_w(IC_CON, CON_MASTER_FAST);
@@ -143,7 +145,7 @@ drv_lsm303_open (void)
 ER
 drv_lsm303_init (drv_lsm303_info_t * p_info)
 {
-    ER er = E_OK;
+    ER err = E_OK;
 
     p_info->ctrl1    = 0u;
     p_info->ctrl4    = 0u;
@@ -153,38 +155,38 @@ drv_lsm303_init (drv_lsm303_info_t * p_info)
     p_info->mag_id[1] = 0u;
     p_info->mag_id[2] = 0u;
 
-    er = reg_write(ADDR_ACC, REG_CTRL1_A, CTRL1_400HZ_XYZ);
-    if (E_OK == er)
+    err = reg_write(ADDR_ACC, REG_CTRL1_A, CTRL1_400HZ_XYZ);
+    if (E_OK == err)
     {
-        er = reg_write(ADDR_ACC, REG_CTRL4_A, CTRL4_BDU_8G_HR);
+        err = reg_write(ADDR_ACC, REG_CTRL4_A, CTRL4_BDU_8G_HR);
     }
-    if (E_OK == er)
+    if (E_OK == err)
     {
-        er = reg_write(ADDR_ACC, REG_CTRL5_A, CTRL5_FIFO_EN);
+        err = reg_write(ADDR_ACC, REG_CTRL5_A, CTRL5_FIFO_EN);
     }
-    if (E_OK == er)
+    if (E_OK == err)
     {
-        er = reg_write(ADDR_ACC, REG_FIFO_CTRL_A, FIFO_BYPASS);
+        err = reg_write(ADDR_ACC, REG_FIFO_CTRL_A, FIFO_BYPASS);
     }
-    if (E_OK == er)
+    if (E_OK == err)
     {
-        er = reg_write(ADDR_ACC, REG_FIFO_CTRL_A, FIFO_STREAM);
+        err = reg_write(ADDR_ACC, REG_FIFO_CTRL_A, FIFO_STREAM);
     }
-    if (E_OK == er)
+    if (E_OK == err)
     {
-        er = reg_read(ADDR_ACC, REG_CTRL1_A, &p_info->ctrl1, 1u);
+        err = reg_read(ADDR_ACC, REG_CTRL1_A, &p_info->ctrl1, 1u);
     }
-    if (E_OK == er)
+    if (E_OK == err)
     {
-        er = reg_read(ADDR_ACC, REG_CTRL4_A, &p_info->ctrl4, 1u);
+        err = reg_read(ADDR_ACC, REG_CTRL4_A, &p_info->ctrl4, 1u);
     }
-    if (E_OK == er)
+    if (E_OK == err)
     {
         p_info->b_acc_ok = (CTRL1_400HZ_XYZ == p_info->ctrl1)
                            && (CTRL4_BDU_8G_HR == p_info->ctrl4);
         if (!p_info->b_acc_ok)
         {
-            er = E_IO;
+            err = E_IO;
         }
     }
 
@@ -197,7 +199,7 @@ drv_lsm303_init (drv_lsm303_info_t * p_info)
                            && ((uint8_t) MAG_ID_C == p_info->mag_id[2]);
     }
 
-    return (er);
+    return (err);
 }
 
 /*!
@@ -212,12 +214,12 @@ ER
 drv_lsm303_fifo_count (uint32_t * p_count, bool * p_b_overrun)
 {
     uint8_t src = 0u;
-    ER      er  = reg_read(ADDR_ACC, REG_FIFO_SRC_A, &src, 1u);
+    ER      err = reg_read(ADDR_ACC, REG_FIFO_SRC_A, &src, 1u);
 
     *p_count     = 0u;
     *p_b_overrun = false;
 
-    if (E_OK == er)
+    if (E_OK == err)
     {
         if (0u != (src & FIFO_SRC_OVRN))
         {
@@ -234,7 +236,7 @@ drv_lsm303_fifo_count (uint32_t * p_count, bool * p_b_overrun)
         }
     }
 
-    return (er);
+    return (err);
 }
 
 /*!
@@ -248,17 +250,17 @@ ER
 drv_lsm303_fifo_read (drv_lsm303_accel_t * p_sample)
 {
     uint8_t raw[SAMPLE_BYTES] = {0u};
-    ER      er = reg_read(ADDR_ACC, REG_OUT_X_L_A | AUTO_INCREMENT, raw,
-                          SAMPLE_BYTES);
+    ER      err = reg_read(ADDR_ACC, REG_OUT_X_L_A | AUTO_INCREMENT, raw,
+                           SAMPLE_BYTES);
 
-    if (E_OK == er)
+    if (E_OK == err)
     {
         p_sample->x_mg = to_mg(raw[0], raw[1]);
         p_sample->y_mg = to_mg(raw[2], raw[3]);
         p_sample->z_mg = to_mg(raw[4], raw[5]);
     }
 
-    return (er);
+    return (err);
 }
 
 /*!
@@ -271,14 +273,15 @@ reg_read (uint8_t addr, uint8_t reg, uint8_t * p_buf, uint32_t len)
     uint32_t sent   = 0u;
     uint32_t got    = 0u;
     uint32_t cmd    = 0u;
-    ER       er     = E_OK;
+    ER       err    = E_OK;
 
     i2c_select(addr);
+    // The cast is safe: an 8-bit register address always fits uint32_t.
     out_w(IC_DATA_CMD, (uint32_t) reg);
 
     // Queue the read commands while there is room, and collect the bytes
     // as they arrive (both FIFOs are 16 deep).
-    while ((got < len) && (E_OK == er))
+    while ((got < len) && (E_OK == err))
     {
         if ((sent < len) && (in_w(IC_TXFLR) < TX_FIFO_DEPTH))
         {
@@ -304,11 +307,11 @@ reg_read (uint8_t addr, uint8_t reg, uint8_t * p_buf, uint32_t len)
 
         if (0u != (in_w(IC_RAW_INTR_STAT) & RAW_TX_ABRT))
         {
-            er = E_IO;      // No ACK: chip missing or wrong address.
+            err = E_IO;      // No ACK: chip missing or wrong address.
         }
         else if ((in_w(TIMER_RAWL) - start) > XFER_TIMEOUT_US)
         {
-            er = E_TMOUT;
+            err = E_TMOUT;
         }
         else
         {
@@ -316,17 +319,19 @@ reg_read (uint8_t addr, uint8_t reg, uint8_t * p_buf, uint32_t len)
         }
     }
 
-    if (E_OK == er)
+    if (E_OK == err)
     {
-        er = xfer_finish(start);
+        err = xfer_finish(start);
     }
     else
     {
+        // The cast discards the read: reading IC_CLR_TX_ABRT only clears the
+        // abort flag.
         (void) in_w(IC_CLR_TX_ABRT);
         out_w(IC_ENABLE, 0u);
     }
 
-    return (er);
+    return (err);
 }
 
 /*!
@@ -338,6 +343,8 @@ reg_write (uint8_t addr, uint8_t reg, uint8_t value)
     uint32_t start = in_w(TIMER_RAWL);
 
     i2c_select(addr);
+    // The casts are safe: an 8-bit register address and value always fit
+    // uint32_t, so OR-ing CMD_STOP (bit 9) cannot touch the data bits.
     out_w(IC_DATA_CMD, (uint32_t) reg);
     out_w(IC_DATA_CMD, (uint32_t) value | CMD_STOP);
 
@@ -364,7 +371,7 @@ i2c_select (uint8_t addr)
 static ER
 xfer_finish (uint32_t start_us)
 {
-    ER       er  = E_OK;
+    ER       err = E_OK;
     uint32_t raw = 0u;
 
     do
@@ -372,37 +379,42 @@ xfer_finish (uint32_t start_us)
         raw = in_w(IC_RAW_INTR_STAT);
         if (0u != (raw & RAW_TX_ABRT))
         {
-            er = E_IO;
+            err = E_IO;
         }
         else if ((in_w(TIMER_RAWL) - start_us) > XFER_TIMEOUT_US)
         {
-            er = E_TMOUT;
+            err = E_TMOUT;
         }
         else
         {
             // Not finished yet.
         }
-    } while ((E_OK == er) && (0u == (raw & RAW_STOP_DET)));
+    } while ((E_OK == err) && (0u == (raw & RAW_STOP_DET)));
 
+    // The casts discard the reads: reading these registers only clears the
+    // abort and stop flags.
     (void) in_w(IC_CLR_TX_ABRT);
     (void) in_w(IC_CLR_STOP_DET);
     out_w(IC_ENABLE, 0u);
 
-    return (er);
+    return (err);
 }
 
 /*!
  * @brief Convert one left-justified 12-bit reading to mg.
  */
 static int16_t
-to_mg (uint8_t lo, uint8_t hi)
+to_mg (uint8_t low, uint8_t high)
 {
     // NOTE: The cast to int16_t reinterprets the two's-complement reading.
-    int16_t raw = (int16_t) (uint16_t) ((uint16_t) lo | ((uint16_t) hi << 8));
-    int32_t mg  = ((int32_t) raw / LEFT_JUSTIFY_DIV) * DRV_LSM303_MG_PER_LSB;
+    int16_t raw      = (int16_t) (uint16_t) ((uint16_t) low |
+                                             ((uint16_t) high << 8));
+    int32_t value_mg = ((int32_t) raw / LEFT_JUSTIFY_DIV) *
+                       DRV_LSM303_MG_PER_LSB;
 
-    // NOTE: The cast is safe: |mg| <= 2048 x 4 = 8192.
-    return ((int16_t) mg);
+    // NOTE: The cast is safe: |value_mg| <= 2048 x 4 = 8192.
+    return ((int16_t) value_mg);
 }
 
 /*** end of file ***/
+

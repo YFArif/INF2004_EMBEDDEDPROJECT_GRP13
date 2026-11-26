@@ -172,8 +172,8 @@ typedef struct
 } obst_flags_t;
 
 /* The state enum must fit its field; a misfit stops the build here. */
-typedef char obst_state_check[(S5_OBST_PINGING <= S5_OBST_STATE_MASK)
-                              ? 1 : -1];
+typedef char obst_state_check_t[(S5_OBST_PINGING <= S5_OBST_STATE_MASK)
+                                ? 1 : -1];
 
 static obst_flags_t             g_obst           = {S5_OBST_HOLD, false,
                                                     false, false};
@@ -292,7 +292,7 @@ obstacle_task (INT stacd, void * p_exinf)
  *        then the first of the others. A scan sent together with a HOLD
  *        is therefore still carried out, not lost.
  *
- * @param[in] requests OB_xxx bits taken from flg_obst.
+ * @param[in] requests OB_xxx bits taken from gh_flg_obst.
  */
 static void
 handle_requests (uint32_t requests)
@@ -390,7 +390,7 @@ monitor_step (void)
     {
         enter_fault();
     }
-    else if ((S5_RANGER_CLEAR == reading.status) && g_obst.b_track)
+    else if ((S5_RANGER_CLEAR == reading.status) && (g_obst.b_track))
     {
         // The obstacle was close a moment ago: the beam has lost it, so
         // this ping says nothing about the path being clear.
@@ -457,7 +457,7 @@ static void
 update_track (s5_ranger_reading_t const * p_reading)
 {
     g_obst.b_track = (S5_OBST_SLOW == g_obst.state)
-                && s5_ranger_is_within(p_reading, SLOW_EXIT_MM);
+                && (s5_ranger_is_within(p_reading, SLOW_EXIT_MM));
 
     if (g_obst.b_track)
     {
@@ -710,7 +710,7 @@ watch_step (void)
             g_watch_last_mm  = odom;
             g_watch_ahead_mm = ahead;
         }
-        else if (g_obst.b_watch_seen && (unseen >= WATCH_GONE_MM))
+        else if ((g_obst.b_watch_seen) && (unseen >= WATCH_GONE_MM))
         {
             watch_passed(RULE_ECHO_GONE, g_watch_ahead_mm - unseen, driven);
         }
@@ -1010,6 +1010,8 @@ set_state (subsystem5_obst_state_t state)
                        (int32_t) state);
     }
 
+    // NOTE: The cast is safe: state is a subsystem5_obst_state_t value, and
+    // obst_state_check_t proves the largest one fits the mask.
     g_obst.state   = (uint32_t) state & S5_OBST_STATE_MASK;
     g_status.state = g_obst.state;
     subsystem5_obst_status_put(&g_status);
@@ -1136,3 +1138,4 @@ count_run (uint32_t run, bool b_condition)
 }
 
 /*** end of file ***/
+

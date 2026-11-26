@@ -223,3 +223,4 @@ duty_to_counts (uint32_t duty_permille)
 }
 
 /*** end of file ***/
+

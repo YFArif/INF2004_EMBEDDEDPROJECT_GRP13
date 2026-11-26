@@ -347,7 +347,7 @@ post_to_s5 (uint8_t opcode, uint8_t cmd_id)
 /*!
  * @brief Give one received map to S3: the map function given to s1_telem.c.
  *
- * s3_set_nav_map() takes mtx_s3 with TMO_FEVR, so it may wait while S3's
+ * s3_set_nav_map() takes gh_mtx_s3 with TMO_FEVR, so it may wait while S3's
  * line or barcode task holds that mutex, and it prints one console line
  * with tm_printf() on this task's stack (S1-U25 measures the stack).
  *

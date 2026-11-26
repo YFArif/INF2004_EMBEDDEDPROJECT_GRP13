@@ -4,8 +4,8 @@
  *        so that buttons are read and time limits are checked.
  *
  * @par Each wake-up
- * 0. S3's events (flg_s3) are added to the mission events.
- * 1. Dashboard commands (mbf_cmd): carried out and acknowledged.
+ * 0. S3's events (gh_flg_s3) are added to the mission events.
+ * 1. Dashboard commands (gh_mbf_cmd): carried out and acknowledged.
  * 2. EV_START, EV_STOP and EV_RESET raised directly by another task:
  *    carried out like commands, without an acknowledgement.
  * 3. Buttons (not in test images): Button 1 press = START, or STOP if a
@@ -102,11 +102,13 @@ handle_event_commands (uint32_t events, uint32_t now_ms)
 
     if (0u != (events & EV_RESET))
     {
+        // NOTE: As above, the result is not acknowledged.
         (void) s5_mission_command(S5_CMD_RESET, now_ms);
     }
 
     if (0u != (events & EV_START))
     {
+        // NOTE: As above, the result is not acknowledged.
         (void) s5_mission_command(S5_CMD_START, now_ms);
     }
 }
@@ -158,3 +160,4 @@ handle_buttons (uint32_t elapsed_ms, uint32_t now_ms)
 }
 
 /*** end of file ***/
+

@@ -6,8 +6,8 @@
  *
  * @par Status of each link
  * - S2 motion (Arif): REAL. subsystem2_xxx().
- * - S3 line following (Sean): REAL. flg_line (IF-07), flg_s3 (IF-S3c),
- *   mbf_nav (IF-01) and the line status (IF-S3b) from s3_api.h. While
+ * - S3 line following (Sean): REAL. gh_flg_line (IF-07), gh_flg_s3 (IF-S3c),
+ *   gh_mbf_nav (IF-01) and the line status (IF-S3b) from s3_api.h. While
  *   S3's sensors are not calibrated, or the S5 floor tests switch the
  *   line off, s5_links_line_is_ready() is false and the controller takes
  *   the line as found where it is expected (s5_avoid.c, s5_mission.c).
@@ -73,3 +73,4 @@ void    s5_links_ack(uint8_t opcode, uint8_t cmd_id, bool b_accepted);
 #endif /* S5_LINKS_H */
 
 /*** end of file ***/
+

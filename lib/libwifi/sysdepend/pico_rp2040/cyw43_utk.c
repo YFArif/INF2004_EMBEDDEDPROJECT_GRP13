@@ -240,7 +240,7 @@ wifi_rejoin_report (const s1_wifi_rejoin_change_t * p_change)
                          (const UB *)"S1: wifi rejoin %s -> %s attempt=%u "
                                      "status=%d wait=%u ms (%s)\n",
                          s1_wifi_rejoin_state_name(p_change->from),
-                         s1_wifi_rejoin_state_name(p_change->to),
+                         s1_wifi_rejoin_state_name(p_change->to_state),
                          (unsigned int)p_change->attempt,
                          (int)p_change->link_status,
                          (unsigned int)p_change->wait_msec,

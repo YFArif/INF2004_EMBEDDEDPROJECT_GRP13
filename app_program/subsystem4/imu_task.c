@@ -2,7 +2,7 @@
  *
  * @brief imu_task: the "Physics Watchdog" (Week 6 report 6.5).
  *
- * @par Every 20 ms (cyc_imu)
+ * @par Every 20 ms (gh_cyc_imu)
  * 1. Read every new accelerometer sample from the FIFO (400 Hz, about 8
  *    per cycle) and turn it into robot axes: forward, left, up (mg).
  * 2. Lifted / overturned (2026-11-11 brief, replaces impact): sets
@@ -130,7 +130,7 @@ typedef struct
 {
     int32_t fwd;
     int32_t left;
-    int32_t up;
+    int32_t upward;
 } body_t;
 
 typedef struct
@@ -191,8 +191,8 @@ typedef struct
     int32_t  pitch_raw_cdeg;
     int32_t  pitch_cdeg;
     int32_t  roll_cdeg;
-    float    h_mm;
-    float    hump_peak_mm;
+    float32_t h_mm;
+    float32_t hump_peak_mm;
     int32_t  theta_max_cdeg;
     int32_t  run_peak_mm;
     uint32_t hump_count;
@@ -246,7 +246,7 @@ static void     imu_class(subsystem2_odom_t const * p_odom);
 static void     imu_impact_follow_up(void);
 static void     imu_lift_check(void);
 static void     imu_lift_stop(void);
-static void     imu_lift_signal(uint32_t ev);
+static void     imu_lift_signal(uint32_t event);
 static void     imu_degrade(char const * p_why);
 static void     imu_publish(void);
 static void     imu_log(void);
@@ -267,9 +267,12 @@ imu_task (INT stacd, void * p_exinf)
 {
     uint32_t events = 0u;
 
+    // The casts mark the arguments as unused.
     (void) stacd;
     (void) p_exinf;
 
+    // The casts are safe: BOOT_WAIT_MS (3000) fits TMO, and a failed delay only
+    // shortens the wait for the sensor to boot.
     (void) tk_dly_tsk((TMO) BOOT_WAIT_MS);
     imu_setup();
 
@@ -299,11 +302,18 @@ imu_setup (void)
     g_imu.hump      = S4_HUMP_FLAT;
     g_imu.cls       = S4_CLASS_STATIONARY;
 
+    // The cast is for tm_printf only: the text is an ASCII literal, which
+    // tm_printf reads as UB.
     tm_printf((UB *) "\nS4 IMU: LSM303DLHC on I2C0 SDA=GP4 SCL=GP5\n");
+    // The casts are for tm_printf only: the format is an ASCII literal, and
+    // each value is printed with %d, so a value outside INT's range would only
+    // print wrong.
     tm_printf((UB *) "S4 terrain stored in %d B (%d bits); unpacked %d B\n",
               (INT) sizeof(s4_terrain_packed_t), (INT) S4_PACKED_BITS,
               (INT) sizeof(subsystem4_terrain_t));
 
+    // The cast discards the result: drv_lsm303_open() always returns E_OK, and
+    // imu_start_chip() below checks that the chip answers.
     (void) drv_lsm303_open();
 
     g_imu.b_imu_ok = true;
@@ -328,7 +338,7 @@ static bool
 imu_start_chip (void)
 {
     drv_lsm303_info_t info = {0};
-    ER                er   = drv_lsm303_init(&info);
+    ER                err  = drv_lsm303_init(&info);
 
     g_imu.status.b_started = true;
     g_imu.status.b_acc_ok  = info.b_acc_ok;
@@ -338,6 +348,9 @@ imu_start_chip (void)
     g_imu.status.mag_id[2] = info.mag_id[2];
     subsystem4_status_put(&g_imu.status);
 
+    // The casts are for tm_printf only: the format is an ASCII literal, and
+    // each value is printed with %d, so a value outside INT's range would only
+    // print wrong.
     tm_printf((UB *) "S4 ACC CTRL1=0x%02x CTRL4=0x%02x %s; MAG id=%02x %02x"
               " %02x %s\n", (INT) info.ctrl1, (INT) info.ctrl4,
               info.b_acc_ok ? "PASS" : "FAIL", (INT) info.mag_id[0],
@@ -347,7 +360,7 @@ imu_start_chip (void)
     g_imu.empty_cycles = 0u;
     g_imu.b_lp_ready   = false;
 
-    return (E_OK == er);
+    return (E_OK == err);
 }
 
 /*!
@@ -395,6 +408,8 @@ imu_cycle (uint32_t events)
             if (imu_start_chip())
             {
                 g_imu.b_imu_ok = true;
+                // The cast is for tm_printf only: the text is an ASCII literal,
+                // which tm_printf reads as UB.
                 tm_printf((UB *) "S4 IMU recovered\n");
                 imu_cal_begin();
             }
@@ -434,7 +449,7 @@ imu_cycle (uint32_t events)
     g_imu.prev_dist_mm = odom.dist_mm;
 
     // Hump drive test: one straight MOVE, 10 s after calibration.
-    if ((0 != DRIVE_TEST) && g_imu.b_cal_done && !g_imu.b_drive_sent)
+    if ((0 != DRIVE_TEST) && (g_imu.b_cal_done) && (!g_imu.b_drive_sent))
     {
         g_imu.drive_cycles++;
         if (0u == (g_imu.drive_cycles % DRIVE_TELL_CYCLES))
@@ -460,7 +475,7 @@ imu_cycle (uint32_t events)
 
     g_imu.log_count++;
     // Drive test: one short line every 20 ms while it drives.
-    if (g_imu.b_drive_sent && (g_imu.drive_log < DRIVE_LOG_CYCLES))
+    if ((g_imu.b_drive_sent) && (g_imu.drive_log < DRIVE_LOG_CYCLES))
     {
         g_imu.drive_log++;
         tm_printf((UB *) "S4 D %d %d %d %d %d\n", (INT) g_imu.drive_log,
@@ -493,17 +508,17 @@ imu_read_samples (uint32_t start_us)
     uint32_t           tries  = 0u;
     bool               b_ovr  = false;
     bool               b_ok   = true;
-    ER                 er     = E_IO;
+    ER                 err    = E_IO;
 
-    for (tries = 0u; (tries < I2C_TRIES) && (E_OK != er); tries++)
+    for (tries = 0u; (tries < I2C_TRIES) && (E_OK != err); tries++)
     {
-        er = drv_lsm303_fifo_count(&count, &b_ovr);
-        if (E_OK != er)
+        err = drv_lsm303_fifo_count(&count, &b_ovr);
+        if (E_OK != err)
         {
             g_imu.status.i2c_errors++;
         }
     }
-    b_ok = (E_OK == er);
+    b_ok = (E_OK == err);
 
     if (b_ovr)
     {
@@ -512,23 +527,23 @@ imu_read_samples (uint32_t start_us)
 
     for (idx = 0u; b_ok && (idx < count); idx++)
     {
-        er = E_IO;
-        for (tries = 0u; (tries < I2C_TRIES) && (E_OK != er); tries++)
+        err = E_IO;
+        for (tries = 0u; (tries < I2C_TRIES) && (E_OK != err); tries++)
         {
-            er = drv_lsm303_fifo_read(&sample);
-            if (E_OK != er)
+            err = drv_lsm303_fifo_read(&sample);
+            if (E_OK != err)
             {
                 g_imu.status.i2c_errors++;
             }
         }
-        b_ok = (E_OK == er);
+        b_ok = (E_OK == err);
 
         if (b_ok)
         {
             body = to_body(&sample);
             sum.fwd  += body.fwd;
             sum.left += body.left;
-            sum.up   += body.up;
+            sum.upward += body.upward;
 
             // Sample idx of count was taken about (count - 1 - idx) x
             // 2.5 ms before this cycle started.
@@ -563,9 +578,9 @@ imu_read_samples (uint32_t start_us)
         g_imu.empty_cycles = 0u;
 
         // NOTE: The casts are safe: count <= 32.
-        g_imu.mean.fwd  = sum.fwd / (int32_t) count;
-        g_imu.mean.left = sum.left / (int32_t) count;
-        g_imu.mean.up   = sum.up / (int32_t) count;
+        g_imu.mean.fwd    = sum.fwd / (int32_t) count;
+        g_imu.mean.left   = sum.left / (int32_t) count;
+        g_imu.mean.upward = sum.upward / (int32_t) count;
     }
 
     g_imu.last_samples = count;
@@ -583,10 +598,10 @@ imu_read_samples (uint32_t start_us)
 static void
 imu_impact_check (body_t const * p_s, uint32_t sample_us)
 {
-    int32_t             d_fwd  = 0;
-    int32_t             d_left = 0;
-    int32_t             d2     = 0;
-    subsystem2_status_t s2     = {0};
+    int32_t             d_fwd     = 0;
+    int32_t             d_left    = 0;
+    int32_t             dev_sq    = 0;
+    subsystem2_status_t s2_status = {0};
 
     if (!g_imu.b_lp_ready)
     {
@@ -601,12 +616,13 @@ imu_impact_check (body_t const * p_s, uint32_t sample_us)
     g_imu.lp_left += d_left / IMPACT_LP_DIV;
 
     // |d| <= 16000 mg, so d^2 + d^2 <= 5.2e8 fits int32_t.
-    d2 = (d_fwd * d_fwd) + (d_left * d_left);
-    if (d2 > g_imu.dxy2_max)
+    dev_sq = (d_fwd * d_fwd) + (d_left * d_left);
+    if (dev_sq > g_imu.dxy2_max)
     {
-        g_imu.dxy2_max = d2;
+        g_imu.dxy2_max = dev_sq;
     }
 
+    // The cast marks the argument as unused.
     (void) sample_us;
 }
 
@@ -617,9 +633,10 @@ imu_impact_check (body_t const * p_s, uint32_t sample_us)
  *        up, "up" higher) -> EV_LIFTED (run ends). "up" lower (tipping:
  *        gravity leaves the up axis) or |pitch| or |roll| > 25 deg for
  *        60 ms stops the motors at once, then waits 500 ms: EV_OVERTURNED
- *        if it reaches 60 deg, else EV_LIFTED (held in the hand). Course humps are about 5-10 deg, one
- *        wheel up 19 deg (2026-11-01). MF_ESTOP is set first, so the
- *        motors stop before the controller is told.
+ *        if it reaches 60 deg, else EV_LIFTED (held in the hand). Course
+ *        humps are about 5-10 deg, one wheel up 19 deg (2026-11-01).
+ *        MF_ESTOP is set first, so the motors stop before the controller
+ *        is told.
  */
 static void
 imu_lift_check (void)
@@ -631,7 +648,7 @@ imu_lift_check (void)
 
     if (0 == g_imu.up0_mg)
     {
-        g_imu.up0_mg = g_imu.mean.up;
+        g_imu.up0_mg = g_imu.mean.upward;
     }
 
     tilt = s4_math_abs(g_imu.pitch_cdeg);
@@ -640,9 +657,9 @@ imu_lift_check (void)
         tilt = s4_math_abs(g_imu.roll_cdeg);
     }
 
-    b_up   = (s4_math_abs(g_imu.mean.up - g_imu.up0_mg) > LIFT_UP_MG);
+    b_up   = (s4_math_abs(g_imu.mean.upward - g_imu.up0_mg) > LIFT_UP_MG);
     b_tilt = (tilt > LIFT_TILT_CDEG);
-    b_over = ((tilt > OVERTURN_CDEG) || (g_imu.mean.up < 0));
+    b_over = ((tilt > OVERTURN_CDEG) || (g_imu.mean.upward < 0));
 
     g_imu.lift_up_cycles   = b_up ? (g_imu.lift_up_cycles + 1u) : 0u;
     g_imu.lift_tilt_cycles = b_tilt ? (g_imu.lift_tilt_cycles + 1u) : 0u;
@@ -662,7 +679,7 @@ imu_lift_check (void)
             g_imu.tilt_wait = 0u;
             imu_lift_signal(EV_OVERTURNED);
         }
-        else if (--g_imu.tilt_wait == 0u)
+        else if (0u == --g_imu.tilt_wait)
         {
             imu_lift_signal(EV_LIFTED);
         }
@@ -684,7 +701,7 @@ imu_lift_check (void)
         imu_lift_signal(EV_OVERTURNED);
     }
     else if ((g_imu.lift_up_cycles >= LIFT_UP_CYCLES)
-             && (g_imu.mean.up > g_imu.up0_mg))
+             && (g_imu.mean.upward > g_imu.up0_mg))
     {
         // Pushed upward: picked up.
         imu_lift_stop();
@@ -708,10 +725,10 @@ imu_lift_check (void)
 static void
 imu_lift_stop (void)
 {
-    subsystem2_status_t s2 = {0};
+    subsystem2_status_t s2_status = {0};
 
-    subsystem2_status_get(&s2);
-    g_imu.brake_us_before = s2.estop_brake_us;
+    subsystem2_status_get(&s2_status);
+    g_imu.brake_us_before = s2_status.estop_brake_us;
     subsystem2_estop_set();
 
     g_imu.b_impact     = true;      // Latched until MF_ESTOP clears.
@@ -725,21 +742,24 @@ imu_lift_stop (void)
  * @brief Tell S5 why the robot stopped: EV_LIFTED or EV_OVERTURNED.
  */
 static void
-imu_lift_signal (uint32_t ev)
+imu_lift_signal (uint32_t event)
 {
     // Shown on the dashboard from now on (motion class), until MF_ESTOP
     // clears. Set before S5 is told, so telemetry never lags the event.
     // NOTE: The casts are safe: both classes are 6 or 7.
-    g_imu.stop_cls = (EV_LIFTED == ev) ? (uint8_t) S4_CLASS_LIFTED
-                                       : (uint8_t) S4_CLASS_OVERTURNED;
-    subsystem5_mission_signal(ev);
+    g_imu.stop_cls = (EV_LIFTED == event) ? (uint8_t) S4_CLASS_LIFTED
+                                          : (uint8_t) S4_CLASS_OVERTURNED;
+    subsystem5_mission_signal(event);
 
+    // The casts are for tm_printf only: the format is an ASCII literal, and
+    // each value is printed with %d, so a value outside INT's range would only
+    // print wrong.
     tm_printf((UB *) "S4 %s: up=%d mg (rest %d) p=%d r=%d cdeg"
               " -> MF_ESTOP, %s\n",
-              (EV_LIFTED == ev) ? "LIFTED" : "OVERTURNED",
-              (INT) g_imu.mean.up, (INT) g_imu.up0_mg,
+              (EV_LIFTED == event) ? "LIFTED" : "OVERTURNED",
+              (INT) g_imu.mean.upward, (INT) g_imu.up0_mg,
               (INT) g_imu.pitch_cdeg, (INT) g_imu.roll_cdeg,
-              (EV_LIFTED == ev) ? "EV_LIFTED" : "EV_OVERTURNED");
+              (EV_LIFTED == event) ? "EV_LIFTED" : "EV_OVERTURNED");
 }
 
 /*!
@@ -771,31 +791,32 @@ imu_motion (subsystem2_odom_t const * p_odom)
 static void
 imu_pitch (void)
 {
-    float fwd   = (float) g_imu.mean.fwd;
-    float left  = (float) g_imu.mean.left;
-    float up    = (float) g_imu.mean.up;
-    float horiz = 0.0f;
+    float32_t fwd    = (float32_t) g_imu.mean.fwd;
+    float32_t left   = (float32_t) g_imu.mean.left;
+    float32_t upward = (float32_t) g_imu.mean.upward;
+    float32_t horiz  = 0.0f;
 
-    if ((0 != AFWD_CORRECTION) && !g_imu.b_calibrating)
+    if ((0 != AFWD_CORRECTION) && (!g_imu.b_calibrating))
     {
         // a_fwd in mg = mm/s^2 x 1000 / 9807.
-        fwd -= (float) ((g_imu.afwd_mms2 * MG_PER_G) / G_MMS2);
+        fwd -= (float32_t) ((g_imu.afwd_mms2 * MG_PER_G) / G_MMS2);
     }
 
-    horiz = s4_math_sqrt((left * left) + (up * up));
+    horiz = s4_math_sqrt((left * left) + (upward * upward));
     g_imu.pitch_raw_cdeg = s4_math_atan2_cdeg(fwd, horiz);
     // Low-pass (1/4 per cycle, about 70 ms): driving vibration made the
     // raw 20 ms pitch jump +/-5 deg (2026-11-01 drive test).
     if (g_imu.b_calibrating)
     {
         g_imu.pitch_cdeg = g_imu.pitch_raw_cdeg - g_imu.pitch0_cdeg;
-        g_imu.roll_cdeg  = s4_math_atan2_cdeg(left, up) - g_imu.roll0_cdeg;
+        g_imu.roll_cdeg  = s4_math_atan2_cdeg(left, upward) - g_imu.roll0_cdeg;
     }
     else
     {
         g_imu.pitch_cdeg += ((g_imu.pitch_raw_cdeg - g_imu.pitch0_cdeg)
                              - g_imu.pitch_cdeg) / ANGLE_LP_DIV;
-        g_imu.roll_cdeg  += ((s4_math_atan2_cdeg(left, up) - g_imu.roll0_cdeg)
+        g_imu.roll_cdeg  += ((s4_math_atan2_cdeg(left, upward)
+                              - g_imu.roll0_cdeg)
                              - g_imu.roll_cdeg) / ANGLE_LP_DIV;
     }
 }
@@ -816,6 +837,8 @@ imu_cal_begin (void)
     g_imu.pitch0_cdeg   = 0;
     g_imu.roll0_cdeg    = 0;
 
+    // The cast is for tm_printf only: the text is an ASCII literal, which
+    // tm_printf reads as UB.
     tm_printf((UB *) "S4 CAL start: keep the robot still and level for 2 s\n");
 }
 
@@ -836,7 +859,7 @@ imu_cal_step (void)
 
     now[0] = g_imu.mean.fwd;
     now[1] = g_imu.mean.left;
-    now[2] = g_imu.mean.up;
+    now[2] = g_imu.mean.upward;
     for (idx = 0u; idx < AXES; idx++)
     {
         if ((0u == g_imu.cal_cycles) || (now[idx] < g_imu.cal_min[idx]))
@@ -856,6 +879,9 @@ imu_cal_step (void)
     if ((spread > CAL_SPREAD_MG)
         || (s4_math_abs(odom.speed_mms) > CAL_STILL_MMS))
     {
+        // The casts are for tm_printf only: the format is an ASCII literal, and
+        // each value is printed with %d, so a value outside INT's range would
+        // only print wrong.
         tm_printf((UB *) "S4 CAL robot moved (spread %d mg, speed %d mm/s),"
                   " starting again\n", (INT) spread, (INT) odom.speed_mms);
         imu_cal_begin();
@@ -877,14 +903,19 @@ imu_cal_step (void)
     imu_orientation(mean);
 
     {
-        float fwd  = (float) axis_value(mean, g_imu.fwd_idx, g_imu.fwd_sign);
-        float left = (float) axis_value(mean, g_imu.left_idx,
-                                        g_imu.left_sign);
-        float up   = (float) axis_value(mean, g_imu.up_idx, g_imu.up_sign);
+        // The casts are safe: each mean is an accelerometer reading of at most
+        // a few thousand mg, which float32_t holds exactly.
+        float32_t fwd    = (float32_t) axis_value(mean, g_imu.fwd_idx,
+                                                  g_imu.fwd_sign);
+        float32_t left   = (float32_t) axis_value(mean, g_imu.left_idx,
+                                                  g_imu.left_sign);
+        float32_t upward = (float32_t) axis_value(mean, g_imu.up_idx,
+                                                  g_imu.up_sign);
 
         g_imu.pitch0_cdeg = s4_math_atan2_cdeg(fwd,
-                                s4_math_sqrt((left * left) + (up * up)));
-        g_imu.roll0_cdeg  = s4_math_atan2_cdeg(left, up);
+                                s4_math_sqrt((left * left) +
+                                             (upward * upward)));
+        g_imu.roll0_cdeg  = s4_math_atan2_cdeg(left, upward);
     }
 
     g_imu.b_calibrating = false;
@@ -899,6 +930,9 @@ imu_cal_step (void)
     g_imu.h_mm          = 0.0f;
     g_imu.hold          = 0u;
 
+    // The casts are for tm_printf only: the format is an ASCII literal, and
+    // each value is printed with %d, so a value outside INT's range would only
+    // print wrong.
     tm_printf((UB *) "S4 CAL done: g=(%d,%d,%d) mg, up=%c%c fwd=%c%c,"
               " pitch0=%d roll0=%d cdeg\n", (INT) mean[0], (INT) mean[1],
               (INT) mean[2], (g_imu.up_sign > 0) ? '+' : '-',
@@ -916,34 +950,37 @@ imu_cal_step (void)
 static void
 imu_orientation (int32_t const * p_mean)
 {
-    uint32_t up  = 0u;
+    uint32_t up_axis = 0u;
     uint32_t idx = 0u;
-    uint32_t k   = 0u;
+    uint32_t left_axis = 0u;
     int32_t  eps = 0;
 
     for (idx = 1u; idx < AXES; idx++)
     {
-        if (s4_math_abs(p_mean[idx]) > s4_math_abs(p_mean[up]))
+        if (s4_math_abs(p_mean[idx]) > s4_math_abs(p_mean[up_axis]))
         {
-            up = idx;
+            up_axis = idx;
         }
     }
 
-    if (up == g_imu.fwd_idx)
+    if (up_axis == g_imu.fwd_idx)
     {
+        // The casts are for tm_printf only: the format is an ASCII literal, and
+        // each value is printed with %d, so a value outside INT's range would
+        // only print wrong.
         tm_printf((UB *) "S4 CAL WARNING: the forward axis points up; fix"
                   " IMU_FWD_AXIS in imu_task.c\n");
         return;
     }
 
-    g_imu.up_idx  = up;
-    g_imu.up_sign = (p_mean[up] >= 0) ? 1 : -1;
+    g_imu.up_idx  = up_axis;
+    g_imu.up_sign = (p_mean[up_axis] >= 0) ? 1 : -1;
 
     // The third axis; (up, fwd, k) cyclic means +1 (right-handed).
-    k   = (AXES - ((up + g_imu.fwd_idx) % AXES)) % AXES;
-    eps = (((up + 1u) % AXES) == g_imu.fwd_idx) ? 1 : -1;
+    left_axis = (AXES - ((up_axis + g_imu.fwd_idx) % AXES)) % AXES;
+    eps = (((up_axis + 1u) % AXES) == g_imu.fwd_idx) ? 1 : -1;
 
-    g_imu.left_idx  = k;
+    g_imu.left_idx  = left_axis;
     g_imu.left_sign = g_imu.up_sign * g_imu.fwd_sign * eps;
 }
 
@@ -961,7 +998,9 @@ imu_hump (subsystem2_odom_t const * p_odom)
     int32_t l_sin = 0;
     int32_t signed_pitch = 0;
 
-    g_imu.h_mm += s4_math_sin_cdeg(pitch) * (float) ds_mm;
+    // The cast is safe: ds_mm is the distance since the last period, far below
+    // 2^24 mm, so float32_t holds it exactly.
+    g_imu.h_mm += s4_math_sin_cdeg(pitch) * (float32_t) ds_mm;
 
     imu_side_hump(p_odom);
 
@@ -1006,6 +1045,9 @@ imu_hump (subsystem2_odom_t const * p_odom)
                     g_imu.hump_sign      = (pitch > 0) ? 1 : -1;
                     g_imu.hump_peak_mm   = 0.0f;
                     g_imu.theta_max_cdeg = s4_math_abs(pitch);
+                    // The casts are for tm_printf only: the format is an ASCII
+                    // literal, and each value is printed with %d, so a value
+                    // outside INT's range would only print wrong.
                     tm_printf((UB *) "S4 HUMP climbing (nose %s)\n",
                               (pitch > 0) ? "up" : "down");
                 }
@@ -1033,13 +1075,16 @@ imu_hump (subsystem2_odom_t const * p_odom)
                 > (int32_t) g_imu.hump_peak_mm)
             {
                 // NOTE: The cast is safe: a hump is far below 2^31 mm.
-                g_imu.hump_peak_mm = (float) s4_math_abs((int32_t) g_imu.h_mm);
+                g_imu.hump_peak_mm =
+                    (float32_t) s4_math_abs((int32_t) g_imu.h_mm);
             }
 
             if ((S4_HUMP_CLIMBING == g_imu.hump)
                 && (signed_pitch < -HUMP_ENTER_CDEG))
             {
                 g_imu.hump = S4_HUMP_DESCENDING;
+                // The cast is for tm_printf only: the text is an ASCII literal,
+                // which tm_printf reads as UB.
                 tm_printf((UB *) "S4 HUMP descending\n");
             }
 
@@ -1048,7 +1093,10 @@ imu_hump (subsystem2_odom_t const * p_odom)
                 g_imu.hold++;
                 if (g_imu.hold >= HUMP_HOLD_CYCLES)
                 {
-                    l_sin = (int32_t) (((float) WHEELBASE_MM
+                    // The casts are safe: WHEELBASE_MM is a small constant that
+                    // float32_t holds exactly, and the product is at most
+                    // WHEELBASE_MM, which fits int32_t.
+                    l_sin = (int32_t) (((float32_t) WHEELBASE_MM
                             * s4_math_sin_cdeg(g_imu.theta_max_cdeg))
                             + ROUND_HALF);
 
@@ -1062,6 +1110,9 @@ imu_hump (subsystem2_odom_t const * p_odom)
                         g_imu.run_peak_mm = peak;
                     }
 
+                    // The casts are for tm_printf only: the format is an ASCII
+                    // literal, and each value is printed with %d, so a value
+                    // outside INT's range would only print wrong.
                     tm_printf((UB *) "S4 HUMP #%d peak=%d mm theta_max=%d"
                               " cdeg L.sin=%d mm integrated=%d mm (run peak"
                               " %d mm)\n", (INT) g_imu.hump_count, (INT) peak,
@@ -1112,6 +1163,9 @@ imu_side_hump (subsystem2_odom_t const * p_odom)
             g_imu.side_roll_sum_cdeg = roll;
             g_imu.side_n             = 1u;
             g_imu.side_start_mm      = p_odom->dist_mm;
+            // The casts are for tm_printf only: the format is an ASCII literal,
+            // and each value is printed with %d, so a value outside INT's range
+            // would only print wrong.
             tm_printf((UB *) "S4 HUMP one wheel up (%s side)\n",
                       (g_imu.roll_cdeg > 0) ? "left" : "right");
         }
@@ -1142,8 +1196,8 @@ imu_side_hump (subsystem2_odom_t const * p_odom)
         else if (g_imu.side_hold >= HUMP_HOLD_CYCLES)
         {
             // NOTE: The cast is safe: |height| <= 112 mm.
-            avg = g_imu.side_roll_sum_cdeg / (int32_t) g_imu.side_n;
-            height = (int32_t) (((float) S2_TRACK_MM
+            avg    = g_imu.side_roll_sum_cdeg / (int32_t) g_imu.side_n;
+            height = (int32_t) (((float32_t) S2_TRACK_MM
                                  * s4_math_sin_cdeg(avg))
                                 + ROUND_HALF);
             g_imu.hump_count++;
@@ -1152,6 +1206,9 @@ imu_side_hump (subsystem2_odom_t const * p_odom)
                 g_imu.run_peak_mm = height;
             }
 
+            // The casts are for tm_printf only: the format is an ASCII literal,
+            // and each value is printed with %d, so a value outside INT's range
+            // would only print wrong.
             tm_printf((UB *) "S4 HUMP #%d (one wheel) peak=%d mm roll_avg=%d"
                       " roll_max=%d cdeg over %d mm (run peak %d mm)\n",
                       (INT) g_imu.hump_count, (INT) height, (INT) avg,
@@ -1161,6 +1218,10 @@ imu_side_hump (subsystem2_odom_t const * p_odom)
 
             g_imu.b_side    = false;
             g_imu.side_hold = 0u;
+        }
+        else
+        {
+            // Still on the hump, or not level for long enough yet.
         }
     }
 }
@@ -1177,14 +1238,16 @@ imu_class (subsystem2_odom_t const * p_odom)
 {
     subsystem4_class_t cand = S4_CLASS_MOVING;
 
-    if (g_imu.b_impact && !subsystem2_estop_is_set())
+    if ((g_imu.b_impact) && (!subsystem2_estop_is_set()))
     {
         g_imu.b_impact = false;
         g_imu.stop_cls = 0u;
+        // The cast is for tm_printf only: the text is an ASCII literal, which
+        // tm_printf reads as UB.
         tm_printf((UB *) "S4 LIFT/OVERTURN STOP cleared (MF_ESTOP cleared)\n");
     }
 
-    if (g_imu.b_impact && (0u != g_imu.stop_cls))
+    if ((g_imu.b_impact) && (0u != g_imu.stop_cls))
     {
         // NOTE: The cast is safe: stop_cls holds LIFTED or OVERTURNED.
         cand = (subsystem4_class_t) g_imu.stop_cls;
@@ -1230,6 +1293,9 @@ imu_class (subsystem2_odom_t const * p_odom)
                                 || (g_imu.cls_count >= CLASS_HOLD_CYCLES)))
     {
         g_imu.cls = cand;
+        // The casts are for tm_printf only: the format is an ASCII literal, and
+        // each value is printed with %d, so a value outside INT's range would
+        // only print wrong.
         tm_printf((UB *) "S4 CLASS %s t=%d ms\n", class_name(cand),
                   (INT) (now_us() / 1000u));
     }
@@ -1242,22 +1308,27 @@ imu_class (subsystem2_odom_t const * p_odom)
 static void
 imu_impact_follow_up (void)
 {
-    subsystem2_status_t s2 = {0};
+    subsystem2_status_t s2_status = {0};
 
     if (g_imu.latency_wait > 0u)
     {
         g_imu.latency_wait--;
-        subsystem2_status_get(&s2);
+        subsystem2_status_get(&s2_status);
 
-        if (s2.estop_brake_us != g_imu.brake_us_before)
+        if (s2_status.estop_brake_us != g_imu.brake_us_before)
         {
+            // The casts are for tm_printf only: the format is an ASCII literal,
+            // and each value is printed with %d, so a value outside INT's range
+            // would only print wrong.
             tm_printf((UB *) "S4 LIFT/OVERTURN STOP braked %d us after the"
                       " sample\n",
-                      (INT) (s2.estop_brake_us - g_imu.impact_us));
+                      (INT) (s2_status.estop_brake_us - g_imu.impact_us));
             g_imu.latency_wait = 0u;
         }
         else if (0u == g_imu.latency_wait)
         {
+            // The cast is for tm_printf only: the text is an ASCII literal,
+            // which tm_printf reads as UB.
             tm_printf((UB *) "S4 LIFT/OVERTURN STOP no brake time from S2\n");
         }
         else
@@ -1291,31 +1362,35 @@ imu_degrade (char const * p_why)
 static void
 imu_publish (void)
 {
-    subsystem4_terrain_t t = {0};
+    subsystem4_terrain_t terrain = {0};
     int32_t live_mm = 0;
     int32_t side_mm = 0;
 
     // NOTE: The casts are safe: s4_terrain_pack clamps every field.
-    t.pitch_hdeg    = (int16_t) s4_math_clamp(g_imu.pitch_cdeg / CDEG_PER_HDEG,
-                                              INT16_MIN, INT16_MAX);
-    t.roll_hdeg     = (int16_t) s4_math_clamp(g_imu.roll_cdeg / CDEG_PER_HDEG,
-                                              INT16_MIN, INT16_MAX);
-    t.turn_rate_dps = (int16_t) s4_math_clamp(g_imu.turn_cdps / CDPS_PER_DPS,
-                                              INT16_MIN, INT16_MAX);
-    t.peak_mm       = (uint8_t) s4_math_clamp(g_imu.run_peak_mm, 0,
-                                              S4_PEAK_MM_MAX);
-    t.hump_state    = (uint8_t) g_imu.hump;
-    t.motion_class  = (uint8_t) g_imu.cls;
-    t.hump_count    = (uint8_t) s4_math_clamp((int32_t) g_imu.hump_count, 0,
-                                              S4_HUMP_COUNT_MAX);
-    t.b_imu_ok      = g_imu.b_imu_ok;
-    t.b_cal_done    = g_imu.b_cal_done;
+    terrain.pitch_hdeg    =
+        (int16_t) s4_math_clamp(g_imu.pitch_cdeg / CDEG_PER_HDEG,
+                                INT16_MIN, INT16_MAX);
+    terrain.roll_hdeg     =
+        (int16_t) s4_math_clamp(g_imu.roll_cdeg / CDEG_PER_HDEG,
+                                INT16_MIN, INT16_MAX);
+    terrain.turn_rate_dps =
+        (int16_t) s4_math_clamp(g_imu.turn_cdps / CDPS_PER_DPS,
+                                INT16_MIN, INT16_MAX);
+    terrain.peak_mm       =
+        (uint8_t) s4_math_clamp(g_imu.run_peak_mm, 0, S4_PEAK_MM_MAX);
+    terrain.hump_state    = (uint8_t) g_imu.hump;
+    terrain.motion_class  = (uint8_t) g_imu.cls;
+    terrain.hump_count    =
+        (uint8_t) s4_math_clamp((int32_t) g_imu.hump_count, 0,
+                                S4_HUMP_COUNT_MAX);
+    terrain.b_imu_ok      = g_imu.b_imu_ok;
+    terrain.b_cal_done    = g_imu.b_cal_done;
     // Reported once the kind is known: during the 500 ms tilt wait the
     // motors are already stopped (MF_ESTOP) but LIFTED vs OVERTURNED is
     // not decided, so the dashboard shows neither yet.
-    t.b_impact      = g_imu.b_impact && (0u != g_imu.stop_cls);
+    terrain.b_impact      = (g_imu.b_impact) && (0u != g_imu.stop_cls);
 
-    subsystem4_terrain_put(&t);
+    subsystem4_terrain_put(&terrain);
 
     // Live hump height from the tilt alone (no odometry, so a hand push
     // works too): the raised end over the wheelbase (pitch) or the raised
@@ -1324,10 +1399,10 @@ imu_publish (void)
     if ((s4_math_abs(g_imu.pitch_cdeg) >= HUMP_FLAT_CDEG)
         || (s4_math_abs(g_imu.roll_cdeg) >= SIDE_FLAT_CDEG))
     {
-        live_mm = (int32_t) (((float) WHEELBASE_MM
+        live_mm = (int32_t) (((float32_t) WHEELBASE_MM
                   * s4_math_sin_cdeg(s4_math_abs(g_imu.pitch_cdeg)))
                   + ROUND_HALF);
-        side_mm = (int32_t) (((float) S2_TRACK_MM
+        side_mm = (int32_t) (((float32_t) S2_TRACK_MM
                   * s4_math_sin_cdeg(s4_math_abs(g_imu.roll_cdeg)))
                   + ROUND_HALF);
         if (side_mm > live_mm)
@@ -1387,12 +1462,12 @@ imu_log (void)
               " cl=%d w=%d hd=%d n=%d dxy=%d run=%d late=%d ok=%d cal=%d\n",
               (INT) g_imu.pitch_cdeg, (INT) g_imu.roll_cdeg,
               (INT) g_imu.mean.fwd, (INT) g_imu.mean.left,
-              (INT) g_imu.mean.up, (INT) g_imu.afwd_mms2,
+              (INT) g_imu.mean.upward, (INT) g_imu.afwd_mms2,
               (INT) (g_imu.h_mm * TENTHS), (INT) g_imu.run_peak_mm,
               (INT) g_imu.hump, (INT) g_imu.cls, (INT) g_imu.turn_cdps,
               (INT) (g_imu.head_cdeg_ms / 100000),
               (INT) g_imu.last_samples,
-              (INT) s4_math_sqrt((float) g_imu.dxy2_max),
+              (INT) s4_math_sqrt((float32_t) g_imu.dxy2_max),
               (INT) g_imu.run_period_max_us, (INT) g_imu.late_period_max_us,
               g_imu.b_imu_ok ? 1 : 0, g_imu.b_cal_done ? 1 : 0);
 
@@ -1407,18 +1482,18 @@ imu_log (void)
 static body_t
 to_body (drv_lsm303_accel_t const * p_s)
 {
-    int32_t v[AXES] = {0};
-    body_t  b       = {0};
+    int32_t axes[AXES] = {0};
+    body_t  body       = {0};
 
-    v[0] = p_s->x_mg;
-    v[1] = p_s->y_mg;
-    v[2] = p_s->z_mg;
+    axes[0] = p_s->x_mg;
+    axes[1] = p_s->y_mg;
+    axes[2] = p_s->z_mg;
 
-    b.fwd  = axis_value(v, g_imu.fwd_idx, g_imu.fwd_sign);
-    b.left = axis_value(v, g_imu.left_idx, g_imu.left_sign);
-    b.up   = axis_value(v, g_imu.up_idx, g_imu.up_sign);
+    body.fwd    = axis_value(axes, g_imu.fwd_idx, g_imu.fwd_sign);
+    body.left   = axis_value(axes, g_imu.left_idx, g_imu.left_sign);
+    body.upward = axis_value(axes, g_imu.up_idx, g_imu.up_sign);
 
-    return (b);
+    return (body);
 }
 
 /*!
@@ -1456,3 +1531,4 @@ class_name (subsystem4_class_t cls)
 }
 
 /*** end of file ***/
+

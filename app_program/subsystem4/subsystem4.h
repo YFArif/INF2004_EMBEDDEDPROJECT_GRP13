@@ -35,8 +35,8 @@
  * - The template's build uses -std=gnu11 rather than C99 (rule 1.1a).
  * - The template's file names subsystem1 ... subsystem5 are not unique in
  *   their first 8 characters (rule 4.1b).
- * - Template section below: mbf_summary and flg_events are declared
- *   extern (rule 4.2c) because S3's example consumer_task still sends to
+ * - Template section below: gh_mbf_summary and gh_flg_events are declared
+ *   extern (rule 4.2c) because S3's example task_consumer_task still sends to
  *   them. Delete them with that example.
  *
  * @par Abbreviations used in S4 (BARR-C 1.5b)
@@ -119,14 +119,14 @@ uint8_t subsystem4_height_get(void); /* Live hump height, 0 ... 255 mm. */
 
 /* ---------------------------------------------------------------------
  *  Template example (IF-03 of the course example), kept only because
- *  S3's consumer_task still sends to it with TMO_POL. Nobody reads it
+ *  S3's task_consumer_task still sends to it with TMO_POL. Nobody reads it
  *  any more, so its lines are simply dropped when the buffer is full.
  * --------------------------------------------------------------------- */
 #define S4_SUMMARY_MAX          (48)
 #define FLG_BATCH               (0x0002)    /* Set by subsystem 3.        */
 
-IMPORT ID mbf_summary;
-IMPORT ID flg_events;
+IMPORT ID gh_mbf_summary;
+IMPORT ID gh_flg_events;
 
 /* ---------------------------------------------------------------------
  *  Private to subsystem 4
@@ -134,10 +134,10 @@ IMPORT ID flg_events;
 #define S4_PRI_IMU              (10)    /* Week 6 report section 3.       */
 #define S4_IMU_PERIOD_MS        (20u)
 
-#define S4_EV_TICK              (0x01u) /* flg_imu: 20 ms period.         */
-#define S4_EV_CAL               (0x02u) /* flg_imu: recalibrate.          */
+#define S4_EV_TICK              (0x01u) /* gh_flg_imu: 20 ms period.      */
+#define S4_EV_CAL               (0x02u) /* gh_flg_imu: recalibrate.       */
 
-void imu_task(INT stacd, void * exinf);
+void imu_task(INT stacd, void * p_exinf);
 uint32_t subsystem4_wait(void);
 void subsystem4_terrain_put(subsystem4_terrain_t const * p_terrain);
 void subsystem4_status_put(subsystem4_status_t const * p_status);
@@ -146,3 +146,4 @@ void subsystem4_height_put(uint8_t height_mm);
 #endif /* SUBSYSTEM4_H */
 
 /*** end of file ***/
+

@@ -306,6 +306,8 @@ choose_angle (int32_t shift_mm, int32_t extra_mm, int32_t face_mm,
         swing_sq = tip_sq;
     }
 
+    // NOTE: The cast is safe: the square root of a uint32_t is below 2^16,
+    // which fits int32_t.
     int32_t swing_mm = (int32_t) s5_math_isqrt(swing_sq) + TURN_MARGIN_MM;
 
     while ((angle < S5_PLAN_OUT_MAX_DEG)
@@ -424,3 +426,4 @@ leg_for_shift (int32_t shift_mm, int32_t angle_deg)
 }
 
 /*** end of file ***/
+

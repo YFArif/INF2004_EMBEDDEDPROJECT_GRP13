@@ -52,14 +52,15 @@ typedef struct
  * p_stats   out: diagnostics (may be NULL)
  * returns   number of durations written (29 for one clean *X* frame)
  */
-uint32_t s3_analog_widths(uint8_t const * p_x, uint32_t n, uint32_t dt_us,
+uint32_t s3_analog_widths(uint8_t const * p_x, uint32_t count, uint32_t dt_us,
                           uint32_t * p_dur, uint32_t max_dur,
                           s3_an_stats_t * p_stats);
 
 /* Join white stripes much shorter than the median white (DOUT flicker
    inside a bar) with the bars around them. Returns the new count. */
-uint32_t s3_merge_gaps(uint32_t * p_dur, uint32_t n);
+uint32_t s3_merge_gaps(uint32_t * p_dur, uint32_t count);
 
 #endif /* S3_ANALOG_H */
 
 /*** end of file ***/
+

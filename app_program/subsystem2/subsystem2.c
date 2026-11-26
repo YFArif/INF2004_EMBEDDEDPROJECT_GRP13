@@ -9,12 +9,12 @@
  * here (except the legacy flg_motion, see subsystem2.h).
  *
  * @par Objects
- * - mbf_motion: IF-04 commands to motion_task, 8 deep, never blocks.
- * - flg_motion: IF-05 MF_ESTOP latch, plus the private MF_TICK bit set by
- *   cyc_motion every 20 ms. Several tasks may wait on it (TA_WMUL).
- * - mtx_odom:   guards the odometry and the status block (IF-06).
- * - mtx_steer:  guards the steering correction (IF-02).
- * - cyc_motion: 20 ms cyclic handler that wakes motion_task.
+ * - gh_mbf_motion: IF-04 commands to motion_task, 8 deep, never blocks.
+ * - flg_motion:    IF-05 MF_ESTOP latch, plus the private MF_TICK bit set
+ *   by gh_cyc_motion every 20 ms. Several tasks may wait on it (TA_WMUL).
+ * - gh_mtx_odom:   guards the odometry and the status block (IF-06).
+ * - gh_mtx_steer:  guards the steering correction (IF-02).
+ * - gh_cyc_motion: 20 ms cyclic handler that wakes motion_task.
  */
 
 #include <stdbool.h>
@@ -56,6 +56,8 @@ _Static_assert(S2_WIRE_TYPE_MAX == S2_CMD_CLEAR,
                "IF-04 packed type range must match the command enum");
 _Static_assert(0u == (S2_MOTION_STACK_BYTES % 8u),
                "stack must be 8-byte sized");
+// The cast is safe: the stack size is a compile-time constant of a few
+// kilobytes, which fits int.
 _Static_assert((TASK_STACK_SIZE + 128) == (int) S2_MOTION_STACK_BYTES,
                "keep motion_task's stack equal to the other tasks'");
 
@@ -63,21 +65,21 @@ _Static_assert((TASK_STACK_SIZE + 128) == (int) S2_MOTION_STACK_BYTES,
  * file builds and runs with or without S3 in the image: without it the
  * address is NULL and the steering stays at 0 (BARR-C 4.2c deviation). */
 extern BOOL s3_get_steer_sp(H * p_dv_mms, UB * p_seq) __attribute__((weak));
-extern void s3_set_odometry(UW (* fn)(void)) __attribute__((weak));
+extern void s3_set_odometry(UW (* p_fn)(void)) __attribute__((weak));
 
-ID                         flg_motion   = 0;    /* Legacy extern.      */
-static ID                  g_mbf_motion = 0;
-static ID                  g_mtx_odom   = 0;
-static ID                  g_mtx_steer  = 0;
-static ID                  g_cyc_motion = 0;
-static subsystem2_odom_t   g_odom       = {0};
-static subsystem2_status_t g_status     = {0};
-static int16_t             g_steer_mms  = 0;
-static uint32_t            g_steer_us   = 0u;  /* When it was set.       */
-static bool                g_steer_ever = false;
-static uint8_t             g_s3_seq     = 0u;  /* Last S3 sequence seen. */
-static uint32_t            g_s3_us      = 0u;  /* When it last changed.  */
-static bool                g_s3_seen    = false;
+ID                         flg_motion    = 0;    /* Legacy extern.      */
+static ID                  gh_mbf_motion = 0;
+static ID                  gh_mtx_odom   = 0;
+static ID                  gh_mtx_steer  = 0;
+static ID                  gh_cyc_motion = 0;
+static subsystem2_odom_t   g_odom        = {0};
+static subsystem2_status_t g_status      = {0};
+static int16_t             g_steer_mms   = 0;
+static uint32_t            g_steer_us    = 0u;   /* When it was set.       */
+static bool                gb_steer_ever = false;
+static uint8_t             g_s3_seq      = 0u;   /* Last S3 sequence seen. */
+static uint32_t            g_s3_us       = 0u;   /* When it last changed.  */
+static bool                gb_s3_seen    = false;
 static uint64_t            g_motion_stack[MOTION_STACK_WORDS];
 
 static ID   motion_task_create(void);
@@ -106,52 +108,52 @@ subsystem2_init (void)
 
     // Only S2's compact wire command enters the message buffer. The
     // public subsystem2_cmd_t stays 6 bytes for peer-source compatibility.
-    cmbf.mbfatr  = TA_TFIFO;
-    cmbf.bufsz   = (SZ) (S2_CMD_QUEUE_LEN * MBF_SLOT_BYTES);
-    cmbf.maxmsz  = (INT) S2_WIRE_BYTES;
-    g_mbf_motion = tk_cre_mbf(&cmbf);
+    cmbf.mbfatr   = TA_TFIFO;
+    cmbf.bufsz    = (SZ) (S2_CMD_QUEUE_LEN * MBF_SLOT_BYTES);
+    cmbf.maxmsz   = (INT) S2_WIRE_BYTES;
+    gh_mbf_motion = tk_cre_mbf(&cmbf);
 
     cflg.flgatr = TA_TFIFO | TA_WMUL;
     flg_motion  = tk_cre_flg(&cflg);
 
     // Priority inheritance bounds the wait when S1 / S3 / S4 / S5 read
     // the odometry while motion_task writes it (Week 6 report section 3).
-    cmtx.mtxatr = TA_INHERIT;
-    g_mtx_odom  = tk_cre_mtx(&cmtx);
-    g_mtx_steer = tk_cre_mtx(&cmtx);
+    cmtx.mtxatr  = TA_INHERIT;
+    gh_mtx_odom  = tk_cre_mtx(&cmtx);
+    gh_mtx_steer = tk_cre_mtx(&cmtx);
 
     // Created stopped; started in subsystem2_start() once motion_task
     // exists. NOTE: The cast is safe: motion_tick has the kernel's cyclic
     // handler signature, void (void *), which FP stands for.
-    ccyc.cycatr  = TA_HLNG;
-    ccyc.cychdr  = (FP) motion_tick;
-    ccyc.cyctim  = S2_MOTION_PERIOD_MS;
-    ccyc.cycphs  = S2_MOTION_PERIOD_MS;
-    g_cyc_motion = tk_cre_cyc(&ccyc);
+    ccyc.cycatr   = TA_HLNG;
+    ccyc.cychdr   = (FP) motion_tick;
+    ccyc.cyctim   = S2_MOTION_PERIOD_MS;
+    ccyc.cycphs   = S2_MOTION_PERIOD_MS;
+    gh_cyc_motion = tk_cre_cyc(&ccyc);
 
-    if (g_mbf_motion < E_OK)
+    if (gh_mbf_motion < E_OK)
     {
-        result = g_mbf_motion;
+        result = gh_mbf_motion;
     }
     else if (flg_motion < E_OK)
     {
         result = flg_motion;
     }
-    else if (g_mtx_odom < E_OK)
+    else if (gh_mtx_odom < E_OK)
     {
-        result = g_mtx_odom;
+        result = gh_mtx_odom;
     }
-    else if (g_mtx_steer < E_OK)
+    else if (gh_mtx_steer < E_OK)
     {
-        result = g_mtx_steer;
+        result = gh_mtx_steer;
     }
-    else if (g_cyc_motion < E_OK)
+    else if (gh_cyc_motion < E_OK)
     {
-        result = g_cyc_motion;
+        result = gh_cyc_motion;
     }
     else
     {
-        result = producer_init();   /* Template example.               */
+        result = task_producer_init();   /* Template example.               */
     }
 
     return (result);
@@ -169,20 +171,20 @@ ER
 subsystem2_start (void)
 {
     ER result = E_OK;
-    ID tid    = motion_task_create();
+    ID h_tid  = motion_task_create();
 
-    if (tid < E_OK)
+    if (h_tid < E_OK)
     {
-        result = tid;
+        result = h_tid;
     }
     else
     {
-        result = tk_sta_cyc(g_cyc_motion);
+        result = tk_sta_cyc(gh_cyc_motion);
     }
 
     if (E_OK == result)
     {
-        result = producer_start();  /* Template example.               */
+        result = task_producer_start();  /* Template example.               */
     }
 
     // S3's line task measures distance moved with this (IF-S3d).
@@ -207,7 +209,8 @@ subsystem2_motion_send (subsystem2_cmd_t const * p_cmd)
     uint32_t packed = s2_wire_pack(p_cmd->type, p_cmd->value,
                                    p_cmd->speed_mms);
 
-    return (tk_snd_mbf(g_mbf_motion, &packed, (INT) S2_WIRE_BYTES, TMO_POL));
+    // The cast is safe: S2_WIRE_BYTES is 4, which fits INT.
+    return (tk_snd_mbf(gh_mbf_motion, &packed, (INT) S2_WIRE_BYTES, TMO_POL));
 }
 
 /*!
@@ -341,9 +344,9 @@ subsystem2_estop_is_set (void)
 void
 subsystem2_odom_get (subsystem2_odom_t * p_odom)
 {
-    CHECK(tk_loc_mtx(g_mtx_odom, TMO_FEVR), "mtx_odom");
+    CHECK(tk_loc_mtx(gh_mtx_odom, TMO_FEVR), "mtx_odom");
     *p_odom = g_odom;
-    CHECK(tk_unl_mtx(g_mtx_odom), "mtx_odom");
+    CHECK(tk_unl_mtx(gh_mtx_odom), "mtx_odom");
 }
 
 /*!
@@ -354,9 +357,9 @@ subsystem2_odom_get (subsystem2_odom_t * p_odom)
 void
 subsystem2_status_get (subsystem2_status_t * p_status)
 {
-    CHECK(tk_loc_mtx(g_mtx_odom, TMO_FEVR), "mtx_odom");
+    CHECK(tk_loc_mtx(gh_mtx_odom, TMO_FEVR), "mtx_odom");
     *p_status = g_status;
-    CHECK(tk_unl_mtx(g_mtx_odom), "mtx_odom");
+    CHECK(tk_unl_mtx(gh_mtx_odom), "mtx_odom");
 }
 
 /*!
@@ -368,11 +371,11 @@ subsystem2_status_get (subsystem2_status_t * p_status)
 void
 subsystem2_steer_set (int16_t dv_mms)
 {
-    CHECK(tk_loc_mtx(g_mtx_steer, TMO_FEVR), "mtx_steer");
-    g_steer_mms  = dv_mms;
-    g_steer_us   = drv_encoder_now_us();
-    g_steer_ever = true;
-    CHECK(tk_unl_mtx(g_mtx_steer), "mtx_steer");
+    CHECK(tk_loc_mtx(gh_mtx_steer, TMO_FEVR), "mtx_steer");
+    g_steer_mms   = dv_mms;
+    g_steer_us    = drv_encoder_now_us();
+    gb_steer_ever = true;
+    CHECK(tk_unl_mtx(gh_mtx_steer), "mtx_steer");
 }
 
 /*!
@@ -422,8 +425,9 @@ bool
 subsystem2_cmd_receive (subsystem2_cmd_t * p_cmd)
 {
     uint32_t packed = 0u;
-    INT      size   = tk_rcv_mbf(g_mbf_motion, &packed, TMO_POL);
+    INT      size   = tk_rcv_mbf(gh_mbf_motion, &packed, TMO_POL);
 
+    // The cast is safe: S2_WIRE_BYTES is 4, which fits INT.
     if ((INT) S2_WIRE_BYTES != size)
     {
         return false;
@@ -443,10 +447,10 @@ void
 subsystem2_odom_put (subsystem2_odom_t const * p_odom,
                      subsystem2_status_t const * p_status)
 {
-    CHECK(tk_loc_mtx(g_mtx_odom, TMO_FEVR), "mtx_odom");
+    CHECK(tk_loc_mtx(gh_mtx_odom, TMO_FEVR), "mtx_odom");
     g_odom   = *p_odom;
     g_status = *p_status;
-    CHECK(tk_unl_mtx(g_mtx_odom), "mtx_odom");
+    CHECK(tk_unl_mtx(gh_mtx_odom), "mtx_odom");
 }
 
 /*!
@@ -463,14 +467,14 @@ subsystem2_steer_get (void)
 
     bool    b_set  = false;
 
-    CHECK(tk_loc_mtx(g_mtx_steer, TMO_FEVR), "mtx_steer");
-    if (g_steer_ever &&
+    CHECK(tk_loc_mtx(gh_mtx_steer, TMO_FEVR), "mtx_steer");
+    if (gb_steer_ever &&
         ((drv_encoder_now_us() - g_steer_us) <= STEER_STALE_US))
     {
         dv_mms = g_steer_mms;
         b_set  = true;
     }
-    CHECK(tk_unl_mtx(g_mtx_steer), "mtx_steer");
+    CHECK(tk_unl_mtx(gh_mtx_steer), "mtx_steer");
 
     // A fresh subsystem2_steer_set() (the S2 tests) wins; otherwise S3.
     if (!b_set)
@@ -501,17 +505,20 @@ s3_steer_read (void)
     int32_t out    = 0;
     uint32_t now   = drv_encoder_now_us();
 
-    if ((NULL != s3_get_steer_sp) && s3_get_steer_sp(&dv_mms, &seq))
+    if ((NULL != s3_get_steer_sp) && (s3_get_steer_sp(&dv_mms, &seq)))
     {
-        if ((!g_s3_seen) || (seq != g_s3_seq))
+        if ((!gb_s3_seen) || (seq != g_s3_seq))
         {
-            g_s3_seen = true;
-            g_s3_seq  = (uint8_t) seq;
-            g_s3_us   = now;
+            gb_s3_seen = true;
+            // The cast is safe: seq is a UB, the same width as uint8_t.
+            g_s3_seq   = (uint8_t) seq;
+            g_s3_us    = now;
         }
 
         if ((now - g_s3_us) <= STEER_STALE_US)
         {
+            // The cast is safe: dv_mms is a 16-bit H, which widens to int32_t
+            // without loss.
             out = -(((int32_t) dv_mms * S2_S3_STEER_PERCENT) / 100);
         }
     }
@@ -580,7 +587,7 @@ static ID
 motion_task_create (void)
 {
     T_CTSK   ctsk   = {0};
-    ID       tid    = 0;
+    ID       h_tid  = 0;
     ER       result = E_OK;
     uint32_t idx    = 0u;
 
@@ -601,20 +608,20 @@ motion_task_create (void)
     ctsk.assprc  = TP_PRC2;
 #endif
 
-    tid = tk_cre_tsk(&ctsk);
+    h_tid = tk_cre_tsk(&ctsk);
 
-    if (tid >= E_OK)
+    if (h_tid >= E_OK)
     {
-        result = tk_sta_tsk(tid, 0);
+        result = tk_sta_tsk(h_tid, 0);
         if (E_OK != result)
         {
-            tid = result;
+            h_tid = result;
         }
     }
 
-    CHECK(tid, "motion_task");
+    CHECK(h_tid, "motion_task");
 
-    return (tid);
+    return (h_tid);
 }
 
 /*!
@@ -641,7 +648,7 @@ cmd_send (subsystem2_cmd_type_t type, int16_t value, uint16_t speed_mms)
 }
 
 /*!
- * @brief cyc_motion handler: start the next 20 ms cycle. Runs in the
+ * @brief gh_cyc_motion handler: start the next 20 ms cycle. Runs in the
  *        timer interrupt, so it only sets a flag bit.
  *
  * @param[in] p_exinf Extended information (unused).
@@ -654,3 +661,4 @@ motion_tick (void * p_exinf)
 }
 
 /*** end of file ***/
+

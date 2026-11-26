@@ -59,12 +59,12 @@
 static void         barcode_task(INT stacd, void * p_exinf);
 static void         hardware_start(void);
 static bool         pass_decode(char * p_ch, uint8_t * p_rev, uint8_t * p_src);
-static void         nav_publish(char ch, uint8_t rev, uint8_t src);
+static void         nav_publish(char letter, uint8_t rev, uint8_t src);
 static void         beep(void);
 #if (1 == S3_BC_VERBOSE)
-static void         result_print(s3_c39_result_t res, char ch);
+static void         result_print(s3_c39_result_t res, char letter);
 static void         stripes_print(char const * p_tag,
-                                  uint32_t const * p_dur, uint32_t n);
+                                  uint32_t const * p_dur, uint32_t count);
 static char const * result_txt(s3_c39_result_t res);
 static char const * opener_txt(uint32_t src);
 #endif
@@ -75,19 +75,27 @@ static char const * opener_txt(uint32_t src);
 ER
 task_barcode_start (void)
 {
-    ID tid = app_start_task((FP) barcode_task, S3_PRI_BARCODE, TP_PRC2,
-                            "s3_barcode_task");
+    ID h_tid = app_start_task((FP) barcode_task, S3_PRI_BARCODE, TP_PRC2,
+                              "s3_barcode_task");
 
-    return (tid < E_OK) ? tid : E_OK;
+    return (h_tid < E_OK) ? h_tid : E_OK;
 }
 
+/*!
+ * @brief The barcode task: decode each finished pass and publish its
+ *        letter.
+ *
+ * @param[in] stacd   Start code; not used.
+ * @param[in] p_exinf Extended information; not used.
+ */
 static void
 barcode_task (INT stacd, void * p_exinf)
 {
-    char    ch;
+    char    letter;
     uint8_t rev;
     uint8_t src;
 
+    /* The casts mark the arguments as unused. */
     (void) stacd;
     (void) p_exinf;
     hardware_start();
@@ -99,26 +107,30 @@ barcode_task (INT stacd, void * p_exinf)
         {
             continue;
         }
-        ch  = '?';
-        rev = 0u;
-        src = 0u;
+        letter = '?';
+        rev    = 0u;
+        src    = 0u;
 #if (1 == S3_TIMING)
         {
-            uint32_t t0     = in_w(TIMER_TIMERAWL);
-            bool     b_ok   = pass_decode(&ch, &rev, &src);
-            uint32_t run_us = in_w(TIMER_TIMERAWL) - t0;
+            uint32_t start_us = in_w(TIMER_TIMERAWL);
+            bool     b_ok     = pass_decode(&letter, &rev, &src);
+            uint32_t run_us   = in_w(TIMER_TIMERAWL) - start_us;
 
+            /* The casts are for tm_printf only: the format is an ASCII literal,
+             * and each value is printed with %d, so a value outside INT's range
+             * would only print wrong.
+             */
             tm_printf((UB *) "S3 TIME barcode decode %d us (both paths)\n",
                       (INT) run_us);
             if (b_ok)
             {
-                nav_publish(ch, rev, src);
+                nav_publish(letter, rev, src);
             }
         }
 #else
-        if (pass_decode(&ch, &rev, &src))
+        if (pass_decode(&letter, &rev, &src))
         {
-            nav_publish(ch, rev, src);
+            nav_publish(letter, rev, src);
         }
 #endif
     }
@@ -135,6 +147,10 @@ hardware_start (void)
     CHECK(drv_barcode_init(), "drv_barcode_init");
     CHECK(drv_adc_init(), "drv_adc_init");
 
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 RUN: barcode DOUT=GP%d AOUT=ADC%d, Left IR=ADC%d "
                      "(GP%d), Centre=ADC%d (GP%d), line sensors: %s\n",
               (INT) DRV_BARCODE_DOUT_PIN, (INT) DRV_BARCODE_ADC_CH,
@@ -154,12 +170,12 @@ hardware_start (void)
 static bool
 pass_decode (char * p_ch, uint8_t * p_rev, uint8_t * p_src)
 {
-    static uint32_t    an_dur[S3_AN_MAX_EXTREMA];  /* Static: stack.     */
+    static uint32_t    an_dur[S3_AN_MAX_EXTREMA];   /* Static: stack.     */
     static uint32_t    dig_dur[S3_AN_MAX_EXTREMA];
     static uint32_t    dig_alt[S3_AN_MAX_EXTREMA];  /* Shifted retry.    */
     uint32_t           n_raw = 0u;
     uint32_t           n_dig = 0u;
-    uint32_t           i;
+    uint32_t           idx;
     drv_barcode_pass_t pass;
     s3_an_stats_t      stats = {0};
     s3_c39_result_t    res_d = S3_C39_BAD_COUNT;
@@ -178,10 +194,10 @@ pass_decode (char * p_ch, uint8_t * p_rev, uint8_t * p_src)
     {
         n_raw = pass.n_edges - 1u;
         n_raw = (n_raw > S3_AN_MAX_EXTREMA) ? S3_AN_MAX_EXTREMA : n_raw;
-        for (i = 0u; i < n_raw; i++)
+        for (idx = 0u; idx < n_raw; idx++)
         {
-            dig_dur[i] = pass.p_dur[i];
-            dig_alt[i] = pass.p_dur[i];
+            dig_dur[idx] = pass.p_dur[idx];
+            dig_alt[idx] = pass.p_dur[idx];
         }
         n_dig = s3_merge_gaps(dig_dur, n_raw);  /* DOUT flicker in a bar. */
         res_d = s3_code39_decode(dig_dur, n_dig, &ch_d, &rev_d);
@@ -207,14 +223,22 @@ pass_decode (char * p_ch, uint8_t * p_rev, uint8_t * p_src)
     }
 
 #if (1 == S3_BC_VERBOSE)
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 PASS digital: edges=%d chatter=%d dropped=%d -> ",
               (INT) pass.n_edges, (INT) pass.glitches, (INT) pass.lost);
     result_print(res_d, ch_d);
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "S3 PASS analog : window=%dms (opened by %s)%s "
                      "stripes=%d white=%d black=%d P=%d -> ",
               (INT) ((pass.n_win * DRV_ADC_SAMPLE_US) / US_PER_MS),
               opener_txt(pass.src),
-              pass.b_clipped ? " TOO SLOW, start lost" : "",
+              (pass.b_clipped) ? " TOO SLOW, start lost" : "",
               (INT) n_an, (INT) stats.min << 4, (INT) stats.max << 4,
               (INT) stats.prominence << 4);
     result_print(res_a, ch_a);
@@ -225,7 +249,7 @@ pass_decode (char * p_ch, uint8_t * p_rev, uint8_t * p_src)
                      "at %d = %d%% of the way to black (%d switches)\n",
               (INT) ((stats.max - stats.min) << 4), (INT) stats.min << 4,
               (INT) stats.max << 4, (INT) pass.dout_level << 4,
-              (INT) ((stats.max > stats.min) && (pass.dout_n > 0u) ?
+              (INT) (((stats.max > stats.min) && (pass.dout_n > 0u)) ?
                      ((((INT) pass.dout_level - (INT) stats.min) * 100) /
                       ((INT) stats.max - (INT) stats.min)) : -1),
               (INT) pass.dout_n);
@@ -282,27 +306,31 @@ pass_decode (char * p_ch, uint8_t * p_rev, uint8_t * p_src)
  *        flag. A second barcode within S3_BC_COOLDOWN_MS is ignored.
  */
 static void
-nav_publish (char ch, uint8_t rev, uint8_t src)
+nav_publish (char letter, uint8_t rev, uint8_t src)
 {
     static uint32_t seq;
     static uint32_t last_ms;
     static bool     b_have_last;
     s3_nav_msg_t    msg    = {0};
     uint32_t        now_ms = s3_now_ms();
-    ER              er;
+    ER              err;
 
     if (b_have_last && ((now_ms - last_ms) < S3_BC_COOLDOWN_MS))
     {
-        tm_printf((UB *) "S3 NAV ignored '%c' (cooldown)\n", ch);
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
+        tm_printf((UB *) "S3 NAV ignored '%c' (cooldown)\n", letter);
         return;
     }
     b_have_last  = true;
     last_ms      = now_ms;
-    msg.ch_idx   = s3_code39_index(ch);
+    msg.ch_idx   = s3_code39_index(letter);
     msg.reversed = (0u != rev) ? 1u : 0u;
     msg.source   = src & NAV_SRC_MASK;
     msg.odom_mm  = s3_odom_mm() & ODOM_16_MASK;
-    msg.cmd      = (uint32_t) s3_nav_lookup(ch);   /* s3_nav_cmd_t values */
+    msg.cmd      = (uint32_t) s3_nav_lookup(letter);   /* s3_nav_cmd_t values */
                                                    /* == s3_cmd_t values. */
     s3_status_set_barcode((uint8_t) msg.ch_idx, (uint8_t) msg.cmd,
                           (uint8_t) msg.reversed);
@@ -313,7 +341,7 @@ nav_publish (char ch, uint8_t rev, uint8_t src)
      * messages only, so a gap at the receiver always means a drop. */
     if (S3_NAV_NONE == (s3_nav_cmd_t) msg.cmd)
     {
-        tm_printf((UB *) "S3 NAV '%c'%s not in today's map: ignored\n", ch,
+        tm_printf((UB *) "S3 NAV '%c'%s not in today's map: ignored\n", letter,
                   (0u != rev) ? " (read backwards)" : "");
         beep();                     /* Decoded, so beep even if unmapped. */
         return;
@@ -321,14 +349,18 @@ nav_publish (char ch, uint8_t rev, uint8_t src)
     seq     = (seq + 1u) & NAV_SEQ_MASK;
     msg.seq = seq;
 
-    er = tk_snd_mbf(mbf_nav, &msg, (INT) sizeof(msg), TMO_POL);  /* Never */
+    err = tk_snd_mbf(gh_mbf_nav, &msg, (INT) sizeof(msg), TMO_POL);  /* Never */
                                                                  /* block. */
-    (void) tk_set_flg(flg_s3, FLG_S3_BARCODE);
+    (void) tk_set_flg(gh_flg_s3, FLG_S3_BARCODE);
 
-    tm_printf((UB *) "S3 NAV #%d '%c' -> %s%s%s\n", (INT) msg.seq, ch,
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
+    tm_printf((UB *) "S3 NAV #%d '%c' -> %s%s%s\n", (INT) msg.seq, letter,
               s3_nav_name((s3_nav_cmd_t) msg.cmd),
               (0u != rev) ? " (read backwards)" : "",
-              (E_OK == er) ? "" : "  [mbf_nav full: nobody is reading it]");
+              (E_OK == err) ? "" : "  [mbf_nav full: nobody is reading it]");
     beep();                         /* After the send: S5 is not delayed. */
 }
 
@@ -348,6 +380,9 @@ beep (void)
     }
     if (!b_ready)
     {
+        /* The casts discard the results: the buzzer pin and its PWM values are
+         * valid constants.
+         */
         (void) pwm_set_wrap(BUZZER_PIN, BUZZER_TOP);
         (void) pwm_set_cc(BUZZER_PIN, 0u);      /* Silent until a beep. */
         (void) pwm_set_pin(BUZZER_PIN);
@@ -360,15 +395,26 @@ beep (void)
 }
 
 #if (1 == S3_BC_VERBOSE)
+/*!
+ * @brief Print one decode result (S3_BC_VERBOSE builds only).
+ */
 static void
-result_print (s3_c39_result_t res, char ch)
+result_print (s3_c39_result_t res, char letter)
 {
     if (S3_C39_OK == res)
     {
-        tm_printf((UB *) "'%c'\n", ch);
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
+        tm_printf((UB *) "'%c'\n", letter);
     }
     else
     {
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) "failed (%s)\n", result_txt(res));
     }
 }
@@ -381,30 +427,45 @@ result_print (s3_c39_result_t res, char ch)
  *        colour = thick), not the decoder's decision.
  */
 static void
-stripes_print (char const * p_tag, uint32_t const * p_dur, uint32_t n)
+stripes_print (char const * p_tag, uint32_t const * p_dur, uint32_t count)
 {
     uint32_t min_dur[2] = {UINT32_MAX, UINT32_MAX};
-    uint32_t i;
+    uint32_t idx;
 
-    for (i = 0u; i < n; i++)
+    for (idx = 0u; idx < count; idx++)
     {
-        if (p_dur[i] < min_dur[i & 1u])
+        if (p_dur[idx] < min_dur[idx & 1u])
         {
-            min_dur[i & 1u] = p_dur[i];
+            min_dur[idx & 1u] = p_dur[idx];
         }
     }
-    tm_printf((UB *) "S3 STRIPES %s: %d =", p_tag, (INT) n);
-    for (i = 0u; i < n; i++)
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
+    tm_printf((UB *) "S3 STRIPES %s: %d =", p_tag, (INT) count);
+    for (idx = 0u; idx < count; idx++)
     {
+        /* The casts are for tm_printf only: the format is an ASCII literal, and
+         * each value is printed with %d, so a value outside INT's range would
+         * only print wrong.
+         */
         tm_printf((UB *) " %c%c %d%s",
-                  ((p_dur[i] * 10u) >= (min_dur[i & 1u] * 16u)) ? 't' : 'n',
-                  (0u == (i & 1u)) ? 'b' : 'w',
-                  (INT) (p_dur[i] / US_PER_MS),
-                  ((i + 1u) < n) ? "," : "");
+                  ((p_dur[idx] * 10u) >= (min_dur[idx & 1u] * 16u)) ? 't' : 'n',
+                  (0u == (idx & 1u)) ? 'b' : 'w',
+                  (INT) (p_dur[idx] / US_PER_MS),
+                  ((idx + 1u) < count) ? "," : "");
     }
+    /* The casts are for tm_printf only: the format is an ASCII literal, and
+     * each value is printed with %d, so a value outside INT's range would only
+     * print wrong.
+     */
     tm_printf((UB *) "\n");
 }
 
+/*!
+ * @brief Short text for a decode result.
+ */
 static char const *
 result_txt (s3_c39_result_t res)
 {
@@ -431,6 +492,9 @@ result_txt (s3_c39_result_t res)
     return p_txt;
 }
 
+/*!
+ * @brief Which path opened a pass: AOUT, DOUT or both.
+ */
 static char const *
 opener_txt (uint32_t src)
 {
@@ -457,3 +521,4 @@ opener_txt (uint32_t src)
 #endif
 
 /*** end of file ***/
+

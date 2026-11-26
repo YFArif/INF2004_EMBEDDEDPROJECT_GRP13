@@ -46,3 +46,4 @@ drv_button_event_t drv_button_update(drv_button_id_t button,
 #endif /* DRV_BUTTON_H */
 
 /*** end of file ***/
+

@@ -4,9 +4,10 @@
  *        provides the public getters (see subsystem4.h).
  *
  * @par Kernel objects
- * flg_imu (S4_EV_TICK from cyc_imu every 20 ms, S4_EV_CAL on request),
- * cyc_imu, mtx_terrain (TA_INHERIT; guards the packed terrain and the
- * status), plus the template's mbf_summary and flg_events.
+ * gh_flg_imu (S4_EV_TICK from gh_cyc_imu every 20 ms, S4_EV_CAL on
+ * request), gh_cyc_imu, gh_mtx_terrain (TA_INHERIT; guards the packed
+ * terrain and the status), plus the template's gh_mbf_summary and
+ * gh_flg_events.
  */
 
 #include <stdbool.h>
@@ -15,12 +16,12 @@
 #include "s4_terrain.h"
 #include "subsystem4.h"
 
-EXPORT ID mbf_summary;      /* Template example, see subsystem4.h.       */
-EXPORT ID flg_events;
+EXPORT ID gh_mbf_summary;      /* Template example, see subsystem4.h.       */
+EXPORT ID gh_flg_events;
 
-static ID g_flg_imu     = E_NOEXS;
-static ID g_cyc_imu     = E_NOEXS;
-static ID g_mtx_terrain = E_NOEXS;
+static ID gh_flg_imu     = E_NOEXS;
+static ID gh_cyc_imu     = E_NOEXS;
+static ID gh_mtx_terrain = E_NOEXS;
 
 static s4_terrain_packed_t g_terrain;   /* Written by imu_task only.     */
 static subsystem4_status_t g_status;    /* Written by imu_task only.     */
@@ -43,46 +44,48 @@ subsystem4_init (void)
     T_CCYC ccyc   = {0};
     ER     result = E_OK;
 
-    cflg.flgatr = TA_TFIFO | TA_WMUL;
-    flg_events  = tk_cre_flg(&cflg);
-    g_flg_imu   = tk_cre_flg(&cflg);
+    cflg.flgatr   = TA_TFIFO | TA_WMUL;
+    gh_flg_events = tk_cre_flg(&cflg);
+    gh_flg_imu    = tk_cre_flg(&cflg);
 
-    cmbf.mbfatr = TA_TFIFO;
-    cmbf.bufsz  = (SZ) (4 * S4_SUMMARY_MAX);
-    cmbf.maxmsz = (INT) S4_SUMMARY_MAX;
-    mbf_summary = tk_cre_mbf(&cmbf);
+    cmbf.mbfatr    = TA_TFIFO;
+    // The casts are safe: S4_SUMMARY_MAX is 48, so 4 x 48 = 192 bytes fits SZ
+    // and 48 fits INT.
+    cmbf.bufsz     = (SZ) (4 * S4_SUMMARY_MAX);
+    cmbf.maxmsz    = (INT) S4_SUMMARY_MAX;
+    gh_mbf_summary = tk_cre_mbf(&cmbf);
 
     // Priority inheritance bounds the wait of S1 and S5 when they read
     // the terrain while imu_task writes it.
-    cmtx.mtxatr   = TA_INHERIT;
-    g_mtx_terrain = tk_cre_mtx(&cmtx);
+    cmtx.mtxatr    = TA_INHERIT;
+    gh_mtx_terrain = tk_cre_mtx(&cmtx);
 
     // NOTE: The cast is safe: imu_tick has the cyclic handler signature.
     ccyc.cycatr = TA_HLNG;
     ccyc.cychdr = (FP) imu_tick;
     ccyc.cyctim = S4_IMU_PERIOD_MS;
     ccyc.cycphs = S4_IMU_PERIOD_MS;
-    g_cyc_imu   = tk_cre_cyc(&ccyc);
+    gh_cyc_imu  = tk_cre_cyc(&ccyc);
 
-    if (flg_events < E_OK)
+    if (gh_flg_events < E_OK)
     {
-        result = flg_events;
+        result = gh_flg_events;
     }
-    else if (g_flg_imu < E_OK)
+    else if (gh_flg_imu < E_OK)
     {
-        result = g_flg_imu;
+        result = gh_flg_imu;
     }
-    else if (mbf_summary < E_OK)
+    else if (gh_mbf_summary < E_OK)
     {
-        result = mbf_summary;
+        result = gh_mbf_summary;
     }
-    else if (g_mtx_terrain < E_OK)
+    else if (gh_mtx_terrain < E_OK)
     {
-        result = g_mtx_terrain;
+        result = gh_mtx_terrain;
     }
-    else if (g_cyc_imu < E_OK)
+    else if (gh_cyc_imu < E_OK)
     {
-        result = g_cyc_imu;
+        result = gh_cyc_imu;
     }
     else
     {
@@ -101,16 +104,16 @@ ER
 subsystem4_start (void)
 {
     ER result = E_OK;
-    ID tid    = app_start_task((FP) imu_task, S4_PRI_IMU, TP_PRC1,
+    ID h_tid  = app_start_task((FP) imu_task, S4_PRI_IMU, TP_PRC1,
                                "imu_task");
 
-    if (tid < E_OK)
+    if (h_tid < E_OK)
     {
-        result = tid;
+        result = h_tid;
     }
     else
     {
-        result = tk_sta_cyc(g_cyc_imu);
+        result = tk_sta_cyc(gh_cyc_imu);
     }
 
     return ((result < E_OK) ? result : E_OK);
@@ -127,9 +130,9 @@ subsystem4_terrain_get (subsystem4_terrain_t * p_terrain)
 {
     s4_terrain_packed_t copy = {0u, 0u};
 
-    CHECK(tk_loc_mtx(g_mtx_terrain, TMO_FEVR), "mtx_terrain");
+    CHECK(tk_loc_mtx(gh_mtx_terrain, TMO_FEVR), "mtx_terrain");
     copy = g_terrain;
-    CHECK(tk_unl_mtx(g_mtx_terrain), "mtx_terrain");
+    CHECK(tk_unl_mtx(gh_mtx_terrain), "mtx_terrain");
 
     s4_terrain_unpack(&copy, p_terrain);
 }
@@ -157,7 +160,7 @@ subsystem4_cal_done (void)
 void
 subsystem4_calibrate (void)
 {
-    CHECK(tk_set_flg(g_flg_imu, S4_EV_CAL), "flg_imu");
+    CHECK(tk_set_flg(gh_flg_imu, S4_EV_CAL), "flg_imu");
 }
 
 /*!
@@ -168,9 +171,9 @@ subsystem4_calibrate (void)
 void
 subsystem4_status_get (subsystem4_status_t * p_status)
 {
-    CHECK(tk_loc_mtx(g_mtx_terrain, TMO_FEVR), "mtx_terrain");
+    CHECK(tk_loc_mtx(gh_mtx_terrain, TMO_FEVR), "mtx_terrain");
     *p_status = g_status;
-    CHECK(tk_unl_mtx(g_mtx_terrain), "mtx_terrain");
+    CHECK(tk_unl_mtx(gh_mtx_terrain), "mtx_terrain");
 }
 
 /*!
@@ -182,10 +185,12 @@ uint32_t
 subsystem4_wait (void)
 {
     UINT flgptn = 0u;
-    ER   er     = tk_wai_flg(g_flg_imu, S4_EV_TICK | S4_EV_CAL,
+    ER   err    = tk_wai_flg(gh_flg_imu, S4_EV_TICK | S4_EV_CAL,
                              TWF_ORW | TWF_BITCLR, &flgptn, TMO_FEVR);
 
-    return ((E_OK == er) ? (uint32_t) flgptn : 0u);
+    // The cast is safe: flgptn is the UINT flag pattern, which has the same
+    // width as uint32_t.
+    return ((E_OK == err) ? (uint32_t) flgptn : 0u);
 }
 
 /*!
@@ -201,9 +206,9 @@ subsystem4_terrain_put (subsystem4_terrain_t const * p_terrain)
     // Pack outside the lock; inside it only the 6 bytes are copied.
     s4_terrain_pack(p_terrain, &packed);
 
-    CHECK(tk_loc_mtx(g_mtx_terrain, TMO_FEVR), "mtx_terrain");
+    CHECK(tk_loc_mtx(gh_mtx_terrain, TMO_FEVR), "mtx_terrain");
     g_terrain = packed;
-    CHECK(tk_unl_mtx(g_mtx_terrain), "mtx_terrain");
+    CHECK(tk_unl_mtx(gh_mtx_terrain), "mtx_terrain");
 }
 
 /*!
@@ -238,9 +243,9 @@ subsystem4_height_put (uint8_t height_mm)
 void
 subsystem4_status_put (subsystem4_status_t const * p_status)
 {
-    CHECK(tk_loc_mtx(g_mtx_terrain, TMO_FEVR), "mtx_terrain");
+    CHECK(tk_loc_mtx(gh_mtx_terrain, TMO_FEVR), "mtx_terrain");
     g_status = *p_status;
-    CHECK(tk_unl_mtx(g_mtx_terrain), "mtx_terrain");
+    CHECK(tk_unl_mtx(gh_mtx_terrain), "mtx_terrain");
 }
 
 /*!
@@ -252,7 +257,8 @@ static void
 imu_tick (void * p_exinf)
 {
     (void) p_exinf;
-    (void) tk_set_flg(g_flg_imu, S4_EV_TICK);
+    (void) tk_set_flg(gh_flg_imu, S4_EV_TICK);
 }
 
 /*** end of file ***/
+

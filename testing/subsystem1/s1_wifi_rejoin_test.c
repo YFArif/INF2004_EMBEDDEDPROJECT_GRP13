@@ -351,7 +351,7 @@ expect_change (const harness_t * p_harness, uint32_t index,
     {
         p_rec = &p_harness->changes[index];
         b_ok  = ((from_state == p_rec->change.from)
-                 && (to_state == p_rec->change.to)
+                 && (to_state == p_rec->change.to_state)
                  && (why == p_rec->change.why)
                  && (when_msec == p_rec->when_msec));
 
@@ -360,7 +360,7 @@ expect_change (const harness_t * p_harness, uint32_t index,
             printf("     change %" PRIu32 ": %s -> %s (%s) at %" PRIu32
                    ", expected %s -> %s (%s) at %" PRIu32 "\n", index,
                    s1_wifi_rejoin_state_name(p_rec->change.from),
-                   s1_wifi_rejoin_state_name(p_rec->change.to),
+                   s1_wifi_rejoin_state_name(p_rec->change.to_state),
                    s1_wifi_rejoin_why_text(p_rec->change.why), p_rec->when_msec,
                    s1_wifi_rejoin_state_name(from_state),
                    s1_wifi_rejoin_state_name(to_state),
@@ -1072,7 +1072,7 @@ test_refused (void)
     start(p_harness, START_MSEC, false);
     go_up_stable(p_harness);
     s1_wifi_rejoin_refused(&p_harness->rejoin, p_harness->now_msec, &change);
-    check(!change.b_changed, "in UP: no change", state_detail(change.to));
+    check(!change.b_changed, "in UP: no change", state_detail(change.to_state));
     check(S1_WIFI_REJOIN_UP == p_harness->rejoin.state, "still UP",
           state_detail(p_harness->rejoin.state));
     check(0U == p_harness->rejoin.attempt, "attempt still 0",
@@ -1081,9 +1081,9 @@ test_refused (void)
     /* Right after the boot join, as if the boot request were refused. */
     start(p_harness, START_MSEC, false);
     s1_wifi_rejoin_refused(&p_harness->rejoin, START_MSEC, &change);
-    check(change.b_changed && (S1_WIFI_REJOIN_BACKOFF == change.to)
+    check(change.b_changed && (S1_WIFI_REJOIN_BACKOFF == change.to_state)
           && (1U == change.attempt) && (2000U == change.wait_msec),
-          "boot: BACKOFF, attempt 1, wait 2 s", state_detail(change.to));
+          "boot: BACKOFF, attempt 1, wait 2 s", state_detail(change.to_state));
     group_end();
 }
 

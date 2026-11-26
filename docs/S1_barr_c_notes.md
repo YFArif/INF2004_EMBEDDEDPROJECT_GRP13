@@ -11,7 +11,7 @@ it is.
   `docs/reference/barr_c_coding_standard_2018.pdf`; it is git-ignored and
   not in the repository.
 - Scope: S1's C files, which are everything in `app_program/subsystem1/`
-  except the course template's files and lines (section 4),
+  (the course template's files there were added later, section 4),
   `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.c`, and the host tests in
   `testing/subsystem1/`.
 
@@ -58,38 +58,34 @@ Three rules leave room for interpretation. The reading chosen for each:
 
 ## 4. Left as it is
 
-- **The course template's files:** the template lines of `subsystem1.c`,
-  and all of `subsystem1.h`, `subsystem1_test.c`, `task_led.c` and the
-  header block of `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.h`. They
-  keep the template's style (tabs, braces on the same line, no
-  end-of-file marker), including the 4 `exinf` hits. Reason: they are
-  the course's code, not S1's.
-- **Mixed style in `subsystem1.c`.** S1's lines there, which start the
-  MQTT link and telemetry_task, use spaces, braces on their own lines
-  and commented casts; the template lines around them keep their tabs
-  and same-line braces. Reason: template lines are left exactly as they
-  are.
+The whole-repository pass on branch `barr-c-2018` (see
+`docs/barr_c_2018.md`) has since brought the course template's files in
+`app_program/` into the same style: `subsystem1.c`, `subsystem1.h`,
+`subsystem1_test.c` and `task_led.c` now use spaces, braces on their own
+lines, Doxygen blocks and commented casts; `tid_led` and `cyc_led` are
+now `gh_tid_led` and `gh_cyc_led` (IF-05 in TEAM.md is updated);
+`exinf` is `p_exinf`; the unused `<stdbool.h>` include in `subsystem1.c`
+is gone (4.3.e); and the `s5_event.h` comment names `msg_layout_event_t`.
+Every firmware image stayed byte-identical. What is still left:
+
+- **The course template's files outside `app_program/`:** the header
+  block of `lib/liblwip/sysdepend/pico_rp2040/mqtt_utk.h` keeps the
+  template's style. Reason: library and kernel code is the course's, not
+  the team's.
 - **Mixed style in `lib/libwifi/sysdepend/pico_rp2040/cyw43_utk.c`.** S1's
   lines there, which call the WiFi rejoin policy in MQTT=1 builds (branch
   `s1-fr17`, from `244bef8`), use Barr-C style: spaces, braces on their
   own lines, Doxygen blocks and commented casts. The template's lines
-  around them keep their own style. Reason: template lines are left
-  exactly as they are, as in `subsystem1.c`.
+  around them keep their own style. Reason: template lines in the library
+  are left exactly as they are. (S1's print of the rejoin change there now
+  reads the renamed field `to_state`.)
 - **4.1.b, first 8 characters of a test's name.** `s1_wifi_rejoin_test`
   shares its first 8 characters (`s1_wifi_`) with `s1_wifi_rejoin`, as
   `s1_telem_test` does with `s1_telem`. Reason: each host test is named
   after the module it tests, and no test is built into the image.
-- **`tid_led` and `cyc_led`.** These globals lack the `g` and `h`
-  prefixes. Reason: they are template names, and `tid_led` is interface
-  IF-05 (TEAM.md section 5), so a rename needs team agreement.
 - **4.3.b in `mqtt_link.c`:** `mqtt_link_check_table_t`, a compile-time
   check, comes after the static data. Reason: it measures
   `gp_topic_suffix`, which must be declared first.
-- **4.3.e in `subsystem1.c`:** `<stdbool.h>` is included in every build
-  but used only when `TM_MQTT` is 1. Reason: a template-origin file.
-- **`app_program/subsystem5/s5_event.h`:** its comment still names
-  `msg_event_t`, which is now `msg_layout_event_t`. Reason: S5's file, so
-  S5's owner updates it.
 - **Host-test layout:** assignment alignment, parentheses, Doxygen
   blocks, cast comments, literal loop bounds, and the test file names and
   structure (4.1.b, 4.1.d, 4.2.a, 4.3.f). Only names were changed in the

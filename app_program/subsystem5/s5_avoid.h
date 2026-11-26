@@ -69,3 +69,4 @@ bool                    s5_avoid_forward_is_left(void);
 #endif /* S5_AVOID_H */
 
 /*** end of file ***/
+

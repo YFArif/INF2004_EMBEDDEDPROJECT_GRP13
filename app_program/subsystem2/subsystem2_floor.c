@@ -78,7 +78,7 @@ static void    send(subsystem2_cmd_type_t type, int16_t value,
                     uint16_t speed_mms);
 static int32_t cdeg_diff(int32_t to_cdeg, int32_t from_cdeg);
 static int32_t magnitude(int32_t value);
-static void    sleep_ms(uint32_t ms);
+static void    sleep_ms(uint32_t msec);
 #endif
 
 /*!
@@ -187,6 +187,8 @@ subsystem2_floor_test (void)
 
     subsystem2_step_ready("S2-U12 drive 150 mm/s for 2 s, then STOP:"
                           " WATCH the wheels as it stops");
+    // The cast discards brake_from()'s result: this step only lets the tester
+    // watch the wheels stop.
     (void) brake_from(150u, false);
 
     // S2-U12 b: slow speeds, one step each so it can be watched. 150 is
@@ -392,6 +394,7 @@ stall_check (void)
     subsystem2_status_get(&status);
     stalls = status.stall_count;
     send(S2_CMD_FOLLOW, 0, 150u);
+    // The cast is safe: the format string is ASCII.
     tm_printf((UB *) "[S2-FLOOR] HOLD the LEFT tyre now: pinch it still"
               " (10 s)\n");
 
@@ -403,7 +406,7 @@ stall_check (void)
     } while ((status.stall_count == stalls) && (waited < U12_STALL_WAIT_MS));
 
     b_ok = (status.stall_count != stalls) &&
-           (S2_STATE_ESTOP == status.state) && subsystem2_estop_is_set() &&
+           (S2_STATE_ESTOP == status.state) && (subsystem2_estop_is_set()) &&
            (0 == status.duty_l) && (0 == status.duty_r);
 
     // NOTE: The cast is safe: the format string is ASCII and waited is
@@ -485,16 +488,17 @@ magnitude (int32_t value)
 /*!
  * @brief Sleep, letting the other tasks run.
  *
- * @param[in] ms Milliseconds.
+ * @param[in] msec Milliseconds.
  */
 static void
-sleep_ms (uint32_t ms)
+sleep_ms (uint32_t msec)
 {
     // NOTE: The cast is safe: delays here are at most 15 s.
-    CHECK(tk_dly_tsk((RELTIM) ms), "tk_dly_tsk");
+    CHECK(tk_dly_tsk((RELTIM) msec), "tk_dly_tsk");
 }
 #endif /* 0 != S2_FLOOR_TEST */
 
 #endif /* APP_TEST */
 
 /*** end of file ***/
+

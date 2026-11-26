@@ -1,26 +1,36 @@
-/*
- *	subsystem1.c
- *	Subsystem 1 -- LED heartbeat: creates its objects and starts its task.
+/** @file subsystem1.c
  *
- *	APIs shown: tk_cre_cyc, tk_sta_cyc
+ * @brief Subsystem 1 -- LED heartbeat: creates its objects and starts its
+ *        task.
+ *
+ * @par
+ * APIs shown: tk_cre_cyc, tk_sta_cyc
  */
 
 #include "subsystem1.h"
-#include <stdbool.h>
 #include "mqtt_link.h"       /* empty unless TM_MQTT (MQTT=1 builds) */
 #include "telemetry_task.h"  /* empty unless TM_MQTT */
 #include "s1_event.h"        /* s1_event_init() only if TM_MQTT */
 
-EXPORT ID	tid_led;	/* IF-05, see subsystem1.h */
-EXPORT ID	cyc_led;
+EXPORT ID   gh_tid_led;     /* IF-05, see subsystem1.h */
+EXPORT ID   gh_cyc_led;
 
 #if TM_MQTT
 LOCAL bool gb_mqtt_ok = false;  /* mqtt_link_init() succeeded */
 #endif
 
-EXPORT ER subsystem1_init(void)
+/*!
+ * @brief Create subsystem 1's kernel objects (called by usermain()).
+ *
+ * In MQTT=1 builds it also creates the MQTT link's and mbf_event's
+ * message buffers; a failure there leaves the car running without them.
+ *
+ * @return E_OK, or the negative kernel error from tk_cre_cyc().
+ */
+EXPORT ER
+subsystem1_init (void)
 {
-	T_CCYC	ccyc = {0};
+    T_CCYC ccyc = {0};
 
 #if TM_MQTT
     /* MQTT driver: creates its two message buffers; no lwIP calls. A failure
@@ -44,23 +54,39 @@ EXPORT ER subsystem1_init(void)
     }
 #endif
 
-	/* Cyclic handler: once started, the kernel calls led_cyclic_handler
-	   every S1_TICK_MS.  Without TA_STA it is created stopped; it is
-	   started in subsystem1_start(), once the task it wakes exists. */
-	ccyc.cycatr = TA_HLNG;
-	ccyc.cychdr = (FP)led_cyclic_handler;
-	ccyc.cyctim = S1_TICK_MS;	/* period, ms */
-	ccyc.cycphs = S1_TICK_MS;	/* delay before the first call, ms */
-	cyc_led = tk_cre_cyc(&ccyc);
-	return (cyc_led < E_OK) ? cyc_led : E_OK;
+    /* Cyclic handler: once started, the kernel calls s1_led_cyclic_handler
+     * every S1_TICK_MS.  Without TA_STA it is created stopped; it is
+     * started in subsystem1_start(), once the task it wakes exists.  The
+     * cast is safe: FP is the kernel's generic handler address type, and
+     * the kernel calls the handler with the one argument it declares.
+     */
+    ccyc.cycatr = TA_HLNG;
+    ccyc.cychdr = (FP)s1_led_cyclic_handler;
+    ccyc.cyctim = S1_TICK_MS;   /* period, ms */
+    ccyc.cycphs = S1_TICK_MS;   /* delay before the first call, ms */
+    gh_cyc_led  = tk_cre_cyc(&ccyc);
+    return ((gh_cyc_led < E_OK) ? gh_cyc_led : E_OK);
 }
 
-EXPORT ER subsystem1_start(void)
+/*!
+ * @brief Start subsystem 1's task and cyclic handler (called by
+ *        usermain() after every subsystem's init).
+ *
+ * In MQTT=1 builds it also starts telemetry_task if the MQTT link was
+ * created; if that fails the car runs on without it.
+ *
+ * @return E_OK, or the negative kernel error from app_start_task() or
+ *         tk_sta_cyc().
+ */
+EXPORT ER
+subsystem1_start (void)
 {
-	tid_led = app_start_task(led_task, S1_PRI_LED, 0, "led_task");
-	if (tid_led < E_OK) {
-		return tid_led;
-	}
+    gh_tid_led = app_start_task(s1_led_task, S1_PRI_LED, 0, "led_task");
+    if (gh_tid_led < E_OK)
+    {
+        return gh_tid_led;
+    }
+
 #if TM_MQTT
     /* telemetry_task (Stage 4a): dashboard commands and the heartbeat.
        Only with a working MQTT link; without one, or if it cannot start,
@@ -71,5 +97,8 @@ EXPORT ER subsystem1_start(void)
         tm_printf((UB *)"S1: telemetry_task not started\n");
     }
 #endif
-	return tk_sta_cyc(cyc_led);	/* start the cyclic handler now */
+    return tk_sta_cyc(gh_cyc_led);  /* start the cyclic handler now */
 }
+
+/*** end of file ***/
+

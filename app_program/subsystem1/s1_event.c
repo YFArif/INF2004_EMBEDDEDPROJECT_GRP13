@@ -224,3 +224,4 @@ subsystem1_event_post (uint8_t code, uint8_t arg_a, uint8_t arg_b)
 #endif /* TM_MQTT */
 
 /*** end of file ***/
+

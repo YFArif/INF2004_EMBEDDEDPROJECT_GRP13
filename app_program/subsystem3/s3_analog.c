@@ -23,8 +23,9 @@ typedef struct
 static extremum_t g_ext[S3_AN_MAX_EXTREMA];
 static uint32_t   g_cross_us[S3_AN_MAX_EXTREMA];
 
-static uint32_t find_extrema(uint8_t const * p_x, uint32_t n, uint32_t prom);
-static uint32_t merge_fragments(uint32_t * p_dur, uint32_t n);
+static uint32_t find_extrema(uint8_t const * p_x, uint32_t count,
+                             uint32_t prom);
+static uint32_t merge_fragments(uint32_t * p_dur, uint32_t count);
 static uint32_t find_crossings(uint8_t const * p_x, uint32_t n_ext,
                                uint32_t dt_us);
 
@@ -34,32 +35,36 @@ static uint32_t find_crossings(uint8_t const * p_x, uint32_t n_ext,
  * @return Number of durations written (29 for one clean *X* frame).
  */
 uint32_t
-s3_analog_widths (uint8_t const * p_x, uint32_t n, uint32_t dt_us,
+s3_analog_widths (uint8_t const * p_x, uint32_t count, uint32_t dt_us,
                   uint32_t * p_dur, uint32_t max_dur, s3_an_stats_t * p_stats)
 {
-    uint8_t  lo = 0xFFu;
-    uint8_t  hi = 0u;
+    uint8_t  low   = 0xFFu;
+    uint8_t  high  = 0u;
     uint32_t prom;
     uint32_t n_ext;
     uint32_t n_cross;
     uint32_t n_out = 0u;
-    uint32_t i;
+    uint32_t idx;
 
-    if ((NULL == p_x) || (NULL == p_dur) || (n < 3u))
+    if ((NULL == p_x) || (NULL == p_dur) || (count < 3u))
     {
         return 0u;
     }
-    if (n > IDX_MAX)
+    if (count > IDX_MAX)
     {
-        n = IDX_MAX;
+        count = IDX_MAX;
     }
 
-    for (i = 0u; i < n; i++)
+    for (idx = 0u; idx < count; idx++)
     {
-        lo = (p_x[i] < lo) ? p_x[i] : lo;
-        hi = (p_x[i] > hi) ? p_x[i] : hi;
+        low  = (p_x[idx] < low) ? p_x[idx] : low;
+        high = (p_x[idx] > high) ? p_x[idx] : high;
     }
-    prom = ((uint32_t) (hi - lo) * S3_AN_PROM_PCT) / PCT;
+    /* The casts are safe: high and low are 8-bit samples with high >= low, so
+     * the range is 0 ... 255, and the prominence (a percentage of it) is at
+     * most 255, which fits uint8_t.
+     */
+    prom = ((uint32_t) (high - low) * S3_AN_PROM_PCT) / PCT;
 
     /* Thick bars set hi - lo, so a % of it hides blurred 3 mm bars (car
      * 30 Oct: only the 6 thick bars were found). Use the noise on the
@@ -68,13 +73,17 @@ s3_analog_widths (uint8_t const * p_x, uint32_t n, uint32_t dt_us,
         uint8_t  lead_lo = 0xFFu;
         uint8_t  lead_hi = 0u;
         uint32_t noise_prom;
-        uint32_t n_lead = (n < S3_AN_LEAD_SAMPLES) ? n : S3_AN_LEAD_SAMPLES;
+        uint32_t n_lead  = (count < S3_AN_LEAD_SAMPLES) ? count :
+                                                         S3_AN_LEAD_SAMPLES;
 
-        for (i = 0u; i < n_lead; i++)
+        for (idx = 0u; idx < n_lead; idx++)
         {
-            lead_lo = (p_x[i] < lead_lo) ? p_x[i] : lead_lo;
-            lead_hi = (p_x[i] > lead_hi) ? p_x[i] : lead_hi;
+            lead_lo = (p_x[idx] < lead_lo) ? p_x[idx] : lead_lo;
+            lead_hi = (p_x[idx] > lead_hi) ? p_x[idx] : lead_hi;
         }
+        /* The cast is safe: lead_hi >= lead_lo, both 8 bits, so the range is 0
+         * ... 255.
+         */
         noise_prom = (uint32_t) (lead_hi - lead_lo) * S3_AN_NOISE_X;
         prom       = (noise_prom < prom) ? noise_prom : prom;
     }
@@ -82,18 +91,22 @@ s3_analog_widths (uint8_t const * p_x, uint32_t n, uint32_t dt_us,
 
     if (NULL != p_stats)
     {
-        p_stats->min        = lo;
-        p_stats->max        = hi;
+        p_stats->min        = low;
+        p_stats->max        = high;
+        /* The cast is safe: prom is at most 255 here (a percentage of an 8-bit
+         * range, or the 8-bit noise floor), which fits uint8_t.
+         */
         p_stats->prominence = (uint8_t) prom;
         p_stats->extrema    = 0u;
     }
-    if ((uint32_t) (hi - lo) < S3_AN_MIN_RANGE)
+    /* The cast is safe: high >= low, both 8 bits. */
+    if ((uint32_t) (high - low) < S3_AN_MIN_RANGE)
     {
         return 0u;
     }
 
     /* 1. Alternating peaks / valleys with hysteresis prom. */
-    n_ext = find_extrema(p_x, n, prom);
+    n_ext = find_extrema(p_x, count, prom);
     if (NULL != p_stats)
     {
         p_stats->extrema = (uint8_t) n_ext;
@@ -103,9 +116,9 @@ s3_analog_widths (uint8_t const * p_x, uint32_t n, uint32_t dt_us,
     n_cross = find_crossings(p_x, n_ext, dt_us);
 
     /* 3. Durations between consecutive edges. */
-    for (i = 0u; ((i + 1u) < n_cross) && (n_out < max_dur); i++)
+    for (idx = 0u; ((idx + 1u) < n_cross) && (n_out < max_dur); idx++)
     {
-        p_dur[n_out] = g_cross_us[i + 1u] - g_cross_us[i];
+        p_dur[n_out] = g_cross_us[idx + 1u] - g_cross_us[idx];
         n_out++;
     }
     return merge_fragments(p_dur, n_out);
@@ -121,90 +134,97 @@ s3_analog_widths (uint8_t const * p_x, uint32_t n, uint32_t dt_us,
  * @return New number of durations.
  */
 static uint32_t
-merge_fragments (uint32_t * p_dur, uint32_t n)
+merge_fragments (uint32_t * p_dur, uint32_t count)
 {
     uint32_t sorted[S3_AN_MAX_EXTREMA];
     uint32_t thr;
-    uint32_t i;
-    uint32_t j;
-    uint32_t k;
+    uint32_t idx;
+    uint32_t pos;
+    uint32_t dst;
 
-    if (n < 3u)
+    if (count < 3u)
     {
-        return n;
+        return count;
     }
-    for (i = 0u; i < n; i++)            /* Insertion sort for the median. */
+    for (idx = 0u; idx < count; idx++)  /* Insertion sort for the median. */
     {
-        uint32_t v = p_dur[i];
+        uint32_t dur = p_dur[idx];
 
-        for (j = i; (j > 0u) && (sorted[j - 1u] > v); j--)
+        for (pos = idx; (pos > 0u) && (sorted[pos - 1u] > dur); pos--)
         {
-            sorted[j] = sorted[j - 1u];
+            sorted[pos] = sorted[pos - 1u];
         }
-        sorted[j] = v;
+        sorted[pos] = dur;
     }
-    thr = sorted[n / 2u] / S3_AN_FRAG_DIV;
+    thr = sorted[count / 2u] / S3_AN_FRAG_DIV;
 
-    i = 0u;
-    while (i < n)
+    idx = 0u;
+    while (idx < count)
     {
-        if (p_dur[i] >= thr)
+        if (p_dur[idx] >= thr)
         {
-            i++;
+            idx++;
         }
-        else if ((0u == i) || ((i + 1u) == n))
+        else if ((0u == idx) || ((idx + 1u) == count))
         {
-            for (k = i; (k + 1u) < n; k++)  /* At an end: drop it.        */
+            for (dst = idx; (dst + 1u) < count; dst++)  /* At an end: drop. */
             {
-                p_dur[k] = p_dur[k + 1u];
+                p_dur[dst] = p_dur[dst + 1u];
             }
-            n--;
-            i = (0u == i) ? 0u : n;
+            count--;
+            idx = (0u == idx) ? 0u : count;
         }
         else
         {
-            p_dur[i - 1u] += p_dur[i] + p_dur[i + 1u];  /* prev+frag+next */
-            for (k = i; (k + 2u) < n; k++)
+            /* prev + frag + next */
+            p_dur[idx - 1u] += p_dur[idx] + p_dur[idx + 1u];
+            for (dst = idx; (dst + 2u) < count; dst++)
             {
-                p_dur[k] = p_dur[k + 2u];
+                p_dur[dst] = p_dur[dst + 2u];
             }
-            n -= 2u;
-            i = i - 1u;                 /* The joined stripe may still be */
-        }                               /* next to another fragment.      */
+            count -= 2u;
+
+            /* The joined stripe may still be next to another fragment. */
+            idx = idx - 1u;
+        }
     }
-    return n;
+    return count;
 }
 
 /*!
  * @brief Alternating peaks and valleys that stand out by at least prom.
  *
+ * NOTE: The casts in this function are safe: idx is below IDX_MAX, which
+ * fits uint16_t, and each 8-bit difference cast to uint32_t is either
+ * known to be positive or tested for it in the same condition.
+ *
  * @return Number of extrema stored in g_ext.
  */
 static uint32_t
-find_extrema (uint8_t const * p_x, uint32_t n, uint32_t prom)
+find_extrema (uint8_t const * p_x, uint32_t count, uint32_t prom)
 {
     uint32_t   n_ext = 0u;
     int32_t    dir   = 0;       /* +1 looking for a peak, -1 a valley.  */
     extremum_t cand_hi;
     extremum_t cand_lo;
-    uint32_t   i;
+    uint32_t   idx;
 
     cand_hi.idx = 0u;
     cand_hi.val = p_x[0];
     cand_lo     = cand_hi;
 
-    for (i = 1u; (i < n) && (n_ext < S3_AN_MAX_EXTREMA); i++)
+    for (idx = 1u; (idx < count) && (n_ext < S3_AN_MAX_EXTREMA); idx++)
     {
-        uint8_t value = p_x[i];
+        uint8_t value = p_x[idx];
 
         if (value > cand_hi.val)
         {
-            cand_hi.idx = (uint16_t) i;
+            cand_hi.idx = (uint16_t) idx;
             cand_hi.val = value;
         }
         if (value < cand_lo.val)
         {
-            cand_lo.idx = (uint16_t) i;
+            cand_lo.idx = (uint16_t) idx;
             cand_lo.val = value;
         }
 
@@ -215,18 +235,18 @@ find_extrema (uint8_t const * p_x, uint32_t n, uint32_t prom)
             {
                 g_ext[n_ext] = cand_lo;         /* Started on white.     */
                 n_ext++;
-                dir         = 1;
-                cand_hi.idx = (uint16_t) i;
-                cand_hi.val = value;
+                dir          = 1;
+                cand_hi.idx  = (uint16_t) idx;
+                cand_hi.val  = value;
             }
             else if ((cand_hi.val > value) &&
                      ((uint32_t) (cand_hi.val - value) >= prom))
             {
                 g_ext[n_ext] = cand_hi;         /* Started on black.     */
                 n_ext++;
-                dir         = -1;
-                cand_lo.idx = (uint16_t) i;
-                cand_lo.val = value;
+                dir          = -1;
+                cand_lo.idx  = (uint16_t) idx;
+                cand_lo.val  = value;
             }
             else
             {
@@ -238,18 +258,18 @@ find_extrema (uint8_t const * p_x, uint32_t n, uint32_t prom)
         {
             g_ext[n_ext] = cand_hi;             /* Confirmed peak.       */
             n_ext++;
-            dir         = -1;
-            cand_lo.idx = (uint16_t) i;
-            cand_lo.val = value;
+            dir          = -1;
+            cand_lo.idx  = (uint16_t) idx;
+            cand_lo.val  = value;
         }
         else if ((-1 == dir) && (value > cand_lo.val) &&
                  ((uint32_t) (value - cand_lo.val) >= prom))
         {
             g_ext[n_ext] = cand_lo;             /* Confirmed valley.     */
             n_ext++;
-            dir         = 1;
-            cand_hi.idx = (uint16_t) i;
-            cand_hi.val = value;
+            dir          = 1;
+            cand_hi.idx  = (uint16_t) idx;
+            cand_hi.val  = value;
         }
         else
         {
@@ -290,31 +310,36 @@ static uint32_t
 find_crossings (uint8_t const * p_x, uint32_t n_ext, uint32_t dt_us)
 {
     uint32_t n_cross = 0u;
-    uint32_t i;
-    uint32_t j;
+    uint32_t idx;
+    uint32_t sample;
 
-    for (i = 0u; (i + 1u) < n_ext; i++)
+    for (idx = 0u; (idx + 1u) < n_ext; idx++)
     {
-        uint32_t a        = g_ext[i].idx;
-        uint32_t b        = g_ext[i + 1u].idx;
-        int32_t  mid      = ((int32_t) g_ext[i].val +
-                             (int32_t) g_ext[i + 1u].val) / 2;
-        int32_t  b_rising = (g_ext[i + 1u].val > g_ext[i].val) ? 1 : 0;
+        uint32_t first    = g_ext[idx].idx;
+        uint32_t last     = g_ext[idx + 1u].idx;
+        /* The casts are safe: the samples are 8 bits, which int32_t holds, so
+         * the sums and differences cannot overflow.
+         */
+        int32_t  mid      = ((int32_t) g_ext[idx].val +
+                             (int32_t) g_ext[idx + 1u].val) / 2;
+        int32_t  b_rising = (g_ext[idx + 1u].val > g_ext[idx].val) ? 1 : 0;
 
-        for (j = a + 1u; j <= b; j++)
+        for (sample = first + 1u; sample <= last; sample++)
         {
-            int32_t x0 = (int32_t) p_x[j - 1u];
-            int32_t x1 = (int32_t) p_x[j];
+            /* The casts are safe: 8-bit samples always fit int32_t. */
+            int32_t x_prev = (int32_t) p_x[sample - 1u];
+            int32_t x_now  = (int32_t) p_x[sample];
 
-            if (((0 != b_rising) && (x1 >= mid)) ||
-                ((0 == b_rising) && (x1 <= mid)))
+            if (((0 != b_rising) && (x_now >= mid)) ||
+                ((0 == b_rising) && (x_now <= mid)))
             {
-                int32_t frac = (x1 != x0) ?
-                               (((mid - x0) * FRAC_ONE) / (x1 - x0)) :
+                int32_t frac = (x_now != x_prev) ?
+                               (((mid - x_prev) * FRAC_ONE) /
+                                (x_now - x_prev)) :
                                FRAC_ONE;
 
                 /* (j - 1) * dt + frac * dt / 1000: no 32-bit overflow. */
-                g_cross_us[n_cross] = ((j - 1u) * dt_us) +
+                g_cross_us[n_cross] = ((sample - 1u) * dt_us) +
                                       (((uint32_t) frac * dt_us) /
                                        (uint32_t) FRAC_ONE);
                 n_cross++;
@@ -335,49 +360,50 @@ find_crossings (uint8_t const * p_x, uint32_t n_ext, uint32_t dt_us)
  * @return New number of durations.
  */
 uint32_t
-s3_merge_gaps (uint32_t * p_dur, uint32_t n)
+s3_merge_gaps (uint32_t * p_dur, uint32_t count)
 {
     uint32_t sorted[S3_AN_MAX_EXTREMA];
     uint32_t n_w = 0u;
     uint32_t thr;
-    uint32_t i;
-    uint32_t j;
-    uint32_t k;
+    uint32_t idx;
+    uint32_t pos;
+    uint32_t dst;
 
-    if ((n < 3u) || (n > S3_AN_MAX_EXTREMA))
+    if ((count < 3u) || (count > S3_AN_MAX_EXTREMA))
     {
-        return n;
+        return count;
     }
-    for (i = 1u; i < n; i += 2u)        /* Insertion sort of the whites.  */
+    for (idx = 1u; idx < count; idx += 2u)  /* Insertion sort of whites. */
     {
-        uint32_t v = p_dur[i];
+        uint32_t dur = p_dur[idx];
 
-        for (j = n_w; (j > 0u) && (sorted[j - 1u] > v); j--)
+        for (pos = n_w; (pos > 0u) && (sorted[pos - 1u] > dur); pos--)
         {
-            sorted[j] = sorted[j - 1u];
+            sorted[pos] = sorted[pos - 1u];
         }
-        sorted[j] = v;
+        sorted[pos] = dur;
         n_w++;
     }
     thr = sorted[n_w / 2u] / S3_AN_FRAG_DIV;
 
-    for (i = 1u; (i + 1u) < n; )
+    for (idx = 1u; (idx + 1u) < count; )
     {
-        if (p_dur[i] < thr)
+        if (p_dur[idx] < thr)
         {
-            p_dur[i - 1u] += p_dur[i] + p_dur[i + 1u];  /* bar+gap+bar   */
-            for (k = i; (k + 2u) < n; k++)
+            p_dur[idx - 1u] += p_dur[idx] + p_dur[idx + 1u]; /* bar+gap+bar */
+            for (dst = idx; (dst + 2u) < count; dst++)
             {
-                p_dur[k] = p_dur[k + 2u];
+                p_dur[dst] = p_dur[dst + 2u];
             }
-            n -= 2u;
+            count -= 2u;
         }
         else
         {
-            i += 2u;
+            idx += 2u;
         }
     }
-    return n;
+    return count;
 }
 
 /*** end of file ***/
+
