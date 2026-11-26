@@ -87,6 +87,7 @@ s4_terrain_unpack (s4_terrain_packed_t const * p_in,
                    subsystem4_terrain_t * p_out)
 {
     uint32_t word0 = p_in->word0;
+    // NOTE: The cast widens the 16-bit word, so it keeps the value.
     uint32_t word1 = (uint32_t) p_in->word1;
 
     // NOTE: The casts are safe: each field is at most 10 bits wide, and

@@ -75,6 +75,8 @@ s4_math_atan2_cdeg (float32_t y_val, float32_t x_val)
 float32_t
 s4_math_sin_cdeg (int32_t angle_cdeg)
 {
+    // NOTE: The cast is safe: the angle is clamped to +/-9000 cdeg,
+    // which float32_t holds exactly.
     float32_t rad    = (float32_t) s4_math_clamp(angle_cdeg, -CDEG_90,
                                                  CDEG_90)
                        * RAD_PER_CDEG;

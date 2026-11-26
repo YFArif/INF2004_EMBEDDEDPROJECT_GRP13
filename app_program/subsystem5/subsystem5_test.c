@@ -577,6 +577,7 @@ wait_state (uint32_t limit_ms, bool b_after_avoid)
     if (!b_end)
     {
         // No obstacle seen in time: stop the robot before it goes far.
+        // The cast is safe: waited is at most limit_ms, a few seconds.
         s5_event_trace("RUN timed out after ms, stopping", (int32_t) waited,
                        0);
         command(S5_CMD_STOP);

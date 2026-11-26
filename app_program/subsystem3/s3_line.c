@@ -66,6 +66,8 @@ s3_line_init (s3_line_t * p_ln, int32_t l_side)
 void
 s3_line_set_gains (s3_line_t * p_ln, int32_t kp_x100, int32_t kd_x100)
 {
+    /* The casts are safe: each gain is clamped to 0 ... max (at most
+     * 4000), which int16_t holds. */
     p_ln->kp_x100      = (int16_t) clamp_i32(kp_x100, 0, S3_LN_KP_MAX_X100);
     p_ln->kd_x100      = (int16_t) clamp_i32(kd_x100, 0, S3_LN_KD_MAX_X100);
     p_ln->e_prev_valid = 0u;
@@ -77,6 +79,7 @@ s3_line_set_gains (s3_line_t * p_ln, int32_t kp_x100, int32_t kd_x100)
 void
 s3_line_set_shape (s3_line_t * p_ln, int32_t boost_x100)
 {
+    /* The cast is safe: the boost is clamped to 0 ... 600. */
     p_ln->boost_x100 = (int16_t) clamp_i32(boost_x100, 0,
                                            S3_LN_BOOST_MAX_X100);
 }
@@ -121,6 +124,7 @@ s3_line_recalibrate (s3_line_t * p_ln)
 void
 s3_line_set_mode (s3_line_t * p_ln, s3_ln_mode_t mode)
 {
+    /* The cast is safe: mode is an s3_ln_mode_t, 0 ... 3. */
     if ((uint32_t) mode == p_ln->mode)
     {
         return;
@@ -154,6 +158,7 @@ s3_line_set_mode (s3_line_t * p_ln, s3_ln_mode_t mode)
 void
 s3_line_request_mode (s3_line_t * p_ln, s3_ln_mode_t mode)
 {
+    /* The cast is safe: mode is an s3_ln_mode_t, 0 ... 3. */
     if ((uint32_t) mode == p_ln->req_mode)
     {
         return;
@@ -176,6 +181,8 @@ void
 s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
               uint32_t moved_um, uint32_t dt_us, s3_line_out_t * p_out)
 {
+    /* The cast is safe: the 3-bit field only ever holds an s3_ln_state_t.
+     */
     s3_ln_state_t prev_state = (s3_ln_state_t) p_ln->state;
     uint16_t      filt_l;
     uint16_t      filt_c;
@@ -311,6 +318,7 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
         p_ln->e_prev_valid  = 0u;   /* No D kick on the way out.         */
         steer               = 0;
         p_ln->steer_prev    = 0;
+        /* The casts widen 16-bit distances, so they keep every value. */
         if ((uint32_t) p_ln->both_black_um >= MM_TO_UM(S3_LN_JUNC_MM))
         {
             if ((uint32_t) prev_um < MM_TO_UM(S3_LN_JUNC_MM))
@@ -329,6 +337,7 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
         /* 2. A sensor sees the line: PD, and remember the side. */
         p_ln->both_black_um = 0u;
         steer = pd_steer(p_ln, err, dt_us, prev_state);
+        /* The cast is safe: pd_steer() clamps to the permille limit. */
         p_ln->steer_prev = (int16_t) steer;
         if ((err > S3_LN_SIDE_MIN) || (err < -S3_LN_SIDE_MIN))
         {
@@ -381,6 +390,7 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
         {
             steer = -steer;
         }
+        /* The cast widens a 16-bit distance, so it keeps every value. */
         if ((uint32_t) p_ln->both_white_um >= MM_TO_UM(S3_LN_LOST_MM))
         {
             if (S3_LN_LOST != prev_state)
@@ -395,6 +405,8 @@ s3_line_step (s3_line_t * p_ln, uint16_t raw_l, uint16_t raw_c,
         }
     }
     p_out->steer = steer;
+    /* The cast is safe: the 3-bit field only ever holds an s3_ln_state_t.
+     */
     p_out->state = (s3_ln_state_t) p_ln->state;
 }
 
@@ -449,6 +461,8 @@ pd_steer (s3_line_t * p_ln, int32_t err, uint32_t dt_us,
     {
         p_ln->e_prev_valid = 0u;    /* No D across a state jump.         */
     }
+    /* The casts are safe: the gains are 0 ... 4000 and |err| is at most
+     * 1000 permille, so each product is far inside int32_t. */
     p_term = (int32_t) p_ln->kp_x100 * err;
     if (err > S3_LN_BOOST_FROM)
     {
@@ -514,6 +528,7 @@ reset_tracking (s3_line_t * p_ln)
 static int32_t
 off_line_steer (uint16_t white_um)
 {
+    /* The casts are safe: both limits and white_um fit 16 bits. */
     int32_t hold_um = (int32_t) MM_TO_UM(S3_LN_HOLD_MM);
     int32_t lost_um = (int32_t) MM_TO_UM(S3_LN_LOST_MM);
     int32_t d_um    = (int32_t) white_um;
@@ -596,6 +611,9 @@ s3_ir_cal_filter (s3_ir_cal_t * p_cal, uint16_t raw)
     }
     else
     {
+        /* The casts widen 16-bit values; the weighted mean of two values
+         * of at most S3_IR_CAL_ADC_MAX is no larger, so it fits 16 bits.
+         */
         p_cal->filt = ((3u * (uint32_t) p_cal->filt) + (uint32_t) raw + 2u)
                       / 4u;
     }

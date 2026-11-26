@@ -75,6 +75,8 @@ static char const * opener_txt(uint32_t src);
 ER
 task_barcode_start (void)
 {
+    /* The cast is safe: FP is the kernel's generic entry address type,
+     * and the kernel calls the task with the arguments it declares. */
     ID h_tid = app_start_task((FP) barcode_task, S3_PRI_BARCODE, TP_PRC2,
                               "s3_barcode_task");
 

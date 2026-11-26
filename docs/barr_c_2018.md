@@ -152,6 +152,7 @@ the code does or the compiled image.
 | 5.4.b.v, `isfinite()` after floating-point maths | S4's `s4_math.c` and `imu_task.c` | Adding the checks, and deciding what to do when one fails, adds code and new behaviour. |
 | 1.1.a, C99 | The makefile compiles with `-std=gnu11` | The build system is the course's. The code is C99 plus GCC attributes in two places (`weak` on two declarations in `subsystem2.c`, and the section attribute in `S3_RAM_FUNC`), which rule 1.1.c allows when kept to a minimum. |
 | 4.2.b, header guard named after the file | `mqtt_config.example.h` uses `MQTT_CONFIG_H` | It is a template that is copied to `mqtt_config.h`, so it carries that file's guard. |
+| 4.2.c, declarations belong in a header | `extern UW tm_usb_state(void);` in `subsystem2_test.c` (test builds only) | The function is in the course's USB console code, which has no header for it. Adding one means changing `lib/`, which is not the team's code. |
 
 ## 6. Readings
 
@@ -168,6 +169,11 @@ Where the standard leaves room, this is the reading used:
 - **5.2.a, fixed-width types, and bit-fields.** Bit-fields are declared
   `unsigned int` or `signed int`, the only types C99 guarantees for a
   bit-field. The width is given by the field size.
+- **5.2.a, `int` for status codes.** The rule asks for a fixed-width
+  type wherever the width matters. S3's helpers that return a small
+  status code (for example `-1`, `0` or `1` from `recovery_move()`,
+  `search_step()` and the `s3_code39` lookups), and the locals that hold
+  those codes, keep `int`: the width of a status code does not matter.
 - **6.1.i, module prefix on public functions.** A function named exactly
   like its module, for example the task `imu_task` in `imu_task.c`, has
   the prefix. Subsystem N's functions may also use `sN_` or

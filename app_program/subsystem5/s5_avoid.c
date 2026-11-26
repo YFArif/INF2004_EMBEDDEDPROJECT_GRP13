@@ -537,6 +537,8 @@ next_leg (uint32_t now_ms)
     s5_avoid_result_t result = S5_AVOID_BUSY;
     s5_plan_t const * p_plan = &g_avoid.plan;
 
+    // NOTE: The cast is safe: the 5-bit field only ever holds an
+    // s5_avoid_state_t.
     switch ((s5_avoid_state_t) g_avoid.state)
     {
         case S5_AVOID_REVERSING:
@@ -1480,6 +1482,8 @@ fail (subsystem5_ctrl_fault_t fault)
     s5_links_motion_stop();
     s5_links_line_search(S5_LINKS_SIDE_NONE);
     subsystem5_obst_request(OB_HOLD);
+    // NOTE: The cast is safe: a fault code is small and positive, and
+    // the mask keeps the bits that fit the 4-bit field.
     g_avoid.fault = (uint32_t) fault & S5_CTRL_FAULT_MASK;
     enter(S5_AVOID_FAILED);
 

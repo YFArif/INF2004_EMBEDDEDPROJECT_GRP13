@@ -257,6 +257,7 @@ fine_sweep (s5_scan_measure_fn_t p_measure, s5_scan_result_t * p_result,
 {
     s5_scan_step_t     step     = S5_SCAN_STEP_OK;
     s5_profile_point_t prev     = start;
+    // NOTE: The casts widen a 0 ... 180 degree angle, so they keep it.
     int32_t            limit    = (int32_t) start.angle_deg
                                   + (dir * COARSE_STEP_DEG);
     int32_t            angle    = (int32_t) start.angle_deg

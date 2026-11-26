@@ -43,9 +43,10 @@
  * the sizes assumed above, and the buffer is the 240 bytes the layout
  * document states.
  */
-typedef uint8_t s1_event_check_record_t[(sizeof(msg_layout_event_t)
-                                         == MSG_EVENT_RECORD_BYTES) ? 1 : -1];
-typedef uint8_t s1_event_check_unit_t[((sizeof(INT) == MBF_UNIT_BYTES)
+typedef uint8_t s1_event_check_record_t[(MSG_EVENT_RECORD_BYTES
+                                         == sizeof(msg_layout_event_t))
+                                        ? 1 : -1];
+typedef uint8_t s1_event_check_unit_t[((MBF_UNIT_BYTES == sizeof(INT))
                                        && (sizeof(UW) == sizeof(uint32_t)))
                                       ? 1 : -1];
 typedef uint8_t s1_event_check_size_t[(240U == EVENT_BUF_BYTES) ? 1 : -1];

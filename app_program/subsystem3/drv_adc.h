@@ -95,6 +95,7 @@
 static inline uint8_t
 drv_adc_to8 (uint16_t adc)
 {
+    /* The cast widens a 16-bit count, so adc + 8 cannot overflow. */
     uint32_t value = ((uint32_t) adc + 8u) >> 4;
 
     /* The cast is safe: value is limited to 255 first, which fits uint8_t. */

@@ -211,7 +211,10 @@ drv_barcode_take_pass (drv_barcode_pass_t * p_pass)
     UINT           imask;
 
     /* Digital: drain the gap ring. Gap 0 is the idle time before the
-     * first edge, so element k is gap k + 1. */
+     * first edge, so element k is gap k + 1. The casts are safe: the
+     * ring index is masked to DIG_MASK, a gap is 16 bits and is widened
+     * before the shift, and the glitch and lost counters are 8-bit
+     * values whose difference wraps the same way they do. */
     p_pass->n_edges = (uint32_t) ((uint8_t) (write_idx - read_idx) & DIG_MASK);
     for (idx = 1u; idx < p_pass->n_edges; idx++)
     {
@@ -249,6 +252,7 @@ drv_barcode_take_pass (drv_barcode_pass_t * p_pass)
             first             = now_idx - DRV_BARCODE_RING + COPY_GUARD;
             p_pass->b_clipped = true;   /* Oldest part overwritten.     */
         }
+        /* The cast widens an 8-bit value, so it keeps every value. */
         p_pass->src = (uint32_t) (g_act >> 1);
         g_act       = 0u;
     }
@@ -294,6 +298,9 @@ S3_RAM_FUNC(dout_edge) static void
 dout_edge (uint32_t now_us, uint32_t idx)
 {
     uint8_t  write_idx = g_gap_wr;
+    /* The casts are safe: the index is masked to DIG_MASK, the gap is
+     * capped at GAP_MAX (16 bits), and the 8-bit counters are meant to
+     * wrap. */
     uint8_t  next = (uint8_t) ((write_idx + 1u) & DIG_MASK);
     uint32_t gap  = (now_us - g_last_us) >> GAP_SHIFT;
 
@@ -335,6 +342,7 @@ mark_active (uint32_t idx, uint8_t src_bit)
         ;   /* The gap is no wider than the widest so far. */
     }
     g_act_last = idx;
+    /* The cast is safe: src_bit is one of the ACT_xxx bits of g_act. */
     g_act      = (uint8_t) (g_act | src_bit);
 }
 
