@@ -39,8 +39,8 @@
 #define U8_FULL         (255)
 
 /* Change Requirement 1: the packed sizes are part of the interface. */
-typedef char s3_chk_nav_t[(sizeof(s3_nav_msg_t) == 4u) ? 1 : -1];
-typedef char s3_chk_status_t[(sizeof(s3_line_status_t) == 16u) ? 1 : -1];
+typedef char s3_chk_nav_t[(4u == sizeof(s3_nav_msg_t)) ? 1 : -1];
+typedef char s3_chk_status_t[(16u == sizeof(s3_line_status_t)) ? 1 : -1];
 typedef char s3_chk_line_t[(sizeof(s3_line_t) <= 48u) ? 1 : -1];
 
 ID gh_mbf_nav;
@@ -156,6 +156,7 @@ BOOL
 s3_get_steer_sp (H * p_dv_mms, UB * p_seq)
 {
     uint32_t word   = g_steer_word;   /* ONE load: dv, seq and valid match. */
+    /* The cast is safe: the mask keeps 10 bits, 0 ... 1023. */
     int32_t  dv_mms = (int32_t) (word & SP_DV_MASK);
 
     if (0 != (dv_mms & SP_DV_SIGN))
@@ -184,6 +185,7 @@ s3_barcode_reading (void)
 char
 s3_nav_msg_char (s3_nav_msg_t const * p_msg)
 {
+    /* The cast is safe: ch_idx is a 6-bit field, 0 ... 43. */
     return s3_code39_char((uint8_t) p_msg->ch_idx);
 }
 
@@ -237,6 +239,8 @@ s3_set_line_shape (INT boost_x100)
 void
 s3_set_steer_max (INT dv_mms)
 {
+    /* INT is a signed 32-bit integer on this port: the cast keeps the
+     * value. */
     int32_t limit_mms = (int32_t) dv_mms;
 
     limit_mms = (limit_mms < 1) ? 1 :
@@ -354,6 +358,8 @@ s3_odom_mm (void)
 void
 s3_steer_publish (int32_t dv_mms, uint32_t seq, bool b_valid)
 {
+    /* The cast keeps the two's-complement bits of dv_mms; the mask keeps
+     * the low 10, which s3_get_steer_sp() sign-extends again. */
     g_steer_word = ((uint32_t) dv_mms & SP_DV_MASK) |
                    ((seq & SP_SEQ_MASK) << SP_SEQ_POS) |
                    (b_valid ? SP_VALID_BIT : 0u);
@@ -370,6 +376,8 @@ s3_status_set_line (s3_line_report_t const * p_rep)
     g_status.pos        = p_rep->pos;
     g_status.state      = p_rep->state;
     g_status.overshoot  = p_rep->overshoot;
+    /* The casts are safe: n_left and n_centre are permille, 0 ... 1000,
+     * so each result is 0 ... 255 and fits its 8-bit field. */
     g_status.n_outer    = (uint32_t) ((p_rep->n_left * U8_FULL) / PERMILLE);
     g_status.n_centre   = (uint32_t) ((p_rep->n_centre * U8_FULL) / PERMILLE);
     g_status.seq        = p_rep->seq & U8_MASK;

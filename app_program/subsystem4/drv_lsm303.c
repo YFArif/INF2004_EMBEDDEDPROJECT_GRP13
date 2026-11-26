@@ -191,7 +191,8 @@ drv_lsm303_init (drv_lsm303_info_t * p_info)
     }
 
     // The magnetometer is only a cross-check: its result does not change
-    // the return value.
+    // the return value. The casts are safe: each ID is an ASCII letter
+    // or digit.
     if (E_OK == reg_read(ADDR_MAG, REG_IRA_M, p_info->mag_id, 3u))
     {
         p_info->b_mag_ok = ((uint8_t) MAG_ID_A == p_info->mag_id[0])
@@ -358,6 +359,7 @@ static void
 i2c_select (uint8_t addr)
 {
     out_w(IC_ENABLE, 0u);
+    // NOTE: The cast widens an 8-bit address, so it keeps the value.
     out_w(IC_TAR, (uint32_t) addr);
     out_w(IC_ENABLE, 1u);
     (void) in_w(IC_CLR_TX_ABRT);

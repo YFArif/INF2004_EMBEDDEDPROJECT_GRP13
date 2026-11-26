@@ -895,6 +895,7 @@ junction_reached (uint32_t events)
     }
     else
     {
+        // NOTE: The cast widens an 8-bit field, so it keeps the value.
         b_reached = (0u != (events & EV_JUNCTION))
                     || (count != (uint32_t) g_mission.junc_from);
     }
@@ -1797,6 +1798,7 @@ static uint16_t
 slow_mms (void)
 {
     // The lower of the two, so slowing down never speeds the robot up.
+    // The cast is safe: SLOW_NEAR_MMS is 60.
     return ((cruise_mms() < SLOW_NEAR_MMS) ? cruise_mms()
                                            : (uint16_t) SLOW_NEAR_MMS);
 }

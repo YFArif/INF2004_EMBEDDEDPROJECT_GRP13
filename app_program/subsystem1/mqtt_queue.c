@@ -78,7 +78,7 @@
 /* Compile-time checks. Each typedef has a negative array size, and so stops
  * the build, when its condition is false.
  */
-typedef uint8_t mqtt_queue_check_unit_t[(sizeof(INT) == MBF_UNIT_BYTES)
+typedef uint8_t mqtt_queue_check_unit_t[(MBF_UNIT_BYTES == sizeof(INT))
                                         ? 1 : -1];
 typedef uint8_t mqtt_queue_check_word_t[(sizeof(uint32_t) == sizeof(UW))
                                         ? 1 : -1];

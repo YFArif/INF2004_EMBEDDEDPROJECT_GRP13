@@ -563,6 +563,8 @@ s2_u06_run (drv_motor_t motor, int32_t duty)
     drv_encoder_count_t o_from = {0};
     drv_encoder_count_t o_to   = {0};
     uint32_t            ticks  = 0u;
+    // NOTE: The casts are safe: both constants are positive and far below
+    // 2^32 (639 ticks, 208620 um).
     uint32_t            tpr    = (uint32_t) S2_TICKS_PER_REV_L;
     uint32_t            circ   = (uint32_t) S2_WHEEL_CIRC_UM_L;
 

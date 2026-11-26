@@ -33,6 +33,8 @@ subsystem3_init (void)
 ER
 subsystem3_start (void)
 {
+    /* The cast is safe: FP is the kernel's generic entry address type,
+     * and the kernel calls the task with the arguments it declares. */
     ID h_tid = app_start_task((FP) task_consumer_task, S3_PRI_CONSUMER, TP_PRC1,
                               "consumer_task");   /* Template example.     */
 

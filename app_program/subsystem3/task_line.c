@@ -223,6 +223,8 @@ moved_um_get (uint32_t dt_us)
     d_mm = (int32_t) (odom_now - odom_prev);  /* Reversing / reset: <= 0. */
     if (b_odom_started && (d_mm > 0) && (d_mm < S3_ODOM_MAX_STEP_MM))
     {
+        /* The cast is safe: d_mm is positive and below
+         * S3_ODOM_MAX_STEP_MM here. */
         moved_um = (uint32_t) d_mm * UM_PER_MM;
     }
     odom_prev      = odom_now;
@@ -356,6 +358,9 @@ status_print (s3_line_t const * p_ln, s3_line_out_t const * p_out,
     {
         ;   /* Straight. */
     }
+    /* The casts are for tm_printf only: the format is an ASCII literal,
+     * and each value (permille, mm/s or a 12-bit ADC level) is far
+     * inside INT's range. */
     tm_printf((UB *) "S3 LINE  GP27=%s %4d  GP26=%s %4d  -> turn %s %4d mm/s"
                      "  %s   cal GP27 %d-%d  GP26 %d-%d\n",
               zone_txt(p_out->n_c), (INT) p_out->n_c,
@@ -410,6 +415,9 @@ timing_report (uint32_t t_start_us, uint32_t dt_us)
         return;
     }
     last_ms = now_ms;
+    /* The casts are for tm_printf only: the format is an ASCII literal,
+     * and each time is a few microseconds to milliseconds, far below
+     * INT's range. A minimum that was never set prints as -1. */
     tm_printf((UB *) "S3 TIME line step max %d us, period %d-%d us, "
                      "sampler isr max %d us\n",
               (INT) step_max_us, (INT) dt_min_us, (INT) dt_max_us,

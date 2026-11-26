@@ -478,6 +478,9 @@ imu_cycle (uint32_t events)
     if ((g_imu.b_drive_sent) && (g_imu.drive_log < DRIVE_LOG_CYCLES))
     {
         g_imu.drive_log++;
+        // NOTE: The casts are for tm_printf only: the format is an ASCII
+        // literal, the integers are 32-bit like INT, and the height in
+        // tenths of a mm is a few thousand at most.
         tm_printf((UB *) "S4 D %d %d %d %d %d\n", (INT) g_imu.drive_log,
                   (INT) g_imu.pitch_cdeg, (INT) g_imu.roll_cdeg,
                   (INT) odom.dist_mm, (INT) (g_imu.h_mm * TENTHS));
@@ -782,6 +785,7 @@ imu_motion (subsystem2_odom_t const * p_odom)
     // omega = (v_right - v_left) / track; + = left.
     g_imu.turn_cdps = ((p_odom->speed_r_mms - p_odom->speed_l_mms)
                        * (CDPS_PER_DIFF / TRACK_SCALE)) / S2_TRACK_MM;
+    // NOTE: The cast is safe: the period is 20 ms.
     g_imu.head_cdeg_ms += g_imu.turn_cdps * (int32_t) S4_IMU_PERIOD_MS;
 }
 
@@ -791,6 +795,8 @@ imu_motion (subsystem2_odom_t const * p_odom)
 static void
 imu_pitch (void)
 {
+    // NOTE: The casts are safe: the means and the acceleration are a
+    // few thousand mg, which float32_t holds exactly.
     float32_t fwd    = (float32_t) g_imu.mean.fwd;
     float32_t left   = (float32_t) g_imu.mean.left;
     float32_t upward = (float32_t) g_imu.mean.upward;
@@ -1071,10 +1077,10 @@ imu_hump (subsystem2_odom_t const * p_odom)
             {
                 g_imu.theta_max_cdeg = s4_math_abs(pitch);
             }
+            // NOTE: The casts are safe: a hump is far below 2^31 mm.
             if (s4_math_abs((int32_t) g_imu.h_mm)
                 > (int32_t) g_imu.hump_peak_mm)
             {
-                // NOTE: The cast is safe: a hump is far below 2^31 mm.
                 g_imu.hump_peak_mm =
                     (float32_t) s4_math_abs((int32_t) g_imu.h_mm);
             }
@@ -1520,14 +1526,17 @@ now_us (void)
 static char const *
 class_name (subsystem4_class_t cls)
 {
-    static char const * const names[] =
+    static char const * const p_names[] =
     {
         "STATIONARY", "MOVING", "ACCELERATING", "TURNING",
         "CLIMBING_HUMP", "DESCENDING_HUMP", "LIFTED", "OVERTURNED"
     };
+    // NOTE: The cast is safe: a class is 0 ... 7, and the index is
+    // checked against the size of the table.
     uint32_t idx = (uint32_t) cls;
 
-    return ((idx < (sizeof(names) / sizeof(names[0]))) ? names[idx] : "?");
+    return ((idx < (sizeof(p_names) / sizeof(p_names[0]))) ? p_names[idx]
+                                                           : "?");
 }
 
 /*** end of file ***/

@@ -104,6 +104,8 @@ ER
 subsystem4_start (void)
 {
     ER result = E_OK;
+    // NOTE: The cast is safe: FP is the kernel's generic entry address
+    // type, and the kernel calls the task with the arguments it declares.
     ID h_tid  = app_start_task((FP) imu_task, S4_PRI_IMU, TP_PRC1,
                                "imu_task");
 

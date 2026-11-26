@@ -281,8 +281,8 @@ static const char * const       gp_topic_suffix[] =
 /* One suffix for each topic ID: an ID added without a suffix stops the
  * build here.
  */
-typedef uint8_t mqtt_link_check_table_t[((sizeof(gp_topic_suffix) \
-    / sizeof(gp_topic_suffix[0])) == MQTT_LINK_TOPIC_COUNT) ? 1 : -1];
+typedef uint8_t mqtt_link_check_table_t[(MQTT_LINK_TOPIC_COUNT
+    == (sizeof(gp_topic_suffix) / sizeof(gp_topic_suffix[0]))) ? 1 : -1];
 
 static void publish_status(void);
 static void build_topics(void);

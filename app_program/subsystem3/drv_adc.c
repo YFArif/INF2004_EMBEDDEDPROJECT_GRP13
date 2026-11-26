@@ -97,6 +97,7 @@ drv_adc_convert (uint32_t channel)
     {
         ;
     }
+    /* The cast is safe: the mask keeps 12 bits, 0 ... 4095. */
     return (uint16_t) (in_w(ADC_RESULT_REG) & ADC_RESULT_MASK);
 }
 

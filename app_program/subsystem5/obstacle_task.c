@@ -353,6 +353,8 @@ handle_requests (uint32_t requests)
 static void
 step_state (void)
 {
+    // NOTE: The cast is safe: the 3-bit field only ever holds a
+    // subsystem5_obst_state_t.
     switch ((subsystem5_obst_state_t) g_obst.state)
     {
         case S5_OBST_MONITORING:

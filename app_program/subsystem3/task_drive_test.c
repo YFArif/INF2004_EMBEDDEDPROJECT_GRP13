@@ -180,6 +180,8 @@ static void    run_summary(drive_stats_t const * p_s, uint32_t moved_mm);
 ER
 task_drive_test_start (void)
 {
+    /* The cast is safe: FP is the kernel's generic entry address type,
+     * and the kernel calls the task with the arguments it declares. */
     ID h_tid = app_start_task((FP) drive_task, S3_PRI_DRIVE_TEST, TP_PRC1,
                               "s3_drive_task");
 
@@ -336,6 +338,8 @@ auto_sweep (void)
     }
     wheels_stop();
     subsystem2_odom_get(&odom);
+    /* The casts are for tm_printf only: the format is an ASCII literal,
+     * and INT is a signed 32-bit integer like the heading. */
     tm_printf((UB *) "S3 CAL sweep end: %d (1/100 deg) off the start "
                      "heading\n", (INT) (odom.heading_cdeg - start));
 }
@@ -365,6 +369,8 @@ sweep_turn_to (int32_t target_cdeg)
         {
             return true;
         }
+        /* The cast is safe: err is wrapped to -18000 ... 18000 above, so
+         * err / 100 is -180 ... 180. */
         if (recovery_move(true, (int16_t) (err / CDEG_PER_DEG), false) < 0)
         {
             return false;
@@ -464,6 +470,8 @@ cal_print (s3_cal_levels_t const * p_cal)
 static bool
 cal_ready (s3_cal_levels_t const * p_cal)
 {
+    /* The casts are safe: the levels are 12-bit ADC counts and the
+     * constant is small, so the signed differences keep every value. */
     return (p_cal->black_o >= S3_DRIVE_CAL_BLACK_MIN) &&
            (p_cal->black_c >= S3_DRIVE_CAL_BLACK_MIN) &&
            (((int32_t) p_cal->black_o - p_cal->white_o) >=
@@ -1166,6 +1174,8 @@ nav_take (s3_line_status_t const * p_st, uint32_t * p_bc_seen, uint32_t * p_nav)
     if (S3_CMD_NONE != p_st->last_cmd)
     {
         *p_nav = p_st->last_cmd;
+        /* The casts are for tm_printf only: the format is an ASCII
+         * literal, and last_cmd holds an s3_nav_cmd_t value. */
         tm_printf((UB *) "S3 DRIVE NAV %s queued for the next junction\n",
                   s3_nav_name((s3_nav_cmd_t) *p_nav));
     }
@@ -1199,6 +1209,9 @@ junction_turn (uint32_t cmd, uint16_t speed_mms)
     {
         ;   /* STRAIGHT: carry on across. */
     }
+    /* The casts are safe: the format is an ASCII literal, cmd holds an
+     * s3_nav_cmd_t value, and deg (at most 180) and DRIVE_JUNC_FWD_MM
+     * (125) fit both INT and int16_t. */
     tm_printf((UB *) "S3 DRIVE JUNCTION TURN %s: forward %d mm, turn %d deg "
                      "(+ = left)\n", s3_nav_name((s3_nav_cmd_t) cmd),
               (INT) ((0 != deg) ? DRIVE_JUNC_FWD_MM : 0), (INT) deg);
